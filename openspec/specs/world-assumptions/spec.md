@@ -404,6 +404,13 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | clipboard | — | the copy-and-paste buffer of a person's desktop session | world-only |
 | main branch | — | this repository's default branch on the forge, whose newest commits the build service builds and publishes, and which a cloud environment that is not pinned follows | shared |
 | input source | — | the fetched contents of one flake input at the version the flake lock file records, which evaluating the flake needs before anything is built | shared |
+| plugin group | — | a named set of skills, or of agent instructions, that this repository publishes as one installable unit | shared |
+| marketplace | — | the catalogue of plugin groups this repository publishes, which a person registers once in a tool to browse and install plugin groups from it | shared |
+| apm consumer | — | a person, outside this fleet or in it, who registers the marketplace with apm and installs plugin groups into a project of their own | world-only |
+| Claude app | — | Anthropic's Claude Code program or Claude desktop application, in which a person can add a marketplace by the forge name of its repository | world-only |
+| Claude user | — | a person who has added the marketplace in a Claude app and installs plugin groups from it | world-only |
+| skills CLI | — | the `skills` command-line program (vercel-labs/skills, run as `npx skills`), which clones a repository by its forge name and installs the individual skills it finds there | world-only |
+| skills CLI user | — | a person who lists or installs skills from this repository with the skills CLI | world-only |
 
 #### Scenario: The terms with two senses are read
 
@@ -1023,46 +1030,46 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A136 — apm installs a locked remote dependency from apm_modules without fetching
 
-It is true of apm 0.36.x, independent of what this fleet builds, that `apm install` with a lock recording a remote dependency and that dependency's tree in `apm_modules` installs it without git or network.
+It is true of apm 0.38.0, independent of what this fleet builds, that `apm install` with a lock recording a remote dependency and that dependency's tree in `apm_modules` installs it without git or network.
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: 2026-11-18 spike and magnetite sandbox runs, 10/10 `(cached)` (`logs/apm-sandboxlinux-compose-*`).
+**Evidence**: 2026-11-18 spike and magnetite sandbox runs under 0.36.x, 10/10 `(cached)` (`logs/apm-sandboxlinux-compose-*`); on 2026-11-23 the composition, which refuses to run with git on its path, built under apm 0.38.0 on aarch64-darwin and in the x86_64-linux sandbox on magnetite.
 
 #### Scenario: apm stops reusing apm_modules
 
-- **WHEN** the pinned apm leaves 0.36.x before this evidence is re-run, or an offline install with a matching lock and tree attempts a fetch
+- **WHEN** the pinned apm leaves 0.38.x before this evidence is re-run, or an offline install with a matching lock and tree attempts a fetch
 - **THEN** this assumption is void, and `third-party-plugin-dependency` requirement `The composition installs remote apm dependencies offline from the download` loses its discharge
 
 ### Requirement: A137 — apm installs a virtual-subdirectory dependency as that directory alone
 
-It is true of apm 0.36.x that an `owner/repo/<path>#<sha>` dependency installs only `<path>` as the package root, so files outside it, hooks included, are never seen.
+It is true of apm 0.38.0 that an `owner/repo/<path>#<sha>` dependency installs only `<path>` as the package root, so files outside it, hooks included, are never seen.
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: experiments E3, E9 and E10 and the v7.0.2 addendum run f1 (`logs/apm-superpowersd1-*`).
+**Evidence**: experiments E3, E9 and E10 and the v7.0.2 addendum run f1 under 0.36.x (`logs/apm-superpowersd1-*`); on 2026-11-23 the composition under apm 0.38.0 was byte-identical to 0.36.0's, superpowers' and agency's skills included, and its `.claude/settings.json` was unchanged.
 
 #### Scenario: a subdirectory dependency brings repository files
 
-- **WHEN** the pinned apm leaves 0.36.x before this evidence is re-run, or a subdirectory dependency installs a hook or file from outside its path
+- **WHEN** the pinned apm leaves 0.38.x before this evidence is re-run, or a subdirectory dependency installs a hook or file from outside its path
 - **THEN** this assumption is void, and `third-party-plugin-dependency` requirement `superpowers and agency are consumed per skill directory` loses its discharge
 
 ### Requirement: A138 — apm removes a downloaded package whose content no longer matches its lock
 
-It is true of apm 0.36.x that an installed package whose tree differs from its lock's content hash is deleted and re-fetched rather than used.
+It is true of apm 0.38.0 that an installed package whose tree differs from its lock's content hash is deleted and re-fetched rather than used.
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: F6, `apm_cli/install/phases/integrate.py:281-300` (`logs/apm-verify-f5f6v-*`).
+**Evidence**: F6 under 0.36.x, `apm_cli/install/phases/integrate.py:281-300` (`logs/apm-verify-f5f6v-*`). Re-observed under 0.38.0 on 2026-11-23 in the compose's layout (the download's `apm_modules` and lock, an isolated HOME): after one line was appended to `apm_modules/obra/superpowers/skills/brainstorming/SKILL.md`, `apm install` reported "Content hash mismatch ... Re-downloading from the locked source". Offline (no usable git) the re-fetch failed, the install failed and rolled back ("Deployed files restored to their previous state"), and the deployed `brainstorming` stayed unedited; unlike 0.36, which deleted the copy before fetching, the edited copy stayed in `apm_modules` (`logs/apm-verify-f5f6-038-20261123-151020.log`). With git and the network the same install re-fetched it, passed, and left the copy byte-identical to the download (`logs/apm-verify-f6-online-038-20261123-151107.log`). The edited download is never used, so the assumption holds.
 
 #### Scenario: an edited download is used
 
-- **WHEN** the pinned apm leaves 0.36.x before this evidence is re-run, or an install uses a package whose tree differs from its locked hash
+- **WHEN** the pinned apm leaves 0.38.x before this evidence is re-run, or an install uses a package whose tree differs from its locked hash
 - **THEN** this assumption is void, and `third-party-plugin-dependency` requirement `Upstream tool skills are delivered unmodified` loses its discharge
 
 ### Requirement: A139 — apm's download bytes change only with apm's version
 
-It is true of apm that, for full-SHA refs, its download is byte-identical across runs and platforms for one apm version, and differs between versions only through apm's own normalization (0.36 carries each repository LICENSE into every skill).
+It is true of apm that, for full-SHA refs, its download is byte-identical across runs and platforms for one apm version, and differs between versions only through apm's own normalization (0.36 carries each repository LICENSE into every skill; 0.37 moved the lock to format v4, which changes its bytes).
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: U1, R2 and R3 (`logs/apm-verify-r3-*`, `logs/apm-sandboxlinux-deps-*`).
+**Evidence**: U1, R2 and R3 (`logs/apm-verify-r3-*`, `logs/apm-sandboxlinux-deps-*`); on 2026-11-23 the download under apm 0.38.0 had the same hash on aarch64-darwin and x86_64-linux, and rebuilt to the same hash with `--rebuild`.
 
 #### Scenario: the same apm version yields different bytes
 
@@ -1071,14 +1078,14 @@ Any requirement relying on this SHALL name it and SHALL lose its discharge once 
 
 ### Requirement: A140 — apm lock records commits and content hashes but no deployed files
 
-It is true of apm 0.36.x that `apm lock` writes, per remote dependency, its resolved commit and content hash, with no deployed-files records, so `--frozen` cannot install from it.
+It is true of apm 0.38.0 that `apm lock` writes, per remote dependency, its resolved commit and content hash, with no deployed-files records, so `--frozen` cannot install from it.
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: U3 and F5 (`logs/apm-verify-f5f6v-*`).
+**Evidence**: U3 and F5 under 0.36.x (`logs/apm-verify-f5f6v-*`); on 2026-11-23 a frozen install of the composition under apm 0.38.0 (forced by `CI=true`) failed because the lock records no deployed files for the local packages. Re-observed for the remote entries under 0.38.0 on 2026-11-23: the download's lock, written by `apm lock`, has 26 remote entries, each with `resolved_commit` and `content_hash`, none with `deployed_files`; a plain offline install from it deploys 177 skills per tree and records `deployed_files` for all 26; `apm install --frozen` with those 26 entries as `apm lock` wrote them (local entries taken from the plain install) fails with "apm.lock.yaml does not record everything this install deploys" and 102 "deployed by this install but not recorded" lines (`logs/apm-verify-f5f6-038-20261123-151020.log`). The assumption holds.
 
 #### Scenario: the lock shape changes
 
-- **WHEN** the pinned apm leaves 0.36.x before this evidence is re-run, or its `apm lock` output gains deployed files or loses commits or content hashes
+- **WHEN** the pinned apm leaves 0.38.x before this evidence is re-run, or its `apm lock` output gains deployed files or loses commits or content hashes
 - **THEN** this assumption is void, and the `third-party-plugin-dependency` requirements `Remote apm dependencies are downloaded in one guarded fixed-output derivation` and `The composition installs remote apm dependencies offline from the download` lose their discharge
 
 ### Requirement: A141 — GitHub serves a shallow, blobless fetch of a commit by its SHA
@@ -1436,3 +1443,143 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** an omnigent release lets an administrator revoke a grant by owner or by identifier
 - **THEN** this assumption is void, and superseded grants can be revoked rather than purged before the lifetime is raised
+
+### Requirement: A213 — apm deploys a package's `.apm/skills` children flat whatever plugin manifest sits beside them
+
+It is true of apm 0.38.0 that a package whose `apm.yml` sits beside an `.apm/` directory is typed `apm_package` before any plugin-manifest rule applies, and that at project scope each child of its `.apm/skills/` is deployed flat under each target's skills root, with or without a root `plugin.json`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: apm `models/format_detection.py:455-497` (an "eligible" `apm.yml` wins, read at the 0.38 checkout); on 2026-11-23 the composition built from a scratch copy of this repository with all 22 root `plugin.json` files removed emitted 177 skill directories in each tree, with `nix hash path` `sha256-YI99ZQcB/QhiCWYZqs1OMcs0yPuNkiLJTKT8ue+B8F0=` for both, equal to the composition with the files; a third-party consumer of the same tree received `nix-build-operations` and `planning-and-development` flat and byte-identical to their sources.
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** the composition and a third-party consumer install ran with apm 0.38.0 over groups that carry no plugin manifest
+- **THEN** every first-party skill was deployed flat and byte-identical to its source
+
+#### Scenario: apm changes its package typing or deployment
+
+- **WHEN** an apm release types such a package otherwise, deploys it whole into `.agents/plugins/`, or deploys fewer than all children of `.apm/skills/`
+- **THEN** this assumption is void, and the `first-party-skill-distribution` requirement `Build-time apm composition of first-party skills` and the `skill-marketplace-publication` requirement `An apm consumer installs every published plugin group` lose their discharge until the composition's tree comparison passes again
+
+### Requirement: A214 — apm deploys a Claude-plugin dependency flat when the dependency selects its skills
+
+It is true of apm 0.38.0 that, at project scope with the `claude` target, a dependency typed as a marketplace plugin with a `.claude-plugin/plugin.json` is deployed whole into `.agents/plugins/` unless its entry carries a `skills:` selection, which deploys the selected skills flat; and that the selection `["*"]` matches no skill.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: apm `claude_plugins/admission.py:465-511` (`plan_native_claude_plugin` returns no plan at project scope when a skill subset is set); on 2026-11-23 mattpocock/skills without a selection was deployed to `.agents/plugins/` and `tdd` was missing from `.claude/skills`; with its 25 skills listed the composition was byte-identical to apm 0.36.0's; `skills: ["*"]` failed with "Skill selection matched no available skills".
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** the composition ran with apm 0.38.0 and mattpocock/skills listed by skill name
+- **THEN** its 25 skills were deployed flat and nothing was written under `.agents/plugins/`
+
+#### Scenario: apm deploys a selected plugin whole, or accepts the wildcard
+
+- **WHEN** an apm release deploys a dependency with a `skills:` selection into `.agents/plugins/`, or `["*"]` starts selecting every skill
+- **THEN** this assumption is void, and the `third-party-plugin-dependency` requirement `A whole-plugin upstream is consumed through a skill list equal to its plugin manifest` loses its discharge (for the wildcard case, the explicit list may be replaced)
+
+### Requirement: A215 — apm requires a version in every package manifest and inherits it into its marketplace files
+
+It is true of apm 0.38.0 that installing a package whose `apm.yml` has no `version` fails ("Missing required field 'version'"), and that `apm pack` fills a local marketplace entry's version and description from the package's own `apm.yml` when the marketplace entry omits them, and omits `version` only when the package has none.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: on 2026-11-23 the composition with every group's `version: 0.0.0` removed failed for `agent-orchestration-and-meta-tooling` with that message; `apm pack --offline` over the root manifest with `packages[].version` removed wrote a file identical (`jq -S`) to the committed one; apm `marketplace/output_mappers.py` (`_apply_field_with_precedence` for local entries).
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** the composition and `apm pack` ran with apm 0.38.0 over the manifests described above
+- **THEN** the version-free group failed to install and the version-free marketplace entries inherited `0.0.0`
+
+#### Scenario: apm drops the requirement or stops inheriting
+
+- **WHEN** an apm release installs a version-free package, or stops filling marketplace entries from the package manifest
+- **THEN** this assumption is void, and the `skill-marketplace-publication-interface` requirement `Each fact about a plugin group is authored once` is re-examined: the group version may become removable, or the published list may need its descriptions back
+
+### Requirement: A216 — apm's marketplace client reads the first of three marketplace files and accepts Claude-only fields
+
+It is true of apm 0.38.0 and 0.36.0 that `apm marketplace add` reads `marketplace.json`, then `.github/plugin/marketplace.json`, then `.claude-plugin/marketplace.json`, the first present; that it reads both the Claude and the Copilot formats; and that it ignores the entry fields `skills` and `strict` and a missing `version`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: apm `marketplace/client.py:97-101`; on 2026-11-23 a served copy of this repository holding only the Claude-ready `.claude-plugin/marketplace.json` registered 18 plugins and installed `nix-build-operations` and `planning-and-development` flat and byte-identical, and a copy also holding a Copilot-profile `.github/plugin/marketplace.json` registered 22 and installed those two and `agent-context-core`, under apm 0.38.0 and 0.36.0 (served through a `url.insteadOf` rewrite of an `https://` URL; apm refuses `file://` marketplace sources' relative paths).
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** a third-party consumer registered each served copy and installed from it
+- **THEN** registration and installs succeeded as described
+
+#### Scenario: apm changes its probe order or rejects the fields
+
+- **WHEN** an apm release prefers `.claude-plugin/marketplace.json`, stops reading the Copilot format, or rejects an entry with `skills`, `strict` or no `version`
+- **THEN** this assumption is void, and the `skill-marketplace-publication` requirement `An apm consumer installs every published plugin group` loses its discharge until the consumer checks pass again
+
+### Requirement: A217 — Claude Code installs a manifest-free marketplace entry whose skills sit in a hidden directory
+
+It is true of Claude Code 2.1.330 that a marketplace entry with a relative `source`, no `.claude-plugin/plugin.json` in that directory, `strict: false` and `skills: ["./.apm/skills"]` validates, installs, and lists each child of `.apm/skills/` as a skill of the plugin, from a local directory marketplace and offline.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Documentation**: Claude's documentation describes a manifest-free entry as the plugin's manifest (`plugins/marketplace-reference.md:105`) and requires `skills` paths to start with `./` (`plugins-reference.md:392-394`), but neither allows nor forbids a hidden directory there; this assumption is an observation, not a documented promise.
+
+**Evidence**: on 2026-11-23, with an isolated configuration directory, all 18 entries of the generated marketplace installed and listed 126 skills, each plugin's names equal to its `.apm/skills` children; the same install-and-count ran inside a Linux build sandbox on magnetite with no network.
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** Claude Code 2.1.330 installed every entry of the generated marketplace
+- **THEN** every plugin listed exactly its group's skills
+
+#### Scenario: Claude Code stops honouring the entry
+
+- **WHEN** a Claude Code release rejects a hidden `skills` path or a manifest-free entry, or installs such a plugin with fewer skills than its directory holds
+- **THEN** this assumption is void, and the `skill-marketplace-publication` requirement `A Claude user installs every skill group with all its first-party skills` loses its discharge until the skills move to the documented `skills/` layout
+
+### Requirement: A218 — The Claude desktop app installs the same entries as Claude Code
+
+It is true of the Claude desktop app as the operator used it on 2026-11-23 that its Add marketplace dialog, given a public GitHub repository name, lists, installs and shows every skill of a plugin laid out as in A217, at `modules/home/ai/plugins/<group>` depth.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Documentation**: the desktop documentation names `skills/<name>/SKILL.md` and a `.claude-plugin/plugin.json` manifest for Chat and Cowork (`plugins/build.md:21,39,56`); this assumption is an observation, not a documented promise.
+
+**Evidence**: the operator's test of `cameronraysmith/skills-marketplace-test` (commit 2542b08) on 2026-11-23: all three layouts tested, including the manifest-free entry with `skills: ["./.apm/skills"]` and `strict: false`, listed, installed and showed five skills. On the real repository with Claude 6.28899.6 (2f5fc5, 2026-11-20T22:01:14Z) on 2026-11-23, the operator added `cameronraysmith/vanixiets` (`main` 43a4ac7d): the dialog listed exactly 18 plugins, none `agent-context-*`, and the installed `nix-build-operations` and `planning-and-development` showed 5 and 16 skills, every skill of their `.apm/skills`. After those installs, on stibnite, `~/.claude/plugins/installed_plugins.json` and `enabledPlugins` in `~/.claude/settings.json` held no vanixiets entry: the desktop installs did not appear in Claude Code's plugin state on that machine (observed, not explained).
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** the operator added the test marketplace in the desktop app and installed each layout's plugin
+- **THEN** each showed all five skills
+
+#### Scenario: The desktop app stops honouring the entry
+
+- **WHEN** a desktop release, re-tested by hand with the fixture repository `cameronraysmith/skills-marketplace-test` (add it as a marketplace, install each layout's plugin, count its skills), lists fewer skills than the plugin directory holds or refuses the entry
+- **THEN** this assumption is void, and the `skill-marketplace-publication` requirement `A Claude user installs every skill group with all its first-party skills` loses its discharge for the desktop app
+
+### Requirement: A219 — Claude versions a plugin without a declared version by its commit
+
+It is true of Claude Code that a plugin's version comes from its plugin manifest, else its marketplace entry, else the commit of the marketplace's git source (`plugins/marketplace-reference.md`), so a plugin with no version anywhere installs at, and updates to, the marketplace's current commit, while `0.0.0` pins it.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: Claude Code 2.1.330 on 2026-11-23: a git marketplace without versions installed at `6832a512c2fe`, a local git checkout at `9b57e72a448b`, an entry with `0.0.0` at `0.0.0`, and an entry without version beside a root `plugin.json` with `0.0.0` at `0.0.0` (the root manifest was read although the documentation names only `.claude-plugin/plugin.json`). The desktop app, Claude 6.28899.6 (2f5fc5) on 2026-11-23: the `but` rename (#4188) reached `main` after the operator added `cameronraysmith/vanixiets`, and the version-free `version-control-and-forge` entry then offered "v2 · current" and "v1" in its Files tab, v2 holding `/.apm/skills/but/SKILL.md` (21 files): the app took a content change without any version change and numbered the versions itself (screenshot seen by the orchestrator). The "Version 0.0.0" on that page is the `but` skill's own frontmatter, not a marketplace version.
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** Claude Code installed plugins from marketplaces with and without versions
+- **THEN** the installed versions were as listed
+
+#### Scenario: Claude stops following commits
+
+- **WHEN** a Claude release installs a version-free plugin as `unknown` from a git marketplace, or, re-tested by hand with `cameronraysmith/skills-marketplace-test` (push a skill edit without a version change, then check for updates), does not offer the newer commit as an update
+- **THEN** this assumption is void, and the `skill-marketplace-publication` requirement `A Claude user follows the published skills without versions` loses its discharge
+
+### Requirement: A220 — The skills CLI finds skills in the directories a root skills.sh.json lists
+
+It is true of the skills CLI 1.9.0 that it walks each directory listed in the `paths` of a repository's root `skills.sh.json` three levels deep and lists every skill found there by its frontmatter `name`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the vercel-labs/skills 57217cf source (`src/skills.ts:261-319`, `src/constants.ts:6`, `src/skills-sh-config.ts:20-61`: the search root at depth 1, the default containers, and the `skills.sh.json` paths to depth 3) and the 2026-11-23 runs (`logs/s5-npx-skills-proof-*`).
+
+#### Scenario: Observed on 2026-11-23
+
+- **WHEN** skills 1.9.0 listed this repository at `main` c8b35ddb, which has no `skills.sh.json`, then a copy with the generated file listing the 18 `.apm/skills` directories, then a copy whose file lists only `./modules/home/ai/plugins`
+- **THEN** it found no skills, then the 126 first-party skills and none of the remote ones (`--skill openspec-explore` installed that skill alone), then no skills
+
+#### Scenario: The skills CLI stops reading skills.sh.json
+
+- **WHEN** a skills release pinned by `llm-agents` lists fewer skills than the first-party directories in the `skills-cli-discovery` check, or `npx skills add cameronraysmith/vanixiets --list` from GitHub does
+- **THEN** this assumption is void, and the `skill-marketplace-publication` requirement `A skills CLI user installs each first-party skill` loses its discharge
