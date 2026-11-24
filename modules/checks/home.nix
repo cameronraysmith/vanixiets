@@ -69,6 +69,33 @@ in
   perSystem =
     { system, ... }:
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 7.1 s, slowest 2019 s, 685 runs in 30 days
+            home-manager-christophersmith.class = "small";
+            # nixbot: median 18 s, slowest 56 s, 20 runs in 30 days
+            home-manager-claude-sandbox.class = "small";
+            # nixbot: median 17 s, slowest 2018 s, 701 runs in 30 days
+            home-manager-crs58.class = "small";
+            # nixbot: median 7.2 s, slowest 2010 s, 686 runs in 30 days
+            home-manager-janettesmith.class = "small";
+            # nixbot: median 7.2 s, slowest 1994 s, 686 runs in 30 days
+            home-manager-raquel.class = "small";
+            # nixbot: median 6.4 s, slowest 2466 s, 683 runs in 30 days
+            home-manager-ubuntu.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 93 s, slowest 533 s, 573 runs in 30 days
+            home-manager-crs58.class = "medium";
+            # nixbot: median 42 s, slowest 434 s, 572 runs in 30 days
+            home-manager-tara.class = "small";
+          };
+        }
+        .${system} or { };
       checks = lib.listToAttrs (
         map (user: {
           name = "home-manager-${user}";

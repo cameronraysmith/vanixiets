@@ -2378,6 +2378,13 @@
       );
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 20 s, slowest 28 s, all 3 runs 2026-10-21..2026-11-22
+        otel-collector-config.class = "small";
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         otel-collector-config =
           assert lib.assertMsg (actual == [ ]) "otel-collector-config failures: ${builtins.toJSON actual}";

@@ -48,6 +48,16 @@ in
           '';
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: 0 runs, too few to class (design D4)
+        nixbot-eval-record = {
+          class = "medium";
+          measured = false;
+        };
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         inherit nixbot-eval-record;
       };

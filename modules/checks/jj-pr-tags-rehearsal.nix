@@ -16,7 +16,7 @@
 { self, ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
       tags = self.lib.jjPrTags;
       ghStub = pkgs.writeShellApplication {
@@ -127,6 +127,21 @@
       );
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 17 s, slowest 1786 s, 5 runs in 30 days
+            jj-pr-tags-rehearsal.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 107 s, slowest 735 s, 5 runs in 30 days
+            jj-pr-tags-rehearsal.class = "medium";
+          };
+        }
+        .${system} or { };
       checks.jj-pr-tags-rehearsal =
         pkgs.runCommand "jj-pr-tags-rehearsal"
           {

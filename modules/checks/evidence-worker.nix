@@ -10,6 +10,7 @@
       pkgs,
       lib,
       config,
+      system,
       ...
     }:
     let
@@ -17,6 +18,21 @@
       inherit (pkgs.stdenv.hostPlatform) isLinux;
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 104 s, slowest 699 s, 89 runs in 30 days
+            evidence-worker.class = "medium";
+          };
+          aarch64-darwin = {
+            # nixbot: median 284 s, slowest 892 s, 77 runs in 30 days
+            evidence-worker.class = "medium";
+          };
+        }
+        .${system} or { };
       checks.evidence-worker = pkgs.stdenv.mkDerivation {
         name = "evidence-worker";
         src = lib.fileset.toSource {

@@ -926,6 +926,31 @@
       };
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 2.0 s, slowest 38 s, all 5 runs 2026-10-04..2026-11-19
+            omnigent-credential-policy.class = "small";
+            # nixbot: median 17 s, slowest 38 s, all 4 runs 2026-10-07..2026-11-19
+            omnigent-credentials-unit.class = "small";
+            # nixbot: median 8.8 s, slowest 1394 s, 56 runs in 30 days
+            omnigent-worker-capabilities.class = "small";
+            # nixbot: median 3.2 s, slowest 11 s, all 7 runs 2026-09-19..2026-11-11
+            omnigent-worker-inventory.class = "small";
+            # nixbot: median 33 s, slowest 166 s, 4 runs in 30 days
+            omnigent-worker-linux.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 53 s, slowest 232 s, 51 runs in 30 days
+            omnigent-worker-capabilities.class = "small";
+            # nixbot: median 117 s, slowest 520 s, 559 runs in 30 days
+            omnigent-worker-darwin.class = "medium";
+          };
+        }
+        .${system} or { };
       checks = {
         omnigent-worker-capabilities =
           assert lib.assertMsg (

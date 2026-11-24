@@ -7,8 +7,27 @@
 { ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 7.3 s, slowest 19 s, all 9 runs 2026-08-29..2026-10-21
+            hook-gate-dangerous-commands.class = "small";
+            # nixbot: median 3.0 s, slowest 80 s, 66 runs in 30 days
+            updater-repository-paths.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 33 s, slowest 39 s, 3 runs in 30 days
+            hook-gate-dangerous-commands.class = "small";
+            # nixbot: median 14 s, slowest 358 s, 69 runs in 30 days
+            updater-repository-paths.class = "small";
+          };
+        }
+        .${system} or { };
       checks.hook-gate-dangerous-commands =
         let
           # Each case is "<expected> <command>", where <expected> is ask or allow.

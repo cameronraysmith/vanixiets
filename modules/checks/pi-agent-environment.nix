@@ -2045,6 +2045,23 @@
       '';
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 47 s, slowest 82 s, 3 runs in 30 days
+            pi-agent-environment-policy.class = "small";
+            # nixbot: median 6.9 s, slowest 88 s, 39 runs in 30 days
+            pi-agent-environment-smoke.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 16 s, slowest 257 s, 42 runs in 30 days
+            pi-agent-environment-smoke.class = "small";
+          };
+        }
+        .${system} or { };
       checks = {
         pi-agent-environment-smoke =
           let

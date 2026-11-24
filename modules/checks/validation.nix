@@ -80,6 +80,17 @@
       '';
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 1.6 s, slowest 8.5 s, all 11 runs 2026-09-04..2026-11-11
+        home-module-exports.class = "small";
+        # nixbot: median 4.1 s, slowest 44 s, 22 runs in 30 days
+        secrets-encryption-integrity.class = "small";
+        # nixbot: median 14 s, slowest 80 s, 6 runs in 30 days
+        terraform-validate.class = "small";
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         # TC-020: every primary user's `contentPrivate` slot resolves to a
         # non-empty config. The slot is a `deferredModule` defaulting to

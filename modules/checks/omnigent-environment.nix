@@ -108,6 +108,13 @@ in
   perSystem =
     { pkgs, system, ... }:
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 3.3 s, slowest 34 s, all 7 runs 2026-09-18..2026-11-11
+        omnigent-worker-environment.class = "small";
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         omnigent-worker-environment =
           assert lib.assertMsg (

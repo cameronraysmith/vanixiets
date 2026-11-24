@@ -67,6 +67,13 @@
           ''token="$(ntfy token generate)"'';
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 11 s, slowest 56 s, 5 runs in 30 days
+        ntfy-provisioning.class = "small";
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         ntfy-provisioning = pkgs.runCommand "ntfy-provisioning" { } ''
           token_re='^tk_[-_A-Za-z0-9]{29}$'

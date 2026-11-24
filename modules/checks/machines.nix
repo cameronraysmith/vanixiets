@@ -122,6 +122,35 @@
       fleetDeployer.problems == [ ]
     ) "flake.lib.fleetDeployer: ${lib.concatStringsSep "; " fleetDeployer.problems}";
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 14 s, slowest 395 s, 694 runs in 30 days
+            nixos-cinnabar.class = "small";
+            # nixbot: median 25 s, slowest 496 s, 698 runs in 30 days
+            nixos-electrum.class = "small";
+            # nixbot: median 23 s, slowest 323 s, 698 runs in 30 days
+            nixos-galena.class = "small";
+            # nixbot: median 25 s, slowest 996 s, 711 runs in 30 days
+            nixos-magnetite.class = "small";
+            # nixbot: median 24 s, slowest 541 s, 678 runs in 30 days
+            nixos-pyrite.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 126 s, slowest 539 s, 571 runs in 30 days
+            darwin-argentum.class = "medium";
+            # nixbot: median 125 s, slowest 511 s, 560 runs in 30 days
+            darwin-blackphos.class = "medium";
+            # nixbot: median 125 s, slowest 491 s, 569 runs in 30 days
+            darwin-rosegold.class = "medium";
+            # nixbot: median 130 s, slowest 563 s, 576 runs in 30 days
+            darwin-stibnite.class = "medium";
+          };
+        }
+        .${system} or { };
       checks =
         (lib.mapAttrs' (
           name: _:

@@ -7,7 +7,7 @@
 { self, lib, ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
       program = lib.getExe (self.lib.managedConfigProgram pkgs);
 
@@ -113,6 +113,21 @@
         };
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 13 s, slowest 16 s, all 5 runs 2026-10-02..2026-11-11
+            managed-config-rehearsal.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 75 s, slowest 389 s, all 5 runs 2026-10-04..2026-11-11
+            managed-config-rehearsal.class = "medium";
+          };
+        }
+        .${system} or { };
       checks.managed-config-rehearsal =
         pkgs.runCommand "managed-config-rehearsal"
           {

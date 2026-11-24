@@ -87,6 +87,16 @@ in
       missing = lib.filter (a: !lib.elem a lines) assignments;
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: 2 runs, too few to class (design D4)
+        claude-sandbox-setup-script = {
+          class = "medium";
+          measured = false;
+        };
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         claude-sandbox-setup-script =
           assert lib.assertMsg (wide == [ ])

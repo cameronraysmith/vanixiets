@@ -50,6 +50,21 @@
         zerotierone.package;
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      # A large package build shares one reason (design D6).
+      testSizes.checks =
+        let
+          packageBuild = "a package check is the package's own build: it cannot be split, it reruns only when the package's inputs change, and a host closure that includes the package needs the same build";
+        in
+        lib.optionalAttrs (system == "x86_64-linux") {
+          # nixbot: median 433 s, slowest 506 s, all 3 runs 2026-09-29..2026-10-23
+          zerotierone-controller-cinnabar = {
+            class = "large";
+            reason = packageBuild;
+          };
+        };
       checks = lib.listToAttrs (
         map (name: lib.nameValuePair "zerotierone-controller-${name}" (controllerPackage name)) controllers
       );

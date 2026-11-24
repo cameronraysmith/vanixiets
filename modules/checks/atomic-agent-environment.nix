@@ -67,6 +67,13 @@
       activationScripts = map (entry: entry.data or "") (builtins.attrValues homeConfig.home.activation);
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 2.0 s, slowest 14 s, all 10 runs 2026-09-04..2026-11-13
+        atomic-agent-environment-structural.class = "small";
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         atomic-agent-environment-structural = mkCheck {
           name = "atomic-agent-environment";

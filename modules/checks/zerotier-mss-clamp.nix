@@ -36,6 +36,13 @@
       hosts = lib.attrNames self.nixosConfigurations;
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 8.6 s, slowest 66 s, all 9 runs 2026-09-17..2026-11-11
+        zerotier-mss-clamp.class = "small";
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         zerotier-mss-clamp = self.lib.mkStructuralCheck pkgs {
           name = "zerotier-mss-clamp";

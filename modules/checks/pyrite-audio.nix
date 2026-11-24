@@ -7,6 +7,13 @@
   perSystem =
     { system, ... }:
     lib.mkIf (system == "x86_64-linux") {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 3.8 s, slowest 118 s, all 7 runs 2026-09-17..2026-10-07
+        pyrite-audio.class = "small";
+      };
       checks.pyrite-audio =
         let
           machine = config.flake.nixosConfigurations.pyrite;

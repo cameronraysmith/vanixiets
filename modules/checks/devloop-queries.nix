@@ -442,6 +442,13 @@
       '';
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 14 s, slowest 28 s, 6 runs in 30 days
+        devloop-queries.class = "small";
+      };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         devloop-queries = pkgs.stdenvNoCC.mkDerivation {
           name = "devloop-queries";

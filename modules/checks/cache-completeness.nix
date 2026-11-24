@@ -14,7 +14,12 @@
 { self, inputs, ... }:
 {
   perSystem =
-    { lib, pkgs, ... }:
+    {
+      lib,
+      pkgs,
+      system,
+      ...
+    }:
     let
       magnetite = self.nixosConfigurations.magnetite;
       postgresql = magnetite.config.services.postgresql.package;
@@ -32,6 +37,16 @@
       migrations = "${inputs.nixbot}/nixbot/nixbot/migrations";
     in
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: 0 runs, too few to class (design D4)
+        cache-completeness = {
+          class = "medium";
+          measured = false;
+        };
+      };
       checks = lib.optionalAttrs (pkgs.stdenv.hostPlatform.system == "x86_64-linux") {
         cache-completeness = pkgs.stdenvNoCC.mkDerivation {
           name = "cache-completeness";

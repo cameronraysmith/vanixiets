@@ -47,6 +47,13 @@ in
   perSystem =
     { system, ... }:
     lib.mkIf (system == "x86_64-linux") {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        # nixbot: median 3.7 s, slowest 15 s, all 5 runs 2026-09-22..2026-11-11
+        magnetite-zram-headroom.class = "small";
+      };
       checks.magnetite-zram-headroom =
         let
           machine = config.flake.nixosConfigurations.magnetite;

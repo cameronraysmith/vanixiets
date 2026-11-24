@@ -31,8 +31,23 @@
 { ... }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     {
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 36 s, slowest 537 s, 6 runs in 30 days
+            renovate-config.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 22 s, slowest 396 s, 8 runs in 30 days
+            renovate-config.class = "small";
+          };
+        }
+        .${system} or { };
       checks.renovate-config =
         pkgs.runCommand "renovate-config"
           {

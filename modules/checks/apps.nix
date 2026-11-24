@@ -12,11 +12,31 @@
 { ... }:
 {
   perSystem =
-    { self', pkgs, ... }:
+    {
+      self',
+      pkgs,
+      system,
+      ...
+    }:
     {
       # Referencing each program in the environment puts it in this derivation's
       # build closure, so evaluating the check forces every app's expression and
       # building it realizes every app's program.
+      # Size classes (declare-test-size-classes design D1, D2): the median of
+      # nixbot's uncached runs of at least 1 s, read 2026-11-24
+      # (logs/tsc-4-durations-runs-20261124-141600.log).
+      testSizes.checks =
+        {
+          x86_64-linux = {
+            # nixbot: median 50 s, slowest 729 s, 215 runs in 30 days
+            apps-build.class = "small";
+          };
+          aarch64-darwin = {
+            # nixbot: median 102 s, slowest 624 s, 195 runs in 30 days
+            apps-build.class = "medium";
+          };
+        }
+        .${system} or { };
       checks.apps-build =
         pkgs.runCommand "apps-build"
           {
