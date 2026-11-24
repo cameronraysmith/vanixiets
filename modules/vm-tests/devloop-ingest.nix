@@ -3,9 +3,9 @@
 # 4.6, 5.6), built as two tests from the one container below
 # (declare-test-size-classes design D8):
 #   - devloop-ingest, the medium test of the collection path, the documented
-#     queries and the three SQL alert rules: firstStart, noAutoCreate,
+#     queries and the five SQL alert rules: firstStart, noAutoCreate,
 #     overlap, tableShape, switch, documentedQueries, burnRule,
-#     ietsHealthRule, sizeRule;
+#     ietsHealthRule, sizeRule, runtimeRules;
 #   - devloop-ingest-reconcile, the enormous test of devloop-reconcile and its
 #     mutant legs, whose waits on the receiver's 60 s polls are what it
 #     proves: firstStart, the container's readiness gate, then reconcile.
@@ -1308,7 +1308,169 @@
             print("ok: sizeRule", flush=True)
           '';
 
-          # The collection path, the documented queries and the three SQL
+          # RuntimeTestCostDrift and EnormousTestStale as fleet-alert's
+          # evaluator sends them (declare-test-size-classes design D10, D11,
+          # G7, G8), the stale rule rendered over fixture enormous tests,
+          # against records written to the weekly run's result file and
+          # shipped by the collector through file_log/runtime-test-result, as
+          # pyrite ships them. Each fixture test isolates one clause, so each
+          # mutant below changes the answer.
+          runtimeAlertRules =
+            (self.lib.fleetAlertRules {
+              inherit lib;
+              enormousTests = [
+                "fx-failing"
+                "fx-fresh"
+                "fx-never"
+                "fx-stale"
+                "fx-still"
+              ];
+            }).rules;
+          runtimeRule =
+            alert:
+            lib.findFirst (r: r.alert == alert) (throw "devloop-ingest: no ${alert} rule") runtimeAlertRules;
+          runtimeRules = ''
+            print("=== case runtimeRules", flush=True)
+            import datetime  # noqa: F811 -- burnRule's import precedes it, unused at module level
+
+            DRIFT_EXPR = json.loads(${builtins.toJSON (builtins.toJSON (runtimeRule "RuntimeTestCostDrift").expr)})
+            STALE_EXPR = json.loads(${builtins.toJSON (builtins.toJSON (runtimeRule "EnormousTestStale").expr)})
+            for alert, language, database in (
+                ("RuntimeTestCostDrift", ${builtins.toJSON (runtimeRule "RuntimeTestCostDrift").language}, ${builtins.toJSON (runtimeRule "RuntimeTestCostDrift").database}),
+                ("EnormousTestStale", ${builtins.toJSON (runtimeRule "EnormousTestStale").language}, ${builtins.toJSON (runtimeRule "EnormousTestStale").database}),
+            ):
+                assert language == "sql" and database == "devloop", (alert, language, database)
+            COLUMNS = [column["name"] for column in config()["tables"]["runtime_test_result"]["columns"]]
+
+            reset_devloop()
+            NOW = int(store.succeed("date -u +%s").strip())
+            RECORDS = []
+
+
+            def record(test, outcome, seconds, days_ago, klass="medium", limit=300):
+                """One result line as enormous-tests.service writes it."""
+                finished = NOW - int(days_ago * 86400) - len(RECORDS)
+                line = {
+                    "host": "pyrite",
+                    "test": test,
+                    "revision": "fixture",
+                    "drv_path": f"/nix/store/fixture-{test}.drv",
+                    "class": klass,
+                    "limit_s": limit,
+                    "outcome": outcome,
+                    "script_ms": None if seconds is None else int(round(seconds * 1000)),
+                    "build_ms": None,
+                    "finished_at": datetime.datetime.fromtimestamp(finished, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                }
+                assert list(line) == COLUMNS, (list(line), COLUMNS)
+                RECORDS.append(json.dumps(line))
+
+
+            # The drift rule's fixtures. 5.1's acceptance tests, on their
+            # 2026-11-24 measurements: two stable, silent ...
+            record("tincr-mesh", "passed", 267.74, 1)
+            record("tincr-mesh", "passed", 269.94, 8)
+            record("devloop-ingest", "passed", 229.54, 1)
+            record("devloop-ingest", "passed", 233.38, 8)
+            # ... and fleet-ingress before its fix, its spread over its
+            # margin, beside a present and a failed record, which are not runs.
+            record("fleet-ingress", "present", None, 1)
+            record("fleet-ingress", "failed", None, 2)
+            record("fleet-ingress", "passed", 252.56, 3)
+            record("fleet-ingress", "passed", 280.74, 4)
+            record("fleet-ingress", "passed", 216.61, 5)
+            record("fleet-ingress", "timed_out", 300, 6)
+            # A median grown by 40 s against a 30 s threshold: fires on growth.
+            for day in (1, 2, 3):
+                record("fx-grown", "passed", 140, day)
+            for day in (4, 5, 6, 7, 8):
+                record("fx-grown", "passed", 100, day)
+            # A spread only with its timed-out run: fires.
+            record("fx-timeout", "passed", 200, 1)
+            record("fx-timeout", "passed", 205, 2)
+            record("fx-timeout", "timed_out", 300, 3)
+            # A spread only in runs over 180 days old: silent.
+            record("fx-old", "passed", 100, 181)
+            record("fx-old", "passed", 290, 182)
+            # A spread only outside the newest 8 runs: silent.
+            for day in range(1, 9):
+                record("fx-eight", "passed", 200, day)
+            record("fx-eight", "passed", 50, 9)
+            record("fx-eight", "passed", 50, 10)
+            # Reclassified small at its newest run: 40 s as medium, then 55 s
+            # as small; the small margin, 12.5 s, is under the 15 s spread.
+            record("fx-reclassed", "passed", 55, 1, klass="small", limit=60)
+            record("fx-reclassed", "passed", 40, 2)
+            # The stale rule's fixtures, rendered as enormous but for
+            # fx-not-enormous; one run each, so the drift rule ignores them.
+            record("fx-stale", "passed", 1000, 9, klass="enormous", limit=3600)
+            record("fx-fresh", "passed", 1000, 2, klass="enormous", limit=3600)
+            record("fx-still", "present", None, 1, klass="enormous", limit=3600)
+            record("fx-still", "passed", 1000, 20, klass="enormous", limit=3600)
+            record("fx-failing", "failed", None, 1, klass="enormous", limit=3600)
+            record("fx-failing", "passed", 1000, 9, klass="enormous", limit=3600)
+            record("fx-not-enormous", "passed", 30, 30, klass="small", limit=60)
+
+            # The empty table first: the drift rule returns no row.
+            collector_restart()
+            empty = gsql(DRIFT_EXPR)
+            assert empty == [], empty
+            print("ok: runtimeRules: RuntimeTestCostDrift returns no row on an empty table", flush=True)
+            store.succeed(f"cat >> {RUNTIME_RECORD} <<'EOF'\n" + "\n".join(RECORDS) + "\nEOF")
+            stored = wait_rows("runtime_test_result", len(RECORDS))
+            assert stored == len(RECORDS), (stored, len(RECORDS))
+            assert send_failed("runtime_test_result") == 0, send_failed("runtime_test_result")
+            print(f"ok: runtimeRules: {stored} result lines shipped into runtime_test_result", flush=True)
+
+
+            def fired(expr):
+                return sorted(row[0] for row in gsql(expr))
+
+
+            def mutant(expr, name, old, new):
+                assert old in expr, f"mutant {name} found nothing to replace"
+                return expr.replace(old, new)
+
+
+            DRIFT = ["fleet-ingress", "fx-grown", "fx-reclassed", "fx-timeout"]
+            got = fired(DRIFT_EXPR)
+            print(f"RuntimeTestCostDrift fires for {got}", flush=True)
+            assert got == DRIFT, (got, DRIFT)
+            rows = gsql(f'SELECT "test", "class", "value" FROM ({DRIFT_EXPR}) AS drift ORDER BY "test"')
+            print(f"RuntimeTestCostDrift rows {rows}", flush=True)
+            assert rows[0] == ["fleet-ingress", "medium", "median 266.7 s of 4 runs, spread 83.4 s, newest three 252.6 s against 300.0 s, limit 300 s"], rows[0]
+            assert rows[2][1] == "small", rows[2]
+
+            STALE = ["fx-failing", "fx-never", "fx-stale"]
+            got = fired(STALE_EXPR)
+            print(f"EnormousTestStale fires for {got}", flush=True)
+            assert got == STALE, (got, STALE)
+
+            MUTANTS = {
+                # design G8
+                "noSpreadArm": (DRIFT_EXPR, DRIFT, " OR (r.runs >= 2 AND r.limit_s - r.median_s < r.spread_s)", ""),
+                "noGrowthArm": (DRIFT_EXPR, DRIFT, "(r.runs >= 6 AND r.newest_s - r.older_s > r.limit_s / 10.0) OR ", ""),
+                "noTimeoutCount": (DRIFT_EXPR, DRIFT, "outcome IN ('passed', 'timed_out')", "outcome IN ('passed')"),
+                "noWindow": (DRIFT_EXPR, DRIFT, " AND finished_at >= now() - INTERVAL '180 days'", ""),
+                "noLastEight": (DRIFT_EXPR, DRIFT, " WHERE rn <= 8", ""),
+                "largestLimit": (DRIFT_EXPR, DRIFT, "max(CASE WHEN rn = 1 THEN limit_s END)", "max(limit_s)"),
+                # design G7
+                "enormousStaleAt80Days": (STALE_EXPR, STALE, "INTERVAL '8 days'", "INTERVAL '80 days'"),
+                "noPresent": (STALE_EXPR, STALE, "outcome IN ('passed', 'present')", "outcome = 'passed'"),
+                "noAbsentArm": (STALE_EXPR, STALE, "LEFT JOIN", "JOIN"),
+                "anyOutcome": (STALE_EXPR, STALE, " WHERE outcome IN ('passed', 'present')", ""),
+            }
+            for name, (expr, expected, old, new) in MUTANTS.items():
+                got = fired(mutant(expr, name, old, new))
+                assert got != expected, f"mutant {name} accepted: {got}"
+                print(f"mutant {name} rejected: fires for {got}", flush=True)
+
+            reset_devloop()
+            collector_restart()
+            print("ok: runtimeRules", flush=True)
+          '';
+
+          # The collection path, the documented queries and the five SQL
           # alert rules: a medium run (declare-test-size-classes design D8).
           ingestCases = [
             firstStart
@@ -1320,6 +1482,7 @@
             burnRule
             ietsHealthRule
             sizeRule
+            runtimeRules
           ];
           # devloop-reconcile and its mutant legs, which wait out the
           # receiver's 60 s polls: an enormous run, weekly or on demand
@@ -1538,21 +1701,23 @@
                     };
                     script = ''
                       if [ ! -s ${devloop.runtimeTestResultFile} ]; then
-                        install -m 0644 ${pkgs.writeText "runtime-test-seed.jsonl" (
-                          builtins.toJSON {
-                            host = "store";
-                            test = "seed";
-                            revision = "seed";
-                            drv_path = null;
-                            class = "small";
-                            limit_s = 60;
-                            outcome = "present";
-                            script_ms = null;
-                            build_ms = null;
-                            finished_at = "2026-11-24T00:00:00.000000Z";
-                          }
-                          + "\n"
-                        )} ${devloop.runtimeTestResultFile}
+                        install -m 0644 ${
+                          pkgs.writeText "runtime-test-seed.jsonl" (
+                            builtins.toJSON {
+                              host = "store";
+                              test = "seed";
+                              revision = "seed";
+                              drv_path = null;
+                              class = "small";
+                              limit_s = 60;
+                              outcome = "present";
+                              script_ms = null;
+                              build_ms = null;
+                              finished_at = "2026-11-24T00:00:00.000000Z";
+                            }
+                            + "\n"
+                          )
+                        } ${devloop.runtimeTestResultFile}
                       fi
                     '';
                   };
