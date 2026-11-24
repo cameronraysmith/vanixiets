@@ -50,6 +50,9 @@
           "com.steipete.codexbar" = {
             SUAutomaticallyUpdate = false;
           };
+          "com.prakashjoshipax.VoiceInk" = {
+            SUAutomaticallyUpdate = false;
+          };
         };
       };
     };
