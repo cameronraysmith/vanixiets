@@ -68,6 +68,11 @@ Its test script ran 2,115 to 2,200 s on 2026-11-23 across 14 cases.
 Four cases that exercise outage and recovery (`backPressure`, `lossControls`, `crashLoop`, `longRun`) took 1,360 to 1,390 s, most of it fixed sleeps and waits on the collectors' intervals.
 The no-leak scans in `agentSession` and `agentSpans` issue one SQL query per string or JSON column of every table, about 1,550 columns per scan and four scans per run, so about 6,200 queries, each two driver commands, took 280 to 320 s.
 Without those scans, the seven cases that assert filtering, routing, and refusal took 185 to 195 s, a medium run; the outage cases alone are an enormous one, and `langfuse`, whose waits follow its exporter's retry and flush timers, belongs with them.
+The test was split on 2026-11-24 (`declare-test-size-classes` stage 1) into two attributes built from one container definition.
+`fleet-ingress` keeps the eight cases that assert filtering, routing, refusal, the absence of forbidden values, the hand-off cap and the budget.
+Each of its scans now runs as one command inside the container, four queries at a time, and the driver checks the scan's column count against its own.
+Its script measured 252.56 to 280.74 s on pyrite, a medium run.
+`fleet-ingress-outage` takes `langfuse`, `backPressure`, `lossControls`, `crashLoop`, `longRun` and `absentClientCa`, an enormous run.
 
 ## What is not enforced
 
