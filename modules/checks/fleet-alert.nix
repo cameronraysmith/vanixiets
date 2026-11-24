@@ -54,6 +54,9 @@
 # - sizeRuleClause (declare-test-size-classes design D10): CheckOutgrewItsClass
 #   renders one VALUES tuple per gated check with its class limit, and the
 #   mutants sizeRenderLimitOff and sizeRenderDropped must each fail.
+# - staleRenderClause (declare-test-size-classes design D11):
+#   EnormousTestStale renders one VALUES row per lib.enormousTests entry, and
+#   the mutant staleRenderDropped must fail.
 #
 # Relations within one host are assertions where the units are declared,
 # which CI already pays for when it evaluates the host (S1 review F5, S3
@@ -1340,6 +1343,48 @@
           ${lib.concatMapStrings (n: ''
             echo ${lib.escapeShellArg "mutant ${n} rejected: ${builtins.head sizeMutants.${n}}"}
           '') (builtins.attrNames sizeMutants)}
+          touch "$out"
+        '';
+
+      # declare-test-size-classes design D11, regulator G7: EnormousTestStale
+      # renders one VALUES row per test lib.enormousTests names, and no other,
+      # so its absent arm watches every enormous test. The mutant
+      # staleRenderDropped (the rule rendered without one enormous test) must
+      # fail. devloop-ingest's runtimeRules case runs the query itself.
+      staleRuleFindings =
+        expr:
+        let
+          rows = builtins.length (lib.splitString "'), ('" expr);
+          rendered = lib.length (lib.filter (n: lib.hasInfix "('${n}')" expr) self.lib.enormousTests);
+        in
+        map (n: "no VALUES row ('${n}')") (
+          lib.filter (n: !lib.hasInfix "('${n}')" expr) self.lib.enormousTests
+        )
+        ++
+          lib.optional (rows != builtins.length self.lib.enormousTests)
+            "the VALUES list has ${toString rows} rows for ${toString rendered} rendered of ${toString (builtins.length self.lib.enormousTests)} enormous tests";
+      staleExprOf =
+        enormousTests:
+        (lib.findFirst (r: r.alert == "EnormousTestStale") (throw "fleet-alert check: no EnormousTestStale")
+          (self.lib.fleetAlertRules { inherit lib hosts enormousTests; }).rules
+        ).expr;
+      staleActual = staleRuleFindings (ruleNamed "EnormousTestStale").expr;
+      staleMutants = {
+        staleRenderDropped = staleRuleFindings (staleExprOf (lib.tail self.lib.enormousTests));
+      };
+      staleRenderClause =
+        assert lib.assertMsg (
+          staleActual == [ ]
+        ) "fleet-alert EnormousTestStale rendering: ${builtins.toJSON staleActual}";
+        assert lib.assertMsg (lib.all (f: f != [ ]) (lib.attrValues staleMutants))
+          "fleet-alert accepted a stale-rule rendering mutant: ${
+            builtins.toJSON (builtins.attrNames (lib.filterAttrs (_: f: f == [ ]) staleMutants))
+          }";
+        pkgs.runCommand "fleet-alert-stale-rule-clause" { } ''
+          echo "ok: EnormousTestStale renders the ${toString (builtins.length self.lib.enormousTests)} enormous tests ${builtins.toJSON self.lib.enormousTests}"
+          ${lib.concatMapStrings (n: ''
+            echo ${lib.escapeShellArg "mutant ${n} rejected: ${builtins.head staleMutants.${n}}"}
+          '') (builtins.attrNames staleMutants)}
           touch "$out"
         '';
 
@@ -3296,6 +3341,7 @@
                   pingTransport
                   deadmanClause
                   sizeRuleClause
+                  staleRenderClause
                   ;
               };
             }
@@ -3310,6 +3356,7 @@
               test -e ${pingTransport}
               test -e ${deadmanClause}
               test -e ${sizeRuleClause}
+              test -e ${staleRenderClause}
               touch "$out"
             '';
       };

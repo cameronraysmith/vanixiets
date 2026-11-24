@@ -55,10 +55,11 @@
 # instance per failing database (review F7). RuleSignalMissing's `database`
 # is the one the evaluator reads system_memory_usage_bytes from, the
 # selector `reporting` comes from. PullRequestQueueWaitBurn (design D1),
-# IetsEvaluationUnhealthy and CheckOutgrewItsClass read devloop's ci_build,
-# eval_run and ci_attribute in SQL, which promtool cannot parse;
-# vmTests.x86_64-linux.devloop-ingest's burnRule, ietsHealthRule and
-# sizeRule cases run them on GreptimeDB 1.2.1.
+# IetsEvaluationUnhealthy, CheckOutgrewItsClass, RuntimeTestCostDrift and
+# EnormousTestStale read devloop's ci_build, eval_run, ci_attribute and
+# runtime_test_result in SQL, which promtool cannot parse;
+# vmTests.x86_64-linux.devloop-ingest's burnRule, ietsHealthRule, sizeRule
+# and runtimeRules cases run them on GreptimeDB 1.2.1.
 { config, ... }:
 {
   flake.lib.fleetAlertRules =
@@ -72,6 +73,10 @@
       # CheckOutgrewItsClass over fixture checks (declare-test-size-classes
       # design D10).
       checkSizes ? config.flake.lib.checkSizes,
+      # A parameter so devloop-ingest's runtimeRules case can render
+      # EnormousTestStale over fixture tests (declare-test-size-classes
+      # design D11).
+      enormousTests ? config.flake.lib.enormousTests,
     }:
     let
       # A host is expected, or always-on, only once it collects (S4 design
@@ -598,6 +603,51 @@
           for = "24h";
           severity = "info";
           annotations.summary = "A check's builds on nixbot no longer fit its declared size class, or a check declared without a measurement (measured = false) now has three runs: the value gives the median, slowest run and run count of its uncached builds of at least 1 s in the last 30 days, runs_class the class that median gives. Reclassify it in its testSizes entry with the measurement, split it, or remove time its purpose does not need (the preferences-nix-checks-architecture skill's references/test-sizes.md); a median above 900 s takes it off the gate";
+        }
+        # declare-test-size-classes design D10, D11, D13: a runtime test's
+        # cost over time, judged on the weekly run's records in
+        # devloop.runtime_test_result, never on one run. Its runs are its
+        # `passed` and `timed_out` records, a timed-out one carrying its class
+        # limit as its script time; a `present` record (nothing ran) and a
+        # `failed` one are not runs. Per test, the newest 8 runs within 180
+        # days, judged by the class and limit of the newest, which the
+        # revision that ran declared: growth, with at least 6 runs, the
+        # median of the newest 3 above the median of the older ones by more
+        # than a tenth of the limit; spread, with at least 2 runs, the margin
+        # under the limit (limit minus median) below the range. Nearness to
+        # the limit alone is not drift. Info: it pages no one.
+        {
+          alert = "RuntimeTestCostDrift";
+          database = "devloop";
+          language = "sql";
+          expr = "SELECT r.test, r.class, concat('median ', CAST(round(r.median_s, 1) AS STRING), ' s of ', CAST(r.runs AS STRING), ' runs, spread ', CAST(round(r.spread_s, 1) AS STRING), ' s, newest three ', coalesce(CAST(round(r.newest_s, 1) AS STRING), '-'), ' s against ', coalesce(CAST(round(r.older_s, 1) AS STRING), '-'), ' s, limit ', CAST(r.limit_s AS STRING), ' s') AS value FROM (SELECT test, count(*) AS runs, max(CASE WHEN rn = 1 THEN class END) AS class, max(CASE WHEN rn = 1 THEN limit_s END) AS limit_s, median(s) AS median_s, max(s) - min(s) AS spread_s, median(CASE WHEN rn <= 3 THEN s END) AS newest_s, median(CASE WHEN rn > 3 THEN s END) AS older_s FROM (SELECT test, class, limit_s, CAST(script_ms AS DOUBLE) / 1000.0 AS s, row_number() OVER (PARTITION BY test ORDER BY finished_at DESC) AS rn FROM runtime_test_result WHERE outcome IN ('passed', 'timed_out') AND script_ms IS NOT NULL AND finished_at >= now() - INTERVAL '180 days') AS w WHERE rn <= 8 GROUP BY test) AS r WHERE (r.runs >= 6 AND r.newest_s - r.older_s > r.limit_s / 10.0) OR (r.runs >= 2 AND r.limit_s - r.median_s < r.spread_s)";
+          for = "0s";
+          severity = "info";
+          annotations.summary = "A runtime test's script time, over its newest runs in pyrite's weekly run, has grown against its own baseline or spreads wider than its margin under its class limit: the value gives the median, run count, spread, the newest three runs' median against the older ones' and the limit. Remove the variation inside the test or the time its purpose does not need, split it, or reclassify it with the measurement (the preferences-nix-checks-architecture skill's references/test-sizes.md); never loosen its timeout to fit";
+        }
+        # declare-test-size-classes design D11: an enormous test that has not
+        # passed for 8 days, from the weekly run's records. A `present`
+        # record says the test still passes at its current derivation, so
+        # stable inputs never look stale; an enormous test with no passing or
+        # present record at all fires too, so a run or a transport that
+        # delivers nothing is not silent. The names are rendered from
+        # lib.enormousTests of this revision; `for = "2h"` outlasts a cold
+        # run's enormous phase, about 70 minutes, so a deploy just before a
+        # first run does not post.
+        {
+          alert = "EnormousTestStale";
+          database = "devloop";
+          language = "sql";
+          expr =
+            assert lib.assertMsg
+              (enormousTests != [ ] && lib.all (n: builtins.match "[A-Za-z0-9._-]+" n != null) enormousTests)
+              "fleetAlertRules: enormousTests must be non-empty names matching [A-Za-z0-9._-]+, so the VALUES list needs no escape; got ${builtins.toJSON enormousTests}";
+            "SELECT e.test, CASE WHEN g.last_good IS NULL THEN 'no passing or present record' ELSE concat('last passed or found present ', CAST(g.last_good AS STRING)) END AS value FROM (VALUES ${
+              lib.concatMapStringsSep ", " (n: "('${n}')") enormousTests
+            }) AS e (test) LEFT JOIN (SELECT test, max(finished_at) AS last_good FROM runtime_test_result WHERE outcome IN ('passed', 'present') GROUP BY test) AS g ON g.test = e.test WHERE g.last_good IS NULL OR g.last_good < now() - INTERVAL '8 days'";
+          for = "2h";
+          severity = "warning";
+          annotations.summary = "An enormous runtime test has no passing or present record from pyrite's weekly run (enormous-tests.service) in the last 8 days: its runs failed, or none ran or arrived. Read enormous-tests.service's journal on pyrite and devloop.runtime_test_result; run it on demand after the run notice once fixed";
         }
         {
           alert = "StoreQueryFailing";
