@@ -1,3 +1,8 @@
+## Purpose
+
+This capability (stratum: `interface`) states the machine-side contract behind the published skill marketplace: each fact about a plugin group is authored once, group discovery is computed once, both marketplace files are generated from the authored facts and committed unchanged, and checks install every Claude entry and the apm marketplace offline and compare the composed skill trees with their sources and recorded hashes.
+Trust boundary: the checks establish what apm and Claude Code of the pinned versions do with the committed files in a build sandbox; they do not establish what the Claude desktop app, a user's own apm version, or a future Claude release does.
+
 ## ADDED Requirements
 
 ### Requirement: Each fact about a plugin group is authored once

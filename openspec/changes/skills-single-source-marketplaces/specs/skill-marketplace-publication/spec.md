@@ -1,3 +1,7 @@
+## Purpose
+
+This capability (stratum: `behavioral`) states what people outside the fleet receive from this repository's skill marketplace: an apm consumer installs every published plugin group; a Claude user installs every skill group with all its first-party skills and follows the published skills without versions; a skills CLI user installs each first-party skill; and publication never changes what the fleet's hosts receive.
+
 ## ADDED Requirements
 
 ### Requirement: An apm consumer installs every published plugin group

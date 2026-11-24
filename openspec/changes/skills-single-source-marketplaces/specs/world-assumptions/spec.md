@@ -128,7 +128,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of the skills CLI 1.9.0 that it walks each directory listed in the `paths` of a repository's root `skills.sh.json` three levels deep and lists every skill found there by its frontmatter `name`.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: design D14 (vercel-labs/skills 57217cf source and the 2026-11-23 runs, `logs/s5-npx-skills-proof-*`).
+**Evidence**: the vercel-labs/skills 57217cf source (`src/skills.ts:261-319`, `src/constants.ts:6`, `src/skills-sh-config.ts:20-61`: the search root at depth 1, the default containers, and the `skills.sh.json` paths to depth 3) and the 2026-11-23 runs (`logs/s5-npx-skills-proof-*`).
 
 #### Scenario: Observed on 2026-11-23
 
