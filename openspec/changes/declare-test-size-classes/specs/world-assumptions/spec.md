@@ -88,7 +88,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 #### Scenario: A test's measurements cross a class boundary
 
-- **WHEN** a test's median of uncached runs over 30 days, or a runtime test's whole run, falls in a class other than the one declared for it
+- **WHEN** a test's median of uncached runs over 30 days, or a runtime test's measured test script, falls in a class other than the one declared for it
 - **THEN** this assumption is void for that test; its declared class loses the measurement that supports it, and the `test-size-classes` requirement `Every test carries one declared size class` is discharged for it only once its class is restated from the new measurement or the test is split
 
 
@@ -431,7 +431,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | test | — | a named, repeatable procedure this repository declares, whose run passes or fails: a check or a runtime test | shared |
 | check | — | a test the build service builds for a pull request whose inputs it depends on, publishing its outcome as a check run | shared |
 | run | test | one execution of a test from its start to its pass or fail, including the builds it needs that no store or cache already holds | shared |
-| size class | — | the bound a test is declared to stay within for the wall-clock time of one run: small, 1 minute; medium, 5 minutes; large, 15 minutes; enormous, 60 minutes | shared |
+| size class | — | the class a test is declared in, which constrains what it may touch or wait on (a small test waits on no passage of time; a medium or large test may wait within its limit) and the time of one run, measured as its test script for a runtime test and as its build for a check: small, 1 minute; medium, 5 minutes; large, 15 minutes; enormous, 60 minutes | shared |
 | run notice | — | the statement a person or agent makes before starting a run expected to take longer than 5 minutes: its expected duration, what it proves that a cheaper run cannot, and what waits on its result | world-only |
 | pull-request gate | — | the check runs that must pass before the merge queue may land a pull request | shared |
 | default branch | — | the branch of a forge-hosted repository on which the merge queue lands pull requests | shared |

@@ -19,7 +19,7 @@ A class not yet backed by a run SHALL be marked as such until a run measures it.
 
 ### Requirement: A runtime test that outlasts its class fails
 
-A runtime test whose run outlasts the limit of its size class SHALL fail, so that a runtime test that grows past its class is seen when it is next run rather than absorbed.
+A runtime test whose test script outlasts the limit of its size class SHALL fail, so that a runtime test that grows past its class is seen when it is next run rather than absorbed. A runtime test's class is judged on its test script's time alone; the builds of its driver and nodes are build cost, which depends on what the store holds, and are not part of its class.
 
 **Discharged by**: `test-size-classes-interface` requirement `Each runtime test's global timeout is its class limit`, resting on world assumption `A221 — The NixOS test driver ends a test whose script outlasts its global timeout, timing the script only`.
 
@@ -74,7 +74,7 @@ A check whose recent runs on the build service take longer than its size class a
 
 Every enormous test SHALL be run as a scheduled run at least once a week against the default branch's latest commit, its outcome SHALL be recorded where the operator can read it, a failed run SHALL reach the operator as a failure notice, and an enormous test that has not passed for eight days SHALL reach the operator as an alert.
 
-**Discharged by**: `test-size-classes-interface` requirements `enormous-tests builds every enormous runtime test from the default branch weekly` and `EnormousTestStale fires when an enormous test has not passed for eight days`, resting on world assumption `A224 — pyrite is the fleet's only kvm host, takes one build at a time, and is the operator's laptop`.
+**Discharged by**: `test-size-classes-interface` requirements `enormous-tests builds every enormous runtime test from the default branch weekly, and records every runtime test's script time` and `EnormousTestStale fires when an enormous test has not passed for eight days`, resting on world assumption `A224 — pyrite is the fleet's only kvm host, takes one build at a time, and is the operator's laptop`.
 
 #### Scenario: An enormous test fails on the default branch
 
@@ -100,12 +100,49 @@ A property of the fleet that does not depend on elapsed-time behaviour, such as 
 #### Scenario: An agent checks a filter change to the fleet ingress
 
 - **WHEN** an agent changes what the fleet ingress filters or routes and runs the test that shows it
-- **THEN** that run takes at most 5 minutes and needs no run notice
+- **THEN** its test script takes at most 5 minutes and the run needs no run notice
 
 #### Scenario: The ingress's outage behaviour
 
 - **WHEN** the ingress's behaviour across a store outage, a full queue or a crash loop is to be shown
 - **THEN** a separate enormous test shows it, run weekly or after a run notice
+
+### Requirement: A size class constrains what a test may wait on, its time per run and its cost over time, each by its own regulator
+
+A declared size class SHALL constrain three properties of a test, each held by its own regulator: what it may wait on, so that a small test waits on no passage of time while a medium or large test may wait within its limit, and behaviour whose point is the passage of time runs only in the tests named for it; the time of one run, held by a timeout on the test script as tight as it can be without flakiness; and its cost over time, held on its recorded runs, never on one run.
+
+**Discharged by**: `test-size-classes-interface` requirements `Routing and ingest assertions run apart from elapsed-time cases` (kind), `Each runtime test's global timeout is its class limit` (ceiling), `CheckOutgrewItsClass reports a check over its class limit` and `RuntimeTestCostDrift reports a runtime test whose script time grows or whose margin is smaller than its spread` (cost over time), resting on world assumptions `A221 — The NixOS test driver ends a test whose script outlasts its global timeout, timing the script only` and `A223 — nixbot times an attribute's build from its builder slot to its completion, and an output already present gets no duration`.
+
+#### Scenario: A medium test gains a case whose point is an outage window
+
+- **WHEN** a case that shows behaviour across a store outage, a queue filling at its real rate or a crash loop is added to a medium runtime test
+- **THEN** it is moved to the enormous test the interface names for such cases, whatever the medium test's measured time
+
+#### Scenario: A small test sleeps
+
+- **WHEN** a case of a small test waits on a sleep or on an interval
+- **THEN** it is rewritten to wait for the event it needs, or the test is declared medium with its measurement
+
+#### Scenario: A runtime test's script time spreads towards its limit
+
+- **WHEN** a medium runtime test's recorded script times range from 216 to 281 seconds, a spread wider than its margin under 300 seconds
+- **THEN** a low-priority alert names the test, its recorded times and its class, before an unlucky run fails at the limit
+
+#### Scenario: A stable test close to its limit
+
+- **WHEN** a medium runtime test's recorded script times stay within two seconds of 269 seconds
+- **THEN** no alert is posted
+
+### Requirement: Variation that comes from inside a test is removed in the test
+
+A test whose script time varies between runs for a reason internal to the test, such as its phase against a scrape, export or flush interval, SHALL be treated as defective, and the variation SHALL be removed in the test, so that it waits for the event it needs rather than the next tick of an interval; a timeout SHALL NOT be loosened, and a class SHALL NOT be raised, to absorb such variation.
+
+**Discharged by**: the per-case times each measured run records from the test's case markers, compared across runs; `fleet-ingress`'s `processName`, which took 10 or 66 seconds by its phase against the collectors' 60-second process scrape and, with that wait removed, took 5 seconds (`declare-test-size-classes` stage 3).
+
+#### Scenario: A case's time depends on a scrape's phase
+
+- **WHEN** a case's time differs between runs by about one scrape interval
+- **THEN** the case is changed to wait for the scrape it needs, its assertions unchanged, and the test's timeout and class stay as they were
 
 ### Requirement: A run expected to exceed five minutes is preceded by a run notice
 

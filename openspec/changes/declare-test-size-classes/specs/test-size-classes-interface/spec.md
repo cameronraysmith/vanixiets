@@ -78,13 +78,31 @@ The `vmTests` option SHALL apply to every test `test.extend { modules = [ { glob
 - **WHEN** `sizeRule` loads one medium attribute with three runs of 420 seconds, one with two such runs, one small attribute with a single run of 3,700 seconds among nine of 10 seconds, and one within its limit
 - **THEN** the query returns exactly the first and the third
 
-### Requirement: enormous-tests builds every enormous runtime test from the default branch weekly
+### Requirement: RuntimeTestCostDrift reports a runtime test whose script time grows or whose margin is smaller than its spread
 
-pyrite SHALL run `enormous-tests.timer` (`OnCalendar = "Sun 03:00"`, `Persistent = true`) and `enormous-tests.service`, one of pyrite's `notifiedUnits`, which builds every runtime test the default branch declares enormous and exits non-zero if any fails.
+`modules/nixos/fleet-alert/rules.nix` SHALL carry an SQL rule `RuntimeTestCostDrift` on database `devloop`, severity `info`, that returns each `vmTests.x86_64-linux` test whose recorded test-script times show either growth of its median relative to its own recorded baseline, or a margin under its class limit smaller than its own observed spread.
 
-**Run**: the service resolves its flake reference (by default `github:cameronraysmith/vanixiets/main`) to one revision, reads that revision's `lib.enormousTests`, and builds each `vmTests.x86_64-linux.<name>` of that revision one at a time with `--builders ''`; after each build it writes `vanixiets_enormous_test_last_run_timestamp_seconds{test,result}` and, on success, `vanixiets_enormous_test_last_success_timestamp_seconds{test}` to the node exporter's textfile directory.
+**Query**: the rule reads the runtime-test run records the weekly run writes (below), counting a run that ended on its timeout as at least its class limit; the per-test limits SHALL be rendered from `testSizes.vmTests` and `testSizeLimits`. The statistic, window and thresholds are fixed by stage 5's first task against the recorded measurements, with these acceptance cases.
 
-**Discharged by**: one on-demand start after the deploy, given its notice, with both metrics read from the store; the unit started once with a runtime drop-in pointing at a throwaway tree in which `greptimedb-pipeline` is declared enormous and fails, which fails the unit, posts one failure notice and records `result="failure"`. Rests on world assumption `A224 — pyrite is the fleet's only kvm host, takes one build at a time, and is the operator's laptop`.
+**Discharged by**: the acceptance cases below, computed on the measurements recorded on 2026-11-24; `vmTests.x86_64-linux.devloop-ingest`'s `sizeRule` case, extended with runtime-test fixture records, which runs the rendered query and requires exactly the expected tests, with a mutant that renders the rule without its spread arm and must fail.
+
+#### Scenario: A stable test near its limit
+
+- **WHEN** the rule is computed on `tincr-mesh`'s recorded scripts (267.74 and 269.94 seconds, medium) or `devloop-ingest`'s (229.54 and 233.38 seconds, medium)
+- **THEN** it returns neither
+
+#### Scenario: A test whose spread exceeds its margin
+
+- **WHEN** the rule is computed on `fleet-ingress`'s recorded scripts before 2026-11-24's fix (252.56, 280.74 and 216.61 seconds, and one run that reached the 300-second timeout, medium)
+- **THEN** it returns `fleet-ingress`
+
+### Requirement: enormous-tests builds every enormous runtime test from the default branch weekly, and records every runtime test's script time
+
+pyrite SHALL run `enormous-tests.timer` (`OnCalendar = "Sun 03:00"`, `Persistent = true`) and `enormous-tests.service`, one of pyrite's `notifiedUnits`, which builds every runtime test the default branch declares enormous, then every other `vmTests.x86_64-linux` test, and exits non-zero if any fails.
+
+**Run**: the service resolves its flake reference (by default `github:cameronraysmith/vanixiets/main`) to one revision, reads that revision's `lib.enormousTests`, and builds each `vmTests.x86_64-linux.<name>` of that revision one at a time with `--builders ''`; after each enormous build it writes `vanixiets_enormous_test_last_run_timestamp_seconds{test,result}` and, on success, `vanixiets_enormous_test_last_success_timestamp_seconds{test}` to the node exporter's textfile directory. For every test it actually ran, enormous or not, it appends one record (test, revision, class, the script time from the driver's `test script finished in`, outcome) to a file the dev-loop collection ships into a `devloop` table; a test whose output is already in the store adds no record.
+
+**Discharged by**: one on-demand start after the deploy, given its notice, with both metrics and one run record per test it ran read from the store; the unit started once with a runtime drop-in pointing at a throwaway tree in which `greptimedb-pipeline` is declared enormous and fails, which fails the unit, posts one failure notice and records `result="failure"`. Rests on world assumption `A224 — pyrite is the fleet's only kvm host, takes one build at a time, and is the operator's laptop`.
 
 #### Scenario: A test fails
 
@@ -108,20 +126,20 @@ pyrite SHALL run `enormous-tests.timer` (`OnCalendar = "Sun 03:00"`, `Persistent
 
 **Cases**: `fleet-ingress` runs exactly `processName`, `refusal`, `delivery`, `agentSession`, `agentSpans`, `schemaOrder`, `handoffCap` and `budget`, and `fleet-ingress-outage` exactly `backPressure`, `lossControls`, `crashLoop`, `longRun`, `absentClientCa` and `langfuse`, both from one container definition, and `fleet-ingress`'s no-leak scans SHALL run as one command inside the container per scan, reporting per column; `devloop-ingest` runs every case except `reconcile`, which `devloop-ingest-reconcile` runs, with its wait for the next UTC day applied only when fewer than 1,800 seconds remain before midnight.
 
-**Discharged by**: one measured cold run of each medium test, timed as the whole `nix build` on pyrite with `--builders ''`, at most 300 seconds; one passing run of each enormous test; the scan mutants `scanFirstTable` and `scanStringOnly` failing `fleet-ingress`'s positive controls.
+**Discharged by**: measured runs of each medium test on pyrite with `--builders ''`, each test script (the driver's `test script finished in`) at most 300 seconds, and each run's per-case times recorded; one passing run of each enormous test; the scan mutants `scanFirstTable` and `scanStringOnly` failing `fleet-ingress`'s positive controls.
 
 #### Scenario: A run of the routing test
 
-- **WHEN** `vmTests.x86_64-linux.fleet-ingress` is built cold on pyrite after a collector change
-- **THEN** the whole build takes at most 300 seconds and the log shows the eight case markers and none of the six outage cases
+- **WHEN** `vmTests.x86_64-linux.fleet-ingress` is built on pyrite after a collector change
+- **THEN** the test script takes at most 300 seconds and the log shows the eight case markers and none of the six outage cases
 
 ### Requirement: Trust boundary of the size regulators
 
-These properties SHALL be stated with their limits: the timeout bounds a runtime test's script, not its driver or node builds; `CheckOutgrewItsClass` sees only builds nixbot recorded and the dev-loop collection copied, so it sees no agent's local build and no runtime test; the weekly run sees only what pyrite could build while it was running and could reach the forge; the structural check sees attribute names, not durations; and nothing here observes whether a person or agent gave a run notice.
+These properties SHALL be stated with their limits: the timeout bounds a runtime test's script, not its driver or node builds, which are build cost judged by no size regulator; `CheckOutgrewItsClass` sees only builds nixbot recorded, so no local build and no runtime test; `RuntimeTestCostDrift` sees only runs the weekly run made; the weekly run sees only what pyrite could build and reach; the structural check sees names, not durations; nothing observes a run notice.
 
 **Discharged by**: this statement, repeated in the repository fragment's test-size paragraph and in `references/test-sizes.md` "What is not enforced" when each regulator lands.
 
 #### Scenario: A runtime test's cold build is slow
 
 - **WHEN** a runtime test's script takes 250 seconds and its node builds 200 seconds more
-- **THEN** the test passes as medium, and only the whole-build timing in that stage's log shows the excess
+- **THEN** the test passes as medium, since its class is its script's time; the build time is build cost, visible only in the whole-build timing a stage's log records
