@@ -1,3 +1,7 @@
+{ config, ... }:
+let
+  flakeLib = config.flake.lib;
+in
 {
   perSystem =
     {
@@ -145,11 +149,10 @@
         PLAYWRIGHT_BROWSERS_PATH = "${inputs'.playwright-web-flake.packages.playwright-driver.browsers}";
 
         packages = [
-          # Match the fleet client (modules/system/nix-package.nix) rather than
-          # nixpkgs' default 2.34.8, which nix-fast-build and
-          # nix-prefetch-github otherwise put on PATH ahead of
-          # /run/current-system/sw/bin inside the project directory.
-          pkgs.nixVersions.nix_2_35
+          # The fleet client (flake.lib.fleetNix) rather than nixpkgs' default,
+          # which nix-fast-build and nix-prefetch-github otherwise put on PATH
+          # ahead of /run/current-system/sw/bin inside the project directory.
+          (flakeLib.fleetNix pkgs)
           python
           inputs'.clan-core.packages.default
           inputs'.nix2container.packages.skopeo-nix2container

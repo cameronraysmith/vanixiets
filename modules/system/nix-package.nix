@@ -1,8 +1,10 @@
+{ config, ... }:
 let
+  flakeLib = config.flake.lib;
   nixPackage =
     { lib, pkgs, ... }:
     {
-      nix.package = lib.mkDefault pkgs.nixVersions.nix_2_35;
+      nix.package = lib.mkDefault (flakeLib.fleetNix pkgs);
     };
 in
 {
