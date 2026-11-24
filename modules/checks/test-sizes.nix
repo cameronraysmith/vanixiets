@@ -24,6 +24,12 @@
   ...
 }:
 let
+  testSizeLimits = {
+    small = 60;
+    medium = 300;
+    large = 900;
+    enormous = 3600;
+  };
   entry = lib.types.submodule {
     options = {
       class = lib.mkOption {
@@ -65,15 +71,20 @@ in
   };
 
   config.flake.lib = {
-    testSizeLimits = {
-      small = 60;
-      medium = 300;
-      large = 900;
-      enormous = 3600;
-    };
+    inherit testSizeLimits;
     enormousTests = withSystem "x86_64-linux" (
       { config, ... }:
       lib.attrNames (lib.filterAttrs (_: e: e.class == "enormous") config.testSizes.vmTests)
+    );
+    # Every x86_64-linux runtime test's class and limit, which
+    # enormous-tests.service reads from the revision it builds and records
+    # beside each result (design D11).
+    runtimeTestSizes = withSystem "x86_64-linux" (
+      { config, ... }:
+      lib.mapAttrs (_: e: {
+        inherit (e) class;
+        limit = testSizeLimits.${e.class};
+      }) config.testSizes.vmTests
     );
     # The two systems nixbot's gate builds; only the entries are read, so
     # no check is evaluated.

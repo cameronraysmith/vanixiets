@@ -64,7 +64,8 @@ The receiver's role comes from `services.postgresql.ensureUsers`. Any change to 
 
 `file_log/deploy-record` lives in the agent fragment, unchanged in id and settings from when magnetite's dev-loop collection defined it, so magnetite's stored offset carried over.
 It reads `/var/log/deploy-record.jsonl` on every agent host into `logs/devloop-deploy_record`, which ends in `forward` on magnetite and in `otlp_http/ingress-logs` elsewhere.
-On the ingress host it is configured only where the store declares the devloop pipelines, because `forward` would otherwise feed no logs pipeline.
+It is the `deploy-record` entry of `vanixiets.otelCollector.devloopRecordFiles`, the agent role's list of JSON-lines record files, each shipped through `file_log/<name>` into its devloop table with that table's keep-list; pyrite adds `runtime-test-result`, `/var/log/runtime-test-result.jsonl`, which `enormous-tests.service` appends one result per runtime test to each week, into `devloop.runtime_test_result` (declare-test-size-classes design D11).
+On the ingress host the record files are configured only where the store declares the devloop pipelines, because `forward` would otherwise feed no logs pipeline.
 
 ## Data flow
 
@@ -108,7 +109,7 @@ S2 adds a logs path that copies the dev-loop record into `devloop`, one table pe
 - `journald/gitea-mq` reads the five `msg="batch …"` lines of `gitea-mq.service` and keeps only the `batch_event` keys.
   Its `journalctl_path` is a wrapper that runs `journalctl --boot=all`, because the receiver always runs `journalctl --follow` with no boot option, and systemd 261 then reads only the current boot.
 - `journald/nixbot-eval` reads the `"msg": "evaluation finished"` lines of `nixbot.service`, one JSON object per nixbot evaluation written by `modules/nixos/nixbot-evaluation-record.patch` (CAM-111), with `json_parser` and the same wrapper, and keeps only the `eval_run` keys.
-- `file_log/deploy-record` reads `/var/log/deploy-record.jsonl` with `json_parser`.
+- `file_log/deploy-record` reads `/var/log/deploy-record.jsonl` with `json_parser`; on pyrite `file_log/runtime-test-result` reads `/var/log/runtime-test-result.jsonl` the same way into `logs/devloop-runtime_test_result`.
 
 ```mermaid
 flowchart LR

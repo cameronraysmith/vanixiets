@@ -103,6 +103,7 @@
         };
       pyrite =
         agent [
+          "enormous-tests"
           "otel-agent-session"
           "otel-agent-session-envelope"
         ]
