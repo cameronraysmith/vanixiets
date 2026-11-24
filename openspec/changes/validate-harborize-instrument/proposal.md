@@ -26,7 +26,7 @@ Resuming means more than a rebase.
 The branch was 2,239 commits behind `main` when this note was written, and the skills tree has been restructured since: the group `plugin.json` files are gone, apm is at 0.38, the skills are delivered as one tree, and the Claude and Copilot marketplace files are generated.
 The branch's edits to the skill and to its delivery were made against the old layout.
 
-Since August the fleet has stored agent sessions, including skill-description requests, tool calls and traces (changes `agent-session-telemetry` and `darwin-agent-session-telemetry`), and has also sent them to Langfuse.
+After this change was written, the fleet began in November 2026 to store agent sessions, including skill-description requests, tool calls and traces (changes `agent-session-telemetry` and `darwin-agent-session-telemetry`), and to send them to Langfuse.
 That record of real skill use postdates this change's design; it is an input to reconsider on resumption, not a decision this note makes.
 
 ## Why
