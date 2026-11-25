@@ -15,9 +15,10 @@
 # provisioned user logs in; the provisioned set is exactly the committed
 # dashboards after a planted view and a restart; dashboard writes are
 # refused; PromQL and SQL reads through the two datasources return data and
-# a caller's database header is overwritten; every committed view's query
-# succeeds and each PromQL query returns series, while a view with one
-# query naming an absent series fails that case; an INSERT through the SQL
+# a caller's database header is overwritten; every query-checked view's
+# query succeeds and each PromQL query returns series, while a view with one
+# query naming an absent series fails that case (the views it does not run
+# are named with their reasons in notQueryChecked); an INSERT through the SQL
 # datasource is refused by the store; the four out-of-pattern routes, sent
 # as written, are refused by Perses before any request is made; a caller's
 # x-greptime-auth carrying the admin credential reaches the store as perses
@@ -41,7 +42,9 @@
     }:
     {
       # Size class: the script measured 19.85 s on 2026-11-18
-      # (logs/cam111-perses-greptimedb-20261118-160547.log).
+      # (logs/cam111-perses-greptimedb-20261118-160547.log), and 19.09 s, 32 s
+      # for the whole build with the driver already built, on pyrite at
+      # 2026-11-25T01:40Z (logs/ptf-perses-greptimedb-base-20261125T0140Z.log).
       testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         perses-greptimedb.class = "small";
       };
@@ -66,8 +69,36 @@
               name = "perses-test-provisioning";
             };
             readJSON = dir: name: lib.importJSON (dir + "/${name}");
-            dashboards = lib.genAttrs [ "fleet-hosts" "devloop" ] (
-              name: readJSON resourcesDir "dashboard-${name}.json"
+            # Every Dashboard the module provisions, read from the files it
+            # provisions from, so cases 3 to 5 expect exactly what the service
+            # is given and a new view needs no edit here to be listed.
+            provisioned = lib.filter (r: (r.kind or null) == "Dashboard") (
+              map (readJSON resourcesDir) (lib.attrNames (builtins.readDir resourcesDir))
+            );
+            provisionedNames = map (d: d.metadata.name) provisioned;
+            fleetNames = lib.sort lib.lessThan (
+              map (d: d.metadata.name) (lib.filter (d: d.metadata.project == "fleet") provisioned)
+            );
+            # Case 14 runs every query of these views against the data the
+            # test writes.
+            queryChecked = [
+              "devloop"
+              "fleet-hosts"
+            ];
+            # The views case 14 does not run, each with its reason. A
+            # provisioned view in neither list fails evaluation, so a new view
+            # is placed by a decision rather than passing unchecked.
+            notQueryChecked = {
+              r2-usage = "its vanixiets_r2_* series are not emitted by this test";
+            };
+            placed = queryChecked ++ lib.attrNames notQueryChecked;
+            unplaced = lib.subtractLists placed provisionedNames;
+            unprovisioned = lib.subtractLists provisionedNames placed;
+            inBoth = lib.intersectLists queryChecked (lib.attrNames notQueryChecked);
+            dashboards = lib.listToAttrs (
+              map (d: lib.nameValuePair d.metadata.name d) (
+                lib.filter (d: lib.elem d.metadata.name queryChecked) provisioned
+              )
             );
             committedSql = readJSON resourcesDir "globaldatasource-sql.json";
             openSql = readJSON ./perses-greptimedb "globaldatasource-sql-open.json";
@@ -103,6 +134,10 @@
                   sys.stdout.buffer.write(request.SerializeToString())
                 '';
           in
+          # Every provisioned view is query-checked or named with the reason it
+          # is not, exactly once, and each name in the two lists is provisioned.
+          assert lib.assertMsg (unplaced == [ ] && unprovisioned == [ ] && inBoth == [ ])
+            "perses-greptimedb: place every provisioned dashboard in exactly one of queryChecked or notQueryChecked (with its reason); unplaced ${builtins.toJSON unplaced}, listed but not provisioned ${builtins.toJSON unprovisioned}, in both ${builtins.toJSON inBoth}";
           # The bypass control's datasource is the committed SQL datasource
           # without allowHeaders under another name, and nothing else.
           assert lib.assertMsg
@@ -219,11 +254,17 @@
               import datetime as dt
               import json
               import shlex
+              import time
 
               VARS = "${vars}"
               DOMAIN = "${domain}"
               PROMOTE = "${lib.concatStringsSep ";" schema.promotedResourceAttributes}"
               DASHBOARDS = json.loads(${builtins.toJSON (builtins.toJSON dashboards)})
+              # Every fleet dashboard the module provisions, from its resource files.
+              PROVISIONED = json.loads(${builtins.toJSON (builtins.toJSON fleetNames)})
+              # Provisioning runs as Perses starts; the list is complete well
+              # within this, and a wrong list fails here, inside the class limit.
+              PROVISIONING_WAIT_S = 10
               USER = json.loads(${builtins.toJSON (builtins.toJSON (readJSON ./perses-greptimedb "user-tester.json"))})
               LOGIN = USER["metadata"]["name"]
               PASSWORD = USER["spec"]["nativeProvider"]["password"]
@@ -279,6 +320,19 @@
                   status, body = curl("/api/v1/projects/fleet/dashboards")
                   assert status == 200, (status, body)
                   return sorted(d["metadata"]["name"] for d in json.loads(body))
+
+
+              def assert_provisioned(when):
+                  """Poll the fleet list until it is PROVISIONED; fail with the list last seen."""
+                  deadline = time.monotonic() + PROVISIONING_WAIT_S
+                  while True:
+                      seen = dashboards()
+                      if seen == PROVISIONED:
+                          return seen
+                      assert time.monotonic() < deadline, (
+                          f"{when}: fleet lists {seen} after {PROVISIONING_WAIT_S} s, expected {PROVISIONED}"
+                      )
+                      time.sleep(1)
 
 
               def promql(path, query, base=NGINX, extra=()):
@@ -493,8 +547,7 @@
                   ok("native login as the provisioned user answers 200")
 
               with subtest("3: the provisioned set is exactly the committed views"):
-                  retry(lambda _last: dashboards() == ["devloop", "fleet-hosts"], timeout=dt.timedelta(minutes=1))
-                  ok(f"fleet lists {dashboards()}")
+                  ok(f"fleet lists {assert_provisioned('before the restart')}")
 
               with subtest("4: a view planted in the database is gone after a restart"):
                   planted = copy.deepcopy(DASHBOARDS["devloop"])
@@ -513,8 +566,7 @@
                       timeout=dt.timedelta(minutes=3),
                   )
                   login()
-                  retry(lambda _last: dashboards() == ["devloop", "fleet-hosts"], timeout=dt.timedelta(minutes=1))
-                  ok(f"after the restart fleet lists {dashboards()}")
+                  ok(f"after the restart fleet lists {assert_provisioned('after the restart')}")
 
               with subtest("5: dashboard writes are refused"):
                   body = shlex.quote(json.dumps(DASHBOARDS["fleet-hosts"]))
@@ -526,7 +578,7 @@
                       status, text = curl(path, "-X", method, "-H", "Content-Type: application/json", raw=f"--data {body}" if method != "DELETE" else "")
                       assert status in (404, 405), (method, status, text)
                       ok(f"{method} {path} answers {status}")
-                  assert dashboards() == ["devloop", "fleet-hosts"], dashboards()
+                  assert dashboards() == PROVISIONED, dashboards()
                   ok("the provisioned set is unchanged")
 
               with subtest("6: PromQL reads through greptimedb-promql"):
@@ -606,7 +658,7 @@
                   assert status == 200, status
                   ok("/metrics answers 404 through nginx and 200 directly")
 
-              with subtest("14: every committed view's query succeeds"):
+              with subtest("14: every query-checked view's query succeeds"):
                   failures = views_failures(DASHBOARDS)
                   assert failures == [], json.dumps(failures, indent=1)
                   count = sum(len(p["spec"]["queries"]) for v in DASHBOARDS.values() for p in v["spec"]["panels"].values())
