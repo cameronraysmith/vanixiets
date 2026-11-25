@@ -85,8 +85,8 @@
             owns; under Nix there is no such installation to promote into, and
             a worker service silently running a different build than the one
             its generation declares is exactly the drift this repository
-            exists to prevent. `nix run .#update-devin-cli` is the update
-            path.
+            exists to prevent. Renovate proposes new versions and
+            `nix run .#realize-pin -- devin-cli <version>` realizes them.
           '';
         };
 
