@@ -1,0 +1,55 @@
+{
+  "name": "atomic",
+  "version": "0.10.3",
+  "realizedVersion": "0.10.3",
+  "source": {
+    "npm": {
+      "package": "@bastani/atomic"
+    }
+  },
+  "artifacts": {
+    "nodeModules-aarch64-darwin": {
+      "sourceBuild": {
+        "fetcher": {
+          "derived": {}
+        },
+        "hash": "sha256-t9SSqGHw+UTPxT/5jSTAsLWq8cqKvacIlqn+7d7me24=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    },
+    "nodeModules-aarch64-linux": {
+      "sourceBuild": {
+        "fetcher": {
+          "derived": {}
+        },
+        "hash": "sha256-h3UXeXuD41Imw67HW5LP63icDeM1L0Hb/qgnIUhzcW0=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    },
+    "nodeModules-x86_64-linux": {
+      "sourceBuild": {
+        "fetcher": {
+          "derived": {}
+        },
+        "hash": "sha256-q5GWq8XkHVZ4MRXNqdqy4jnieFVF4mb4ywdtz/97aJk=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    },
+    "src": {
+      "file": {
+        "urlTemplate": "https://registry.npmjs.org/@bastani/atomic/-/atomic-{version}.tgz",
+        "checksum": {
+          "prefetch": {}
+        },
+        "hash": "sha256-Nb97/Kwx8K9pYO2EWvzGNirWbBngLdjR4Z/hSypiLcw="
+      }
+    }
+  },
+  "companions": []
+}

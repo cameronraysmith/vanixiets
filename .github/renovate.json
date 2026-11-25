@@ -229,6 +229,12 @@
       "matchManagers": ["custom.jsonata"],
       "matchDepNames": ["greptimedb-bin"],
       "dependencyDashboardApproval": true
+    },
+    {
+      "description": "atomic is held for operator approval (openspec automate-package-version-bumps design D10): since 0.10.4 the @bastani/atomic npm tarball ships no npm-shrinkwrap.json, so realize-pin cannot pin its dependency tree and a realization fails at npm ci. The hold stays until upstream ships a lockfile again or atomic is built from the upstream monorepo at its release tag.",
+      "matchManagers": ["custom.jsonata"],
+      "matchDepNames": ["atomic"],
+      "dependencyDashboardApproval": true
     }
   ]
 }

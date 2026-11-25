@@ -7,17 +7,12 @@
 # Packages with a pin.json have no app here; they are realized with
 # nix run .#realize-pin -- <package> <version>
 #
-# nix run .#update-atomic
+# nix run .#update-xsra
 { ... }:
 {
   perSystem =
     { config, ... }:
     {
-      apps.update-atomic = {
-        type = "app";
-        program = "${config.packages.atomic.updateScript}";
-      };
-
       apps.update-xsra = {
         type = "app";
         program = "${config.packages.xsra.updateScript}";
