@@ -184,6 +184,11 @@
             # a binary repackage since 2026-11-13, so nixbot's source-build runs
             # no longer apply (design D9)
             package-omnigraph.class = "small";
+            # no nixbot runs yet, too few to class
+            package-omnigraph-studio = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 4.1 s, slowest 98 s, 14 runs in 30 days
             package-omp-browser-relay-extension.class = "small";
             # nixbot: median 18 s, slowest 37 s, 3 runs in 30 days
@@ -398,6 +403,11 @@
             package-omnigent-worker-login.class = "medium";
             # nixbot: median 54 s, slowest 7695 s, all 4 runs 2026-10-07..2026-11-13
             package-omnigraph.class = "small";
+            # no nixbot runs yet, too few to class
+            package-omnigraph-studio = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 5.5 s, slowest 400 s, 9 runs in 30 days
             package-omp-browser-relay-extension.class = "small";
             # nixbot: median 88 s, slowest 593 s, 3 runs in 30 days

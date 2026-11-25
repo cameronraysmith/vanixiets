@@ -1,0 +1,36 @@
+{
+  "name": "omnigraph-studio",
+  "version": "0.4.14",
+  "realizedVersion": "0.4.14",
+  "source": {
+    "githubRelease": {
+      "owner": "ModernRelay",
+      "repo": "omnigraph-studio",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/ModernRelay/omnigraph-studio/releases/download/{tag}/{platform}",
+        "platforms": {
+          "x86_64-linux": "omnigraph-studio-linux-x86_64.tar.gz",
+          "aarch64-darwin": "Omnigraph-Studio-arm64.dmg"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://github.com/ModernRelay/omnigraph-studio/releases/download/{tag}/SHA256SUMS",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-eAwwWKkN0Vza2i7pa61cuww0qaMc/KBSSTqKI/2D9bs=",
+          "aarch64-darwin": "sha256-Q3FMirzYuu6C6ra6Fy868gnswD17t4sQbeBB6Lkifu8="
+        }
+      }
+    }
+  },
+  "companions": []
+}

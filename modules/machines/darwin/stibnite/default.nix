@@ -92,7 +92,10 @@ in
       custom.profile.isDesktop = true;
 
       # Nix-managed macOS apps via ditto (modules/darwin/casks.nix)
-      environment.casks = [ pkgs.radicle-desktop ];
+      environment.casks = [
+        pkgs.radicle-desktop
+        pkgs.omnigraph-studio
+      ];
 
       # Base casks from modules/darwin/homebrew.nix; machine-specific additions below
       custom.homebrew = {

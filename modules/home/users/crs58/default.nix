@@ -64,6 +64,14 @@ let
 
       programs.omnigraph = {
         enable = true;
+
+        # The desktop client on the two workstations used at a display.
+        # This home also reaches the servers (as cameron) and standalone
+        # home configurations, which have no use for a desktop app.
+        studio.enable = lib.elem (if osConfig == null then null else osConfig.networking.hostName) [
+          "stibnite"
+          "pyrite"
+        ];
         settings = {
           version = 1;
 

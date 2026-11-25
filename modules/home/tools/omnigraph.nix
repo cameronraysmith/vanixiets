@@ -74,18 +74,61 @@
             of Nix.
           '';
         };
+
+        studio = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = false;
+            description = ''
+              Whether to set up OmniGraph Studio, the desktop client, which
+              reads its servers from this configuration's targets and each
+              bearer token from `omnigraph credentials export` at run time.
+              The client also gets a link at {file}`~/.local/bin/omnigraph`:
+              Studio started from the Dock, Finder or a desktop launcher does
+              not inherit the login shell's {env}`PATH`, and
+              {file}`~/.local/bin` is one of the fixed places it looks for the
+              CLI.
+
+              On Linux this installs the package. On macOS it does not: the
+              app belongs in {file}`/Applications`, where LaunchServices
+              registers its bundle identifier so that `omnigraph studio` can
+              open a graph in it, and nix-darwin's `environment.casks` copies
+              it there.
+            '';
+          };
+
+          package = lib.mkPackageOption pkgs "omnigraph-studio" { };
+        };
       };
 
-      config = lib.mkIf cfg.enable {
-        home.packages = [ cfg.package ];
+      config = lib.mkMerge [
+        (lib.mkIf cfg.enable {
+          home.packages = [ cfg.package ];
 
-        # No token may be added here. Omnigraph resolves a bearer token only
-        # from the source a target's `auth` names (the secure store, a named
-        # environment variable, a file or a helper command), and upstream
-        # forbids tokens in this YAML. That is what makes a world-readable
-        # store path an acceptable target.
-        home.file.".omnigraph/config.yaml".source = yaml.generate "omnigraph-config.yaml" cfg.settings;
-      };
+          # No token may be added here. Omnigraph resolves a bearer token only
+          # from the source a target's `auth` names (the secure store, a named
+          # environment variable, a file or a helper command), and upstream
+          # forbids tokens in this YAML. That is what makes a world-readable
+          # store path an acceptable target.
+          home.file.".omnigraph/config.yaml".source = yaml.generate "omnigraph-config.yaml" cfg.settings;
+        })
+
+        # Studio writes its own settings.json from its settings view, so that
+        # file stays unmanaged; so does the omnigraph-studio:// link handler on
+        # Linux, which would make home-manager own ~/.config/mimeapps.list.
+        (lib.mkIf cfg.studio.enable {
+          assertions = [
+            {
+              assertion = cfg.enable;
+              message = "programs.omnigraph.studio.enable needs programs.omnigraph.enable: Studio reads its servers and tokens through the omnigraph CLI and its configuration.";
+            }
+          ];
+
+          home.file.".local/bin/omnigraph".source = lib.getExe cfg.package;
+
+          home.packages = lib.optionals pkgs.stdenv.hostPlatform.isLinux [ cfg.studio.package ];
+        })
+      ];
     };
 
   # The upstream omnigraph skill, from the source tree tagged with the release
