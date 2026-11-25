@@ -1,0 +1,6 @@
+{
+  "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-x86_64-unknown-linux-gnu.tar.xz.sha256": "icp-cli-x86_64-unknown-linux-gnu.tar.xz.sha256",
+  "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-aarch64-unknown-linux-gnu.tar.xz.sha256": "icp-cli-aarch64-unknown-linux-gnu.tar.xz.sha256",
+  "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-x86_64-apple-darwin.tar.xz.sha256": "icp-cli-x86_64-apple-darwin.tar.xz.sha256",
+  "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-aarch64-apple-darwin.tar.xz.sha256": "icp-cli-aarch64-apple-darwin.tar.xz.sha256"
+}

@@ -1,0 +1,49 @@
+{
+  "version": "2.1.331",
+  "tag": null,
+  "artifacts": {
+    "binary": {
+      "platformBinaries": {
+        "x86_64-linux": {
+          "url": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.331/linux-x64/claude",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.331/manifest.json",
+              "format": {
+                "jsonPointer": {
+                  "pointer": "/platforms/linux-x64/checksum"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-linux": {
+          "url": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.331/linux-arm64/claude",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.331/manifest.json",
+              "format": {
+                "jsonPointer": {
+                  "pointer": "/platforms/linux-arm64/checksum"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-darwin": {
+          "url": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.331/darwin-arm64/claude",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/2.1.331/manifest.json",
+              "format": {
+                "jsonPointer": {
+                  "pointer": "/platforms/darwin-arm64/checksum"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

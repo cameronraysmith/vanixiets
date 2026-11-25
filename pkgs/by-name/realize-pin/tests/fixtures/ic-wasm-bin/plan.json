@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "tag": "1.0.0",
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "x86_64-linux": {
+          "url": "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-x86_64-unknown-linux-gnu.tar.xz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-x86_64-unknown-linux-gnu.tar.xz.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "ic-wasm-x86_64-unknown-linux-gnu.tar.xz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-linux": {
+          "url": "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-aarch64-unknown-linux-gnu.tar.xz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-aarch64-unknown-linux-gnu.tar.xz.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "ic-wasm-aarch64-unknown-linux-gnu.tar.xz"
+                }
+              }
+            }
+          }
+        },
+        "x86_64-darwin": {
+          "url": "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-x86_64-apple-darwin.tar.xz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-x86_64-apple-darwin.tar.xz.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "ic-wasm-x86_64-apple-darwin.tar.xz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-darwin": {
+          "url": "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-aarch64-apple-darwin.tar.xz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-aarch64-apple-darwin.tar.xz.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "ic-wasm-aarch64-apple-darwin.tar.xz"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

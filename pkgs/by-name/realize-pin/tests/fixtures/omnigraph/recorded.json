@@ -1,0 +1,5 @@
+{
+  "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-linux-x86_64.sha256": "omnigraph-linux-x86_64.sha256",
+  "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-linux-arm64.sha256": "omnigraph-linux-arm64.sha256",
+  "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-macos-arm64.sha256": "omnigraph-macos-arm64.sha256"
+}

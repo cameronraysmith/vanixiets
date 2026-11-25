@@ -1,0 +1,6 @@
+{
+  "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-x86_64-unknown-linux-gnu.tar.xz.sha256": "ic-wasm-x86_64-unknown-linux-gnu.tar.xz.sha256",
+  "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-aarch64-unknown-linux-gnu.tar.xz.sha256": "ic-wasm-aarch64-unknown-linux-gnu.tar.xz.sha256",
+  "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-x86_64-apple-darwin.tar.xz.sha256": "ic-wasm-x86_64-apple-darwin.tar.xz.sha256",
+  "https://github.com/dfinity/ic-wasm/releases/download/1.0.0/ic-wasm-aarch64-apple-darwin.tar.xz.sha256": "ic-wasm-aarch64-apple-darwin.tar.xz.sha256"
+}

@@ -1,0 +1,36 @@
+name: version-control-and-forge
+version: 0.0.0
+description: Version-control and forge skills — jj workflow and history, GitButler, git commit, GitHub browse, dependency source acquisition, git-native stacked PR integration.
+dependencies:
+  apm:
+    # worktrunk distributes two agent skills (worktrunk, wt-switch-create) as a
+    # github-hosted apm dependency in object form. The commit is pinned here
+    # only; Nix downloads it in apm-deps (pkgs/by-name/apm-skills-compose/deps.nix).
+    # It must equal pkgs.worktrunk-bin.sourceRev
+    # (structure-release-alignment-worktrunk); pkgs/by-name/worktrunk-bin/update.sh
+    # rewrites both in step.
+    # Upstream's tag series is not monotonic: `apm outdated` reported v0.1.4
+    # (b08d381f...) as "latest", but that tag is an orphan not reachable from
+    # main (verify ancestry via `gh api .../compare/<sha>...main` before
+    # trusting the table on a future bump). This pin instead tracks v0.81.0,
+    # the release actually reachable from main at bump time.
+    - git: max-sixty/worktrunk
+      ref: e42f0f6fef2fdbd98fc92e5cd6c3cbea55b65b38
+      skills: [worktrunk, wt-switch-create]
+    # gh-stack is a Go CLI repo that also ships one agent skill under
+    # skills/gh-stack/. apm types it SKILL_BUNDLE (nested skills/<name>/SKILL.md,
+    # no plugin manifest and no apm.yml) and installs the skill directory with its
+    # references/ siblings. The commit is pinned here only; Nix downloads it in
+    # apm-deps. It must equal pkgs.gh-stack.sourceRev
+    # (structure-release-alignment-gh-stack, modules/nixpkgs/overlays/gh-stack.nix).
+    # The `gh stack` extension the skill drives is installed by
+    # modules/home/development/gh.nix.
+    - git: github/gh-stack
+      ref: 2a49e6751238633db504655d8a8eba3e433e827d
+      skills: [gh-stack]
+    # The commit is pinned here only; Nix downloads it in apm-deps. It must equal
+    # pkgs.mergify-cli-bin.sourceRev (structure-release-alignment-mergify-cli);
+    # pkgs/by-name/mergify-cli-bin/update.sh rewrites both in step.
+    - git: Mergifyio/mergify-cli
+      ref: e7c1ebbc281361f0b2b7827cf583f57339c97ebc
+      skills: [mergify-stack]

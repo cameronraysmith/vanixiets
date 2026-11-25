@@ -1,0 +1,38 @@
+{
+  "name": "claude-code",
+  "version": "2.1.331",
+  "source": {
+    "vendorText": {
+      "url": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/latest",
+      "regex": "^(?<version>\\S+)\\s*$"
+    }
+  },
+  "artifacts": {
+    "binary": {
+      "platformBinaries": {
+        "urlTemplate": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/{version}/{platform}/claude",
+        "platforms": {
+          "x86_64-linux": "linux-x64",
+          "aarch64-linux": "linux-arm64",
+          "aarch64-darwin": "darwin-arm64"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/{version}/manifest.json",
+            "format": {
+              "jsonPointer": {
+                "pointerTemplate": "/platforms/{platform}/checksum"
+              }
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-TACDnPRr6ys47DEBBfLVOPf5Mh/kbGNimbdLyrlGJrE=",
+          "aarch64-linux": "sha256-Plr+p2z27VP0IHbYsXXE7j2as0zZuQRS2hFdIa0NXTE=",
+          "aarch64-darwin": "sha256-SHRZHcOb/xGIkhuCy+uKROOjOw+SyIiz1DY5uTRBAfc="
+        }
+      }
+    }
+  },
+  "companions": []
+}

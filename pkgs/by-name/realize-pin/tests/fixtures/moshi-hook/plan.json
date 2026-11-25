@@ -1,0 +1,62 @@
+{
+  "version": "0.4.64",
+  "tag": null,
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "aarch64-darwin": {
+          "url": "https://cdn.getmoshi.app/hook/v0.4.64/moshi-hook_Darwin_arm64.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://cdn.getmoshi.app/hook/v0.4.64/checksums.txt",
+              "format": {
+                "sha256sum": {
+                  "asset": "moshi-hook_Darwin_arm64.tar.gz"
+                }
+              }
+            }
+          }
+        },
+        "x86_64-darwin": {
+          "url": "https://cdn.getmoshi.app/hook/v0.4.64/moshi-hook_Darwin_x86_64.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://cdn.getmoshi.app/hook/v0.4.64/checksums.txt",
+              "format": {
+                "sha256sum": {
+                  "asset": "moshi-hook_Darwin_x86_64.tar.gz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-linux": {
+          "url": "https://cdn.getmoshi.app/hook/v0.4.64/moshi-hook_Linux_arm64.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://cdn.getmoshi.app/hook/v0.4.64/checksums.txt",
+              "format": {
+                "sha256sum": {
+                  "asset": "moshi-hook_Linux_arm64.tar.gz"
+                }
+              }
+            }
+          }
+        },
+        "x86_64-linux": {
+          "url": "https://cdn.getmoshi.app/hook/v0.4.64/moshi-hook_Linux_x86_64.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://cdn.getmoshi.app/hook/v0.4.64/checksums.txt",
+              "format": {
+                "sha256sum": {
+                  "asset": "moshi-hook_Linux_x86_64.tar.gz"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

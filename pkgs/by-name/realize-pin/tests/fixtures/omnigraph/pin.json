@@ -1,0 +1,51 @@
+{
+  "name": "omnigraph",
+  "version": "0.15.0",
+  "source": {
+    "githubRelease": {
+      "owner": "ModernRelay",
+      "repo": "omnigraph",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/ModernRelay/omnigraph/releases/download/{tag}/omnigraph-{platform}.tar.gz",
+        "platforms": {
+          "x86_64-linux": "linux-x86_64",
+          "aarch64-linux": "linux-arm64",
+          "aarch64-darwin": "macos-arm64"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://github.com/ModernRelay/omnigraph/releases/download/{tag}/omnigraph-{platform}.sha256",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-1zEs5Jq8pHprtHlWtph9MvZQ+pFni+Gr0Q4Cgkk3uxU=",
+          "aarch64-linux": "sha256-+hCCY2uzkn1h3PnSK7TgjrD7RG0I50ZziGnkDDY7R1U=",
+          "aarch64-darwin": "sha256-x4PcnQ42YLdKnC5sVZG/Hk35p2POMilYUmwIcunKGuw="
+        }
+      }
+    },
+    "skillSrc": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "ModernRelay",
+            "repo": "omnigraph"
+          }
+        },
+        "hash": "sha256-fDjXKhh/jAXST0SGoPsGkFDIZtpGF9NxCxGd7H4snBA=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}

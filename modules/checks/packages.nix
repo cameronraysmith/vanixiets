@@ -208,6 +208,11 @@
             package-playwright-cli.class = "small";
             # nixbot: median 45 s, slowest 117 s, all 8 runs 2026-09-12..2026-11-11
             package-quarto-bin.class = "small";
+            # nixbot: 0 runs, too few to class (design D4)
+            package-realize-pin = {
+              class = "small";
+              measured = false;
+            };
             # nixbot: median 5.2 s, slowest 1734 s, all 14 runs 2026-08-29..2026-11-11
             package-repo-sync.class = "small";
             # nixbot: median 7.0 s, slowest 33 s, all 8 runs 2026-09-05..2026-11-11
@@ -411,6 +416,11 @@
             package-quarto-bin.class = "medium";
             # nixbot: median 120 s, slowest 245 s, all 3 runs 2026-10-07..2026-11-11
             package-radicle-desktop.class = "medium";
+            # nixbot: 0 runs, too few to class (design D4)
+            package-realize-pin = {
+              class = "small";
+              measured = false;
+            };
             # nixbot: median 33 s, slowest 365 s, 3 runs in 30 days
             package-repo-sync.class = "small";
             # nixbot: median 89 s, slowest 373 s, all 3 runs 2026-10-21..2026-11-11

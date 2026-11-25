@@ -1,0 +1,62 @@
+{
+  "version": "1.8.0",
+  "tag": "v1.8.0",
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "x86_64-linux": {
+          "url": "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-x86_64-unknown-linux-gnu.tar.xz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-x86_64-unknown-linux-gnu.tar.xz.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "icp-cli-x86_64-unknown-linux-gnu.tar.xz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-linux": {
+          "url": "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-aarch64-unknown-linux-gnu.tar.xz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-aarch64-unknown-linux-gnu.tar.xz.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "icp-cli-aarch64-unknown-linux-gnu.tar.xz"
+                }
+              }
+            }
+          }
+        },
+        "x86_64-darwin": {
+          "url": "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-x86_64-apple-darwin.tar.xz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-x86_64-apple-darwin.tar.xz.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "icp-cli-x86_64-apple-darwin.tar.xz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-darwin": {
+          "url": "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-aarch64-apple-darwin.tar.xz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/dfinity/icp-cli/releases/download/v1.8.0/icp-cli-aarch64-apple-darwin.tar.xz.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "icp-cli-aarch64-apple-darwin.tar.xz"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

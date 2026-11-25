@@ -1,0 +1,62 @@
+{
+  "version": "2026.9.16.1",
+  "tag": "2026.9.16.1",
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "x86_64-linux": {
+          "url": "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/mergify-2026.9.16.1-x86_64-unknown-linux-gnu.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/SHA256SUMS",
+              "format": {
+                "sha256sum": {
+                  "asset": "mergify-2026.9.16.1-x86_64-unknown-linux-gnu.tar.gz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-linux": {
+          "url": "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/mergify-2026.9.16.1-aarch64-unknown-linux-gnu.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/SHA256SUMS",
+              "format": {
+                "sha256sum": {
+                  "asset": "mergify-2026.9.16.1-aarch64-unknown-linux-gnu.tar.gz"
+                }
+              }
+            }
+          }
+        },
+        "x86_64-darwin": {
+          "url": "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/mergify-2026.9.16.1-x86_64-apple-darwin.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/SHA256SUMS",
+              "format": {
+                "sha256sum": {
+                  "asset": "mergify-2026.9.16.1-x86_64-apple-darwin.tar.gz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-darwin": {
+          "url": "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/mergify-2026.9.16.1-aarch64-apple-darwin.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/SHA256SUMS",
+              "format": {
+                "sha256sum": {
+                  "asset": "mergify-2026.9.16.1-aarch64-apple-darwin.tar.gz"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

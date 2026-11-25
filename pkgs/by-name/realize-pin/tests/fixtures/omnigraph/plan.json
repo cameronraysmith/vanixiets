@@ -1,0 +1,58 @@
+{
+  "version": "0.15.0",
+  "tag": "v0.15.0",
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "x86_64-linux": {
+          "url": "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-linux-x86_64.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-linux-x86_64.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "omnigraph-linux-x86_64.tar.gz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-linux": {
+          "url": "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-linux-arm64.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-linux-arm64.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "omnigraph-linux-arm64.tar.gz"
+                }
+              }
+            }
+          }
+        },
+        "aarch64-darwin": {
+          "url": "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-macos-arm64.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/ModernRelay/omnigraph/releases/download/v0.15.0/omnigraph-macos-arm64.sha256",
+              "format": {
+                "sha256sum": {
+                  "asset": "omnigraph-macos-arm64.tar.gz"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "skillSrc": {
+      "sourceBuild": {
+        "fetchFromGitHub": {
+          "owner": "ModernRelay",
+          "repo": "omnigraph",
+          "tag": "v0.15.0"
+        }
+      }
+    }
+  }
+}
