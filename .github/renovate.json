@@ -162,24 +162,42 @@
       }
     },
     {
-      "description": "The pin rule (openspec automate-package-version-bumps design D7): one branch renovate/<p> per package, whose single task runs the realizer for the proposed version; fileFilters repeats the realizer's write confinement, every pin plus the migrated pins' companion paths. The window is Monday and Thursday 14:00-17:59 UTC, clear of the flake-update effect and harmonia-gc, and updateNotScheduled false keeps rebases and realizer runs inside it. The limits bound the builds these branches cause on magnetite, which also runs nixbot; prCommitsPerRunLimit is global-only and set to 4 by the instance (modules/nixos/renovate.nix). Merge authorization stays with the operator: no automerge, and ignoreUnstable is left at its default.",
+      "description": "The pin rule (openspec automate-package-version-bumps design D7): one branch renovate/<p> per package, whose single task runs the realizer for the proposed version. Renovate commits only the task's writes that match fileFilters and drops the rest silently, so the globs cover every path the realizer's write confinement (design D5) can admit for any pin: its pin.json, an apmRef companion's apm.yml under modules/home/ai/plugins, and a fixedOutputHash companion's pkgs/by-name/<package>/hashes.json; checks.renovate-allowed-commands fails when a pin or companion path falls outside them. separateMajorMinor false gives each package one PR straight to its newest version: with separate buckets, the major and non-major updates of one package share the branch renovate/<p> that branchTopic names, and Renovate kept one of them. allowedVersions admits only versions with a dot, since a floating release such as uncomment's v3 names no fixed artifact and semver-coerced versioning reads it as 3.0.0. The pin rule has no schedule: the instance runs hourly (modules/nixos/renovate.nix), at most 4 pin PRs are created in a clock hour, and the number open at once is unbounded, so the bound on magnetite's load is the rate, prHourlyLimit here and the instance's global prCommitsPerRunLimit of 4. Merge authorization stays with the operator: no automerge, and ignoreUnstable is left at its default.",
       "matchManagers": ["custom.jsonata"],
       "branchTopic": "{{{depName}}}",
       "commitMessageTopic": "{{{depName}}}",
-      "schedule": ["* 14-17 * * 1,4"],
-      "updateNotScheduled": false,
-      "prHourlyLimit": 2,
-      "prConcurrentLimit": 6,
-      "branchConcurrentLimit": 6,
+      "separateMajorMinor": false,
+      "allowedVersions": "/\\./",
+      "prHourlyLimit": 4,
+      "prConcurrentLimit": 0,
+      "branchConcurrentLimit": 0,
       "postUpgradeTasks": {
         "commands": ["nix run .#realize-pin -- {{{depName}}} {{{newVersion}}}"],
         "fileFilters": [
-          "pkgs/by-name/**/pin.json",
-          "modules/home/ai/plugins/version-control-and-forge/apm.yml",
-          "pkgs/by-name/apm-skills-compose/hashes.json"
+          "pkgs/by-name/*/pin.json",
+          "pkgs/by-name/*/hashes.json",
+          "modules/home/ai/plugins/*/apm.yml"
         ],
         "executionMode": "update"
       }
+    },
+    {
+      "description": "Label a pin's major update for review (openspec automate-package-version-bumps design D7). With separateMajorMinor false the pin rule raises one PR per package to its newest version, which may cross a major; Renovate still classifies the update as major (lib/workers/repository/process/lookup/generate.ts), so this rule can mark it.",
+      "matchManagers": ["custom.jsonata"],
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major"]
+    },
+    {
+      "description": "Held until realize-pin maintains pkgs/by-name/apm-skills-compose/skills.json (openspec automate-package-version-bumps design D5, known gap). These three pins each have an apmRef companion, and skills.json records a NAR hash per installed remote skill that `just agents-skills-index` writes and apm-skills-compose checks, so a ref bump that changes an upstream skill fails closed until someone commits a regenerated index by hand. Surface their updates on the dependency dashboard but open no PR until approved; the planned fix is a third companion kind, remoteSkillHashes.",
+      "matchManagers": ["custom.jsonata"],
+      "matchDepNames": ["mergify-cli-bin", "worktrunk-bin", "linear-cli"],
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Pins that run as stateful services on fleet hosts are upgraded only after operator approval (openspec automate-package-version-bumps design D7, permanent): greptimedb-bin is services.greptimedb.package on magnetite, and a new version may change its storage format, so data it writes may not be readable after a downgrade. Before approving, read the upstream release notes for storage-format and compatibility changes, run the VM tests that exercise the store (greptimedb-pipeline, fleet-ingress, devloop-ingest), and plan magnetite's deploy with a rollback that accounts for that downgrade incompatibility. perses-bin, the dashboard server on magnetite, joins this rule in its migration commit. Separate from the temporary skills hold above, which ends when realize-pin maintains skills.json.",
+      "matchManagers": ["custom.jsonata"],
+      "matchDepNames": ["greptimedb-bin"],
+      "dependencyDashboardApproval": true
     }
   ]
 }

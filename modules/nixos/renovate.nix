@@ -21,6 +21,13 @@
 # and Renovate never refreshes it, so RuntimeMaxSec stops a run at 55 minutes
 # and every run mints a new token.
 #
+# Cadence (openspec automate-package-version-bumps design D7): the timer
+# fires hourly at :17 plus up to 10 minutes of RandomizedDelaySec, and a run
+# stops at 55 minutes, so a run never outlives its token; systemd does not
+# start the unit while a run is still active. prCommitsPerRunLimit 4 caps the
+# commits a run pushes, which with hourly runs matches the pin rule's
+# prHourlyLimit of 4 in .github/renovate.json.
+#
 # Allowlist coupling: allowedCommands below is the only set of commands
 # Renovate may run as post-upgrade tasks. A refused command still produces a
 # pushed, incomplete commit, so the flake check renovate-allowed-commands
@@ -83,7 +90,7 @@ in
 
       services.renovate = {
         enable = true;
-        schedule = "*-*-* 00/2:17:00";
+        schedule = "*-*-* *:17:00";
         runtimePackages = [
           config.nix.package
           repoBun
