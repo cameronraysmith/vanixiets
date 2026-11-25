@@ -1071,9 +1071,13 @@
           '';
 
           # CAM-111 6.1's detector as fleet-alert's evaluator sends it,
-          # over eval_run rows written as admin, the fields as
-          # nixbot-evaluation-record.patch writes them. Each row's build_id
-          # names its case; the exit statuses are the rule comment's.
+          # over eval_run and ci_build rows written as admin, the fields as
+          # nixbot-evaluation-record.patch and devloop-collection.nix's
+          # ci_build query write them. Each row's build_id names its case;
+          # the exit statuses are the rule comment's. An evaluation is
+          # judged by the first ci_build row of its build that finished at
+          # or after it: a build nixbot settled as cancelled is not judged,
+          # nor is one with no such row yet.
           ietsAlertRule =
             lib.findFirst (r: r.alert == "IetsEvaluationUnhealthy")
               (throw "devloop-ingest: no IetsEvaluationUnhealthy rule")
@@ -1087,18 +1091,29 @@
             assert ${builtins.toJSON ietsAlertRule.language} == "sql", "IetsEvaluationUnhealthy is not an SQL rule"
             assert IETS_DB == "devloop", IETS_DB
 
-            # eval_run holds exactly the rows written below.
+            # eval_run and ci_build hold exactly the rows written below.
             reset_devloop()
             IETS_NOW = int(store.succeed("date -u +%s").strip())
 
 
-            def iets_row(build_id, exit_status, worker_kills=0, oom_kill=0, budget_kills=0, evaluator="iets", hours_ago=1):
+            def iets_time(hours_ago):
                 ts = datetime.datetime.fromtimestamp(IETS_NOW - hours_ago * 3600, datetime.timezone.utc)
+                return ts.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
+            def iets_row(build_id, exit_status, worker_kills=0, oom_kill=0, budget_kills=0, evaluator="iets", hours_ago=1):
                 oom = "NULL" if oom_kill is None else str(oom_kill)
                 return (
-                    f"({build_id}, '{ts.strftime('%Y-%m-%dT%H:%M:%SZ')}', '{evaluator}', '0.2.0', 5, 3072, "
+                    f"({build_id}, '{iets_time(hours_ago)}', '{evaluator}', '0.2.0', 5, 3072, "
                     f"23068672000, 17179869184, {oom}, 40000, {budget_kills}, {worker_kills}, {exit_status})"
                 )
+
+
+            def settled_row(build_id, status, hours_ago=1):
+                """The build's ci_build row, finished one minute after an
+                evaluation hours_ago h ago."""
+                finished = iets_time(hours_ago - 1 / 60)
+                return f"({build_id}, '{finished}', '{finished}', '{finished}', 40000, '{status}', NULL, 'main')"
 
 
             ROWS = [
@@ -1113,16 +1128,47 @@
                 iets_row(9, -9),  # nixbot's timeout, lock wait included
                 iets_row(10, 1, evaluator="nix-eval-jobs"),  # the stock evaluator
                 iets_row(11, 1, hours_ago=13),  # outside the window
+                iets_row(12, -9),  # nixbot killed it because the build was cancelled
+                iets_row(13, -9),  # its build not yet settled
+                iets_row(14, -9, hours_ago=3),  # cancelled, then rerun under the same build_id
+                iets_row(14, 1, hours_ago=2),  # the rerun's evaluator failed
+                iets_row(15, 1, hours_ago=3),  # the evaluator failed
+                iets_row(15, -9, hours_ago=2),  # its rerun was cancelled
             ]
-            FIRING = [4, 5, 6, 7, 8, 9]
+            BUILDS = [
+                settled_row(1, "succeeded"),
+                settled_row(2, "succeeded"),
+                settled_row(3, "succeeded"),
+                settled_row(4, "succeeded"),
+                settled_row(5, "failed"),
+                settled_row(6, "succeeded"),
+                settled_row(7, "failed"),
+                settled_row(8, "failed"),
+                settled_row(9, "failed"),
+                settled_row(10, "failed"),
+                settled_row(11, "failed", hours_ago=13),
+                settled_row(12, "cancelled"),
+                settled_row(14, "cancelled", hours_ago=3),
+                settled_row(14, "failed", hours_ago=2),
+                settled_row(15, "failed", hours_ago=3),
+                settled_row(15, "cancelled", hours_ago=2),
+            ]
+            FIRING = [4, 5, 6, 7, 8, 9, 14, 15]
             admin_sql(
                 'INSERT INTO "eval_run" ("build_id", "ts", "evaluator", "evaluator_version", "workers", '
                 '"max_memory_mib", "memory_max_bytes", "memory_peak_bytes", "oom_kill", "wall_ms", '
                 '"budget_kills", "worker_kills", "exit_status") VALUES ' + ", ".join(ROWS),
                 db=IETS_DB,
             )
+            admin_sql(
+                'INSERT INTO "ci_build" ("build_id", "created_at", "started_at", "finished_at", '
+                '"eval_duration_ms", "status", "pr_number", "branch") VALUES ' + ", ".join(BUILDS),
+                db=IETS_DB,
+            )
             stored = gsql('SELECT count(*) FROM "eval_run"', db=IETS_DB)
             assert stored == [[len(ROWS)]], (stored, len(ROWS))
+            stored = gsql('SELECT count(*) FROM "ci_build"', db=IETS_DB)
+            assert stored == [[len(BUILDS)]], (stored, len(BUILDS))
 
 
             def iets_fired(expr):
@@ -1135,16 +1181,22 @@
 
 
             # One row per unhealthy evaluation, its value column the exit
-            # status, which the evaluator requires.
+            # status, which the evaluator requires: 14's is its rerun's
+            # failure, 15's its own failure, never the cancelled run's -9.
             fired = iets_fired(IETS_EXPR)
             print(f"IetsEvaluationUnhealthy fires for builds {fired}", flush=True)
             assert fired == FIRING, (fired, FIRING)
             values = gsql(f'SELECT "build_id", "value" FROM ({IETS_EXPR}) AS unhealthy ORDER BY "build_id"', db=IETS_DB)
-            assert values == [[4, 0], [5, 0], [6, 0], [7, 1], [8, 137], [9, -9]], values
+            assert values == [[4, 0], [5, 0], [6, 0], [7, 1], [8, 137], [9, -9], [14, 1], [15, 1]], values
 
             IETS_MUTANTS = {
                 "attributeErrorsFire": iets_mutant("attributeErrorsFire", "exit_status <> 0", "exit_status >= 0"),
                 "ignoresWorkerKills": iets_mutant("ignoresWorkerKills", "worker_kills > 0 OR ", ""),
+                # A cancelled build's evaluation judged: 12 and 14's first run fire.
+                "cancelledJudged": iets_mutant("cancelledJudged", " AND status <> 'cancelled'", ""),
+                # Any later settlement of the build, not its first: 14's
+                # cancelled run is judged by its rerun's failure.
+                "anySettlement": iets_mutant("anySettlement", "settlement = 1 AND ", ""),
             }
             for name, expr in IETS_MUTANTS.items():
                 got = iets_fired(expr)

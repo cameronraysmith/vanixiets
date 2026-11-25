@@ -60,6 +60,9 @@
 # - staleRenderClause (declare-test-size-classes design D11):
 #   EnormousTestStale renders one VALUES row per lib.enormousTests entry, and
 #   the mutant staleRenderDropped must fail.
+# - ietsSettlementClause: IetsEvaluationUnhealthy judges an evaluation by its
+#   build's first settlement after it and leaves out a cancelled one, and
+#   the mutants cancelledJudged and anySettlement must each fail.
 #
 # Relations within one host are assertions where the units are declared,
 # which CI already pays for when it evaluates the host (S1 review F5, S3
@@ -1438,6 +1441,50 @@
           ${lib.concatMapStrings (n: ''
             echo ${lib.escapeShellArg "mutant ${n} rejected: ${builtins.head staleMutants.${n}}"}
           '') (builtins.attrNames staleMutants)}
+          touch "$out"
+        '';
+
+      # IetsEvaluationUnhealthy judges an evaluation record by the first
+      # ci_build row of its build that finished at or after it, and only
+      # when that row is not `cancelled`, so an evaluation nixbot killed
+      # because its build was cancelled does not fire (the rule's comment in
+      # modules/nixos/fleet-alert/rules.nix). The deployed rule must carry
+      # each condition; the mutants cancelledJudged (the status condition
+      # dropped) and anySettlement (every later row of the build, not the
+      # first) must each fail. devloop-ingest's ietsHealthRule case runs the
+      # query and the same mutants on GreptimeDB.
+      ietsSettlementFindings =
+        expr:
+        map (f: "no ${builtins.toJSON f}") (
+          lib.filter (f: !lib.hasInfix f expr) [
+            "JOIN ci_build AS c ON c.build_id = e.build_id AND c.finished_at >= e.ts"
+            "row_number() OVER (PARTITION BY e.build_id, e.ts ORDER BY c.finished_at) AS settlement"
+            "WHERE settlement = 1 AND status <> 'cancelled'"
+          ]
+        );
+      ietsExpr = (ruleNamed "IetsEvaluationUnhealthy").expr;
+      ietsActual = ietsSettlementFindings ietsExpr;
+      ietsMutants = {
+        cancelledJudged = ietsSettlementFindings (
+          mutateText "cancelledJudged" " AND status <> 'cancelled'" "" ietsExpr
+        );
+        anySettlement = ietsSettlementFindings (
+          mutateText "anySettlement" "settlement = 1 AND " "" ietsExpr
+        );
+      };
+      ietsSettlementClause =
+        assert lib.assertMsg (
+          ietsActual == [ ]
+        ) "fleet-alert IetsEvaluationUnhealthy settlement: ${builtins.toJSON ietsActual}";
+        assert lib.assertMsg (lib.all (f: f != [ ]) (lib.attrValues ietsMutants))
+          "fleet-alert accepted an IetsEvaluationUnhealthy settlement mutant: ${
+            builtins.toJSON (builtins.attrNames (lib.filterAttrs (_: f: f == [ ]) ietsMutants))
+          }";
+        pkgs.runCommand "fleet-alert-iets-settlement-clause" { } ''
+          echo "ok: IetsEvaluationUnhealthy judges an evaluation by its build's first settlement after it, unless cancelled"
+          ${lib.concatMapStrings (n: ''
+            echo ${lib.escapeShellArg "mutant ${n} rejected: ${builtins.head ietsMutants.${n}}"}
+          '') (builtins.attrNames ietsMutants)}
           touch "$out"
         '';
 
@@ -3396,6 +3443,7 @@
                   sizeRuleClause
                   withdrawnClause
                   staleRenderClause
+                  ietsSettlementClause
                   ;
               };
             }
@@ -3412,6 +3460,7 @@
               test -e ${sizeRuleClause}
               test -e ${withdrawnClause}
               test -e ${staleRenderClause}
+              test -e ${ietsSettlementClause}
               touch "$out"
             '';
       };

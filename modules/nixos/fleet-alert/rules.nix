@@ -549,10 +549,30 @@
         #   when the host evaluation lock's wrapper was still waiting, since
         #   the wrapper waits without a limit (modules/lib/nix-eval-lock.sh),
         #   or a cancellation.
-        # Every non-zero status is therefore unhealthy. A record falls out
-        # of the window 12 h after its evaluation, which resolves its
-        # instance whether or not the cause is fixed; a critical instance
-        # is re-posted only after 24 h, so it posts once.
+        # A cancellation is not unhealthy, and the record cannot tell it
+        # from a timeout: nixbot kills an evaluation whose build is
+        # superseded or cancelled through its API, then settles the build
+        # as `cancelled` (Mic92/nixbot@b0472661 nixbot/nixbot/build_run.py:
+        # 422-447, 228-238), and settles a failed or timed-out evaluation's
+        # build as `failed`. So the rule judges a record by the first
+        # ci_build row of its build that finished at or after the record's
+        # ts, and only when that row is not `cancelled`. Every other
+        # non-zero status is unhealthy. nixbot reruns a cancelled build
+        # under the same build_id (nixbot/nixbot/orchestrator.py:386), so
+        # a build can have several rows; taking the first row after each
+        # record pairs every evaluation with its own settlement, so a
+        # cancelled rerun cannot hide an earlier crash and a later failure
+        # cannot make a cancelled run fire. A record waits for its
+        # settlement row, which nixbot writes right after the evaluation
+        # ends and the collector reads every 60 s
+        # (modules/nixos/devloop-collection.nix), so an evaluator death is
+        # posted about two minutes later than its record: one collection
+        # interval plus the minutely evaluation. A record whose build never
+        # settles, because nixbot exited between writing the record and
+        # settling the build, is not judged. A record falls out of the
+        # window 12 h after its evaluation, which resolves its instance
+        # whether or not the cause is fixed; a critical instance is
+        # re-posted only after 24 h, so it posts once.
         #
         # Runbook, an escalation ladder (tasks.md 6.1; operator Q88,
         # 2026-11-21), from the build named by build_id:
@@ -586,7 +606,7 @@
           alert = "IetsEvaluationUnhealthy";
           database = "devloop";
           language = "sql";
-          expr = "SELECT build_id, ts, evaluator_version, worker_kills, oom_kill, budget_kills, exit_status AS value FROM eval_run WHERE evaluator = 'iets' AND ts >= now() - INTERVAL '12 hours' AND (worker_kills > 0 OR oom_kill > 0 OR budget_kills > 0 OR exit_status <> 0)";
+          expr = "SELECT build_id, ts, evaluator_version, worker_kills, oom_kill, budget_kills, exit_status AS value FROM (SELECT e.build_id, e.ts, e.evaluator_version, e.worker_kills, e.oom_kill, e.budget_kills, e.exit_status, c.status, row_number() OVER (PARTITION BY e.build_id, e.ts ORDER BY c.finished_at) AS settlement FROM eval_run AS e JOIN ci_build AS c ON c.build_id = e.build_id AND c.finished_at >= e.ts WHERE e.evaluator = 'iets' AND e.ts >= now() - INTERVAL '12 hours' AND (e.worker_kills > 0 OR e.oom_kill > 0 OR e.budget_kills > 0 OR e.exit_status <> 0)) AS judged WHERE settlement = 1 AND status <> 'cancelled'";
           for = "0s";
           severity = "critical";
           annotations.summary = "A production nixbot evaluation by iets lost a worker, was killed or crashed; the value is its exit status. 1. Rebuild build_id in nixbot; if it passes, record it in verify.md as transient. 2. If it fails again: kills above 0 are capacity, so tune evalWorkerCount or evalMaxMemorySize (D9); a crash, or errors stock nix-eval-jobs does not produce (the stock check command in the runbook), is fixed forward, e.g. by pinning iets to its last good revision. 3. Revert to stock (task 7.3) only if merges are blocked and no quick fix exists, recorded in verify.md (runbook in modules/nixos/fleet-alert/rules.nix). Resolves 12 h after the evaluation, not when fixed";
