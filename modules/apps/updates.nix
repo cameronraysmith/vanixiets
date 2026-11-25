@@ -38,11 +38,6 @@
         program = "${config.packages.git-xet.updateScript}";
       };
 
-      apps.update-golem-binary = {
-        type = "app";
-        program = "${config.packages.golem-binary.updateScript}";
-      };
-
       # perses-bin exists only on x86_64-linux and aarch64-darwin (its
       # package.nix yields null on aarch64-linux); the updater is
       # host-agnostic, so the app runs the script itself on every system.

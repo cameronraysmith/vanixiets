@@ -1,0 +1,34 @@
+{
+  "name": "golem-binary",
+  "version": "1.6.3",
+  "source": {
+    "githubRelease": {
+      "owner": "golemcloud",
+      "repo": "golem",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/golemcloud/golem/releases/download/{tag}/golem-{platform}",
+        "platforms": {
+          "x86_64-linux": "x86_64-unknown-linux-gnu",
+          "aarch64-linux": "aarch64-unknown-linux-gnu",
+          "x86_64-darwin": "x86_64-apple-darwin",
+          "aarch64-darwin": "aarch64-apple-darwin"
+        },
+        "checksum": {
+          "prefetch": {}
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-yyquaOaDCci/vpPz6e4TABWtJHEJwpJYyLwPSlDRO1E=",
+          "aarch64-linux": "sha256-K2D6KwJX2tOP9Nf9/kNQlSrZFslZ3QuLEVgRY90Lqyg=",
+          "x86_64-darwin": "sha256-jpvjynX6EDsojHVK0CpacOE0pSshwCpxrl/aplZYdoQ=",
+          "aarch64-darwin": "sha256-lx4o0l4J6aU7LJZbgOmjGE+DHe6R0pl35Jplax2j1fI="
+        }
+      }
+    }
+  },
+  "companions": []
+}

@@ -17,14 +17,25 @@
   autoPatchelfHook,
   versionCheckHook,
 }:
-
+let
+  inherit (stdenv.hostPlatform) system;
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "golem-binary"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
+in
 stdenv.mkDerivation (finalAttrs: {
   pname = "golem-binary";
-  version = "1.6.3";
+  inherit (pin) version;
 
-  src =
-    finalAttrs.passthru.sources.${stdenv.hostPlatform.system}
-      or (throw "${finalAttrs.pname}: unsupported platform ${stdenv.hostPlatform.system}");
+  # A bare executable per platform; upstream publishes no checksum file for
+  # these assets, so the pin's hashes are prefetched.
+  src = fetchurl {
+    url = planned.${system}.url or (throw "golem-binary: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
+  };
 
   dontUnpack = true;
   dontConfigure = true;
@@ -49,25 +60,7 @@ stdenv.mkDerivation (finalAttrs: {
   doInstallCheck = true;
 
   passthru = {
-    sources = {
-      "x86_64-linux" = fetchurl {
-        url = "https://github.com/golemcloud/golem/releases/download/v${finalAttrs.version}/golem-x86_64-unknown-linux-gnu";
-        hash = "sha256-yyquaOaDCci/vpPz6e4TABWtJHEJwpJYyLwPSlDRO1E=";
-      };
-      "aarch64-linux" = fetchurl {
-        url = "https://github.com/golemcloud/golem/releases/download/v${finalAttrs.version}/golem-aarch64-unknown-linux-gnu";
-        hash = "sha256-K2D6KwJX2tOP9Nf9/kNQlSrZFslZ3QuLEVgRY90Lqyg=";
-      };
-      "x86_64-darwin" = fetchurl {
-        url = "https://github.com/golemcloud/golem/releases/download/v${finalAttrs.version}/golem-x86_64-apple-darwin";
-        hash = "sha256-jpvjynX6EDsojHVK0CpacOE0pSshwCpxrl/aplZYdoQ=";
-      };
-      "aarch64-darwin" = fetchurl {
-        url = "https://github.com/golemcloud/golem/releases/download/v${finalAttrs.version}/golem-aarch64-apple-darwin";
-        hash = "sha256-lx4o0l4J6aU7LJZbgOmjGE+DHe6R0pl35Jplax2j1fI=";
-      };
-    };
-    updateScript = ./update.sh;
+    inherit pin pinPlan;
   };
 
   meta = {
@@ -89,7 +82,7 @@ stdenv.mkDerivation (finalAttrs: {
     changelog = "https://github.com/golemcloud/golem/releases/tag/v${finalAttrs.version}";
     license = lib.licenses.asl20;
     mainProgram = "golem";
-    platforms = builtins.attrNames finalAttrs.passthru.sources;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
 })
