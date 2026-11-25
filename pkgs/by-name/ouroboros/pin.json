@@ -1,0 +1,17 @@
+{
+  "name": "ouroboros",
+  "version": "0.55.3",
+  "source": {
+    "pypi": {
+      "package": "ouroboros-ai"
+    }
+  },
+  "artifacts": {
+    "cli": {
+      "runtimeFetch": {
+        "probeUrlTemplate": "https://pypi.org/pypi/ouroboros-ai/{version}/json"
+      }
+    }
+  },
+  "companions": []
+}

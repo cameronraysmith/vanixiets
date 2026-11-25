@@ -5,7 +5,13 @@
 }:
 
 let
-  version = "0.55.3";
+  # The pin's `cli` artifact is a runtimeFetch: uvx resolves the release from
+  # PyPI when the program runs, so the pin carries a version and no hash.
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "ouroboros"; })
+    pin
+    pinPlan
+    ;
+  inherit (pin) version;
 in
 writeShellApplication {
   name = "ouroboros";
@@ -21,6 +27,8 @@ writeShellApplication {
   text = ''
     exec uvx --isolated --python '>=3.12' --from "ouroboros-ai[mcp,claude-cli,tui]==${version}" ouroboros "$@"
   '';
+
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     description = "Specification-first agentic loop with MCP, Claude, and TUI integration";
