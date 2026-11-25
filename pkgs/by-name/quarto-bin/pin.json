@@ -1,0 +1,39 @@
+{
+  "name": "quarto-bin",
+  "version": "1.10.18",
+  "source": {
+    "githubRelease": {
+      "owner": "quarto-dev",
+      "repo": "quarto-cli",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "tarball": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/quarto-dev/quarto-cli/releases/download/{tag}/quarto-{version}-{platform}.tar.gz",
+        "platforms": {
+          "x86_64-linux": "linux-amd64",
+          "aarch64-linux": "linux-arm64",
+          "aarch64-darwin": "macos",
+          "x86_64-darwin": "macos"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://github.com/quarto-dev/quarto-cli/releases/download/{tag}/quarto-{version}-checksums.txt",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-r60HG1vSLALy0wBpV0MYnTZQ4FN6Uwc+ZUtjDP8rDHM=",
+          "aarch64-linux": "sha256-9qB99o4lMwtd809l099mvKYFrM47gwxZOljpGITUz2w=",
+          "aarch64-darwin": "sha256-3danGp4ESKsV+2VbxYnhHLZYmiSOw1zNf39EE3UxaI4=",
+          "x86_64-darwin": "sha256-3danGp4ESKsV+2VbxYnhHLZYmiSOw1zNf39EE3UxaI4="
+        }
+      }
+    }
+  },
+  "companions": []
+}

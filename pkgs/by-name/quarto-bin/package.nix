@@ -1,7 +1,7 @@
 # quarto-cli prebuilt binary (bundled tools incl. pandoc retained).
-# version and per-platform SRI hashes live in manifest.json alongside this file.
+# version and per-platform SRI hashes tracked in pin.json alongside this file.
 #
-# update: nix run .#update-quarto
+# update: nix run .#realize-pin -- quarto-bin <version>
 # source: https://github.com/quarto-dev/quarto-cli
 {
   lib,
@@ -13,17 +13,21 @@
 }:
 
 let
-  manifest = lib.importJSON ./manifest.json;
   inherit (stdenv.hostPlatform) system;
-  entry = manifest.platforms.${system} or (throw "quarto-bin: unsupported platform ${system}");
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "quarto-bin"; })
+    pin
+    pinPlan
+    ;
+  tarball = pin.artifacts.tarball.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.tarball.platformBinaries;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "quarto-bin";
-  version = manifest.version;
+  inherit (pin) version;
 
   src = fetchurl {
-    url = "https://github.com/quarto-dev/quarto-cli/releases/download/v${finalAttrs.version}/quarto-${finalAttrs.version}-${entry.asset}.tar.gz";
-    hash = entry.hash;
+    url = planned.${system}.url or (throw "quarto-bin: unsupported platform ${system}");
+    hash = tarball.hashes.${system};
   };
 
   preUnpack = lib.optionalString stdenv.hostPlatform.isDarwin "mkdir ${finalAttrs.sourceRoot}";
@@ -57,19 +61,14 @@ stdenv.mkDerivation (finalAttrs: {
     runHook postInstallCheck
   '';
 
-  passthru.updateScript = ./update.sh;
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     description = "Vendored upstream Quarto CLI (bundled tools incl. pandoc retained)";
     homepage = "https://quarto.org";
     license = lib.licenses.gpl2Plus;
     mainProgram = "quarto";
-    platforms = [
-      "x86_64-linux"
-      "aarch64-linux"
-      "aarch64-darwin"
-      "x86_64-darwin"
-    ];
+    platforms = lib.attrNames tarball.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
 })

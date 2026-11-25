@@ -74,11 +74,6 @@
         program = "${config.packages.linear-cli.updateScript}";
       };
 
-      apps.update-quarto = {
-        type = "app";
-        program = "${config.packages.quarto-bin.updateScript}";
-      };
-
       apps.update-buzz-source = {
         type = "app";
         program = "${config.packages.buzz-source.updateScript}";
