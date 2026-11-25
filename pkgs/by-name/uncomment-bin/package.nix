@@ -13,33 +13,21 @@
 
 let
   inherit (stdenv.hostPlatform) system;
-  systemToPlatform = {
-    "x86_64-linux" = {
-      name = "x86_64-unknown-linux-gnu";
-      hash = "sha256-Z+ifzX3TEnPYkQlEoFMuu4sqqhPPcWmEmjnbhiaX6Lk=";
-    };
-    "aarch64-linux" = {
-      name = "aarch64-unknown-linux-gnu";
-      hash = "sha256-y7WzLU8PXsOlpQ/9/HNQAwIxMr4Z9RY8J+rWeawI988=";
-    };
-    "x86_64-darwin" = {
-      name = "x86_64-apple-darwin";
-      hash = "sha256-mGb0VwG70Z4Jg/xVOO8W/JEV2ARMQCJYYZhS+Mlfc+A=";
-    };
-    "aarch64-darwin" = {
-      name = "aarch64-apple-darwin";
-      hash = "sha256-Vo0UinC5zjAzNDX/wGpkv3nnxSn5E/AMtq+2D3stWWE=";
-    };
-  };
-  platform = systemToPlatform.${system} or (throw "uncomment-bin: unsupported platform ${system}");
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "uncomment-bin"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "uncomment-bin";
-  version = "3.12.1";
+  inherit (pin) version;
 
   src = fetchurl {
-    url = "https://github.com/polylint/uncomment/releases/download/v${finalAttrs.version}/uncomment-${platform.name}.tar.gz";
-    hash = platform.hash;
+    url = planned.${system}.url or (throw "uncomment-bin: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
   };
 
   # Each archive holds only the bare `uncomment` binary at its root, with no
@@ -69,7 +57,7 @@ stdenv.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/uncomment";
   doInstallCheck = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     description = "Fast tree-sitter based tool to remove comments from source code";
@@ -77,7 +65,7 @@ stdenv.mkDerivation (finalAttrs: {
     changelog = "https://github.com/polylint/uncomment/releases/tag/v${finalAttrs.version}";
     license = lib.licenses.mit;
     mainProgram = "uncomment";
-    platforms = lib.attrNames systemToPlatform;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
 })

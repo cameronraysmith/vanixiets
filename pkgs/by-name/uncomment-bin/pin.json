@@ -1,0 +1,38 @@
+{
+  "name": "uncomment-bin",
+  "version": "3.12.1",
+  "source": {
+    "githubRelease": {
+      "owner": "polylint",
+      "repo": "uncomment",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/polylint/uncomment/releases/download/{tag}/uncomment-{platform}.tar.gz",
+        "platforms": {
+          "x86_64-linux": "x86_64-unknown-linux-gnu",
+          "aarch64-linux": "aarch64-unknown-linux-gnu",
+          "x86_64-darwin": "x86_64-apple-darwin",
+          "aarch64-darwin": "aarch64-apple-darwin"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://github.com/polylint/uncomment/releases/download/{tag}/uncomment_{version}_checksums.txt",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-Z+ifzX3TEnPYkQlEoFMuu4sqqhPPcWmEmjnbhiaX6Lk=",
+          "aarch64-linux": "sha256-y7WzLU8PXsOlpQ/9/HNQAwIxMr4Z9RY8J+rWeawI988=",
+          "x86_64-darwin": "sha256-mGb0VwG70Z4Jg/xVOO8W/JEV2ARMQCJYYZhS+Mlfc+A=",
+          "aarch64-darwin": "sha256-Vo0UinC5zjAzNDX/wGpkv3nnxSn5E/AMtq+2D3stWWE="
+        }
+      }
+    }
+  }
+}
