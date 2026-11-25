@@ -8,7 +8,7 @@ import pytest
 
 from fakes import FIXTURES
 from realize_pin.adapters import nix_update_selection, parse_porcelain
-from realize_pin.capabilities import CargoDeps, Custom, GoModules, NpmDeps, Src, sri
+from realize_pin.capabilities import CargoDeps, Custom, GoModules, NpmDeps, Src, fod_attr_path, sri
 from realize_pin.cli import main
 from realize_pin.companions import load_json_object, render_json, set_apm_ref
 from realize_pin.digest import hex_to_sri, json_pointer, sha256sum_digest
@@ -170,6 +170,15 @@ def test_nix_update_selection() -> None:
     assert nix_update_selection(CargoDeps()) == ("--no-src",)
     assert nix_update_selection(GoModules()) == ("--no-src",)
     assert nix_update_selection(Custom("deps")) == ("--no-src", "--custom-dep", "deps")
+
+
+def test_fod_attr_path() -> None:
+    """`fetchCargoVendor` makes `cargoDeps` a plain `runCommand`: the cargo hash is on `vendorStaging`."""
+    assert fod_attr_path(Src()) == "src"
+    assert fod_attr_path(CargoDeps()) == "cargoDeps.vendorStaging"
+    assert fod_attr_path(GoModules()) == "goModules"
+    assert fod_attr_path(NpmDeps()) == "npmDeps"
+    assert fod_attr_path(Custom("deps")) == "deps"
 
 
 def test_sri_accepts_only_sha256_sri() -> None:

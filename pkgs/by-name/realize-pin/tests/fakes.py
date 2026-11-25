@@ -15,7 +15,7 @@ from typing import override
 
 from expression import Error, Ok, Result
 
-from realize_pin.capabilities import FixedOutputHasher, FodAttr, Files, Git, Http, Method, Nix, SkillHasher, Sri, sri
+from realize_pin.capabilities import FixedOutputHasher, FodAttr, Files, Git, Http, Method, Nix, SkillHasher, Sri, fod_attr_path, sri
 from realize_pin.model import Json
 from realize_pin.policy import pin_path
 
@@ -93,12 +93,30 @@ class FakeHasher(FixedOutputHasher):
         not_ready = self.ready(package, attr)
         if not_ready is not None:
             return Error(f"hash mismatch building from a stale tree: {not_ready}")
-        answer = self.answers.get((package, attr))
+        answer = self.answer(package, attr)
         if answer is None:
             return Error(f"no recorded hash for {package} {attr}")
         if isinstance(answer, Exception):
             return Error(str(answer))
         return sri(answer)
+
+    def answer(self, package: str, attr: FodAttr) -> str | Exception | None:
+        return self.answers.get((package, attr))
+
+
+@dataclass
+class FakeEvalHasher(FakeHasher):
+    """Answers by the path `<package>.<attr path>` whose `outputHash` the real hasher evaluates.
+
+    `answers` is not consulted: an attribute whose `fod_attr_path` is not in
+    `paths` finds no hash, as `nix eval` finds no `outputHash` there.
+    """
+
+    paths: Mapping[str, str | Exception] = field(default_factory=lambda: {})
+
+    @override
+    def answer(self, package: str, attr: FodAttr) -> str | Exception | None:
+        return self.paths.get(f"{package}.{fod_attr_path(attr)}")
 
 
 @dataclass

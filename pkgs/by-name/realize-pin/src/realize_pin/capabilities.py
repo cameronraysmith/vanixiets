@@ -63,7 +63,7 @@ def fod_attr_path(attr: FodAttr) -> str:
         case Src():
             return "src"
         case CargoDeps():
-            return "cargoDeps"
+            return "cargoDeps.vendorStaging"
         case GoModules():
             return "goModules"
         case NpmDeps():

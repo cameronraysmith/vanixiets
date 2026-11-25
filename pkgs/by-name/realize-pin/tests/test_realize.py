@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -11,9 +12,9 @@ from urllib.parse import urlsplit
 import pytest
 from expression import Result
 
-from fakes import FIXTURES, Clock, FakeGit, FakeHasher, FakeHttp, FakeNix, FakeSkillHasher, RecordingFiles
+from fakes import FIXTURES, Clock, FakeEvalHasher, FakeGit, FakeHasher, FakeHttp, FakeNix, FakeSkillHasher, RecordingFiles
 from realize_pin.adapters import TreeFiles
-from realize_pin.capabilities import Capabilities, Custom, Files, FodAttr, NpmDeps, Src
+from realize_pin.capabilities import Capabilities, CargoDeps, Custom, Files, FodAttr, NpmDeps, Src
 from realize_pin.cli import main
 from realize_pin.model import Json
 from realize_pin.policy import pin_path
@@ -402,22 +403,28 @@ def test_forge_api_host_is_refused(tmp_path: Path) -> None:
     assert s.tree() == before
 
 
-DEPS_PIN: dict[str, Json] = {
-    "name": "deps-demo",
-    "version": "0.0.1",
-    "realizedVersion": "0.0.1",
-    "source": {"githubRelease": {"owner": "example", "repo": "deps-demo", "tagTemplate": "v{version}"}},
-    "artifacts": {
-        "src": {
-            "sourceBuild": {
-                "fetcher": {"fetchFromGitHub": {"owner": "example", "repo": "deps-demo"}},
-                "hash": STALE_SRI,
-                "depsHash": {"npm": {"hash": STALE_SRI}},
+type Ready = Callable[[str, FodAttr], str | None]
+
+
+def _deps_pin(deps: str) -> dict[str, Json]:
+    return {
+        "name": "deps-demo",
+        "version": "0.0.1",
+        "realizedVersion": "0.0.1",
+        "source": {"githubRelease": {"owner": "example", "repo": "deps-demo", "tagTemplate": "v{version}"}},
+        "artifacts": {
+            "src": {
+                "sourceBuild": {
+                    "fetcher": {"fetchFromGitHub": {"owner": "example", "repo": "deps-demo"}},
+                    "hash": STALE_SRI,
+                    "depsHash": {deps: {"hash": STALE_SRI}},
+                }
             }
-        }
-    },
-    "companions": [],
-}
+        },
+        "companions": [],
+    }
+
+
 DEPS_PLAN: dict[str, Json] = {
     "version": "1.2.3",
     "tag": "v1.2.3",
@@ -427,16 +434,16 @@ DEPS_SRC = "sha256-" + "C" * 43 + "="
 DEPS_GOT = "sha256-" + "D" * 43 + "="
 
 
-def _deps_scenario(root: Path, npm: str | Exception) -> Scenario:
-    files = {pin_path("deps-demo"): (json.dumps(DEPS_PIN, indent=2) + "\n").encode()}
+def _deps_scenario(root: Path, deps: str, hasher: Callable[[Ready], FakeHasher]) -> Scenario:
+    files = {pin_path("deps-demo"): (json.dumps(_deps_pin(deps), indent=2) + "\n").encode()}
     for path, data in files.items():
         (root / path).parent.mkdir(parents=True, exist_ok=True)
         _ = (root / path).write_bytes(data)
 
     def ready(package: str, attr: FodAttr) -> str | None:
-        """npmDeps unpacks src, so src must already carry its realized hash."""
+        """The dependency derivation unpacks src, so src must already carry its realized hash."""
         source = json.loads((root / pin_path("deps-demo")).read_text())["artifacts"]["src"]["sourceBuild"]
-        if attr == NpmDeps() and source["hash"] != DEPS_SRC:
+        if attr != Src() and source["hash"] != DEPS_SRC:
             return f"src is at {source['hash']}"
         return None
 
@@ -446,22 +453,38 @@ def _deps_scenario(root: Path, npm: str | Exception) -> Scenario:
         version="1.2.3",
         http=FakeHttp({}),
         nix=FakeNix(root, {"1.2.3": DEPS_PLAN}),
-        hasher=FakeHasher({("deps-demo", Src()): DEPS_SRC, ("deps-demo", NpmDeps()): npm}, ready),
+        hasher=hasher(ready),
         skills=FakeSkillHasher({}),
         git=FakeGit(root, files),
         clock=Clock(),
     )
 
 
-def test_source_and_deps_hash_from_the_hasher(tmp_path: Path) -> None:
-    s = _deps_scenario(tmp_path, DEPS_GOT)
-    result = s.run()
-    assert result.is_ok(), result.error.render() if result.is_error() else ""
-    doc = json.loads((tmp_path / pin_path("deps-demo")).read_text())
+def _assert_deps_realized(root: Path, deps: str) -> None:
+    doc = json.loads((root / pin_path("deps-demo")).read_text())
     assert doc["version"] == doc["realizedVersion"] == "1.2.3"
     assert doc["artifacts"]["src"]["sourceBuild"]["hash"] == DEPS_SRC
-    assert doc["artifacts"]["src"]["sourceBuild"]["depsHash"]["npm"]["hash"] == DEPS_GOT
+    assert doc["artifacts"]["src"]["sourceBuild"]["depsHash"][deps]["hash"] == DEPS_GOT
+
+
+def test_source_and_deps_hash_from_the_hasher(tmp_path: Path) -> None:
+    s = _deps_scenario(
+        tmp_path, "npm", lambda ready: FakeHasher({("deps-demo", Src()): DEPS_SRC, ("deps-demo", NpmDeps()): DEPS_GOT}, ready)
+    )
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    _assert_deps_realized(tmp_path, "npm")
     assert s.hasher.calls == [("deps-demo", Src()), ("deps-demo", NpmDeps())]
+
+
+def test_cargo_deps_hash_is_the_vendor_staging_hash(tmp_path: Path) -> None:
+    """`fetchCargoVendor` makes `cargoDeps` a plain `runCommand`; its fixed-output derivation is `vendorStaging`."""
+    paths = {"deps-demo.src": DEPS_SRC, "deps-demo.cargoDeps.vendorStaging": DEPS_GOT}
+    s = _deps_scenario(tmp_path, "cargo", lambda ready: FakeEvalHasher({}, ready, paths=paths))
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    _assert_deps_realized(tmp_path, "cargo")
+    assert s.hasher.calls == [("deps-demo", Src()), ("deps-demo", CargoDeps())]
 
 
 GREPTIME_VERSION = "https://raw.githubusercontent.com/GreptimeTeam/greptimedb/v1.2.1/src/servers/dashboard/VERSION"
