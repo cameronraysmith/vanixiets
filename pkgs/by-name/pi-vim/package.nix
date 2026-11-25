@@ -4,12 +4,16 @@
 # The repository ships a top-level `doc/` directory, which stdenv's
 # `forceShare = [ "man" "doc" "info" ]` silently relocates to share/doc during
 # fixup; the tarball's `files` list excludes it. Upstream has 7 git tags against
-# 24 npm versions with a hole from 0.3.2 to 0.13.0, so a tag-tracking
-# nix-update-script would never fire. And upstream publishes no GitHub releases,
-# so a `changelog` meta line would 404.
+# 24 npm versions with a hole from 0.3.2 to 0.13.0, so tracking tags would miss
+# most releases; pin.json's source is the npm registry instead. And upstream
+# publishes no GitHub releases, so a `changelog` meta line would 404.
 #
-# The tarball unpacks to `package/`, hence sourceRoot; its sha256 is
-# cross-checkable against the registry's published dist.integrity.
+# pin.json pins the version and the tarball's hash; Renovate proposes releases
+# from the npm registry and `nix run .#realize-pin -- pi-vim <version>`
+# realizes one. The registry publishes a sha512 dist.integrity and a sha1
+# shasum but no sha256, so the hash is a prefetch of the tarball.
+#
+# The tarball unpacks to `package/`, hence sourceRoot.
 #
 # No postPatch. Up to 0.14.1, clipboard-mirror.ts called
 # `import.meta.resolve("@earendil-works/pi-coding-agent")` at module top level.
@@ -28,13 +32,20 @@
   lib,
   stdenvNoCC,
 }:
-stdenvNoCC.mkDerivation (finalAttrs: {
+let
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "pi-vim"; })
+    pin
+    pinPlan
+    ;
+  planned = pinPlan pin.version;
+in
+stdenvNoCC.mkDerivation {
   pname = "pi-vim";
-  version = "0.14.2";
+  inherit (pin) version;
 
   src = fetchurl {
-    url = "https://registry.npmjs.org/pi-vim/-/pi-vim-${finalAttrs.version}.tgz";
-    hash = "sha256-BJkHE2C/SIBYHyINCD971+ew+yDS+X0yU5xjkNks4rg=";
+    inherit (planned.artifacts.tarball.file) url;
+    inherit (pin.artifacts.tarball.file) hash;
   };
 
   sourceRoot = "package";
@@ -58,6 +69,8 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     runHook postInstall
   '';
 
+  passthru = { inherit pin pinPlan; };
+
   meta = {
     description = "Vim-style modal editing for Pi's TUI editor";
     homepage = "https://github.com/lajarre/pi-vim";
@@ -65,4 +78,4 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     sourceProvenance = with lib.sourceTypes; [ fromSource ];
     platforms = lib.platforms.all;
   };
-})
+}
