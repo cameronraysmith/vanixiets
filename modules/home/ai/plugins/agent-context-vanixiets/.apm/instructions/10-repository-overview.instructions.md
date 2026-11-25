@@ -96,6 +96,9 @@ A green `nixbot/nix-build` is not the same as every check having passed.
 The aarch64-darwin checks are best-effort through `modules/checks/nixbot-best-effort-darwin.nix`, which marks their failures `ignored_failure` so an asleep or unreachable Mac builder cannot block the queue; the flag concerns builder availability, never correctness.
 Read those failures before enqueueing rather than treating the aggregate status as the whole answer, because a genuine platform-specific break — an upstream package that compiles only with the other platform's toolchain, say — presents exactly as an ignored failure and would otherwise reach `main` unnoticed.
 
+The jj change id `mxptywwq` is divergent in this repository: the commit "feat(skills): repair harborize contracts and encode evaluation decisions" on the parked branch `fm/vx-harborize-rung0` shares it with "chore: ignore python bytecode", a commit already in `main`.
+The operator decided on 2026-11-24 to leave the branch and the divergence as they are (§Parked in `openspec/changes/validate-harborize-instrument/proposal.md`), so a session that sees this divergence should neither report it nor try to repair it.
+
 Checkouts of this repository are commonly colocated with [jujutsu](https://jj-vcs.github.io/jj/), in which case a detached git `HEAD` is normal and must not be reattached.
 Because this is a flake repository, flake evaluation resolves the root through git, so a second working tree must itself be a git worktree: either a colocated `jj workspace add` directory, which jj 0.46.0 and later creates by default here because `git.colocate` is `true`, or a `wt switch --create <branch>` worktree.
 Entering the devshell once in a new tree (`direnv allow`) installs the prek hooks, pins `core.hooksPath` to an absolute path so git runs them from every checkout, and runs `mergify stack setup`, so a git commit there gets treefmt, gitleaks, and a `Change-Id` trailer.
