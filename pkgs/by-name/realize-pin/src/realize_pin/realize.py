@@ -56,6 +56,7 @@ from realize_pin.model import (
     PlatformBinaries,
     Prefetch,
     Pypi,
+    RemoteSkillHashes,
     RuntimeFetch,
     SourceBuild,
     VendorJson,
@@ -85,6 +86,7 @@ class Step(StrEnum):
     APM_REF = "apmRef"
     DEPS_HASH = "depsHash"
     FIXED_OUTPUT_HASH = "fixedOutputHash"
+    SKILL_HASH = "remoteSkillHashes"
     WRITE = "write"
     CONFINE = "confine"
     DEADLINE = "deadline"
@@ -326,7 +328,7 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
                 done = _write_apm_ref(run, companion.path, git, rev.ok)
                 if done.is_error():
                     return Error(done.error)
-            case FixedOutputHash():
+            case FixedOutputHash() | RemoteSkillHashes():
                 pass
     for name, artifact in pin.artifacts.items():
         match artifact:
@@ -342,7 +344,17 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
                 done = _realize_fixed_output_hash(run, companion, companion.kind)
                 if done.is_error():
                     return Error(done.error)
-            case ApmRef():
+            case ApmRef() | RemoteSkillHashes():
+                pass
+    # Last: the compose these hashes come from builds from the apm.yml refs and
+    # the apmDepsHash written above.
+    for companion in pin.companions:
+        match companion.kind:
+            case RemoteSkillHashes():
+                done = _realize_remote_skill_hashes(run, companion, companion.kind)
+                if done.is_error():
+                    return Error(done.error)
+            case ApmRef() | FixedOutputHash():
                 pass
     return Ok(None)
 
@@ -623,4 +635,38 @@ def _realize_fixed_output_hash(run: _Run, companion: Companion, kind: FixedOutpu
         return Error(got.error)
     doc = loaded.ok
     doc[kind.attr] = got.ok
+    return _write_object(run, companion.path, doc)
+
+
+def _realize_remote_skill_hashes(run: _Run, companion: Companion, kind: RemoteSkillHashes) -> Result[None, RealizeError]:
+    """Rewrite `remote.<skill>` for each of `kind.skills`; never add or remove a skill."""
+    loaded = _read_object(run, companion.path, Step.SKILL_HASH)
+    if loaded.is_error():
+        return Error(loaded.error)
+    doc = loaded.ok
+    remote = doc.get("remote")
+    if not isinstance(remote, dict):
+        return Error(run.fail(Step.SKILL_HASH, f"{companion.path}: remote is not an object"))
+    missing = [skill for skill in kind.skills if skill not in remote]
+    if missing:
+        return Error(
+            run.fail(
+                Step.SKILL_HASH,
+                f"{companion.path}: remote records no {', '.join(missing)}; "
+                + "a new remote skill is a reviewed change made with `just agents-skills-index`",
+            )
+        )
+    t = run.timeout(Step.SKILL_HASH)
+    if t.is_error():
+        return Error(t.error)
+    got = run.caps.skills.hash(kind.skills, t.ok)
+    if got.is_error():
+        return Error(run.fail(Step.SKILL_HASH, f"{kind.git}: {got.error}"))
+    for skill in kind.skills:
+        sri = got.ok.get(skill)
+        if sri is None:
+            return Error(run.fail(Step.SKILL_HASH, f"{kind.git}: no hash for skill {skill}"))
+        done = set_in(doc, ("remote", skill), sri)
+        if done.is_error():
+            return Error(run.fail(Step.SKILL_HASH, done.error))
     return _write_object(run, companion.path, doc)

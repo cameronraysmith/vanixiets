@@ -34,7 +34,8 @@
   # without reading the build output (no import-from-derivation); `remote`, the
   # `nix hash path` of every skill no first-party group carries. The tree oracle
   # fails when the output drifts from it; `just agents-skills-index` regenerates
-  # it. null disables the index comparisons (used only by that recipe).
+  # it. null disables the index comparisons: `passthru.unindexed`, which that
+  # recipe and realize-pin's remoteSkillHashes companion build.
   skillIndex ? lib.importJSON ./skills.json,
 }:
 let
@@ -137,6 +138,19 @@ runCommandLocal "apm-skills-compose"
       skillNames = if skillIndex == null then null else skillIndex.names;
       firstPartySkills = map (s: s.name) firstPartySkills;
       deps = apmDeps;
+    }
+    // lib.optionalAttrs (skillIndex != null) {
+      unindexed = callPackage ./package.nix {
+        inherit
+          apm
+          firstPartyPackages
+          upstreamDeps
+          apmDepsHash
+          apmDeps
+          targets
+          ;
+        skillIndex = null;
+      };
     };
   }
   ''

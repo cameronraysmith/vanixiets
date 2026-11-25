@@ -127,6 +127,13 @@ let
                     default = "";
                   };
                 };
+                # The `nix hash path` of each of `skills`, the skills the
+                # apm.yml entry `git: <git>` selects, as the compose installs
+                # them, under `remote.<skill>` of a JSON skill index.
+                remoteSkillHashes = {
+                  git = option str;
+                  skills = option (types.nonEmptyListOf str);
+                };
               });
             };
           }
@@ -154,6 +161,7 @@ let
     let
       packageDir = "pkgs/by-name/${name}/";
       needsRev = pin.source ? gitCommit || lib.any (c: c.kind ? apmRef) pin.companions;
+      apmGits = map (c: c.kind.apmRef.git) (lib.filter (c: c.kind ? apmRef) pin.companions);
 
       artifactProblems = lib.concatLists (
         lib.mapAttrsToList (
@@ -189,6 +197,7 @@ let
           let
             at = "companions.${toString i}.path";
             components = lib.splitString "/" c.path;
+            tag = lib.head (lib.attrNames c.kind);
           in
           lib.optional (lib.hasPrefix "/" c.path) "${at}: ${c.path} is not repository-relative"
           ++ lib.optional (lib.elem ".." components) "${at}: ${c.path} has a `..` component"
@@ -197,8 +206,12 @@ let
           ) "${at}: ${c.path} has an empty or `.` component"
           ++ lib.optional (lib.hasPrefix packageDir c.path) "${at}: ${c.path} lies inside ${packageDir}"
           ++ lib.optional (
-            c.kind ? fixedOutputHash && !lib.hasSuffix ".json" c.path
-          ) "${at}: ${c.path} is a fixedOutputHash companion, which must name a JSON file"
+            lib.elem tag [
+              "fixedOutputHash"
+              "remoteSkillHashes"
+            ]
+            && !lib.hasSuffix ".json" c.path
+          ) "${at}: ${c.path} is a ${tag} companion, which must name a JSON file"
           ++
             lib.optional
               (
@@ -206,6 +219,9 @@ let
                 && builtins.match "[A-Za-z_][A-Za-z0-9_'-]*" c.kind.fixedOutputHash.fodAttr == null
               )
               "companions.${toString i}.kind.fixedOutputHash.fodAttr: `${c.kind.fixedOutputHash.fodAttr}' is not an attribute name"
+          ++
+            lib.optional (c.kind ? remoteSkillHashes && !lib.elem c.kind.remoteSkillHashes.git apmGits)
+              "companions.${toString i}.kind.remoteSkillHashes.git: no apmRef companion of this pin has git ${c.kind.remoteSkillHashes.git}"
         ) pin.companions
       );
     in
@@ -345,4 +361,42 @@ in
       inherit pin;
       pinPlan = plan pin;
     };
+
+  # The rule a pin cannot check alone: each remoteSkillHashes companion's
+  # `skills` equals the `skills:` of the apm.yml entries of its `git`, as the
+  # apm-deps guard parses them (`apm-skills-compose.deps.guard.remoteDeps`), so
+  # the realizer rewrites the hashes of exactly the skills that `ref:` moves.
+  # Each problem is "<package>: <option path>: <message>"; pin-contract applies
+  # it to every package pin.
+  remoteSkillProblems =
+    { pin, remoteDeps }:
+    lib.concatLists (
+      lib.imap0 (
+        i: c:
+        let
+          inherit (c.kind.remoteSkillHashes) git skills;
+          at = "${pin.name}: companions.${toString i}.kind.remoteSkillHashes.skills";
+          entries = lib.filter (d: d.repo == git) remoteDeps;
+          # `skills: [a, b]`; any other form is kept whole, so it never matches.
+          selection =
+            d:
+            let
+              flow = builtins.match "\\[(.*)]" (d.skills or "[]");
+            in
+            if flow == null then
+              [ d.skills ]
+            else
+              lib.filter (s: s != "") (map lib.trim (lib.splitString "," (lib.head flow)));
+          declared = lib.sort lib.lessThan (lib.concatMap selection entries);
+          show = l: "[${lib.concatStringsSep ", " l}]";
+        in
+        if !(c.kind ? remoteSkillHashes) then
+          [ ]
+        else if entries == [ ] then
+          [ "${at}: no apm.yml entry has git ${git}" ]
+        else
+          lib.optional (lib.sort lib.lessThan skills != declared)
+            "${at}: ${show skills} differs from ${show declared}, the skills: of the apm.yml entries with git ${git}"
+      ) pin.companions
+    );
 }

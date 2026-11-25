@@ -14,6 +14,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
@@ -32,6 +33,7 @@ from realize_pin.capabilities import (
     Method,
     Nix,
     NpmDeps,
+    SkillHasher,
     Sri,
     Src,
     fod_attr_path,
@@ -82,6 +84,16 @@ def _run(argv: tuple[str, ...], cwd: Path, timeout: float) -> Result[_Ran, str]:
 
 def _tail(text: str, lines: int = 20) -> str:
     return "\n".join(text.strip().splitlines()[-lines:])
+
+
+def _output(argv: tuple[str, ...], root: Path, deadline: float, what: str) -> Result[str, str]:
+    """The stripped stdout of `argv`, run in `root` with the time left before `deadline` (monotonic)."""
+    ran = _run(argv, root, max(deadline - time.monotonic(), 0.001))
+    if ran.is_error():
+        return Error(ran.error)
+    if ran.ok.code != 0:
+        return Error(f"{what}: {_tail(ran.ok.stderr)}")
+    return Ok(ran.ok.stdout.decode().strip())
 
 
 def parse_porcelain(output: bytes) -> frozenset[str]:
@@ -168,12 +180,7 @@ class NixUpdateHasher(FixedOutputHasher):
         deadline = time.monotonic() + timeout
 
         def output(argv: tuple[str, ...], what: str) -> Result[str, str]:
-            ran = _run(argv, self.root, max(deadline - time.monotonic(), 0.001))
-            if ran.is_error():
-                return Error(ran.error)
-            if ran.ok.code != 0:
-                return Error(f"{what}: {_tail(ran.ok.stderr)}")
-            return Ok(ran.ok.stdout.decode().strip())
+            return _output(argv, self.root, deadline, what)
 
         target = f"{package}.{fod_attr_path(attr)}"
         current = output(("nix", "eval", *_NIX_FLAGS, "--raw", f".#{target}.outputHash"), f"evaluating {target}.outputHash")
@@ -217,6 +224,48 @@ class NixUpdateHasher(FixedOutputHasher):
         if not isinstance(value, str):
             return Error("nix-update left no hash")
         return sri(value)
+
+
+_UNINDEXED_COMPOSE = "apm-skills-compose.unindexed"
+
+
+@dataclass(frozen=True)
+class ComposeSkillHasher(SkillHasher):
+    """Hash installed remote skills from the compose built without its committed index.
+
+    The same computation as `just agents-skills-index` and the compose's tree
+    oracle: `nix hash path` of `<out>/.claude/skills/<skill>`.  The build reads
+    the working tree, so it sees the `apm.yml` ref and the `apmDepsHash` the
+    realizer wrote before it; `passthru.unindexed` skips the index comparison,
+    which would otherwise fail on the very hashes being recomputed.
+    """
+
+    root: Path
+
+    @override
+    def hash(self, skills: tuple[str, ...], timeout: float) -> Result[Mapping[str, Sri], str]:
+        deadline = time.monotonic() + timeout
+        out = _output(
+            ("nix", "build", *_NIX_FLAGS, "--no-link", "--print-out-paths", f".#{_UNINDEXED_COMPOSE}"),
+            self.root,
+            deadline,
+            f"building {_UNINDEXED_COMPOSE}",
+        )
+        if out.is_error():
+            return Error(out.error)
+        hashes: dict[str, Sri] = {}
+        for skill in skills:
+            directory = Path(out.ok) / ".claude" / "skills" / skill
+            if not directory.is_dir():
+                return Error(f"{_UNINDEXED_COMPOSE} installs no skill {skill}")
+            got = _output(("nix", "hash", "path", *_NIX_FLAGS, str(directory)), self.root, deadline, f"hashing {skill}")
+            if got.is_error():
+                return Error(got.error)
+            checked = sri(got.ok)
+            if checked.is_error():
+                return Error(f"{skill}: {checked.error}")
+            hashes[skill] = checked.ok
+        return Ok(hashes)
 
 
 @dataclass(frozen=True)

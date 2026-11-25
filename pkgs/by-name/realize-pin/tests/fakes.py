@@ -15,7 +15,7 @@ from typing import override
 
 from expression import Error, Ok, Result
 
-from realize_pin.capabilities import FixedOutputHasher, FodAttr, Git, Http, Method, Nix, Sri, sri
+from realize_pin.capabilities import FixedOutputHasher, FodAttr, Git, Http, Method, Nix, SkillHasher, Sri, sri
 from realize_pin.model import Json
 from realize_pin.policy import pin_path
 
@@ -99,6 +99,41 @@ class FakeHasher(FixedOutputHasher):
         if isinstance(answer, Exception):
             return Error(str(answer))
         return sri(answer)
+
+
+@dataclass
+class FakeSkillHasher(SkillHasher):
+    """Answers each skill with a recorded installed hash, or fails as a stale tree would.
+
+    `ready` stands for the compose building from the current tree: it names
+    what in the tree is not yet at the realized version, and the hash then fails.
+    """
+
+    answers: Mapping[str, str | Exception]
+    ready: Callable[[], str | None] = lambda: None
+    calls: list[tuple[str, ...]] = field(default_factory=lambda: [])
+    on_hash: Callable[[], None] | None = None
+
+    @override
+    def hash(self, skills: tuple[str, ...], timeout: float) -> Result[Mapping[str, Sri], str]:
+        self.calls.append(skills)
+        if self.on_hash is not None:
+            self.on_hash()
+        not_ready = self.ready()
+        if not_ready is not None:
+            return Error(f"the compose builds from a stale tree: {not_ready}")
+        hashes: dict[str, Sri] = {}
+        for skill in skills:
+            answer = self.answers.get(skill)
+            if answer is None:
+                return Error(f"the compose installs no skill {skill}")
+            if isinstance(answer, Exception):
+                return Error(str(answer))
+            checked = sri(answer)
+            if checked.is_error():
+                return Error(checked.error)
+            hashes[skill] = checked.ok
+        return Ok(hashes)
 
 
 @dataclass

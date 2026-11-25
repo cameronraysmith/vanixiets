@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 import pytest
 from expression import Result
 
-from fakes import FIXTURES, Clock, FakeGit, FakeHasher, FakeHttp, FakeNix
+from fakes import FIXTURES, Clock, FakeGit, FakeHasher, FakeHttp, FakeNix, FakeSkillHasher
 from realize_pin.adapters import TreeFiles
 from realize_pin.capabilities import Capabilities, Custom, FodAttr, NpmDeps, Src
 from realize_pin.cli import main
@@ -31,6 +31,8 @@ RECORDED = (
 )
 APM = "modules/home/ai/plugins/version-control-and-forge/apm.yml"
 HASHES = "pkgs/by-name/apm-skills-compose/hashes.json"
+SKILLS = "pkgs/by-name/apm-skills-compose/skills.json"
+MERGIFY_SKILL = "mergify-stack"
 MERGIFY_REV = "e7c1ebbc281361f0b2b7827cf583f57339c97ebc"
 UNRELATED_DIRTY = "notes/scratch.txt"
 STALE_SRI = "sha256-" + "B" * 43 + "="
@@ -55,13 +57,24 @@ def committed(package: str) -> dict[str, bytes]:
     if package == "mergify-cli-bin":
         files[APM] = (d / "apm.yml").read_bytes()
         files[HASHES] = (d / "hashes.json").read_bytes()
+        files[SKILLS] = (d / "skills.json").read_bytes()
     return files
+
+
+def _stale_skill_index(data: bytes) -> bytes:
+    """The skill index before a mergify release: only mergify's own skill hash differs."""
+    doc = json.loads(data)
+    doc["remote"][MERGIFY_SKILL] = STALE_SRI
+    return (json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode()
 
 
 def stale(files: dict[str, bytes]) -> dict[str, bytes]:
     """The same files at an older version: every digest, rev, file value and version moved."""
     out: dict[str, bytes] = {}
     for path, data in files.items():
+        if path == SKILLS:
+            out[path] = _stale_skill_index(data)
+            continue
         text = SRI.sub(STALE_SRI, data.decode()).replace(MERGIFY_REV, "0" * 40)
         if path.endswith("pin.json"):
             doc = json.loads(text)
@@ -82,11 +95,14 @@ class Scenario:
     http: FakeHttp
     nix: FakeNix
     hasher: FakeHasher
+    skills: FakeSkillHasher
     git: FakeGit
     clock: Clock
 
     def capabilities(self) -> Capabilities:
-        return Capabilities(http=self.http, nix=self.nix, hasher=self.hasher, git=self.git, files=TreeFiles(self.root))
+        return Capabilities(
+            http=self.http, nix=self.nix, hasher=self.hasher, skills=self.skills, git=self.git, files=TreeFiles(self.root)
+        )
 
     def run(self) -> Result[Realization, RealizeError]:
         return realize(self.package, self.version, self.capabilities(), Deadline.start(self.clock))
@@ -126,9 +142,11 @@ def scenario(
     answers: dict[tuple[str, FodAttr], str | Exception] = {}
     if package == "omnigraph":
         answers[("omnigraph", Custom("skillSrc"))] = "sha256-fDjXKhh/jAXST0SGoPsGkFDIZtpGF9NxCxGd7H4snBA="
+    skill_answers: dict[str, str | Exception] = {}
     if package == "mergify-cli-bin":
         remotes["https://github.com/Mergifyio/mergify-cli"] = (d / "ls-remote.txt").read_text()
         answers[("apm-skills-compose", Custom("deps"))] = "sha256-4ELGyWHWhpyAODdyXvNbf4heYCBhwjDiFP6Plgm3Td8="
+        skill_answers[MERGIFY_SKILL] = json.loads((d / "skills.json").read_text())["remote"][MERGIFY_SKILL]
     if hashes is not None:
         answers.update(hashes)
 
@@ -142,6 +160,15 @@ def scenario(
             return f"{APM} is not at {MERGIFY_REV}"
         return None
 
+    def skills_ready() -> str | None:
+        """The compose builds from the tree: the apm.yml ref and apmDepsHash must already be realized."""
+        not_ready = ready("apm-skills-compose", Custom("deps"))
+        if not_ready is not None:
+            return not_ready
+        if STALE_SRI in (root / HASHES).read_text():
+            return f"{HASHES} still holds the stale apmDepsHash"
+        return None
+
     return Scenario(
         root=root,
         package=package,
@@ -149,6 +176,7 @@ def scenario(
         http=FakeHttp(served),
         nix=FakeNix(root, {version: planned}),
         hasher=FakeHasher(answers, ready),
+        skills=FakeSkillHasher(skill_answers, skills_ready),
         git=FakeGit(root, dict(files), remotes),
         clock=Clock(),
     )
@@ -353,6 +381,7 @@ def _deps_scenario(root: Path, npm: str | Exception) -> Scenario:
         http=FakeHttp({}),
         nix=FakeNix(root, {"1.2.3": DEPS_PLAN}),
         hasher=FakeHasher({("deps-demo", Src()): DEPS_SRC, ("deps-demo", NpmDeps()): npm}, ready),
+        skills=FakeSkillHasher({}),
         git=FakeGit(root, files),
         clock=Clock(),
     )
@@ -512,6 +541,7 @@ def _file_scenario(
         http=FakeHttp(bodies or {}),
         nix=FakeNix(root, {"3.9.0": plan}, prefetches or {}),
         hasher=FakeHasher({}),
+        skills=FakeSkillHasher({}),
         git=FakeGit(root, files),
         clock=Clock(),
     )
@@ -556,4 +586,49 @@ def test_file_checksum_without_its_line_restores_the_pin(tmp_path: Path) -> None
     assert result.error.step == Step.HASH
     assert "cli: " in result.error.message
     assert "no line for cli.tgz" in result.error.message
+    assert s.tree() == before
+
+
+def test_mergify_rewrites_only_its_remote_skill_hash_after_the_fixed_output_hash(tmp_path: Path) -> None:
+    s = scenario("mergify-cli-bin", tmp_path, stale(committed("mergify-cli-bin")))
+    before = json.loads(s.tree()[SKILLS])
+    order: list[str] = []
+    s.hasher.on_hash = lambda: order.append("fixedOutputHash")
+    s.skills.on_hash = lambda: order.append("remoteSkillHashes")
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    assert order == ["fixedOutputHash", "remoteSkillHashes"]
+    assert s.skills.calls == [(MERGIFY_SKILL,)]
+    after_bytes = s.tree()[SKILLS]
+    assert after_bytes == committed("mergify-cli-bin")[SKILLS]
+    after = json.loads(after_bytes)
+    assert after["names"] == before["names"]
+    changed = {k for k in after["remote"].keys() | before["remote"].keys() if after["remote"].get(k) != before["remote"].get(k)}
+    assert changed == {MERGIFY_SKILL}
+    assert SKILLS in result.ok.changed
+
+
+def test_remote_skill_missing_from_the_index_restores_every_file(tmp_path: Path) -> None:
+    files = stale(committed("mergify-cli-bin"))
+    index = json.loads(files[SKILLS])
+    del index["remote"][MERGIFY_SKILL]
+    files[SKILLS] = (json.dumps(index, indent=2, ensure_ascii=False) + "\n").encode()
+    s = scenario("mergify-cli-bin", tmp_path, files)
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.SKILL_HASH
+    assert f"remote records no {MERGIFY_SKILL}" in result.error.message
+    assert s.skills.calls == []
+    assert s.tree() == before
+
+
+def test_skill_hasher_error_restores_every_file(tmp_path: Path) -> None:
+    s = scenario("mergify-cli-bin", tmp_path, stale(committed("mergify-cli-bin")))
+    s.skills.answers = {MERGIFY_SKILL: RuntimeError("builder for apm-skills-compose failed")}
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.SKILL_HASH
+    assert "Mergifyio/mergify-cli: builder for apm-skills-compose failed" in result.error.message
     assert s.tree() == before

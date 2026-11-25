@@ -844,9 +844,8 @@ agents-skills-index:
   #!/usr/bin/env bash
   set -euo pipefail
   index=pkgs/by-name/apm-skills-compose/skills.json
-  compose='(builtins.getFlake (toString ./.)).packages.${builtins.currentSystem}.apm-skills-compose.override { skillIndex = null; }'
-  out=$({{nix_stock}} build --no-link --print-out-paths --impure --expr "$compose")
-  firstParty=$({{nix_stock}} eval --json --impure --expr "($compose).firstPartySkills")
+  out=$({{nix_stock}} build --no-link --print-out-paths .#apm-skills-compose.unindexed)
+  firstParty=$({{nix_stock}} eval --json .#apm-skills-compose.firstPartySkills)
   names=$(find "$out/.claude/skills" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | LC_ALL=C sort | jq -R . | jq -s .)
   remote=$(jq -r --argjson firstParty "$firstParty" '(. - $firstParty)[]' <<<"$names" | while read -r n; do
     jq -n --arg n "$n" --arg hash "$({{nix_stock}} hash path "$out/.claude/skills/$n")" '{($n): $hash}'

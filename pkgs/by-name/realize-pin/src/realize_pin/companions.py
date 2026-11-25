@@ -1,4 +1,4 @@
-"""Edits of the two companion kinds (design D3) and of the pin document."""
+"""Edits of the companion kinds (design D3) and of the pin and JSON companion documents."""
 
 from __future__ import annotations
 

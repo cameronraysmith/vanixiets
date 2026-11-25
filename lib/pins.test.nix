@@ -4,12 +4,15 @@
 # `packagePins` holds the `passthru.pin` of every package with a pin.json, and
 # `fixedOutputs` each of their sourceBuild artifacts and fixedOutputHash
 # companions as `{ at = "<package>.<attribute>"; resolves; }`, where `resolves`
-# says whether that attribute carries an `outputHash`.
+# says whether that attribute carries an `outputHash`. `remoteSkillMismatches`
+# holds `pins.remoteSkillProblems` over every package pin against the apm-deps
+# guard's parse of the plugin apm.yml files.
 {
   lib,
   pins,
   packagePins,
   fixedOutputs,
+  remoteSkillMismatches,
 }:
 let
   load =
@@ -184,6 +187,29 @@ let
     // {
       companions = [ companion ];
     };
+
+  skillHashes = {
+    path = "pkgs/by-name/apm-skills-compose/skills.json";
+    kind.remoteSkillHashes = {
+      git = "Mergifyio/mergify-cli";
+      skills = [ "mergify-stack" ];
+    };
+  };
+
+  withSkillHashes = mergify // {
+    companions = mergify.companions ++ [ skillHashes ];
+  };
+
+  # The guard's parse of the version-control-and-forge apm.yml entry.
+  mergifyRemoteDeps = [
+    {
+      plugin = "version-control-and-forge";
+      repo = "Mergifyio/mergify-cli";
+      path = null;
+      ref = "e7c1ebbc281361f0b2b7827cf583f57339c97ebc";
+      skills = "[mergify-stack]";
+    }
+  ];
 
   mops = {
     name = "mops-bin";
@@ -387,6 +413,84 @@ in
     expectedError = fails "pin of package mergify-cli-bin\\) is malformed:${any}rev: required by an apmRef companion or a gitCommit source, and absent";
   };
 
+  testValidRemoteSkillHashesParsesToItself = {
+    expr = (load "skill-hashes" "mergify-cli-bin" withSkillHashes).pin;
+    expected = withSkillHashes;
+  };
+
+  testRemoteSkillHashesWithoutApmRefFails = {
+    expr =
+      (load "skill-hashes-no-apm-ref" "mergify-cli-bin" (
+        mergify
+        // {
+          companions = [ skillHashes ];
+          rev = null;
+        }
+      )).pin;
+    expectedError = fails "pin of package mergify-cli-bin\\) is malformed:${any}companions\\.0\\.kind\\.remoteSkillHashes\\.git: no apmRef companion of this pin has git Mergifyio/mergify-cli";
+  };
+
+  testRemoteSkillHashesOnANonJsonFileFails = {
+    expr =
+      (load "skill-hashes-yaml" "mergify-cli-bin" (
+        mergify
+        // {
+          companions = mergify.companions ++ [
+            (skillHashes // { path = "pkgs/by-name/apm-skills-compose/skills.yml"; })
+          ];
+        }
+      )).pin;
+    expectedError = fails "pin of package mergify-cli-bin\\) is malformed:${any}companions\\.2\\.path: pkgs/by-name/apm-skills-compose/skills\\.yml is a remoteSkillHashes companion, which must name a JSON file";
+  };
+
+  testRemoteSkillHashesWithoutSkillsFails = {
+    expr =
+      (load "skill-hashes-empty" "mergify-cli-bin" (
+        mergify
+        // {
+          companions = mergify.companions ++ [
+            (
+              skillHashes
+              // {
+                kind.remoteSkillHashes = skillHashes.kind.remoteSkillHashes // {
+                  skills = [ ];
+                };
+              }
+            )
+          ];
+        }
+      )).pin;
+    expectedError = fails "${any}kind\\.remoteSkillHashes\\.skills' is not of type `non-empty \\(list of";
+  };
+
+  testRemoteSkillsMatchingTheApmSelectionHaveNoProblem = {
+    expr = pins.remoteSkillProblems {
+      pin = (load "skill-hashes-match" "mergify-cli-bin" withSkillHashes).pin;
+      remoteDeps = mergifyRemoteDeps;
+    };
+    expected = [ ];
+  };
+
+  testRemoteSkillsDifferingFromTheApmSelectionAreAProblem = {
+    expr = pins.remoteSkillProblems {
+      pin = (load "skill-hashes-mismatch" "mergify-cli-bin" withSkillHashes).pin;
+      remoteDeps = map (d: d // { skills = "[mergify-stack, mergify-cli-upgrade]"; }) mergifyRemoteDeps;
+    };
+    expected = [
+      "mergify-cli-bin: companions.2.kind.remoteSkillHashes.skills: [mergify-stack] differs from [mergify-cli-upgrade, mergify-stack], the skills: of the apm.yml entries with git Mergifyio/mergify-cli"
+    ];
+  };
+
+  testRemoteSkillsWithoutAnApmEntryAreAProblem = {
+    expr = pins.remoteSkillProblems {
+      pin = (load "skill-hashes-no-entry" "mergify-cli-bin" withSkillHashes).pin;
+      remoteDeps = [ ];
+    };
+    expected = [
+      "mergify-cli-bin: companions.2.kind.remoteSkillHashes.skills: no apm.yml entry has git Mergifyio/mergify-cli"
+    ];
+  };
+
   testValidFileValuePinParsesToItself = {
     expr = (load "fileValue" "greptimedb-bin" greptimedb).pin;
     expected = greptimedb // {
@@ -585,5 +689,10 @@ in
   testSomeFixedOutputIsRecorded = {
     expr = fixedOutputs != [ ];
     expected = true;
+  };
+
+  testEveryRemoteSkillSelectionMatchesApm = {
+    expr = remoteSkillMismatches;
+    expected = [ ];
   };
 }

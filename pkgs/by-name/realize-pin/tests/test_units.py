@@ -10,9 +10,9 @@ from fakes import FIXTURES
 from realize_pin.adapters import nix_update_selection, parse_porcelain
 from realize_pin.capabilities import CargoDeps, Custom, GoModules, NpmDeps, Src, sri
 from realize_pin.cli import main
-from realize_pin.companions import set_apm_ref
+from realize_pin.companions import load_json_object, render_json, set_apm_ref
 from realize_pin.digest import hex_to_sri, json_pointer, sha256sum_digest
-from realize_pin.model import Json, parse_pin
+from realize_pin.model import Json, RemoteSkillHashes, parse_companion, parse_pin
 from realize_pin.policy import allowed_paths
 
 
@@ -105,7 +105,47 @@ def test_allowed_paths_of_mergify() -> None:
         "pkgs/by-name/mergify-cli-bin/pin.json",
         "modules/home/ai/plugins/version-control-and-forge/apm.yml",
         "pkgs/by-name/apm-skills-compose/hashes.json",
+        "pkgs/by-name/apm-skills-compose/skills.json",
     }
+
+
+SKILLS_PATH = "pkgs/by-name/apm-skills-compose/skills.json"
+
+
+def test_parse_remote_skill_hashes() -> None:
+    raw: Json = {"path": SKILLS_PATH, "kind": {"remoteSkillHashes": {"git": "max-sixty/worktrunk", "skills": ["worktrunk", "wt-switch-create"]}}}
+    parsed = parse_companion(raw, "c")
+    assert parsed.is_ok(), parsed.error if parsed.is_error() else ""
+    assert parsed.ok.path == SKILLS_PATH
+    assert parsed.ok.kind == RemoteSkillHashes("max-sixty/worktrunk", ("worktrunk", "wt-switch-create"))
+
+
+@pytest.mark.parametrize(
+    ("fields", "fault"),
+    [
+        ({"git": "Mergifyio/mergify-cli"}, "c.kind.remoteSkillHashes.skills: expected a non-empty list"),
+        ({"git": "Mergifyio/mergify-cli", "skills": []}, "c.kind.remoteSkillHashes.skills: expected a non-empty list"),
+        ({"git": "Mergifyio/mergify-cli", "skills": ["../escape"]}, "c.kind.remoteSkillHashes.skills.0: '../escape' is not a skill name"),
+        ({"git": "Mergifyio/mergify-cli", "skills": ["a", "a"]}, "c.kind.remoteSkillHashes.skills.1: 'a' is listed twice"),
+        ({"skills": ["mergify-stack"]}, "c.kind.remoteSkillHashes.git: expected a string"),
+    ],
+)
+def test_parse_remote_skill_hashes_rejects(fields: dict[str, Json], fault: str) -> None:
+    parsed = parse_companion({"path": SKILLS_PATH, "kind": {"remoteSkillHashes": fields}}, "c")
+    assert parsed.is_error() and fault in parsed.error
+
+
+def test_parse_companion_rejects_an_unknown_kind() -> None:
+    parsed = parse_companion({"path": SKILLS_PATH, "kind": {"skillIndex": {}}}, "c")
+    assert parsed.is_error() and "unknown tag 'skillIndex'" in parsed.error
+
+
+def test_skill_index_round_trips_byte_for_byte() -> None:
+    """The committed index, written by jq, renders back unchanged, so a rewrite moves only the values it sets."""
+    data = (FIXTURES / "mergify-cli-bin" / "skills.json").read_bytes()
+    doc = load_json_object(data, "skills.json")
+    assert doc.is_ok()
+    assert render_json(doc.ok) == data
 
 
 def test_parse_porcelain() -> None:

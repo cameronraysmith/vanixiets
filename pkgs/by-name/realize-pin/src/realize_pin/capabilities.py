@@ -7,6 +7,7 @@ boundary.  `timeout` is the seconds left before the realizer's deadline.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, NewType, Protocol, runtime_checkable
 
@@ -104,6 +105,18 @@ class FixedOutputHasher(Protocol):
 
 
 @runtime_checkable
+class SkillHasher(Protocol):
+    def hash(self, skills: tuple[str, ...], timeout: float) -> Result[Mapping[str, Sri], str]:
+        """The `nix hash path` of each of `skills` as the skill compose installs it from the current tree.
+
+        Builds the compose without its committed skill index, so a skill whose
+        recorded hash is stale does not fail the build.  Writes nothing in the
+        repository: the realizer records the hashes itself.
+        """
+        ...
+
+
+@runtime_checkable
 class Git(Protocol):
     def ls_remote(self, url: str, refs: tuple[str, ...], timeout: float) -> Result[str, str]:
         """Return `git ls-remote <url> <refs>` output."""
@@ -134,5 +147,6 @@ class Capabilities:
     http: Http
     nix: Nix
     hasher: FixedOutputHasher
+    skills: SkillHasher
     git: Git
     files: Files

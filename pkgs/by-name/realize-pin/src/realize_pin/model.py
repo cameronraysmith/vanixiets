@@ -21,6 +21,8 @@ VERSION = re.compile(r"[0-9A-Za-z][0-9A-Za-z.+_-]*")
 COMMIT = re.compile(r"[0-9a-f]{40}")
 SRI_SHA256 = re.compile(r"sha256-[A-Za-z0-9+/]{43}=")
 ATTR_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_'-]*")
+# A skill's directory name under .claude/skills, so never a path.
+SKILL_NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
 
 
 # source
@@ -194,7 +196,15 @@ class FixedOutputHash:
     fod_attr: str
 
 
-type CompanionKind = ApmRef | FixedOutputHash
+@dataclass(frozen=True)
+class RemoteSkillHashes:
+    """The installed hash of each of `skills`, the skills the apm.yml entry `git` selects."""
+
+    git: str
+    skills: tuple[str, ...]
+
+
+type CompanionKind = ApmRef | FixedOutputHash | RemoteSkillHashes
 
 
 @dataclass(frozen=True)
@@ -470,7 +480,7 @@ def parse_companion(value: Json, where: str) -> Result[Companion, str]:
     path = _str(obj.ok, "path", where)
     if path.is_error():
         return Error(path.error)
-    kind = _tag(obj.ok.get("kind"), f"{where}.kind", ("apmRef", "fixedOutputHash"))
+    kind = _tag(obj.ok.get("kind"), f"{where}.kind", ("apmRef", "fixedOutputHash", "remoteSkillHashes"))
     if kind.is_error():
         return Error(kind.error)
     tag, f = kind.ok
@@ -479,6 +489,8 @@ def parse_companion(value: Json, where: str) -> Result[Companion, str]:
         if git.is_error():
             return Error(git.error)
         return Ok(Companion(path.ok, ApmRef(git.ok)))
+    if tag == "remoteSkillHashes":
+        return _parse_remote_skill_hashes(path.ok, f, f"{where}.kind.remoteSkillHashes")
     w = f"{where}.kind.fixedOutputHash"
     package = _str(f, "package", w)
     attr = _str(f, "attr", w)
@@ -491,6 +503,23 @@ def parse_companion(value: Json, where: str) -> Result[Companion, str]:
     if ATTR_NAME.fullmatch(fod_attr.ok) is None:
         return Error(f"{w}.fodAttr: {fod_attr.ok!r} is not an attribute name")
     return Ok(Companion(path.ok, FixedOutputHash(package.ok, attr.ok, fod_attr.ok)))
+
+
+def _parse_remote_skill_hashes(path: str, f: Mapping[str, Json], w: str) -> Result[Companion, str]:
+    git = _str(f, "git", w)
+    if git.is_error():
+        return Error(git.error)
+    raw = f.get("skills")
+    if not isinstance(raw, list) or not raw:
+        return Error(f"{w}.skills: expected a non-empty list of skill names")
+    skills: list[str] = []
+    for i, skill in enumerate(raw):
+        if not isinstance(skill, str) or SKILL_NAME.fullmatch(skill) is None:
+            return Error(f"{w}.skills.{i}: {skill!r} is not a skill name")
+        if skill in skills:
+            return Error(f"{w}.skills.{i}: {skill!r} is listed twice")
+        skills.append(skill)
+    return Ok(Companion(path, RemoteSkillHashes(git.ok, tuple(skills))))
 
 
 def parse_pin(value: Json) -> Result[Pin, str]:

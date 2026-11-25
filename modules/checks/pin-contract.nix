@@ -6,6 +6,9 @@
 # fixedOutputHash companion through `nix-update --custom-dep`, which reads
 # `<package>.<attribute>`, so each must name an attribute carrying an
 # `outputHash`; whether it does is recorded here and asserted in the cases.
+# Each remoteSkillHashes companion's skills are compared here with the
+# apm.yml selection the apm-deps guard parses, and the problems are asserted
+# empty in the cases.
 { config, lib, ... }:
 {
   perSystem =
@@ -41,8 +44,17 @@
           ) (lib.filter (c: c.kind ? fixedOutputHash) pin.companions)
         ) packagePins
       );
+      remoteSkillMismatches = lib.concatLists (
+        lib.mapAttrsToList (
+          _: pin:
+          config.flake.lib.pins.remoteSkillProblems {
+            inherit pin;
+            inherit (self'.packages.apm-skills-compose.deps.guard) remoteDeps;
+          }
+        ) packagePins
+      );
       packageData = pkgs.writeText "package-pins.json" (
-        builtins.toJSON { inherit packagePins fixedOutputs; }
+        builtins.toJSON { inherit packagePins fixedOutputs remoteSkillMismatches; }
       );
       check = config.flake.lib.mkEvalCheck pkgs {
         name = "pin-contract";
@@ -53,7 +65,7 @@
           import ${../../lib/pins.test.nix} {
             inherit lib;
             pins = import ${../../lib/pins.nix} { inherit lib; };
-            inherit (lib.importJSON ${packageData}) packagePins fixedOutputs;
+            inherit (lib.importJSON ${packageData}) packagePins fixedOutputs remoteSkillMismatches;
           }
         '';
       };

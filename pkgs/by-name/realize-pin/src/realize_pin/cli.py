@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from realize_pin.adapters import GitCli, NixCli, NixUpdateHasher, TreeFiles, UrllibHttp
+from realize_pin.adapters import ComposeSkillHasher, GitCli, NixCli, NixUpdateHasher, TreeFiles, UrllibHttp
 from realize_pin.capabilities import Capabilities
 from realize_pin.model import PACKAGE_NAME, VERSION
 from realize_pin.realize import Deadline, realize
@@ -19,6 +19,7 @@ def real_capabilities(root: Path) -> Capabilities:
         http=UrllibHttp(),
         nix=NixCli(root),
         hasher=NixUpdateHasher(root),
+        skills=ComposeSkillHasher(root),
         git=GitCli(root),
         files=TreeFiles(root),
     )
