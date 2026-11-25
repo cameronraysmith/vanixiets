@@ -22,9 +22,11 @@
 # keeps them usable for an interactive ACP client. Drop the patch when
 # upstream handles atomic's session store.
 #
-# Version lives in manifest.json alongside this file; update.sh re-derives the
-# source hash and npmDepsHash per bump.
-# update: nix run .#update-pi-acp
+# pin.json pins the version, the source hash and npmDepsHash; Renovate proposes
+# GitHub releases and `nix run .#realize-pin -- pi-acp <version>` realizes one.
+# The patch is applied as is to every version: when a release moves the code it
+# touches, the realizer fails computing npmDepsHash (npmDeps applies the
+# patches), and the patch must be rebased by hand.
 # source: https://github.com/svkozak/pi-acp
 {
   lib,
@@ -35,7 +37,12 @@
   writableTmpDirAsHomeHook,
 }:
 let
-  manifest = lib.importJSON ./manifest.json;
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "pi-acp"; })
+    pin
+    pinPlan
+    ;
+  planned = (pinPlan pin.version).artifacts;
+  inherit (pin.artifacts.src) sourceBuild;
 
   # One ACP initialize round trip against the given binary; it does not start
   # atomic. pi-acp exits as soon as stdin ends, possibly before replying, so
@@ -49,19 +56,14 @@ let
 in
 buildNpmPackage (finalAttrs: {
   pname = "pi-acp";
-  inherit (manifest) version;
+  inherit (pin) version;
 
-  src = fetchFromGitHub {
-    owner = "svkozak";
-    repo = "pi-acp";
-    tag = "v${finalAttrs.version}";
-    hash = "sha256-QRwxOtTZOY+Np3PkAoy2o2PrUzEqjItM/372sCPlSMo=";
-  };
+  src = fetchFromGitHub (planned.src.sourceBuild.fetchFromGitHub // { inherit (sourceBuild) hash; });
 
   patches = [ ./atomic-sqlite-sessions.patch ];
 
   nodejs = nodejs_22;
-  npmDepsHash = "sha256-BvLNtFfp1cMVjzWcMRSdhTqiJrTfbFoUbWkkPW9200o=";
+  npmDepsHash = sourceBuild.depsHash.npm.hash;
 
   doCheck = true;
   nativeCheckInputs = [ writableTmpDirAsHomeHook ];
@@ -87,7 +89,7 @@ buildNpmPackage (finalAttrs: {
   strictDeps = true;
 
   passthru = {
-    updateScript = ./update.sh;
+    inherit pin pinPlan;
 
     # installCheck runs while $out is still being built; this probes the
     # finished, read-only store path.

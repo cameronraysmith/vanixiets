@@ -1,0 +1,31 @@
+{
+  "name": "pi-acp",
+  "version": "0.0.34",
+  "realizedVersion": "0.0.34",
+  "source": {
+    "githubRelease": {
+      "owner": "svkozak",
+      "repo": "pi-acp",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "svkozak",
+            "repo": "pi-acp"
+          }
+        },
+        "hash": "sha256-QRwxOtTZOY+Np3PkAoy2o2PrUzEqjItM/372sCPlSMo=",
+        "depsHash": {
+          "npm": {
+            "hash": "sha256-BvLNtFfp1cMVjzWcMRSdhTqiJrTfbFoUbWkkPW9200o="
+          }
+        }
+      }
+    }
+  },
+  "companions": []
+}
