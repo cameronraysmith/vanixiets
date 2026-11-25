@@ -33,5 +33,5 @@ dependencies:
     # realize-pin keeps this ref and the pin's sourceRev in step through the
     # pin's apmRef companion.
     - git: Mergifyio/mergify-cli
-      ref: e7c1ebbc281361f0b2b7827cf583f57339c97ebc
+      ref: 21d1688cd21357d382a9e1a1d72c90e2cd501915
       skills: [mergify-stack]
