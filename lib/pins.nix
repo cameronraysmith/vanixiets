@@ -169,7 +169,7 @@ let
     name: pin:
     let
       packageDir = "pkgs/by-name/${name}/";
-      needsRev = pin.source ? gitCommit || lib.any (c: c.kind ? apmRef) pin.companions;
+      needsRev = lib.any (c: c.kind ? apmRef) pin.companions;
       apmGits = map (c: c.kind.apmRef.git) (lib.filter (c: c.kind ? apmRef) pin.companions);
 
       artifactProblems = lib.concatLists (
@@ -239,11 +239,10 @@ let
     ++ artifactProblems
     ++ companionProblems
     ++ lib.optional (
-      needsRev && pin.rev == null
-    ) "rev: required by an apmRef companion or a gitCommit source, and absent"
-    ++ lib.optional (
-      !needsRev && pin.rev != null
-    ) "rev: present, but no apmRef companion or gitCommit source needs it";
+      pin.source ? gitCommit && builtins.match "[0-9a-f]{40}" pin.version == null
+    ) "version: ${pin.version} is not a 40-character commit, which a gitCommit source pins"
+    ++ lib.optional (needsRev && pin.rev == null) "rev: required by an apmRef companion, and absent"
+    ++ lib.optional (!needsRev && pin.rev != null) "rev: present, but no apmRef companion needs it";
 
   # Replaces each `{var}` of `vars` in `template`, and fails on any `{word}`
   # left over, which names a variable this pin does not define.
@@ -306,18 +305,28 @@ let
           _system: platform: asset (releaseVars // { inherit platform; }) pb.urlTemplate pb.checksum
         ) pb.platforms;
 
+      # A githubRelease pin fetches its release tag; a gitCommit pin's version
+      # is the commit itself.
+      gitRef = match pin.source {
+        githubRelease = _: { inherit tag; };
+        gitCommit = _: { rev = version; };
+        npm = noGitRef;
+        pypi = noGitRef;
+        vendorJson = noGitRef;
+        vendorText = noGitRef;
+      };
+      noGitRef =
+        _:
+        throw "${context}: fetchFromGitHub needs a release tag or a commit, which only a githubRelease or gitCommit source has";
+
       sourceBuild =
         sb:
         match sb.fetcher {
           fetchFromGitHub = f: {
             fetchFromGitHub = {
               inherit (f) owner repo;
-              tag =
-                if tag == null then
-                  throw "${context}: fetchFromGitHub needs a release tag, which only a githubRelease source has"
-                else
-                  tag;
-            };
+            }
+            // gitRef;
           };
         };
     in

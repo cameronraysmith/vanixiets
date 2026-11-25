@@ -364,15 +364,18 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
 
 
 def _resolve_rev(run: _Run, pin: Pin, plan: Plan) -> Result[str | None, RealizeError]:
-    """The release tag's commit, preferring the peeled line of an annotated tag."""
-    if pin.rev is None:
-        return Ok(None)
+    """The `rev` to write: the release tag's commit, preferring the peeled line of an annotated tag.
+
+    A gitCommit pin's version is its commit, so the version must be one, and no `rev` is written.
+    """
     match pin.source:
         case GitCommit():
             if COMMIT.fullmatch(run.version) is None:
                 return Error(run.fail(Step.REV, f"{run.version!r} is not a 40-character commit"))
-            return Ok(run.version)
+            return Ok(None)
         case GithubRelease():
+            if pin.rev is None:
+                return Ok(None)
             tag = plan.tag
             if tag is None:
                 return Error(run.fail(Step.REV, "the plan has no tag"))
@@ -394,7 +397,9 @@ def _resolve_rev(run: _Run, pin: Pin, plan: Plan) -> Result[str | None, RealizeE
                 return Error(run.fail(Step.REV, f"git ls-remote lists no commit for {plain}"))
             return Ok(rev)
         case Npm() | Pypi() | VendorJson() | VendorText():
-            return Error(run.fail(Step.REV, "rev needs a githubRelease or gitCommit source"))
+            if pin.rev is None:
+                return Ok(None)
+            return Error(run.fail(Step.REV, "rev needs a githubRelease source"))
 
 
 type _Writes = list[tuple[tuple[str, ...], str]]

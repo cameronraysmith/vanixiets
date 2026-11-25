@@ -1,0 +1,29 @@
+{
+  "name": "tmux-command-palette",
+  "version": "dbcaf7666a05b7af34f3ba38c0a67a751188df7a",
+  "realizedVersion": "dbcaf7666a05b7af34f3ba38c0a67a751188df7a",
+  "source": {
+    "gitCommit": {
+      "owner": "lost-melody",
+      "repo": "tmux-command-palette",
+      "branch": "main"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "lost-melody",
+            "repo": "tmux-command-palette"
+          }
+        },
+        "hash": "sha256-zkQhWRd4AiH9XjfRausvB2MNR3xXirYJA13OtvQ4oGQ=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}

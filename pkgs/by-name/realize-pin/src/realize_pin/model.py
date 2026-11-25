@@ -265,10 +265,27 @@ class PlanPlatformBinaries:
 
 
 @dataclass(frozen=True)
+class PlanTag:
+    """A githubRelease pin's fetch: the release tag."""
+
+    tag: str
+
+
+@dataclass(frozen=True)
+class PlanRev:
+    """A gitCommit pin's fetch: the commit that is its version."""
+
+    rev: str
+
+
+type PlanGitRef = PlanTag | PlanRev
+
+
+@dataclass(frozen=True)
 class PlanFetchFromGitHub:
     owner: str
     repo: str
-    tag: str
+    ref: PlanGitRef
 
 
 @dataclass(frozen=True)
@@ -652,11 +669,17 @@ def parse_plan_artifact(value: Json, where: str) -> Result[PlanArtifact, str]:
     fw = f"{w}.fetchFromGitHub"
     owner = _str(ff, "owner", fw)
     repo = _str(ff, "repo", fw)
-    tag_value = _str(ff, "tag", fw)
-    for r in (owner, repo, tag_value):
+    for r in (owner, repo):
         if r.is_error():
             return Error(r.error)
-    return Ok(PlanFetchFromGitHub(owner.ok, repo.ok, tag_value.ok))
+    refs = [key for key in ("tag", "rev") if key in ff]
+    if len(refs) != 1:
+        return Error(f"{fw}: expected exactly one of tag, rev, got {sorted(refs)}")
+    ref_value = _str(ff, refs[0], fw)
+    if ref_value.is_error():
+        return Error(ref_value.error)
+    ref: PlanGitRef = PlanTag(ref_value.ok) if refs[0] == "tag" else PlanRev(ref_value.ok)
+    return Ok(PlanFetchFromGitHub(owner.ok, repo.ok, ref))
 
 
 def parse_plan(value: Json) -> Result[Plan, str]:

@@ -234,6 +234,26 @@ let
   };
 
   withFile = fields: mops // { artifacts.cli.file = fields; };
+
+  tmuxPalette = {
+    name = "tmux-command-palette";
+    version = "dbcaf7666a05b7af34f3ba38c0a67a751188df7a";
+    realizedVersion = "dbcaf7666a05b7af34f3ba38c0a67a751188df7a";
+    source.gitCommit = {
+      owner = "lost-melody";
+      repo = "tmux-command-palette";
+      branch = "main";
+    };
+    artifacts.src.sourceBuild = {
+      fetcher.fetchFromGitHub = {
+        owner = "lost-melody";
+        repo = "tmux-command-palette";
+      };
+      hash = "sha256-zkQhWRd4AiH9XjfRausvB2MNR3xXirYJA13OtvQ4oGQ=";
+      depsHash.none = { };
+    };
+  };
+  tmuxPaletteNext = "0123456789abcdef0123456789abcdef01234567";
 in
 {
   testValidPinParsesToItself = {
@@ -440,7 +460,42 @@ in
 
   testApmRefWithoutRevFails = {
     expr = (load "no-rev" "mergify-cli-bin" (removeAttrs mergify [ "rev" ])).pin;
-    expectedError = fails "pin of package mergify-cli-bin\\) is malformed:${any}rev: required by an apmRef companion or a gitCommit source, and absent";
+    expectedError = fails "pin of package mergify-cli-bin\\) is malformed:${any}rev: required by an apmRef companion, and absent";
+  };
+
+  testValidGitCommitPinParsesToItself = {
+    expr = (load "git-commit" "tmux-command-palette" tmuxPalette).pin;
+    expected = tmuxPalette // {
+      rev = null;
+      companions = [ ];
+    };
+  };
+
+  testPlanFetchesAGitCommitAtItsVersion = {
+    expr = (load "git-commit" "tmux-command-palette" tmuxPalette).pinPlan tmuxPaletteNext;
+    expected = {
+      version = tmuxPaletteNext;
+      tag = null;
+      artifacts.src.sourceBuild.fetchFromGitHub = {
+        owner = "lost-melody";
+        repo = "tmux-command-palette";
+        rev = tmuxPaletteNext;
+      };
+    };
+  };
+
+  testGitCommitWithRevFails = {
+    expr =
+      (load "git-commit-rev" "tmux-command-palette" (tmuxPalette // { rev = tmuxPalette.version; })).pin;
+    expectedError = fails "pin of package tmux-command-palette\\) is malformed:${any}rev: present, but no apmRef companion needs it";
+  };
+
+  testGitCommitWithAVersionThatIsNoCommitFails = {
+    expr =
+      (load "git-commit-version" "tmux-command-palette" (
+        tmuxPalette // { version = "unstable-2025-09-29"; }
+      )).pin;
+    expectedError = fails "pin of package tmux-command-palette\\) is malformed:${any}version: unstable-2025-09-29 is not a 40-character commit, which a gitCommit source pins";
   };
 
   testValidRemoteSkillHashesParsesToItself = {

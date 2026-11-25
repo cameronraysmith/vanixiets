@@ -1,0 +1,15 @@
+{
+  "version": "dbcaf7666a05b7af34f3ba38c0a67a751188df7a",
+  "tag": null,
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetchFromGitHub": {
+          "owner": "lost-melody",
+          "repo": "tmux-command-palette",
+          "rev": "dbcaf7666a05b7af34f3ba38c0a67a751188df7a"
+        }
+      }
+    }
+  }
+}

@@ -29,6 +29,7 @@ RECORDED = (
     "claude-code",
     "greptimedb-bin",
     "ouroboros",
+    "tmux-command-palette",
 )
 APM = "modules/home/ai/plugins/version-control-and-forge/apm.yml"
 HASHES = "pkgs/by-name/apm-skills-compose/hashes.json"
@@ -149,6 +150,8 @@ def scenario(
     answers: dict[tuple[str, FodAttr], str | Exception] = {}
     if package == "omnigraph":
         answers[("omnigraph", Custom("skillSrc"))] = "sha256-fDjXKhh/jAXST0SGoPsGkFDIZtpGF9NxCxGd7H4snBA="
+    if package == "tmux-command-palette":
+        answers[("tmux-command-palette", Src())] = "sha256-zkQhWRd4AiH9XjfRausvB2MNR3xXirYJA13OtvQ4oGQ="
     skill_answers: dict[str, str | Exception] = {}
     if package == "mergify-cli-bin":
         remotes["https://github.com/Mergifyio/mergify-cli"] = (d / "ls-remote.txt").read_text()
@@ -205,7 +208,8 @@ def _plan_urls(node: Json) -> set[str]:
 
 def assert_requests_within_policy(s: Scenario) -> None:
     allowed = _plan_urls(_plan(s.package))
-    assert s.http.requests, "the realization fetched nothing"
+    if allowed:
+        assert s.http.requests, "the realization fetched nothing"
     for method, url in s.http.requests:
         assert method in ("GET", "HEAD")
         assert urlsplit(url).hostname != "api.github.com"
@@ -309,6 +313,38 @@ def test_realization_adds_a_missing_realized_version(tmp_path: Path) -> None:
     result = s.run()
     assert result.is_ok(), result.error.render() if result.is_error() else ""
     assert _realized_version((tmp_path / path).read_bytes()) == s.version
+
+
+def _git_commit_plan(version: str) -> dict[str, Json]:
+    plan = _plan("tmux-command-palette")
+    plan["version"] = version
+    plan["artifacts"] = {
+        "src": {"sourceBuild": {"fetchFromGitHub": {"owner": "lost-melody", "repo": "tmux-command-palette", "rev": version}}}
+    }
+    return plan
+
+
+def test_git_commit_pin_records_no_rev(tmp_path: Path) -> None:
+    """A gitCommit pin's version is its commit; Renovate rewrites only that field, so no `rev` may shadow it."""
+    s = scenario("tmux-command-palette", tmp_path, stale(committed("tmux-command-palette")))
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    doc = _pin_doc(tmp_path, "tmux-command-palette")
+    assert isinstance(doc, dict)
+    assert "rev" not in doc
+    assert doc["version"] == doc["realizedVersion"] == s.version
+    assert s.git.calls == []
+
+
+@pytest.mark.parametrize("version", ["main", "dbcaf76", "DBCAF7666A05B7AF34F3BA38C0A67A751188DF7A"])
+def test_git_commit_pin_refuses_a_version_that_is_no_commit(version: str, tmp_path: Path) -> None:
+    s = scenario("tmux-command-palette", tmp_path, stale(committed("tmux-command-palette")), plan=_git_commit_plan(version))
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.REV
+    assert "is not a 40-character commit" in result.error.message
+    assert s.tree() == before
 
 
 def test_hasher_error(tmp_path: Path) -> None:
