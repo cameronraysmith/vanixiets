@@ -191,6 +191,24 @@ ask({"action": "get", "target": "bare", "tags": True}, tags_cfg)
 if tags(bare):
     failures.append(f"a bare target must not name <root>/<target>: {tags(bare)}")
 
+# A tag ahead of a shallow clone's tip, fetched by --tags without -u, must not
+# become a boundary that leaves the next update with no merge base.
+ahead = os.path.join(work, "ahead")
+os.makedirs(ahead)
+git("init", "-q", "-b", "main", cwd=ahead)
+commit(ahead, 2, "a")
+behind = os.path.join(root, "github.com", "o", "ahead")
+git("clone", "-q", "--depth", "1", "--no-tags", "--filter=blob:none", f"file://{ahead}", behind)
+commit(ahead, 3, "b")
+git("tag", "-a", "-m", "release", "v-ahead", cwd=ahead)
+commit(ahead, 1, "c")
+reply = ask({"action": "get", "target": "github.com/o/ahead", "tags": True}, tags_cfg)
+if reply["exit"] != 0 or "v-ahead" not in tags(behind):
+    failures.append(f"shallow --tags must fetch a tag ahead of the tip: {reply} {tags(behind)}")
+reply = ask({"action": "get", "target": "github.com/o/ahead", "update": True}, tags_cfg)
+if reply["exit"] != 0 or git("rev-parse", "HEAD", cwd=behind) != git("rev-parse", "main", cwd=ahead):
+    failures.append(f"an update after shallow --tags must fast-forward past a tag ahead of the tip: {reply}")
+
 # The fixtures below need the lazy fetches a blobless checkout makes.
 os.environ.pop("GIT_NO_LAZY_FETCH")
 

@@ -183,30 +183,36 @@ def shallow_tags(path, env):
     boundary, including tags inside the history already present, which cuts a
     deepened branch back to depth 1. So tags whose commits are present are fetched
     without --depth (only the tag objects travel), and only tags whose commits are
-    absent are fetched at depth 1. A tag that moved upstream is not forced,
+    absent are fetched at depth 1. The tracked branches are fetched first: a tag
+    ahead of the local tip would otherwise land as a depth-1 boundary inside the
+    branch's future history, where the next update's fetch stops, leaving no merge
+    base and failing its fast-forward. A tag that moved upstream is not forced,
     matching plain `git fetch --tags`, which rejects it as clobbering.
     """
+    results = [git(path, env, "fetch", "--no-tags", "origin")]
+    if results[-1].returncode:
+        return results
     listed = git(path, env, "ls-remote", "--tags", "origin")
     if listed.returncode:
-        return [listed]
+        return results + [listed]
     tag_object, tag_commit = {}, {}
     for line in listed.stdout.decode().splitlines():
         sha, tab, ref = line.partition("\t")
         if not tab:
             message = f"ghq-writer: unexpected ls-remote output: {line!r}\n"
-            return [subprocess.CompletedProcess(listed.args, 1, b"", message.encode())]
+            return results + [subprocess.CompletedProcess(listed.args, 1, b"", message.encode())]
         if ref.endswith("^{}"):
             tag_commit[ref[:-3]] = sha
         else:
             tag_object[ref] = sha
             tag_commit.setdefault(ref, sha)
     if not tag_object:
-        return []
+        return results
     local = git(path, env, "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags")
     have = dict(line.split(" ", 1) for line in local.stdout.decode().splitlines() if line)
     wanted = sorted(ref for ref, sha in tag_object.items() if have.get(ref) != sha)
     if not wanted:
-        return []
+        return results
     # In a partial clone, asking about a missing object would fetch it from the
     # promisor remote and make every tag look present.
     probe = git(path, {**env, "GIT_NO_LAZY_FETCH": "1"}, "cat-file", "--batch-check=%(objectname)",
@@ -214,7 +220,6 @@ def shallow_tags(path, env):
     present = set(probe.stdout.decode().split())
     near = [ref for ref in wanted if tag_commit[ref] in present]
     far = [ref for ref in wanted if tag_commit[ref] not in present]
-    results = []
     for refs, depth in ((near, []), (far, ["--depth=1"])):
         if refs:
             spec = "".join(f"{ref}:{ref}\n" for ref in refs).encode()
