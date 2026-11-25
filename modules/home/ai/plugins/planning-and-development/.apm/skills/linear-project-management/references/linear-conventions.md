@@ -10,6 +10,10 @@ The TL;DR is a one-sentence statement of what the issue delivers.
 The Deliverables enumerate what will exist when the issue is complete.
 The Acceptance Criteria state how completeness is judged.
 
+The title and body stand alone: a reader who opens only the issue learns what outcome it delivers, why it matters, and how completion is judged.
+They carry no stage, wave or task numbers, conversational codes, agent or session names, or jj change ids; the outward-facing writing rule in `agent-context-core` says which terms a reader can resolve.
+A comment recording progress may cite structure the issue itself defines, such as one of its Deliverables, or the bound OpenSpec change's task numbers with the change named (`automate-package-version-bumps` 12.4), and still says what was done.
+
 Status and progress never live in the body.
 They live in Linear fields (the issue state, assignee, labels, cycle) and in comments.
 An issue body that records "in progress" or "blocked on X" or a running checklist of done work is mis-shaped; that information belongs in the state field and in comments.

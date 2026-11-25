@@ -138,7 +138,8 @@ gh pr comment <N> --body "<markdown description>"
 ```
 
 Title and description in the immutable fields cannot be edited after creation, so the discipline is generic-at-creation, detailed-in-comment.
-Keep the PR title descriptive under the referenced creation protocol.
+Keep the PR title descriptive under the referenced creation protocol: title and description say what the PR changes, in the terms the outward-facing writing rule in `agent-context-core` allows.
+Before `gh pr create`, and again before posting the description comment, run the cold read in `git-stacked-pr-integration` §Cold read before publishing: a reader with none of the conversation lists every term it cannot resolve from the title, description, commit messages and diff, and each is replaced or defined before publishing.
 
 For multi-chain work, `jj-version-control/diamond-workflow.md` §Phase 4 preserves local linearization and returns a verified chain ref for stack publication.
 Queue-managed GitHub repositories follow `git-stacked-pr-integration` §Queue authorization; do not create an extra aggregate PR as a separate merge gate.

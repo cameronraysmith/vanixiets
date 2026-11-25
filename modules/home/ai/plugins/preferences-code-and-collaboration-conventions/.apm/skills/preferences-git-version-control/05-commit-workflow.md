@@ -75,6 +75,11 @@ If you encounter a file with multiple distinct logical changes already present:
 ## Commit formatting
 
 - Succinct conventional commit messages for semantic versioning
+- The subject names the kind of change and its object and stays short; the body says why, for a reader who has only the commit and the repository (see the outward-facing writing rule in `agent-context-core`).
+  When a change touches many named things, the subject gives their category and count (`move six vendored and registry packages to pin.json`) and the body lists them.
+  A commit that is one of a series is titled by what it alone changes, never by its position (`stage 2 wave 3`); when order matters, the body names the commit it builds on by what that commit does, or by its hash once it is on `main`.
+  A commit made while applying an OpenSpec change describes what it changes, not the `tasks.md` number it ticks; a Linear key goes in the body (`Part of CAM-124.`), not the subject.
+  Before publishing, run the cold read in `git-stacked-pr-integration` §Cold read before publishing.
 - Test locally before committing when reasonable
 - Never use emojis or multiple authors in commit messages
 - Never @-mention usernames or reference issues/PRs (#NNN, URLs) in commit messages - causes unwanted notifications and immutable backlinks
