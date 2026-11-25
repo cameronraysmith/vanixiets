@@ -1,0 +1,29 @@
+{
+  "name": "nix-fast-build",
+  "version": "2.0.4",
+  "realizedVersion": "2.0.4",
+  "source": {
+    "githubRelease": {
+      "owner": "Mic92",
+      "repo": "nix-fast-build",
+      "tagTemplate": "{version}"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "Mic92",
+            "repo": "nix-fast-build"
+          }
+        },
+        "hash": "sha256-sc/NZIHkRhgyAzK8Xn6G++vGrl/Uf7QHh+J5fnZ/o4s=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}

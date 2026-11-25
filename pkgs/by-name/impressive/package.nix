@@ -4,6 +4,10 @@
 # transitions, spotlight effects, and overview mode.
 #
 # Source: https://impressive.sourceforge.net/
+#
+# pin.json pins the version and the source tarball's hash; Renovate proposes
+# releases from SourceForge's RSS listing of /Impressive and `nix run
+# .#realize-pin -- impressive <version>` realizes one.
 {
   lib,
   stdenv,
@@ -16,15 +20,23 @@
   ffmpeg,
   SDL2,
 }:
-
+let
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "impressive"; })
+    pin
+    pinPlan
+    ;
+  planned = pinPlan pin.version;
+in
 python3Packages.buildPythonApplication rec {
   pname = "impressive";
-  version = "0.13.2";
+  inherit (pin) version;
   pyproject = true;
 
+  # SourceForge publishes no checksum file, so pin.json's `src` hash is a
+  # prefetch of the tarball.
   src = fetchurl {
-    url = "mirror://sourceforge/impressive/Impressive-${version}.tar.gz";
-    hash = "sha256-AzEjsl9CywhPb9CpWd31MQDTICxn5mblzFek5I7BJTw=";
+    inherit (planned.artifacts.src.file) url;
+    inherit (pin.artifacts.src.file) hash;
   };
 
   build-system = [ python3Packages.setuptools ];
@@ -87,6 +99,10 @@ python3Packages.buildPythonApplication rec {
 
   doCheck = false;
   pythonImportsCheck = [ "impressive_pkg" ];
+
+  passthru = {
+    inherit pin pinPlan;
+  };
 
   meta = {
     description = "PDF presentation tool with OpenGL transitions and spotlight effects";

@@ -23,11 +23,6 @@
         program = "${config.packages.pi-acp.updateScript}";
       };
 
-      apps.update-devin-cli = {
-        type = "app";
-        program = "${config.packages.devin-cli.updateScript}";
-      };
-
       apps.update-xsra = {
         type = "app";
         program = "${config.packages.xsra.updateScript}";

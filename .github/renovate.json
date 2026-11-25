@@ -40,6 +40,25 @@
       "description": "claude-code's vendorText source: the url of pkgs/by-name/claude-code/pin.json, the bare version its latest pointer names; the pin's regex is applied as extractVersion by the jsonata manager.",
       "defaultRegistryUrlTemplate": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/latest",
       "format": "plain"
+    },
+    "dbt-fusion": {
+      "description": "dbt-fusion's vendorJson source: the url of pkgs/by-name/dbt-fusion/pin.json, whose pointer /latest/tag names the latest channel's tag, such as v2.0.13; the transform reads that tag and drops its leading v, so the single release is the bare version the pin holds.",
+      "defaultRegistryUrlTemplate": "https://public.cdn.getdbt.com/fs/versions.json",
+      "format": "json",
+      "transformTemplates": [
+        "{\"releases\": [{\"version\": $replace(latest.tag, /^v/, \"\")}]}"
+      ]
+    },
+    "devin-cli": {
+      "description": "devin-cli's vendorJson source: the url of pkgs/by-name/devin-cli/pin.json, the vendor's manifest of its latest release; the transform reads the pin's pointer /version as the one release Renovate sees.",
+      "defaultRegistryUrlTemplate": "https://static.devin.ai/cli/current/manifest.json",
+      "format": "json",
+      "transformTemplates": ["{\"releases\": [{\"version\": version}]}"]
+    },
+    "impressive": {
+      "description": "impressive's vendorText source: the url of pkgs/by-name/impressive/pin.json, SourceForge's RSS listing of /Impressive, one <link> per line; the pin's regex is applied as extractVersion by the jsonata manager.",
+      "defaultRegistryUrlTemplate": "https://sourceforge.net/projects/impressive/rss?path=/Impressive",
+      "format": "plain"
     }
   },
   "packageRules": [

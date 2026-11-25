@@ -1,12 +1,22 @@
 # Devin CLI, vendored from nixpkgs pkgs/by-name/de/devin-cli.
 #
-# The derivation body is upstream's, unmodified. It lives here because the
-# pinned nixpkgs channel carries 3000.3.22 while the Outposts worker surface
-# this repository declares (`services.devin-worker`) is documented against the
-# 3000.6 CLI. modules/nixpkgs/compose.nix merges the by-name set into
+# The derivation body is upstream's apart from reading its version and hashes
+# from pin.json. It lives here because the pinned nixpkgs channel carries
+# 3000.3.22 while the Outposts worker surface this repository declares
+# (`services.devin-worker`) is documented against the 3000.6 CLI.
+# modules/nixpkgs/compose.nix merges the by-name set into
 # flake.overlays.default after the channel overlays, so this attribute shadows
-# the channel's `devin-cli` on every machine; `nix run .#update-devin-cli`
-# keeps it current independently of the channel bump.
+# the channel's `devin-cli` on every machine and moves independently of the
+# channel bump.
+#
+# The pin's source is the vendor's current/manifest.json, which names the
+# latest version. Each release has its own <version>/manifest.json carrying
+# the sha256 of every platform's tarball, which realize-pin reads rather than
+# re-hashing downloads. Superseded releases can disappear: on 2026-11-25, with
+# 3000.14.30821 current, 3000.11.3's tarballs and manifest answered 403, so an
+# older pinned version builds only from a store or cache holding its sources.
+#
+# update: nix run .#realize-pin -- devin-cli <version>
 {
   lib,
   stdenvNoCC,
@@ -16,31 +26,18 @@
 }:
 
 let
-  version = "3000.11.3";
-
-  throwSystem = throw "Unsupported system: ${stdenvNoCC.hostPlatform.system}";
-
-  srcs = {
-    x86_64-linux = fetchurl {
-      url = "https://static.devin.ai/cli/${version}/devin-${version}-x86_64-unknown-linux.tar.gz";
-      hash = "sha256-g7OxE8Ab8qPp4QDbCNd+awhoBqd1TwkeIIMb3+IVFX4=";
-    };
-
-    aarch64-linux = fetchurl {
-      url = "https://static.devin.ai/cli/${version}/devin-${version}-aarch64-unknown-linux.tar.gz";
-      hash = "sha256-IaLXqN6meYcGfN5+s/5xk6SNqo+MPVDUFMYDxKK2fxU=";
-    };
-
-    aarch64-darwin = fetchurl {
-      url = "https://static.devin.ai/cli/${version}/devin-${version}-aarch64-apple-darwin.tar.gz";
-      hash = "sha256-wIzD81B9EDJGuMYBpYT8xxn9d/bMEPJsyQ6fQYZkDfI=";
-    };
-  };
+  inherit (stdenvNoCC.hostPlatform) system;
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "devin-cli"; })
+    pin
+    pinPlan
+    ;
+  binary = pin.artifacts.binary.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binary.platformBinaries;
 in
 
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "devin-cli";
-  inherit version;
+  inherit (pin) version;
 
   outputs = [
     "out"
@@ -51,7 +48,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   strictDeps = true;
   __structuredAttrs = true;
 
-  src = srcs.${stdenvNoCC.hostPlatform.system} or throwSystem;
+  src = fetchurl {
+    url = planned.${system}.url or (throw "devin-cli: unsupported platform ${system}");
+    hash = binary.hashes.${system};
+  };
 
   sourceRoot = ".";
 
@@ -76,7 +76,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   nativeInstallCheckInputs = [ versionCheckHook ];
   doInstallCheck = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     description = "Cognition's Devin Agent CLI";
@@ -88,5 +88,6 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       nhshah15
     ];
     mainProgram = "devin";
+    platforms = lib.attrNames binary.platforms;
   };
 })

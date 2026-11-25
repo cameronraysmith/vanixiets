@@ -1,0 +1,22 @@
+{
+  "name": "pi-vim",
+  "version": "0.14.2",
+  "realizedVersion": "0.14.2",
+  "source": {
+    "npm": {
+      "package": "pi-vim"
+    }
+  },
+  "artifacts": {
+    "tarball": {
+      "file": {
+        "urlTemplate": "https://registry.npmjs.org/pi-vim/-/pi-vim-{version}.tgz",
+        "checksum": {
+          "prefetch": {}
+        },
+        "hash": "sha256-BJkHE2C/SIBYHyINCD971+ew+yDS+X0yU5xjkNks4rg="
+      }
+    }
+  },
+  "companions": []
+}

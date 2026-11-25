@@ -1,0 +1,23 @@
+{
+  "name": "impressive",
+  "version": "0.13.2",
+  "realizedVersion": "0.13.2",
+  "source": {
+    "vendorText": {
+      "url": "https://sourceforge.net/projects/impressive/rss?path=/Impressive",
+      "regex": "^<link>https://sourceforge\\.net/projects/impressive/files/Impressive/[^/]+/Impressive-(?<version>[0-9][^/]*)\\.tar\\.gz/download</link>$"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "file": {
+        "urlTemplate": "https://downloads.sourceforge.net/impressive/Impressive-{version}.tar.gz",
+        "checksum": {
+          "prefetch": {}
+        },
+        "hash": "sha256-AzEjsl9CywhPb9CpWd31MQDTICxn5mblzFek5I7BJTw="
+      }
+    }
+  },
+  "companions": []
+}
