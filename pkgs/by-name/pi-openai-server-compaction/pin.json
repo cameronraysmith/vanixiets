@@ -1,0 +1,29 @@
+{
+  "name": "pi-openai-server-compaction",
+  "version": "8a3de2f3b0c178fdd6f73f2f94172dfc3943e466",
+  "realizedVersion": "8a3de2f3b0c178fdd6f73f2f94172dfc3943e466",
+  "source": {
+    "gitCommit": {
+      "owner": "algal",
+      "repo": "pi-openai-server-compaction",
+      "branch": "main"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "algal",
+            "repo": "pi-openai-server-compaction"
+          }
+        },
+        "hash": "sha256-HFzG+GMriPhoMinjji+3sklQ7Nq0yRHCz/t9Re/TksU=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}

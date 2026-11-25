@@ -2,22 +2,35 @@
 # lazily (src/openai-ws-connection.ts) from a WebSocket transport that the
 # isDirectOpenAIResponsesModel gate makes unreachable on the Codex provider, and
 # its absence degrades to SSE rather than failing.
+#
+# The commit and the source hash are in pin.json: Renovate proposes the head of
+# the branch it names, and realize-pin rewrites both. The version shows the
+# commit's first seven characters.
 {
   fetchFromGitHub,
   jq,
   lib,
   stdenvNoCC,
 }:
+let
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json {
+      name = "pi-openai-server-compaction";
+    })
+    pin
+    pinPlan
+    ;
+in
 stdenvNoCC.mkDerivation {
   pname = "pi-openai-server-compaction";
-  version = "0.1.0-unstable-2026-07-23";
+  version = "0.1.0-unstable-${builtins.substring 0 7 pin.version}";
 
-  src = fetchFromGitHub {
-    owner = "algal";
-    repo = "pi-openai-server-compaction";
-    rev = "8a3de2f3b0c178fdd6f73f2f94172dfc3943e466";
-    hash = "sha256-HFzG+GMriPhoMinjji+3sklQ7Nq0yRHCz/t9Re/TksU=";
-  };
+  src = fetchFromGitHub (
+    (pinPlan pin.version).artifacts.src.sourceBuild.fetchFromGitHub
+    // {
+      inherit (pin.artifacts.src.sourceBuild) hash;
+    }
+  );
 
   nativeBuildInputs = [ jq ];
 
@@ -48,5 +61,9 @@ stdenvNoCC.mkDerivation {
     license = lib.licenses.mit;
     sourceProvenance = with lib.sourceTypes; [ fromSource ];
     platforms = lib.platforms.all;
+  };
+
+  passthru = {
+    inherit pin pinPlan;
   };
 }
