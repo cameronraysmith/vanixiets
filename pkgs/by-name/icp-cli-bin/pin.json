@@ -1,7 +1,7 @@
 {
   "name": "icp-cli-bin",
-  "version": "1.8.0",
-  "realizedVersion": "1.8.0",
+  "version": "1.9.0",
+  "realizedVersion": "1.9.0",
   "source": {
     "githubRelease": {
       "owner": "dfinity",
@@ -27,9 +27,9 @@
           }
         },
         "hashes": {
-          "x86_64-linux": "sha256-XJq6C9Z2RQIneTh/ONI6UdFYYkGWzk66F1rroGXrIic=",
-          "aarch64-linux": "sha256-UX5JRlIH5flwdF0D/s1oPJnuAiC8/wIhkpPqiIp8SgY=",
-          "aarch64-darwin": "sha256-PHIVbyDNIbjlFZn/NLSW8D60AJPfTt3zdOurOMjDZD0="
+          "x86_64-linux": "sha256-2Wogkd5nOUgOp/gvELIreYmNn+imgr3tyn4e7r+Wni4=",
+          "aarch64-linux": "sha256-OKijqzfx8avh8V0yEcr5yrMud8fq2sztrynGxNgQ9aY=",
+          "aarch64-darwin": "sha256-Bp70RkNBiBqw3cobvVVwqbeiyB2wAaWuC25WOAOXgCk="
         }
       }
     }
