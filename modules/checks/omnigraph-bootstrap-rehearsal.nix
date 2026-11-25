@@ -32,7 +32,28 @@
 # AWS_ENDPOINT_URL_S3 is unset, and every request is path-style and
 # SigV4-signed for the configured key and region. Roots with no basename
 # (`s3://bucket/`, `/`) and unsupported schemes exit 1 before touching
-# anything.
+# anything. First initialization of a local root creates its missing
+# directory (mode 0700) before the apply, leaves an existing one unchanged,
+# and an s3:// root gets no local directory.
+#
+# Seed-pending markers, for a bootstrap with seeded graphs `dev` and `ops`, on
+# both backends: the first-initialization branch writes
+# `_omnigraph-markers/<root>.<graph>.seed-pending` for each before the apply
+# runs (so before `.initialized`), and they stay when the apply fails; the
+# adopt, no-op and refusal branches write none; a bootstrap without seeded
+# graphs writes none in any branch (the rows above).
+#
+# The seed program (flake.lib.omnigraphSeed) runs against a loopback stand-in
+# for the server's `POST /graphs/<graph>/load/ndjson`, reached through
+# http_proxy because its URL is fixed at build time, answering as scripted
+# per row. Asserted: with no pending marker it exits 0 and sends nothing; a
+# 200 append commit deletes the marker; a 409 `key_conflict` with effects
+# `none` deletes it; a 409 `key_conflict` with partial effects, a 500
+# `outcome_unknown`, a 200 that is not an append commit, a request that times
+# out and an unreadable token each exit 1 and keep it. Every load is
+# `mode=append` on `main` and carries the bearer token, the HTTP contract the
+# packaged omnigraph reports and the seed as NDJSON. For S3 the marker is
+# deleted with a signed DELETE.
 { self, lib, ... }:
 {
   perSystem =
@@ -45,6 +66,10 @@
         printf '%s\n' "$*" >> "$STUB_OMNIGRAPH_LOG"
         case "$*" in
           "--target "*" cluster status --json") ;;
+          "version --json")
+            echo '{"version":"0.16.0","http_contract":"0.14","internal_schema":{"writes":17,"serves":[14,17]}}'
+            exit 0
+            ;;
           *)
             echo "stub omnigraph: unexpected invocation: $*" >&2
             exit 97
@@ -70,7 +95,17 @@
 
       stubApply = pkgs.writeShellScript "stub-cluster-apply" ''
         if [ -e "$STUB_MARKER_FILE" ]; then marker=present; else marker=absent; fi
-        echo "applied marker=$marker" >> "$STUB_APPLY_LOG"
+        # One path per line: row directories contain spaces.
+        pending=
+        while IFS= read -r p; do
+          [ -n "$p" ] || continue
+          if [ -e "$p" ]; then pending="$pending present"; else pending="$pending absent"; fi
+        done <<<"''${STUB_PENDING_FILES:-}"
+        root=
+        if [ -n "''${STUB_ROOT_DIR:-}" ]; then
+          if [ -d "$STUB_ROOT_DIR" ]; then root=" root=present"; else root=" root=absent"; fi
+        fi
+        echo "applied marker=$marker pending=''${pending# }$root" >> "$STUB_APPLY_LOG"
         exit "''${STUB_APPLY_EXIT:-0}"
       '';
 
@@ -81,17 +116,114 @@
           applyProgram = stubApply;
           inherit storageUri;
         };
+      mkSeededBootstrap =
+        storageUri:
+        self.lib.omnigraphBootstrap pkgs {
+          omnigraph = stubOmnigraph;
+          applyProgram = stubApply;
+          inherit storageUri;
+          seededGraphs = [
+            "dev"
+            "ops"
+          ];
+        };
 
       s3Root = "s3://${bucket}/clusters/dev-graph/";
       s3Bootstrap = mkBootstrap s3Root;
+      s3SeededBootstrap = mkSeededBootstrap s3Root;
       s3MarkerKey = "/${bucket}/clusters/_omnigraph-markers/dev-graph.initialized";
+      s3PendingKeys = map (g: "/${bucket}/clusters/_omnigraph-markers/dev-graph.${g}.seed-pending") [
+        "dev"
+        "ops"
+      ];
       # Relative, so each row resolves it under its own working directory.
       localRoot = "store/root/";
       localBootstrap = mkBootstrap localRoot;
+      localSeededBootstrap = mkSeededBootstrap localRoot;
       localMarker = "store/_omnigraph-markers/root.initialized";
+      localPendingMarkers = map (g: "store/_omnigraph-markers/root.${g}.seed-pending") [
+        "dev"
+        "ops"
+      ];
       bucketRootBootstrap = mkBootstrap "s3://${bucket}/";
       slashRootBootstrap = mkBootstrap "/";
       gsBootstrap = mkBootstrap "gs://${bucket}/root";
+
+      seedFile = pkgs.writeText "seed.jsonl" ''
+        {"type":"Person","data":{"slug":"ada"}}
+      '';
+      seedServer = "http://omnigraph.rehearsal.invalid:8090";
+      mkSeed =
+        storageUri:
+        self.lib.omnigraphSeed pkgs {
+          omnigraph = stubOmnigraph;
+          inherit storageUri seedFile;
+          graph = "dev";
+          serverUrl = seedServer;
+          tokenCredential = "seed-token";
+          timeout = 3;
+        };
+      localSeed = mkSeed localRoot;
+      s3Seed = mkSeed s3Root;
+
+      # The server's load route, answering each request as the mode file
+      # says: ok, conflict, conflict-partial, unknown, not-append or hang.
+      loadStub = pkgs.writeText "load-stub.py" ''
+        import json, os, sys, time
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        log_path, port_path, mode_path = sys.argv[1:4]
+
+        def reply_for(mode):
+            if mode == "ok":
+                return 200, {"branch": "main", "base_branch": None, "branch_created": False, "mode": "append",
+                             "nodes": [{"name": "Person", "entities_loaded": 1}], "edges": [], "total_entities": 1,
+                             "embedding_generation": None, "actor_id": "seeder",
+                             "commit": {"graph_commit_id": "01JREHEARSALCOMMIT00000000", "graph_branch": "main"}}
+            if mode == "not-append":
+                return 200, {"branch": "main", "mode": "merge", "total_entities": 1, "commit": None}
+            if mode == "conflict":
+                return 409, {"error": "node type 'Person' already has id 'ada'", "code": "conflict",
+                             "disposition": {"effects": "none", "action": "refresh"},
+                             "key_conflict": {"entity_kind": "node", "type_name": "Person", "entity_id": "ada"}}
+            if mode == "conflict-partial":
+                return 409, {"error": "node type 'Person' already has id 'ada'", "code": "conflict",
+                             "disposition": {"effects": "partial", "action": "refresh"},
+                             "key_conflict": {"entity_kind": "node", "type_name": "Person", "entity_id": "ada"}}
+            return 500, {"error": "the write's outcome is unknown", "code": "outcome_unknown",
+                         "disposition": {"effects": "unknown", "action": "inspect"}}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                body = self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode()
+                with open(log_path, "a") as log:
+                    log.write(json.dumps({
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization") or "",
+                        "contract": self.headers.get("Omnigraph-Http-Api") or "",
+                        "content_type": self.headers.get("Content-Type") or "",
+                        "body": body,
+                    }) + "\n")
+                with open(mode_path) as f:
+                    mode = f.read().strip()
+                if mode == "hang":
+                    time.sleep(10)
+                status, payload = reply_for(mode)
+                data = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        with open(port_path, "w") as f:
+            f.write(str(server.server_port))
+        server.serve_forever()
+      '';
 
       # Path-style S3: objects are files under the store directory at their
       # request path. A HEAD while the fail flag exists answers 500.
@@ -132,6 +264,12 @@
                 with open(store + self.path, "wb") as f:
                     f.write(body)
                 self._reply(200)
+
+            def do_DELETE(self):
+                self._log(None)
+                if os.path.isfile(store + self.path):
+                    os.remove(store + self.path)
+                self._reply(204)
 
             def log_message(self, *args):
                 pass
@@ -258,7 +396,7 @@
               row_setup "$backend: state missing, marker absent" "$backend" missing absent
               run_backend
               expect_rc 0
-              [ "$(cat "$STUB_APPLY_LOG")" = "applied marker=absent" ] \
+              [ "$(cat "$STUB_APPLY_LOG")" = "applied marker=absent pending=" ] \
                 || fail "expected one apply before the marker, got: $(cat "$STUB_APPLY_LOG")"
               expect_marker_written first-initialization
 
@@ -308,6 +446,38 @@
             [ ! -e "$TMPDIR/rows/local: state found, marker absent/store/root" ] \
               || fail "the local bootstrap created the root directory"
 
+            # First initialization creates a missing local root's directory
+            # before the apply, leaves an existing one as it is, and creates
+            # nothing locally for an s3:// root.
+            row_setup "local: missing root created on first initialization" local missing absent
+            STUB_ROOT_DIR="$rowdir/store/root" run_backend
+            expect_rc 0
+            [ "$(cat "$STUB_APPLY_LOG")" = "applied marker=absent pending= root=present" ] \
+              || fail "the root directory did not exist when the apply ran: $(cat "$STUB_APPLY_LOG")"
+            [ "$(stat -c %a store/root)" = 700 ] || fail "the root directory has mode $(stat -c %a store/root), not 700"
+            grep -qF "created the local storage root directory store/root" "$TMPDIR/stdout" \
+              || fail "did not report creating the root directory"
+
+            row_setup "local: existing root left alone on first initialization" local missing absent
+            mkdir -p store/root
+            chmod 0755 store/root
+            echo kept > store/root/sentinel
+            STUB_ROOT_DIR="$rowdir/store/root" run_backend
+            expect_rc 0
+            [ "$(cat "$STUB_APPLY_LOG")" = "applied marker=absent pending= root=present" ] \
+              || fail "expected one apply: $(cat "$STUB_APPLY_LOG")"
+            [ "$(stat -c %a store/root)" = 755 ] || fail "the existing root directory's mode was changed"
+            [ "$(cat store/root/sentinel)" = kept ] || fail "the existing root directory's contents were changed"
+            ! grep -qF "created the local storage root directory" "$TMPDIR/stdout" \
+              || fail "reported creating an existing root directory"
+
+            row_setup "s3: remote root never touched locally" s3 missing absent
+            run_backend
+            expect_rc 0
+            [ -z "$(ls -A .)" ] || fail "created local files for an s3:// root: $(ls -A .)"
+            ! grep -qF "created the local storage root directory" "$TMPDIR/stdout" \
+              || fail "reported creating a local directory for an s3:// root"
+
             row_setup "s3: HEAD answers 500" s3 missing absent
             touch "$fail_flag"
             run_backend
@@ -344,11 +514,176 @@
             reject_row "rejected root gs" ${lib.getExe gsBootstrap} \
               "unsupported storage scheme in gs://${bucket}/root"
 
+            # Seeded graphs dev and ops: pending markers only on first
+            # initialization, written before the apply.
+            run_seeded() {
+              if [ "$backend" = s3 ]; then run ${lib.getExe s3SeededBootstrap}; else run ${lib.getExe localSeededBootstrap}; fi
+            }
+            pending_files() {
+              if [ "$backend" = s3 ]; then
+                printf "$s3_store%s\n" ${lib.escapeShellArgs s3PendingKeys}
+              else
+                printf "$rowdir/%s\n" ${lib.escapeShellArgs localPendingMarkers}
+              fi
+            }
+            seeded_setup() { # <label> <backend> <state> <marker>
+              row_setup "$@"
+              STUB_PENDING_FILES=$(pending_files)
+              export STUB_PENDING_FILES
+            }
+            expect_no_pending() {
+              while IFS= read -r p; do
+                [ ! -e "$p" ] || fail "wrote a seed-pending marker: $p"
+              done < <(pending_files)
+            }
+            expect_pending() {
+              for graph in dev ops; do
+                p=$(pending_files | grep -F ".$graph.seed-pending")
+                jq -e --arg g "$graph" '.graph == $g and .reason == "first-initialization" and .storage_uri != null and .written_at != null' \
+                  "$p" > /dev/null || fail "no seed-pending record for $graph at $p"
+              done
+            }
+            for backend in s3 local; do
+              seeded_setup "$backend seeded: state found, marker present" "$backend" found present
+              run_seeded
+              expect_rc 0
+              expect_no_apply
+              expect_no_put
+              expect_no_pending
+
+              seeded_setup "$backend seeded: state found, marker absent" "$backend" found absent
+              run_seeded
+              expect_rc 0
+              expect_no_apply
+              expect_marker_written adopted-existing-root
+              expect_no_pending
+
+              seeded_setup "$backend seeded: state missing, marker absent" "$backend" missing absent
+              run_seeded
+              expect_rc 0
+              [ "$(cat "$STUB_APPLY_LOG")" = "applied marker=absent pending=present present" ] \
+                || fail "expected one apply after both pending markers and before the marker, got: $(cat "$STUB_APPLY_LOG")"
+              jq -e '.reason == "first-initialization"' "$STUB_MARKER_FILE" > /dev/null \
+                || fail "marker missing or not a first-initialization record"
+              expect_pending
+              if [ "$backend" = s3 ]; then
+                [ "$(puts | jq -r .path | tr '\n' ' ')" = "${lib.concatStringsSep " " s3PendingKeys} ${s3MarkerKey} " ] \
+                  || fail "expected PUTs of both pending markers, then the marker: $(puts)"
+              fi
+
+              seeded_setup "$backend seeded: state missing, marker present" "$backend" missing present
+              run_seeded
+              expect_rc 1
+              expect_no_apply
+              expect_no_put
+              expect_no_pending
+
+              seeded_setup "$backend seeded: apply fails" "$backend" missing absent
+              STUB_APPLY_EXIT=1 run_seeded
+              expect_rc 1
+              expect_no_marker
+              expect_pending
+            done
+            unset STUB_PENDING_FILES
+
+            # The seed program, against the load route stand-in.
+            load_requests="$TMPDIR/load-requests.jsonl"
+            load_mode="$TMPDIR/load-mode"
+            touch "$load_requests"
+            echo ok > "$load_mode"
+            python3 ${loadStub} "$load_requests" "$TMPDIR/load-port" "$load_mode" &
+            load_pid=$!
+            trap 'kill "$stub_pid" "$load_pid"' EXIT
+            for _ in $(seq 100); do [ -s "$TMPDIR/load-port" ] && break; sleep 0.1; done
+            [ -s "$TMPDIR/load-port" ] || { echo "load stub did not start" >&2; exit 1; }
+            export http_proxy="http://127.0.0.1:$(cat "$TMPDIR/load-port")" no_proxy=127.0.0.1
+            export CREDENTIALS_DIRECTORY="$TMPDIR/credentials"
+            mkdir -p "$CREDENTIALS_DIRECTORY"
+            printf 'rehearsal-seed-token' > "$CREDENTIALS_DIRECTORY/seed-token"
+            local_pending=store/_omnigraph-markers/root.dev.seed-pending
+            s3_pending_key=/${bucket}/clusters/_omnigraph-markers/dev-graph.dev.seed-pending
+
+            seed_setup() { # <label> <backend> <load answer> <pending: present|absent>
+              row_setup "$1" "$2" found present
+              : > "$load_requests"
+              echo "$3" > "$load_mode"
+              if [ "$2" = s3 ]; then pending="$s3_store$s3_pending_key"; else pending="$rowdir/$local_pending"; fi
+              if [ "$4" = present ]; then
+                mkdir -p "$(dirname "$pending")"
+                echo '{"graph":"dev"}' > "$pending"
+              fi
+            }
+            run_seed() {
+              if [ "$backend" = s3 ]; then run ${lib.getExe s3Seed}; else run ${lib.getExe localSeed}; fi
+            }
+            loads() { grep -c . "$load_requests" || true; }
+            expect_one_load() {
+              [ "$(loads)" = 1 ] || fail "expected one load request, got: $(cat "$load_requests")"
+              jq -e --rawfile seed ${seedFile} '
+                .path == "${seedServer}/graphs/dev/load/ndjson?mode=append&branch=main"
+                and .authorization == "Bearer rehearsal-seed-token"
+                and .contract == "0.14"
+                and .content_type == "application/x-ndjson"
+                and .body == $seed' "$load_requests" > /dev/null \
+                || fail "the load request is not an append of the seed with the token and contract: $(cat "$load_requests")"
+            }
+            expect_pending_kept() { [ -e "$pending" ] || fail "the seed-pending marker was deleted"; }
+            expect_pending_deleted() { [ ! -e "$pending" ] || fail "the seed-pending marker was kept"; }
+
+            seed_setup "seed: nothing pending" local ok absent
+            run_seed
+            expect_rc 0
+            [ "$(loads)" = 0 ] || fail "sent a load: $(cat "$load_requests")"
+            grep -qF "nothing to do" "$TMPDIR/stdout" || fail "did not say there was nothing to do"
+
+            seed_setup "seed: load commits" local ok present
+            run_seed
+            expect_rc 0
+            expect_one_load
+            expect_pending_deleted
+
+            seed_setup "seed: key conflict without effects" local conflict present
+            run_seed
+            expect_rc 0
+            expect_one_load
+            expect_pending_deleted
+            grep -qF "already holds the seed" "$TMPDIR/stdout" || fail "did not report the seed as present"
+
+            for answer in conflict-partial unknown not-append hang; do
+              seed_setup "seed: $answer" local "$answer" present
+              run_seed
+              expect_rc 1
+              expect_one_load
+              expect_pending_kept
+            done
+
+            seed_setup "seed: token unreadable" local ok present
+            CREDENTIALS_DIRECTORY="$TMPDIR/no-credentials" run_seed
+            expect_rc 1
+            [ "$(loads)" = 0 ] || fail "sent a load without a token: $(cat "$load_requests")"
+            expect_pending_kept
+
+            seed_setup "seed: s3 load commits" s3 ok present
+            run_seed
+            expect_rc 0
+            expect_one_load
+            expect_pending_deleted
+            [ "$(jq -c 'select(.method == "DELETE") | .path' "$requests")" = "\"$s3_pending_key\"" ] \
+              || fail "expected one DELETE of $s3_pending_key: $(cat "$requests")"
+
+            seed_setup "seed: s3 nothing pending" s3 ok absent
+            run_seed
+            expect_rc 0
+            [ "$(loads)" = 0 ] || fail "sent a load: $(cat "$load_requests")"
+            ! jq -e 'select(.method == "DELETE")' "$requests" > /dev/null || fail "deleted a marker"
+
             row="every S3 request"
             echo "--- $row is path-style and SigV4-signed for the configured key and region"
             cat "$requests" >> "$TMPDIR/all-requests.jsonl"
-            jq -e -s 'length > 0 and all(.[];
-                .path == "${s3MarkerKey}"
+            jq -e -s --argjson keys ${
+              lib.escapeShellArg (builtins.toJSON ([ s3MarkerKey ] ++ s3PendingKeys))
+            } 'length > 0 and all(.[];
+                (.path | IN($keys[]))
                 and (.authorization | startswith("AWS4-HMAC-SHA256 Credential=${accessKey}/"))
                 and (.authorization | test("/auto/s3/aws4_request, *SignedHeaders=[^,]*, *Signature=[0-9a-f]{64}$"))
               )' "$TMPDIR/all-requests.jsonl" > /dev/null \

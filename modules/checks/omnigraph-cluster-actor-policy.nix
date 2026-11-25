@@ -1,7 +1,8 @@
 # Behavioural check: the policy magnetite applies to its omnigraph graph lets
 # the host's cluster actor run the operations its units and its
-# omnigraph-cluster wrapper perform, and nothing more, while the bearer-token
-# actor `admin` keeps its access.
+# omnigraph-cluster wrapper perform, and nothing more; lets the seed actor
+# load into `main`, and nothing more; and keeps the bearer-token actor
+# `admin`'s access.
 #
 # omnigraph judges a direct write to a cluster graph by the policy the cluster
 # applied to that graph and denies an actor the policy does not name
@@ -20,8 +21,8 @@
 # cluster that does not yet grant that actor anything.
 #
 # Each allow case names the operation that needs it; the deny cases hold the
-# cluster actor to those operations, and the `admin` cases hold the
-# bearer-token actor to its access.
+# cluster actor and the seed actor to those operations, and the `admin` cases
+# hold the bearer-token actor to its access.
 { self, lib, ... }:
 {
   perSystem =
@@ -30,6 +31,7 @@
       magnetite = self.nixosConfigurations.magnetite.config;
       omnigraph = magnetite.services.omnigraph;
       actor = omnigraph.cluster.actor;
+      seeder = omnigraph.cluster.graphs.${graph}.seed.actor;
       graph = "dev";
       clusterConfig = magnetite.environment.etc."omnigraph/cluster".source;
       # The bundle file bound to the graph; the binding rules allow one.
@@ -84,6 +86,19 @@
             (case "admin-branch-merge" "admin" "branch_merge" mainToMain "allow")
             (case "admin-no-maintain" "admin" "maintain" onMain "deny")
             (case "admin-no-reclaim" "admin" "reclaim" { } "deny")
+            # omnigraph-seed-dev: a served load into the existing `main`
+            # checks `change` on `main` alone.
+            (case "seeder-change-main-for-seed-load" seeder "change" onMain "allow")
+            (case "seeder-no-change-other-branch" seeder "change" { branch = "feature"; } "deny")
+            (case "seeder-no-read" seeder "read" onMain "deny")
+            (case "seeder-no-export" seeder "export" onMain "deny")
+            (case "seeder-no-invoke-query" seeder "invoke_query" { } "deny")
+            (case "seeder-no-schema-apply" seeder "schema_apply" intoMain "deny")
+            (case "seeder-no-branch-create" seeder "branch_create" mainToMain "deny")
+            (case "seeder-no-branch-delete" seeder "branch_delete" intoMain "deny")
+            (case "seeder-no-branch-merge" seeder "branch_merge" mainToMain "deny")
+            (case "seeder-no-maintain" seeder "maintain" onMain "deny")
+            (case "seeder-no-reclaim" seeder "reclaim" { } "deny")
           ];
         }
       );

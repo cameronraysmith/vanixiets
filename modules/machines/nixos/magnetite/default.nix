@@ -463,6 +463,20 @@ in
         '';
       };
 
+      # The seed actor's token, in a generator of its own: generating it
+      # leaves omnigraph-bearer-tokens, and so admin's token, as it is. The
+      # server adds it to the tokens file at start
+      # (services.omnigraph.cluster.graphs.<graph>.seed.tokenFile).
+      clan.core.vars.generators.omnigraph-seeder-token = {
+        files."token" = {
+          restartUnits = [ "omnigraph-server.service" ];
+        };
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          printf '%s' "$(openssl rand -hex 32)" > "$out/token"
+        '';
+      };
+
       services.omnigraph = {
         enable = true;
 
@@ -471,6 +485,12 @@ in
         # only disposable stub data written by 0.11, so nothing was exported
         # into this one.
         storageUri = "s3://sciexp/omnigraph/clusters/dev-graph-v10";
+        # omnigraph 0.15.0 created this root's graphs at storage format 16;
+        # change it only together with the root's suffix above. servesFloor
+        # is the lowest format the packaged omnigraph reads, and
+        # checks.omnigraph-format-window holds it to the binary.
+        cluster.createdAtFormat = 16;
+        cluster.servesFloor = 14;
 
         s3 = {
           endpointUrl = "https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com";
@@ -508,6 +528,17 @@ in
           config.clan.core.vars.generators.omnigraph-bearer-tokens.files."tokens.json".path;
 
         cluster = {
+          # The cookbooks' example graph: seeded once when the bootstrap
+          # creates a new root, never on an existing one.
+          graphs.dev = {
+            exampleDataOnly = true;
+            seed = {
+              file = "${pkgs.omnigraph-cookbooks}/dev-graph/seed.jsonl";
+              actor = "seeder";
+              tokenFile = config.clan.core.vars.generators.omnigraph-seeder-token.files."token".path;
+            };
+          };
+
           settings = {
             metadata.name = "dev-graph";
             graphs.dev = {

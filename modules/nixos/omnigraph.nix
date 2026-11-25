@@ -1,3 +1,15 @@
+# services.omnigraph: omnigraph-server over one cluster storage root, with the
+# create-once bootstrap, the operator-run apply unit and optional seed units.
+#
+# Recreating an example-data root (a cluster graph keeps the storage format
+# it was created with, and `omnigraph upgrade` refuses cluster graphs):
+#   1. change the root's suffix in services.omnigraph.storageUri and set
+#      services.omnigraph.cluster.createdAtFormat to the format the packaged
+#      omnigraph writes (`omnigraph version --json`, internal_schema.writes);
+#   2. deploy: the bootstrap initializes the new root and marks each seeded
+#      graph's seed pending, and omnigraph-seed-<graph> loads it once the
+#      server serves;
+#   3. the old root and its marker stay in place, untouched, as the way back.
 { config, ... }:
 let
   flakeLib = config.flake.lib;
@@ -200,11 +212,106 @@ in
       localStorageRoot = lib.removeSuffix "/" (lib.removePrefix "file://" cfg.storageUri);
       localRootUnderStateDirectory = lib.hasPrefix "${stateDirectoryPath}/" localStorageRoot;
 
+      seededGraphs = lib.filterAttrs (_: graph: graph.seed != null) cfg.cluster.graphs;
+
       bootstrapScript = flakeLib.omnigraphBootstrap pkgs {
         omnigraph = cfg.package;
         applyProgram = lib.getExe applyScript;
         storageUri = cfg.storageUri;
+        seededGraphs = lib.attrNames seededGraphs;
       };
+
+      seedTokenCredential = "seed-token";
+      seedUnitName = graph: "omnigraph-seed-${graph}";
+
+      # Bearer tokens of the seed actors, each kept in its own file so that
+      # adding one never regenerates the tokens file and the tokens in it.
+      seedTokenFiles = lib.mapAttrs' (
+        _: graph: lib.nameValuePair graph.seed.actor graph.seed.tokenFile
+      ) seededGraphs;
+      tokenCredentialName = actor: "bearer-token-${actor}";
+
+      # omnigraph-server reads one tokens file, so the server's ExecStartPre
+      # assembles it from the tokens file and the seed actors' tokens into
+      # its RuntimeDirectory, readable by the service user alone. An actor
+      # already in the tokens file is refused rather than overwritten. Tokens
+      # stay out of every argv: jq reads them from the credential files.
+      assembleBearerTokens = pkgs.writeShellApplication {
+        name = "omnigraph-server-bearer-tokens";
+        runtimeInputs = [
+          pkgs.coreutils
+          pkgs.jq
+        ];
+        text = ''
+          umask 0077
+          jq -ce \
+            ${
+              lib.concatMapStringsSep " " (
+                actor:
+                "--rawfile ${lib.escapeShellArg actor} \"$CREDENTIALS_DIRECTORY/\"${lib.escapeShellArg (tokenCredentialName actor)}"
+              ) (lib.attrNames seedTokenFiles)
+            } \
+            --argjson actors ${lib.escapeShellArg (builtins.toJSON (lib.attrNames seedTokenFiles))} '
+            if type != "object" then error("the bearer tokens file is not a JSON object")
+            else reduce $actors[] as $actor (.;
+              if has($actor) then error("the bearer tokens file already names the actor \($actor)")
+              else . + {($actor): ($ARGS.named[$actor] | rtrimstr("\n"))} end)
+            end' "$CREDENTIALS_DIRECTORY/bearer-tokens" > "$RUNTIME_DIRECTORY/bearer-tokens.json"
+        '';
+      };
+
+      createdAtFormat = cfg.cluster.createdAtFormat;
+      servesFloor = cfg.cluster.servesFloor;
+
+      seedUnits = lib.mapAttrs' (
+        id: graph:
+        lib.nameValuePair (seedUnitName id) {
+          description = "Load the omnigraph seed of graph ${id} once its root was created";
+          # Started with the server, and restarted with it (PartOf), so a
+          # server restart onto a newly created root runs the load. After the
+          # server's start job, which ends only once its readiness probe sees
+          # the graphs serving; Requires, so a server that fails to start
+          # fails this unit too rather than letting the load meet no server.
+          wantedBy = [ "omnigraph-server.service" ];
+          partOf = [ "omnigraph-server.service" ];
+          requires = [ "omnigraph-server.service" ];
+          after = [
+            "omnigraph-server.service"
+            "network-online.target"
+          ];
+          wants = [ "network-online.target" ];
+          # A deploy that changes only this unit does not run it; it runs at
+          # the next server start, the only time a pending seed can appear.
+          restartIfChanged = false;
+
+          environment = {
+            OMNIGRAPH_HOME = "%T/omnigraph";
+          }
+          // storageEnvironment
+          // cfg.extraEnvironment;
+
+          serviceConfig = hardening // {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            ExecStart = lib.getExe (
+              flakeLib.omnigraphSeed pkgs {
+                omnigraph = cfg.package;
+                storageUri = cfg.storageUri;
+                graph = id;
+                seedFile = graph.seed.file;
+                serverUrl = "http://${bindTarget}";
+                tokenCredential = seedTokenCredential;
+              }
+            );
+            EnvironmentFile = environmentFiles;
+            LoadCredential = [ "${seedTokenCredential}:${graph.seed.tokenFile}" ];
+            StateDirectory = "omnigraph";
+            DynamicUser = true;
+            User = cfg.user;
+            Group = cfg.group;
+          };
+        }
+      ) seededGraphs;
 
       serverRestartSec = 60;
       serverStartLimitBurst = 5;
@@ -255,6 +362,13 @@ in
       };
     in
     {
+      # The seed units are named per graph, which a `systemd.services`
+      # attribute set beside the fixed `systemd.services.<name>` definitions
+      # below cannot hold, so they come from a module of their own.
+      imports = [
+        { config = lib.mkIf cfg.enable { systemd.services = seedUnits; }; }
+      ];
+
       options.services.omnigraph = {
         enable = lib.mkEnableOption "omnigraph, a lakehouse graph database server";
 
@@ -364,6 +478,12 @@ in
             example `{"admin": "…"}`. Passed to the server through systemd
             credentials, so the file is read by the service manager before
             privilege drop and need not be readable by the service user.
+
+            At each start the server's `ExecStartPre` adds the token of every
+            seed actor ({option}`services.omnigraph.cluster.graphs.<graph>.seed`)
+            to it, refusing an actor the file already names, and writes the
+            result to the server's RuntimeDirectory, readable by the service
+            user alone, which the server then reads.
 
             The server refuses to start without at least one bearer token, so
             this is required.
@@ -562,7 +682,11 @@ in
               `RemainAfterExit`, without which a changed configuration directory
               could never re-trigger it, so once it has run it stays
               `active (exited)` and `start` returns 0 without converging
-              anything.
+              anything. Activation never starts or restarts the unit: nothing
+              wants it, and it sets `restartIfChanged = false`, so a deploy that
+              changes the rendered configuration while it is `active (exited)`
+              leaves it alone rather than running an apply that the running
+              server's lock would refuse.
 
               Off is the safer default because apply initializes a root that
               holds no cluster state without ceremony: were the storage root
@@ -617,6 +741,151 @@ in
               and {option}`services.omnigraph.s3.region`, which the marker's
               path-style signed requests need; other roots must be a plain path
               or a `file://` URI.
+            '';
+          };
+
+          graphs = lib.mkOption {
+            type = lib.types.attrsOf (
+              lib.types.submodule {
+                options = {
+                  exampleDataOnly = lib.mkOption {
+                    type = lib.types.bool;
+                    default = false;
+                    description = ''
+                      Whether the graph holds example data only, which may be
+                      loaded automatically and recreated with its storage root.
+                      {option}`seed` is refused on a graph without this.
+                    '';
+                  };
+
+                  seed = lib.mkOption {
+                    type = lib.types.nullOr (
+                      lib.types.submodule {
+                        options = {
+                          file = lib.mkOption {
+                            type = lib.types.path;
+                            description = "NDJSON seed loaded into the graph's `main` branch with `--mode append`.";
+                          };
+                          actor = lib.mkOption {
+                            type = lib.types.str;
+                            example = "seeder";
+                            description = ''
+                              Bearer-token actor the load runs as. The graph's
+                              policy must grant it `change` on `main`, which is
+                              all a served load into an existing branch needs.
+                            '';
+                          };
+                          tokenFile = lib.mkOption {
+                            type = lib.types.path;
+                            description = ''
+                              File holding the actor's bearer token alone. The
+                              server adds it to
+                              {option}`services.omnigraph.bearerTokensFile` at
+                              start, and the seed unit reads it through systemd
+                              credentials, so it never enters the Nix store or a
+                              command line.
+                            '';
+                          };
+                        };
+                      }
+                    );
+                    default = null;
+                    description = ''
+                      Seed loaded once into the graph when the bootstrap creates
+                      its storage root, through the running server.
+
+                      On first initialization (no cluster state and no marker)
+                      `omnigraph-cluster-bootstrap` writes
+                      `<parent>/_omnigraph-markers/<name>.<graph>.seed-pending`
+                      beside its `.initialized` marker, before the apply. Adopting
+                      an existing root and the nothing-to-do case never write it,
+                      so a root initialized earlier is never seeded.
+
+                      `omnigraph-seed-<graph>.service` runs after
+                      `omnigraph-server` has started, which its readiness probe
+                      makes mean serving. With no pending marker it exits without
+                      a request. Otherwise it posts the seed to
+                      `/graphs/<graph>/load/ndjson?mode=append&branch=main` as
+                      {option}`actor`, and deletes the marker when the load
+                      commits, or when it is refused with `key_conflict` and no
+                      effect, which means an earlier attempt already committed
+                      it. Any other outcome fails the unit and keeps the marker:
+                      one load is one commit, all or nothing, and `append` never
+                      replaces an existing id, so the retry on the next start
+                      either commits the seed or meets that `key_conflict`.
+
+                      The unit is wanted by and part of `omnigraph-server`, so it
+                      runs whenever the server starts or restarts, and sets
+                      `restartIfChanged = false`, so a deploy that changes only
+                      the seed unit does not run it. Nothing in this path
+                      applies, deletes or recreates a graph or a root.
+                    '';
+                  };
+                };
+              }
+            );
+            default = { };
+            example = lib.literalExpression ''
+              {
+                dev = {
+                  exampleDataOnly = true;
+                  seed = {
+                    file = "''${pkgs.omnigraph-cookbooks}/dev-graph/seed.jsonl";
+                    actor = "seeder";
+                    tokenFile = "/run/secrets/omnigraph-seeder-token";
+                  };
+                };
+              }
+            '';
+            description = ''
+              Facts about graphs declared in
+              {option}`services.omnigraph.cluster.settings` `graphs`, by graph
+              id, that are not part of `cluster.yaml`.
+            '';
+          };
+
+          createdAtFormat = lib.mkOption {
+            type = lib.types.nullOr lib.types.ints.positive;
+            default = null;
+            example = 16;
+            description = ''
+              Storage format (omnigraph's internal schema version) the graphs
+              of {option}`services.omnigraph.storageUri` were created at: a
+              fact about the existing root, changed only together with the
+              root's URI.
+
+              A cluster graph keeps the format it was created with, and
+              `omnigraph upgrade` refuses cluster graphs, so once the packaged
+              omnigraph no longer reads this format the server cannot open the
+              root, and the only way forward is a new root. The
+              `omnigraph-format-window` check fails when this format is outside
+              the range the packaged binary reads, and the configuration warns
+              while it equals {option}`servesFloor`.
+
+              To recreate an example-data root: change the root's suffix in
+              {option}`services.omnigraph.storageUri` and set this to the
+              format the packaged omnigraph writes (`omnigraph version --json`,
+              `internal_schema.writes`), then deploy. The bootstrap initializes
+              the new root and marks each seeded graph's seed pending, and the
+              seed units load it once the server is serving. The old root and
+              its marker stay in place, untouched, as the way back. A root
+              holding data that is not example data must first be exported
+              with the binary that still reads it.
+            '';
+          };
+
+          servesFloor = lib.mkOption {
+            type = lib.types.nullOr lib.types.ints.positive;
+            default = null;
+            example = 14;
+            description = ''
+              Lowest storage format the packaged omnigraph reads
+              (`omnigraph version --json`, `internal_schema.serves[0]`).
+              Evaluation cannot run the binary, so the value is recorded here,
+              and the `omnigraph-format-window` check fails when it differs from
+              the binary's. While {option}`createdAtFormat` equals it, the next
+              omnigraph release that raises the floor will no longer open the
+              root, and evaluating the configuration warns so.
             '';
           };
         };
@@ -759,7 +1028,82 @@ in
               beneath ${stateDirectoryPath}/, or disable the bootstrap.
             '';
           }
+        ]
+        ++ lib.concatLists (
+          lib.mapAttrsToList (id: graph: [
+            {
+              assertion = lib.hasAttr id (cfg.cluster.settings.graphs or { });
+              message = ''
+                services.omnigraph.cluster.graphs.${id} describes a graph that
+                services.omnigraph.cluster.settings.graphs does not declare.
+              '';
+            }
+            {
+              assertion = graph.seed == null || graph.exampleDataOnly;
+              message = ''
+                services.omnigraph.cluster.graphs.${id}.seed is set, but the
+                graph is not declared to hold example data only
+                (services.omnigraph.cluster.graphs.${id}.exampleDataOnly).
+                A seed is loaded automatically into a newly created root, which
+                only an example graph may receive.
+              '';
+            }
+            {
+              assertion = graph.seed == null || bootstrapEnabled;
+              message = ''
+                services.omnigraph.cluster.graphs.${id}.seed needs
+                services.omnigraph.cluster.bootstrap.enable: only the bootstrap's
+                first initialization of a root marks a seed pending.
+              '';
+            }
+            {
+              assertion = graph.seed == null || builtins.match "[A-Za-z_][A-Za-z0-9_]*" graph.seed.actor != null;
+              message = ''
+                services.omnigraph.cluster.graphs.${id}.seed.actor
+                (${toString (graph.seed.actor or "")}) must match
+                [A-Za-z_][A-Za-z0-9_]*.
+              '';
+            }
+            {
+              assertion =
+                graph.seed == null
+                || lib.all (
+                  other:
+                  other.seed == null
+                  || other.seed.actor != graph.seed.actor
+                  || other.seed.tokenFile == graph.seed.tokenFile
+                ) (lib.attrValues cfg.cluster.graphs);
+              message = ''
+                services.omnigraph.cluster.graphs.${id}.seed.actor is the actor
+                of another graph's seed with a different tokenFile; one actor has
+                one bearer token.
+              '';
+            }
+          ]) cfg.cluster.graphs
+        )
+        ++ [
+          {
+            assertion = (createdAtFormat == null) == (servesFloor == null);
+            message = ''
+              services.omnigraph.cluster.createdAtFormat and
+              services.omnigraph.cluster.servesFloor are recorded together: the
+              format window compares the one with the other.
+            '';
+          }
         ];
+
+        # Printed by every evaluation of the system configuration, while
+        # checks.omnigraph-format-window holds servesFloor to the binary.
+        warnings = lib.optional (createdAtFormat != null && createdAtFormat == servesFloor) (
+          lib.concatStringsSep " " [
+            "services.omnigraph: the graphs of ${cfg.storageUri} were created at storage format"
+            "${toString createdAtFormat}, the lowest format the packaged omnigraph ${cfg.package.version}"
+            "reads (services.omnigraph.cluster.servesFloor). The next omnigraph release that raises"
+            "that floor will not open this root, and a cluster graph cannot be upgraded in place:"
+            "plan to recreate the root under a new suffix (exporting it first with the binary that"
+            "still reads it if it holds anything but example data) before taking that release."
+          ]
+        );
 
         environment.systemPackages = lib.optionals cfg.cluster.enable [
           cfg.package
@@ -795,7 +1139,7 @@ in
           restartTriggers = lib.optional (cfg.cluster.enable && cfg.cluster.apply.auto) clusterConfigDir;
 
           environment = {
-            OMNIGRAPH_SERVER_BEARER_TOKENS_FILE = "%d/bearer-tokens";
+            OMNIGRAPH_SERVER_BEARER_TOKENS_FILE = "%t/omnigraph-server/bearer-tokens.json";
           }
           // storageEnvironment
           // cfg.extraEnvironment;
@@ -812,11 +1156,15 @@ in
               ++ lib.optional cfg.requireAllGraphs "--require-all-graphs"
               ++ cfg.extraFlags
             );
+            ExecStartPre = lib.getExe assembleBearerTokens;
             ExecStartPost = lib.getExe readinessProbe;
             EnvironmentFile = environmentFiles;
-            LoadCredential = lib.optional (
-              cfg.bearerTokensFile != null
-            ) "bearer-tokens:${cfg.bearerTokensFile}";
+            LoadCredential =
+              lib.optional (cfg.bearerTokensFile != null) "bearer-tokens:${cfg.bearerTokensFile}"
+              ++ lib.mapAttrsToList (
+                actor: tokenFile: "${tokenCredentialName actor}:${tokenFile}"
+              ) seedTokenFiles;
+            RuntimeDirectory = "omnigraph-server";
             StateDirectory = "omnigraph";
             DynamicUser = true;
             User = cfg.user;
@@ -856,6 +1204,10 @@ in
           wants = [ "network-online.target" ];
           wantedBy = lib.optional cfg.cluster.apply.auto "multi-user.target";
           restartTriggers = lib.optional cfg.cluster.apply.auto clusterConfigDir;
+          # Left off, only an operator runs the unit. Nothing wants it, so
+          # activation never starts it, and this keeps activation from
+          # restarting it while it is `active (exited)` from a run by hand.
+          restartIfChanged = cfg.cluster.apply.auto;
 
           environment = {
             OMNIGRAPH_HOME = "%T/omnigraph";

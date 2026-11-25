@@ -6,6 +6,12 @@ groups:
   # omnigraph-optimize unit pass as `--as`. Direct writes to a cluster graph
   # are judged by this policy, and a direct actor it does not name is denied.
   cluster-operators: [magnetite]
+  # The bearer-token actor of the omnigraph-seed-dev unit, which loads the
+  # cookbooks' seed into a newly created root through the server.
+  seeders: [seeder]
+# Names `main` for the seeder rule's branch scope; protection has no other
+# effect in a policy bundle.
+protected_branches: [main]
 rules:
   # Loading any policy engine replaces the default-deny fallback that
   # implicitly permits `read`, so omitting `read` here revokes all access.
@@ -33,3 +39,11 @@ rules:
     allow:
       actors: { group: cluster-operators }
       actions: [maintain]
+  # A served load into an existing branch checks `change` on that branch and
+  # nothing else. The seed unit loads into `main` only, and never creates a
+  # branch.
+  - id: seeder-load
+    allow:
+      actors: { group: seeders }
+      actions: [change]
+      branch_scope: protected
