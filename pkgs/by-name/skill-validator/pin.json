@@ -1,0 +1,31 @@
+{
+  "name": "skill-validator",
+  "version": "1.8.0",
+  "realizedVersion": "1.8.0",
+  "source": {
+    "githubRelease": {
+      "owner": "agent-ecosystem",
+      "repo": "skill-validator",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "agent-ecosystem",
+            "repo": "skill-validator"
+          }
+        },
+        "hash": "sha256-pWtOfJCBDihUO87jSzupLLxxrrEKgHycBdEK/DRbax8=",
+        "depsHash": {
+          "go": {
+            "hash": "sha256-q8JRenRhDEzYO9Ub3SnDQ7phG0bWRJzDU2vPDllIrwU="
+          }
+        }
+      }
+    }
+  },
+  "companions": []
+}

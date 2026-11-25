@@ -6,19 +6,22 @@
   fetchFromGitHub,
   versionCheckHook,
 }:
-
+let
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "skill-validator"; })
+    pin
+    pinPlan
+    ;
+  planned = (pinPlan pin.version).artifacts;
+  inherit (pin.artifacts.src) sourceBuild;
+in
 buildGoModule (finalAttrs: {
   pname = "skill-validator";
-  version = "1.8.0";
+  inherit (pin) version;
 
-  src = fetchFromGitHub {
-    owner = "agent-ecosystem";
-    repo = "skill-validator";
-    tag = "v${finalAttrs.version}";
-    hash = "sha256-pWtOfJCBDihUO87jSzupLLxxrrEKgHycBdEK/DRbax8=";
-  };
+  src = fetchFromGitHub (planned.src.sourceBuild.fetchFromGitHub // { inherit (sourceBuild) hash; });
 
-  vendorHash = "sha256-q8JRenRhDEzYO9Ub3SnDQ7phG0bWRJzDU2vPDllIrwU=";
+  vendorHash = sourceBuild.depsHash.go.hash;
 
   subPackages = [ "cmd/skill-validator" ];
 
@@ -31,6 +34,10 @@ buildGoModule (finalAttrs: {
 
   doInstallCheck = true;
   nativeInstallCheckInputs = [ versionCheckHook ];
+
+  passthru = {
+    inherit pin pinPlan;
+  };
 
   meta = {
     description = "Validate Agent Skills against the agentskills.io specification";
