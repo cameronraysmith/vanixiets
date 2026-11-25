@@ -1,7 +1,7 @@
 {
   "name": "agent-plugins-dagster-skills",
-  "version": "1.13.9",
-  "realizedVersion": "1.13.9",
+  "version": "1.13.31",
+  "realizedVersion": "1.13.31",
   "source": {
     "githubRelease": {
       "owner": "dagster-io",
@@ -18,7 +18,7 @@
             "repo": "skills"
           }
         },
-        "hash": "sha256-vY+4PhEfKFy4W04Gf5+qTz1QnUsfnXmZOuk6u2pkJu4=",
+        "hash": "sha256-R2g3s6U1o9Pa34m69TirsRCtmWeH8208E3UM1/EXkFc=",
         "depsHash": {
           "none": {}
         }
