@@ -12,6 +12,7 @@
   git,
   nix,
   nix-update,
+  path,
 }:
 python3Packages.buildPythonApplication {
   pname = "realize-pin";
@@ -36,7 +37,12 @@ python3Packages.buildPythonApplication {
   # nix-update is prefixed: the fixed-output hasher needs 1.17.0 or later
   # (pkgs/by-name/nix-update until nixpkgs ships it), whatever the caller has.
   # nix and git are suffixed so that the caller's, which match its daemon and
-  # configuration, take precedence. Separate elements: with __structuredAttrs
+  # configuration, take precedence. REALIZE_PIN_NIXPKGS is the nixpkgs this
+  # package is built from; the realizer gives its children
+  # NIX_PATH=nixpkgs=<it>, since nix-update's merged-patch probe runs
+  # `import <nixpkgs>` and the host's nix.conf may set no nix-path. Named
+  # `source`, the copy is the store path of the flake's nixpkgs input itself,
+  # not a second copy of it. Separate elements: with __structuredAttrs
   # makeWrapperArgs is not word-split.
   makeWrapperArgs = [
     "--prefix"
@@ -53,6 +59,12 @@ python3Packages.buildPythonApplication {
     "--set-default"
     "SSL_CERT_FILE"
     "${cacert}/etc/ssl/certs/ca-bundle.crt"
+    "--set"
+    "REALIZE_PIN_NIXPKGS"
+    "${builtins.path {
+      inherit path;
+      name = "source";
+    }}"
   ];
 
   pythonImportsCheck = [ "realize_pin.cli" ];

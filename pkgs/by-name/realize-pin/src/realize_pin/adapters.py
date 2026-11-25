@@ -2,7 +2,10 @@
 
 Child processes get an environment reduced to `_PASSED_ENV`, so a token in the
 caller's environment never reaches nix or git, and urllib is built without the
-environment's proxy settings.
+environment's proxy settings. Their `NIX_PATH` is `nixpkgs=` the nixpkgs the
+wrapper names in `REALIZE_PIN_NIXPKGS`, never the caller's: nix-update's
+merged-patch probe runs `import <nixpkgs>`, and a host such as magnetite sets
+no `nix-path` in nix.conf.
 """
 
 from __future__ import annotations
@@ -62,6 +65,10 @@ _NIX_FLAGS = ("--extra-experimental-features", "nix-command flakes", "--option",
 def child_env() -> dict[str, str]:
     env = {name: os.environ[name] for name in _PASSED_ENV if name in os.environ}
     env["GIT_TERMINAL_PROMPT"] = "0"
+    nixpkgs = os.environ.get("REALIZE_PIN_NIXPKGS")
+    if not nixpkgs:
+        raise RuntimeError("REALIZE_PIN_NIXPKGS is unset: run realize-pin through its wrapper")
+    env["NIX_PATH"] = f"nixpkgs={nixpkgs}"
     return env
 
 
