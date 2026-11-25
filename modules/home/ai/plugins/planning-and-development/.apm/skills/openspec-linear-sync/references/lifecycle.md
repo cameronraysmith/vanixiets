@@ -12,6 +12,7 @@ The first transition, Backlog to Todo, fires when proposal.md is created; it is 
 At this bind the overlay also seeds the Linear issue description from the business-facing content in proposal.md, distilling a stakeholder-facing TL;DR, deliverables, scope, and acceptance from its Why, What Changes, and Capabilities.
 This description write is a distinct effect from the at-most-two-sentence comment: it is best-effort, non-blocking, and idempotent — re-pushed only when the distilled body differs from what Linear already holds — and a dropped write is recorded in the attempt log like the other Linear writes.
 Detailed technical design stays out of the issue body; it lives in design.md.
+The seeded description stands alone, as linear-conventions.md in the linear-project-management hub requires: it carries no task numbers, design-decision ids or jj change ids, because its reader has no tasks.md or design.md open.
 When proposal.md's business-facing content later changes, the description is re-synced idempotently by the sync and edit operations: the mirror is down-only, from proposal.md into Linear, and never reconciles human edits to the issue body back into proposal.md.
 When the selected issue has no Linear project, the bind notes that archive spec-mirroring will be skipped and the overlay offers the human the choice to bind a project, never auto-assigning or fabricating one.
 A change with brainstorm.md but no proposal.md is still Backlog and no transition fires, so the brainstorm-exists-proposal-pending window is explicit.

@@ -13,6 +13,8 @@ The grounding is Williams, Gopen & Swan, Pinker, Thomas & Turner, and McEnerney;
 1. Curse of knowledge: before writing, name the intended reader.
     Define any term that reader would pause on.
     Give a one-sentence map before a multi-paragraph argument.
+    A frequent case is an undefined internal reference: a stage, wave or task number, a conversational code such as Q3, an agent name, or "the plan", which the reader has no way to look up.
+    Repair it by stating what the label stood for; keep a pointer only if the reader can follow it (see the outward-facing writing rule in `agent-context-core`).
 2. Old before new: open sentences with information the reader already has (topic position); land the key new information at the end (stress position).
     Reorder before you cut.
 3. Characters as subjects, actions as verbs: repair nominalizations ("the failure of X to act" becomes "X failed to act"), except technical terms and nouns serving as the established topic.

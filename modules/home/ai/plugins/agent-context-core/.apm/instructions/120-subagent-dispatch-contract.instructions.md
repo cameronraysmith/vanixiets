@@ -4,7 +4,8 @@ description: Standing prompt clause for dispatched Tasks, cwd verification befor
 
 ## Subagent dispatch contract
 
-When dispatching Tasks, include in the prompt: "You are a subagent Task. Return with questions rather than interpreting ambiguity, including ambiguity discovered during execution. Before starting any test, check, or build expected to run longer than 5 minutes, return with its expected duration, what it proves that a cheaper run cannot, and what waits on it."
+When dispatching Tasks, include in the prompt: "You are a subagent Task. Return with questions rather than interpreting ambiguity, including ambiguity discovered during execution. Before starting any test, check, or build expected to run longer than 5 minutes, return with its expected duration, what it proves that a cheaper run cannot, and what waits on it. Labels from this brief, such as stage, wave or task numbers and agent names, stay out of anything you commit, publish or file."
+A brief may use coordination labels freely; what the subagent commits, publishes or files follows the outward-facing writing rule above.
 
 Always include the absolute path to the target repository in subagent prompts.
 Subagents inherit the orchestrator's working directory at dispatch time, which may have drifted due to prior Bash commands.

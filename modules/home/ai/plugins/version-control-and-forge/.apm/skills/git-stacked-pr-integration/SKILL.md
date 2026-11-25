@@ -20,6 +20,9 @@ A worker prepares and verifies one independently shippable change, commits it, a
 The worker follows `mergify-stack` for Git-native stack identity, commit, and rewrite mechanics while keeping the result local.
 Each stack delivery step remains one commit and one PR, with exactly one `Change-Id` matching `^I[0-9a-f]{40}$` and the Linear issue id in the commit body.
 Corrections update that delivery commit only; this does not permit rewriting unrelated history.
+`mergify stack` copies each delivery commit's subject and body into its pull request's title and body, so the commit message is the pull request's text.
+Title each member by what it changes, never by its place in the stack or the plan (`wave 3`, `part 2 of 4`), and write the body for a reader who has only that pull request and the repository; the outward-facing writing rule in `agent-context-core` says which terms that reader can resolve.
+The same holds for an ordinary PR and for each of several PRs authorized together.
 
 For delegated work, the orchestrator alone orders returned refs and publishes their pull-request stack through `mergify-stack`, subject to §Fleet upstream overrides.
 Its terminal action is authorization under §Queue authorization, followed by asynchronous queue ownership of landing.
@@ -35,6 +38,20 @@ Independent authors use the same policy directly for their own PRs and stacks.
 | Authorization covers the intended changes | Follow §Queue authorization. | Author or orchestrator |
 | Authorized work lands asynchronously | Test and land the selected head or batch. | Queue |
 | Colocated-jj local work preserves the development join | Follow `jj-version-control` and its return-by-ref contract. | Worker and orchestrator |
+
+## Cold read before publishing
+
+Before a pull request is opened or a stack is pushed, the publisher (the orchestrator, or an author publishing their own work) has the titles, bodies and commit messages read by someone with none of the conversation: a fresh subagent given only that text and the diff, or, when no subagent is available, the publisher rereading them alone.
+The reader lists every term it cannot resolve from that text and the repository.
+The publisher replaces each listed term with what it refers to, or defines it where it stands, following the outward-facing writing rule in `agent-context-core`, and then publishes.
+Nothing enforces this step; it is not a gate.
+Give the reader this prompt:
+
+```text
+You have only the pull-request titles, bodies, commit messages and diff below, and this repository at the diff's head commit.
+Quote every word, number or label in the titles, bodies and commit messages whose meaning you cannot work out from them or from the repository.
+For each, say what you would need to know. Report nothing else and change nothing.
+```
 
 ## Queue authorization
 
