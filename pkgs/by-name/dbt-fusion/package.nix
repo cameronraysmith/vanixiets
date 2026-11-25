@@ -3,7 +3,9 @@
 # dbt Fusion is the next-generation dbt CLI, offering faster execution
 # and enhanced capabilities for data transformation workflows.
 #
-# This derivation uses pre-built binaries from dbt Labs CDN.
+# This derivation uses pre-built binaries from dbt Labs CDN. pin.json follows
+# the `latest` channel of the vendor's versions.json, and realize-pin reads each
+# tarball's hash from the `.sha256` file published beside it.
 #
 # Source: https://github.com/dbt-labs/dbt-fusion
 {
@@ -15,33 +17,20 @@
 
 let
   inherit (stdenv.hostPlatform) system;
-  systemToPlatform = {
-    "x86_64-linux" = {
-      name = "x86_64-unknown-linux-gnu";
-      hash = "sha256-ZGEaODSDg+roakg0YRz8eG+WzbyQf735OCXFVg0gwZc=";
-    };
-    "aarch64-linux" = {
-      name = "aarch64-unknown-linux-gnu";
-      hash = "sha256-57iF2oEQkN+IYxuHkWdr7TGVO6xlMqf6DD+94WRaV60=";
-    };
-    "x86_64-darwin" = {
-      name = "x86_64-apple-darwin";
-      hash = "sha256-2+bf5n76s/Iml3nJVtCWWGbOp+iUWTg7bb5+ijNrr6A=";
-    };
-    "aarch64-darwin" = {
-      name = "aarch64-apple-darwin";
-      hash = "sha256-H/jpQhScnELgomQZ8pTDKT5QC4QmTMuVof+bZYXIjds=";
-    };
-  };
-  platform = systemToPlatform.${system} or (throw "dbt-fusion: unsupported platform ${system}");
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "dbt-fusion"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
-stdenv.mkDerivation (finalAttrs: {
+stdenv.mkDerivation {
   pname = "dbt-fusion";
-  version = "2.0.6";
+  inherit (pin) version;
 
   src = fetchurl {
-    url = "https://public.cdn.getdbt.com/fs/cli/fs-v${finalAttrs.version}-${platform.name}.tar.gz";
-    inherit (platform) hash;
+    url = planned.${system}.url or (throw "dbt-fusion: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
   };
 
   nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
@@ -58,7 +47,7 @@ stdenv.mkDerivation (finalAttrs: {
     runHook postInstall
   '';
 
-  passthru.updateScript = ./update.sh;
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     description = "Next-generation engine for dbt";
@@ -72,7 +61,7 @@ stdenv.mkDerivation (finalAttrs: {
     changelog = "https://github.com/dbt-labs/dbt-fusion/blob/main/CHANGELOG.md";
     license = lib.licenses.elastic20;
     mainProgram = "dbtf";
-    platforms = lib.attrNames systemToPlatform;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
-})
+}
