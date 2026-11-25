@@ -108,10 +108,12 @@ in
           # there silently runs no hooks. The absolute common-dir path names the
           # same directory from every checkout. mergify's hooks mint the
           # Change-Id trailer for git-native commits; jj commits get theirs from
-          # templates.commit_trailers and run no git hooks.
+          # templates.commit_trailers and run no git hooks. stack setup asks a
+          # question when its input is a terminal (mergify-cli 2026.11.19 offers
+          # to enable git rerere), and a shell hook must not wait for an answer.
           if git_common_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
             git config --local core.hooksPath "$git_common_dir/hooks"
-            if ! ${lib.getExe self'.packages.mergify-cli-bin} stack setup >/dev/null; then
+            if ! ${lib.getExe self'.packages.mergify-cli-bin} stack setup </dev/null >/dev/null; then
               echo "mergify stack setup: failed; git commits will lack a Change-Id trailer" >&2
             fi
           fi
