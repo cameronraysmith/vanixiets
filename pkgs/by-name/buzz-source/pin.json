@@ -1,7 +1,7 @@
 {
   "name": "buzz-source",
-  "version": "0.5.26",
-  "realizedVersion": "0.5.26",
+  "version": "0.5.30",
+  "realizedVersion": "0.5.30",
   "source": {
     "githubRelease": {
       "owner": "block",
@@ -18,10 +18,10 @@
             "repo": "buzz"
           }
         },
-        "hash": "sha256-w/CHknkyFT+iHv4jd5Anv1Q/5kOZ7H1DEKB9dwqQHiE=",
+        "hash": "sha256-Ay6zUeHHYO92/Fs4FGHm1+QQUoUEQjYyOC3dDg5+7Ss=",
         "depsHash": {
           "cargo": {
-            "hash": "sha256-A/lpudjM3ZahSNiWHxW8UKFlBhdBuAEQL87c8Q+C7Q4="
+            "hash": "sha256-pYCis8LXLUKU3iPaUkeR/hH3XmBljCjVZQ7EDD2cqrs="
           }
         }
       }
