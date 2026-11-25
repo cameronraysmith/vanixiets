@@ -207,7 +207,7 @@
     sops-secrets-operator-src.url = "github:isindir/sops-secrets-operator/0.22.5";
     sops-secrets-operator-src.flake = false;
 
-    argocd-src.url = "github:argoproj/argo-cd/v3.6.2";
+    argocd-src.url = "github:argoproj/argo-cd/v3.6.3";
     argocd-src.flake = false;
 
     argocd-helm-src.url = "github:argoproj/argo-helm/argo-cd-10.18.3";
