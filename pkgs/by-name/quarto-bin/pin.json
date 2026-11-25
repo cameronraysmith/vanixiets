@@ -1,7 +1,7 @@
 {
   "name": "quarto-bin",
-  "version": "1.10.18",
-  "realizedVersion": "1.10.18",
+  "version": "1.11.9",
+  "realizedVersion": "1.11.9",
   "source": {
     "githubRelease": {
       "owner": "quarto-dev",
@@ -28,10 +28,10 @@
           }
         },
         "hashes": {
-          "x86_64-linux": "sha256-r60HG1vSLALy0wBpV0MYnTZQ4FN6Uwc+ZUtjDP8rDHM=",
-          "aarch64-linux": "sha256-9qB99o4lMwtd809l099mvKYFrM47gwxZOljpGITUz2w=",
-          "aarch64-darwin": "sha256-3danGp4ESKsV+2VbxYnhHLZYmiSOw1zNf39EE3UxaI4=",
-          "x86_64-darwin": "sha256-3danGp4ESKsV+2VbxYnhHLZYmiSOw1zNf39EE3UxaI4="
+          "x86_64-linux": "sha256-nQN7qjs4/6xyF+3KHS5TdgsPq01XSSIHQKMgVuA6FTA=",
+          "aarch64-linux": "sha256-ipbaiQJsjLoPwmB/YtmYNuroxbZUZbXUdq8W9UwQ0ZE=",
+          "aarch64-darwin": "sha256-n8JIgfY3YS2A7b8W1i8BAB/HlFqaDGrCRxmQApAeCm0=",
+          "x86_64-darwin": "sha256-n8JIgfY3YS2A7b8W1i8BAB/HlFqaDGrCRxmQApAeCm0="
         }
       }
     }
