@@ -960,6 +960,7 @@ The queries below quote identifiers in double quotes, as `SHOW CREATE TABLE` pri
 
 - `ci_attribute.status` is nixbot's attribute status: `succeeded`, `skipped_local` (already in the cache, not built), `failed`, `failed_eval`, `dependency_failed`, `ignored_failure`, `cancelled`, `building` or `pending`.
 - `abandoned` is true only for an `ignored_failure` row whose error is nixbot's abandonment marker, an optional attribute that had not finished when the required attributes had settled; other `ignored_failure` rows are real failures of optional attributes.
+  Both come only from vanixiets builds before the darwin checks became required (2026-11-25); the column stays so that a window reaching back over them reads them right.
 - `outputs_out` is the attribute's `out` output path; `commit_sha`, `branch`, `pr_number` and `project` (`owner/name`) are its build's.
 - `pr_number` is set for pull-request builds only; `main` builds and `gitea-mq/batch/<n>` builds have none.
 - `ci_build.created_at` is when nixbot queued the build and `started_at` when it started; a build cancelled before it started has no `started_at`.

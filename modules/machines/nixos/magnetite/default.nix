@@ -129,11 +129,8 @@ in
       #     operator who wants the darwin result in magnetite's store.
       #   /etc/nix/<builder>-store-uri — a caller that wants the build to happen
       #     entirely in that builder's store with nothing copied back.
-      # nixbot also builds checks.aarch64-darwin through these builders, as
-      # best-effort: the darwin builders are laptops without guaranteed
-      # availability, so each darwin check carries ignoreFailure and a
-      # sleeping machine leaves a notice rather than gating CI
-      # (modules/checks/nixbot-best-effort-darwin.nix).
+      # nixbot also builds checks.aarch64-darwin through these builders, and
+      # requires them like every other check.
 
       # The build and session keys are separately authorized for independent
       # revocation and rotation. Only the build key is confined to the Nix

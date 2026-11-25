@@ -35,7 +35,7 @@ SELECT v.build_id, v.attr, 'x86_64-linux', v.drv_path, v.outputs::jsonb, v.statu
        c.t0 - v.started_ago, c.t0 - v.finished_ago, v.eval_wall_ms, v.eval_alloc_bytes
 FROM fixture_clock c,
      (VALUES
-       -- the abandonment marker, as modules/nixos/nixbot-abandon-optional-attributes.patch writes it
+       -- the abandonment marker, as nixbot's local patch wrote it until 2026-11-25
        (101, 'checks.x86_64-linux.marker', '/nix/store/aaaa-marker.drv', '{"out": "/nix/store/aaaa-marker"}',
         'ignored_failure', false, 'not finished when the required attributes had settled',
         interval '11 minutes', interval '10 minutes', 5, 1048576::bigint),

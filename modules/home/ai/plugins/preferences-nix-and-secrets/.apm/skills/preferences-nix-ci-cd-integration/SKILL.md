@@ -7,7 +7,7 @@ description: >
   buildbot-nix project registration, or planning binary cache strategy. Also load
   when sizing nix-eval-jobs evaluation workers and memory budgets (stock or an
   alternative evaluator such as iets), when reading
-  nix-eval/nix-build statuses, cached or best-effort (ignored-failure) attributes
+  nix-eval/nix-build statuses or cached attributes
   before merging, when working with the merge queue, or when the two-phase
   migration pattern (GHA+nix-fast-build to buildbot-nix delegation) or the effect
   execution strategy decision (platform-native vs nix-native effects) is relevant.
@@ -438,13 +438,13 @@ An attribute reported as cached is not evidence that this run verified it.
 It is evidence that a derivation with the identical store path, and therefore identical inputs, was built and verified before, and content addressing is what makes that earlier verification transfer to the current commit.
 That is the point of the binary cache strategy above, and it is also its limit: a cached check is exactly as strong as the check was when it first ran, so a vacuous check stays vacuous at every cache hit (see §"Operationalizing integrity" in `preferences-nix-checks-architecture`).
 
-Best-effort attributes exist because some builders are not always present.
-The `aarch64-darwin` checks can only build on a Mac reachable from the CI host, and those Macs are laptops that sleep and travel, so `modules/checks/nixbot-best-effort-darwin.nix` marks every darwin check with `ignoreFailure`, which removes it from the aggregate build status.
-That marking must be a deliberate per-platform decision documented next to the code, never a way to make a red status go away.
-The ignore flag encodes availability, not correctness: the CI system cannot distinguish an absent builder from a genuine regression, so an ignored failure must still be read.
-The instance that justifies this rule: six Darwin closures failed as ignored failures, and the real cause was a genuine package break on that platform, which would have reached `main` unnoticed had the ignore flag been trusted.
-A darwin evaluation error is not covered by the flag at all, because it fails `nix-eval` before the modifier is read, which is correct for an error no builder could have caused.
-For darwin, local `just check-fast` on a Mac remains the gate the CI status cannot be.
+Every check on every system CI builds is required, the `aarch64-darwin` checks included.
+Those can only build on a Mac reachable from the CI host, and the Macs are laptops that sleep and travel, so until 2026-11-25 every darwin check carried hercules-ci's `ignoreFailure`, which removes a failure from the aggregate build status.
+The flag encodes availability, not correctness: the CI system cannot tell an absent builder from a genuine regression, so a real darwin break passes as an ignored failure.
+That happened twice, six Darwin closures once and build 2456 later, so the flag is gone, and `checks.x86_64-linux.nixbot-wiring` fails if a darwin check carries it again.
+A darwin check that fails, or that no Mac could build, now fails the build, and with no Mac reachable nothing lands.
+The emergency switch is `attribute = "checks.x86_64-linux"` in `nixbot.toml`, which restricts nixbot to the Linux checks from the first commit that carries it, with no deploy; never use `ignoreFailure` to make a red status go away.
+A darwin evaluation error fails `nix-eval` whatever the builders do, which is correct for an error no builder could have caused.
 
 When every required status is green, the merge queue (`modules/nixos/gitea-mq.nix`, required checks `nixbot/nix-eval`, `nixbot/nix-build`, `nixbot/effects`) lands the pull request.
 The queue batches up to 20 pull requests and evaluates the batch once rather than each pull request separately, then fast-forwards the target to the exact tested batch commit.

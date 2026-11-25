@@ -3,22 +3,18 @@
 # two systems, and nixbot narrows "checks" to the instance's evalSystems
 # (x86_64-linux and aarch64-darwin, modules/nixos/nixbot.nix) before
 # evaluating anything (nixbot/nixbot/nix/select.nix:37-50). aarch64-linux is
-# never evaluated. aarch64-darwin checks are best-effort
-# (modules/checks/nixbot-best-effort-darwin.nix).
+# never evaluated. The aarch64-darwin checks are required like the rest.
 #
-# nixbot reads `attribute` from the worktree being built, so a pull request
-# changing it is built with its own value; the effects keys below are read
-# from the default branch only.
+# nixbot reads `attribute` from the worktree being built (a pull request's
+# head merged into its base, or a pushed branch's commit, gitea-mq batches
+# included), so a commit changing it is built with its own value; the
+# effects keys below are read from the default branch only.
+#
+# Emergency switch, when no Mac builder can be had: `attribute =
+# "checks.x86_64-linux"` builds only the Linux checks, from the first commit
+# that carries it, with no deploy. select.nix narrows only a one-name path
+# by evalSystems and uses a longer one as written.
 attribute = "checks"
-
-# The darwin checks run on laptops, which sleep. Once every x86_64-linux
-# check has settled, a darwin check still unfinished 5 minutes later is
-# stopped and recorded as an ignored failure, so the build's outcome, its
-# effects, and the merge queue never wait on a Mac (local nixbot patch,
-# modules/nixos/nixbot.nix). A darwin check finishing earlier ends the build
-# as soon as it does; the grace is a limit, not a wait. Read from the
-# worktree being built, like `attribute`.
-optional_build_grace = 300
 
 # herculesCI effects gating (nixbot, github:Mic92/nixbot)
 #

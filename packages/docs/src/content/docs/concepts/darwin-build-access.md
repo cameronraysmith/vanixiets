@@ -110,19 +110,16 @@ The builder setting `authorizeSshAccessGroup = false` turns that step off for a 
 
 ## What CI asks of the darwin builders
 
-nixbot on magnetite builds `checks.aarch64-darwin` alongside `checks.x86_64-linux`, as best-effort.
+nixbot on magnetite builds `checks.aarch64-darwin` alongside `checks.x86_64-linux`, and requires both.
 `nixbot.toml` sets `attribute = "checks"`, and `modules/nixos/nixbot.nix` sets both `buildSystems` and `evalSystems` to `[ "x86_64-linux" "aarch64-darwin" ]`.
 `evalSystems` is what scopes the attribute, so aarch64-linux, which no builder here serves, is never evaluated.
 
-Every darwin builder is a laptop without guaranteed availability, so a darwin build must not gate CI on whether a Mac is awake.
-`modules/checks/nixbot-best-effort-darwin.nix` gives every darwin check, the `darwin-<host>` machine checks included, hercules-ci's `ignoreFailure` modifier.
-A failed darwin attribute is therefore an ignored failure: shown on the build, excluded from the build's aggregate status, and retried on the next build.
-The cost is real: nixbot cannot tell an absent Mac from a genuine darwin regression, so local `just check-fast` on a Mac remains the gate for darwin.
-A darwin evaluation error is not covered and still fails the build.
-The modifier changes no drvPath, so nothing rebuilds and the binary cache is unaffected.
+Every darwin builder is a laptop without guaranteed availability, and the darwin checks gate CI all the same: a failed darwin attribute fails the build, and so does one no Mac could build.
+With no Mac builder reachable nothing lands; in an emergency, `attribute = "checks.x86_64-linux"` in `nixbot.toml` restricts nixbot to the Linux checks from the first commit that carries it, with no deploy.
+Until 2026-11-25 the darwin checks were best-effort, which let a real darwin regression go green; the analysis of telling an absent Mac from a failed check is in commit `7b4f12bb`.
 
 The builds run on stibnite, the only Mac magnetite dispatches to, at Background QoS with low-priority I/O like all work on a darwin builder.
-The `nixbot-wiring` check pins CI's system scope and the best-effort marking.
+The `nixbot-wiring` check pins CI's system scope and that no darwin check carries hercules-ci's `ignoreFailure`.
 
 ## Related
 

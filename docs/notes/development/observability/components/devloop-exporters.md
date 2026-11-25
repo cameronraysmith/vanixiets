@@ -16,7 +16,8 @@ The component also runs the daily `devloop-reconcile` regulator and the build-ti
 - ADR-005 signal 2: gitea-mq batch events from the `journald` receiver with `units` set to `gitea-mq.service`, a `grep` on the five `msg` values and the `key_value_parser` operator, into `devloop`.
 - ADR-005 signal 3: a deploy record appended to `/var/log/deploy-record.jsonl` at every activation on all ten machines and shipped by the `filelog` receiver with `json_parser` on ADR-003's in-scope hosts, into `devloop`.
 - ADR-005 signal 4: omp exports `omp.agent.tool.calls` and `omp.agent.errors` to the host's collector, with its log and trace signals disabled at the emitter, into `agent`.
-- ADR-005 `abandoned` derivation: the query computes `abandoned` as `status = 'ignored_failure' AND error = <marker>`, where `<marker>` is one Nix value shared with a flake check over `nixbot-abandon-optional-attributes.patch`, and selects no `error` text (ADR-005 Q2).
+- ADR-005 `abandoned` derivation: the query computes `abandoned` as `status = 'ignored_failure' AND error = <marker>`, where `<marker>` is one Nix value, and selects no `error` text (ADR-005 Q2).
+  The marker is the text nixbot's local patch wrote until 2026-11-25, when the darwin checks became required and the patch was removed; it now only reads stored history.
 - ADR-005 Q3: deploys are recorded at activation and attributed to commits by joining the activated closure against CI `outputs.out`, with `system.configurationRevision` left unset.
 - ADR-005 Q12: nixbot's database is read directly, departing from web-verification D4 and D10, for one cursor across all builds.
 - ADR-004: the `devloop` column allow-list, primary key and time index per table, the omp metric-name and key allow-lists, and the label bans that keep `commit_sha`, `pr_number`, `drv_path`, store paths and build ids on log rows only.
@@ -75,7 +76,8 @@ Files to add (ADR-005 Implementation surface):
 
 - `modules/nixos/devloop-collection.nix`: the two `sqlquery` queries, the gitea-mq `journald` receiver with `key_value_parser`, routing to `devloop`, the shared abandonment marker, the `opentelemetry-collector` PostgreSQL role with column-level `SELECT`, the collector's journal read, and `devloop-reconcile` service and timer as its own `DynamicUser` with a peer-authenticated nixbot role and journal read, reading `regulator-password` and setting `OnFailure=observability-notify@%n.service`.
 - `modules/system/deploy-record.nix`: the NixOS and darwin activation snippets, following the two-platform shape of `modules/system/zt-dns.nix`.
-- `modules/checks/devloop-signals.nix`, added in S7: an eval-time check for the omp session variables with an embedded negative control; the abandonment-marker clause lives in `devloop-queries` (charter v22).
+- `modules/checks/devloop-signals.nix`, added in S7: an eval-time check for the omp session variables with an embedded negative control.
+  The abandonment-marker clause that lived in `devloop-queries` (charter v22) was removed with the patch it bound on 2026-11-25.
 - `modules/checks/devloop-queries.nix`: `checks.x86_64-linux.devloop-queries`, using `postgresqlTestHook`, applying the nixbot input's migrations, loading fixtures and running the two export queries rendered from the same Nix values as `devloop-collection`, with the renamed-column mutant.
 - `modules/vm-tests/devloop-ingest.nix`: `perSystem.vmTests.devloop-ingest`, a systemd-nspawn container test requiring `uid-range`, run on demand on magnetite, with PostgreSQL, GreptimeDB, the collector, a stub `gitea-mq` unit and the reconcile job with its mutants, following `modules/vm-tests/greptimedb-pipeline.nix` (ADR-005, charter v22).
 
@@ -101,7 +103,7 @@ Envelopes and regulators (ADR-005):
 |---|---|---|
 | E5.1 nixbot export queries | every `build_attributes` row with `finished_at` in the previous UTC day, reconciled at 02:15 UTC, appears once in `devloop`, distinct on `(build_id, attr, finished_at)`; every finished build likewise | `devloop-reconcile`, daily on magnetite, comparing both sides' keys and exiting non-zero on any unexplained difference |
 | E5.2 nixbot schema coupling | the export queries execute against the schema the pinned nixbot input creates | flake check `devloop-queries` |
-| E5.3 `abandoned` derivation | the marker is byte-identical to the error text in `nixbot-abandon-optional-attributes.patch` | flake check `devloop-queries`, against the patch's production code |
+| E5.3 `abandoned` derivation | rows carrying the marker nixbot wrote before 2026-11-25 read as abandoned, and no other row does | flake check `devloop-queries`, over its marker fixtures |
 | E5.4 gitea-mq journal parse | each `batch done` line yields one row with integer `landed`, `ejected`, `builds` and boolean `flaky`; any 24-hour window containing a nixbot build on a `gitea-mq/batch/` branch contains at least one `batch built` row | `devloop-reconcile`, counting the day's journal entries per message with `jq`, comparing the counts with store rows and checking the cross-signal liveness condition |
 | E5.5 deploy-record snippet | every machine appends one valid JSON line per activation with `host`, `closure` and, outside boot, `previous_closure` | the deploy-record obligation in `modules/checks/machines.nix`, evaluated with each machine's toplevel, plus `devloop-reconcile` asserting magnetite's latest stored record equals its current system |
 | E5.6 `devloop-reconcile` itself | runs daily and fails on any envelope breach above | the mutants of `vmTests.x86_64-linux.devloop-ingest`, run on demand on magnetite |

@@ -61,7 +61,7 @@ A class says what a test may touch or wait on and how long one run may take, aft
 
 Behaviour whose point is the passage of time (an outage window, a queue filling at its real rate, a crash loop, the next UTC day) runs only in `fleet-ingress-outage` and `devloop-ingest-reconcile`, held there by the exact case lists of the `declare-test-size-classes` interface.
 Each runtime test's timeout is its class limit, which Bazel's advice to set a timeout "as tight as you can without incurring any flakiness" ([test encyclopedia](https://bazel.build/reference/test-encyclopedia)) asks of it; a case whose time varies with its own timers is fixed in the test, not given a looser timeout or a larger class.
-nixbot's pull-request gate builds `checks.x86_64-linux` on Magnetite's store and `checks.aarch64-darwin` best-effort; small and medium checks belong there, and a large check belongs there only with its reason recorded beside its definition.
+nixbot's pull-request gate builds `checks.x86_64-linux` on Magnetite's store and `checks.aarch64-darwin` on Stibnite, both required; small and medium checks belong there, and a large check belongs there only with its reason recorded beside its definition.
 nixbot records each attribute's build in the `build_attributes` table of its PostgreSQL database on Magnetite, from builder-slot acquisition to completion, and the dev-loop collection copies those rows into the telemetry store's `devloop` database; an uncached run there is the measurement a check's class rests on.
 VM and container tests run on Pyrite, a container test with `--builders ''`; their class is their test script's time, the driver's `test script finished in`, and the driver and node builds a cold run adds are build cost outside the class.
 `fleet-ingress` is medium (its script measured 189.37 s on Pyrite on 2026-11-24 once `processName` stopped waiting on the collectors' scrape interval, after earlier runs of 216.61 to 280.74 s and one that reached the 300 s timeout) and is the test to run for a change to what the collectors filter, route or store.
@@ -92,9 +92,9 @@ For an ordinary trunk-based PR, enqueue with `gh pr merge <PR> --auto --rebase`;
 `gh-queue-open-prs` evaluates every open PR against the ruleset-derived required set and enqueues the green ones in bulk; `gh-queue-open-prs -n` reports without acting.
 External handoff follows `git-stacked-pr-integration` §Queue authorization in every local VCS mode.
 
-A green `nixbot/nix-build` is not the same as every check having passed.
-The aarch64-darwin checks are best-effort through `modules/checks/nixbot-best-effort-darwin.nix`, which marks their failures `ignored_failure` so an asleep or unreachable Mac builder cannot block the queue; the flag concerns builder availability, never correctness.
-Read those failures before enqueueing rather than treating the aggregate status as the whole answer, because a genuine platform-specific break — an upstream package that compiles only with the other platform's toolchain, say — presents exactly as an ignored failure and would otherwise reach `main` unnoticed.
+The aarch64-darwin checks are required like every other check, so a green `nixbot/nix-build` means every check passed, the Mac ones included.
+They build only on Stibnite: with no Mac builder reachable they fail, and nothing lands.
+The emergency switch is `attribute = "checks.x86_64-linux"` in `nixbot.toml`, which restricts nixbot to the Linux checks from the first commit that carries it, with no deploy.
 
 The jj change id `mxptywwq` is divergent in this repository: the commit "feat(skills): repair harborize contracts and encode evaluation decisions" on the parked branch `fm/vx-harborize-rung0` shares it with "chore: ignore python bytecode", a commit already in `main`.
 The operator decided on 2026-11-24 to leave the branch and the divergence as they are (§Parked in `openspec/changes/validate-harborize-instrument/proposal.md`), so a session that sees this divergence should neither report it nor try to repair it.

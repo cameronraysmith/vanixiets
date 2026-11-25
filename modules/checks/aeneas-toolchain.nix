@@ -9,9 +9,9 @@
 #
 # On darwin the mismatch builds successfully — the rpath edit and re-sign apply
 # to whatever toolchain the marker names — and surfaces only at runtime as a
-# dyld "Library not loaded: @rpath/librustc_driver-<hash>.dylib". darwin checks
-# are best-effort in CI (modules/checks/nixbot-best-effort-darwin.nix), so the
-# check runs on x86_64-linux over every platform's bundle: the bundles are
+# dyld "Library not loaded: @rpath/librustc_driver-<hash>.dylib". A darwin
+# check needs a Mac builder, so this one runs on x86_64-linux over every
+# platform's bundle: the bundles are
 # fixed-output downloads, so a Linux builder fetches the darwin tarball too and
 # the darwin case gates.
 #

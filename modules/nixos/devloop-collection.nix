@@ -5,10 +5,12 @@
 # and column grants (D6, D10), and flake.modules.nixos.devloop-collection
 # hands the statements and pipelines to greptimedb-schema
 # (modules/nixos/greptimedb.nix). abandonMarker is the error nixbot's local
-# patch writes for an abandoned attribute (D13); the attribute query derives
-# `abandoned` from it. checks.x86_64-linux.devloop-queries binds the marker
-# to the patch's production code and runs the queries and grants against
-# the nixbot input's migrations (D14, D15 as amended by plan review F11).
+# patch wrote for an abandoned attribute (D13) until 2026-11-25, when the
+# patch was removed with best-effort Mac checks; the attribute query derives
+# `abandoned` from it so that rows written before then still read as
+# abandoned if exported again. It can go once nixbot's retention (90 days by
+# default) has deleted those rows. checks.x86_64-linux.devloop-queries runs
+# the queries and grants against the nixbot input's migrations (D14, D15).
 # The NixOS module also creates the two readers' roles and their column
 # grants, and the collector's five source receivers, each stamping its rows
 # for the ingress role's `routing/logs` (D4, D6, D7, D9, D10);
@@ -235,6 +237,10 @@ let
     # flaky when it has a pass row and an own-fail row in the window.
     # A build with no outcome row (only cancelled, pending, building or
     # abandoned rows) is left out (plan review F21).
+    # Once magnetite runs nixbot without the patches for best-effort Mac
+    # checks (removed 2026-11-25), no vanixiets build writes abandoned or
+    # ignored_failure rows; the condition stays so that a window reaching
+    # back over earlier rows still reads them right.
     # Limitation: a dependency_failed row cannot be attributed to the flaky
     # derivation under it, because nixbot names it only in error text.
     buildOutcome = ''

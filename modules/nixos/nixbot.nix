@@ -41,11 +41,7 @@ in
   # and checks.x86_64-linux.nixbot-upload-local.
   #
   # A merge-queue batch reusing its PR build would otherwise never get
-  # nixbot/effects, stalling gitea-mq until its check timeout. An
-  # ignoreFailure attribute whose dependency failed would otherwise fail
-  # the build (dependency_failed) instead of being ignored. Without
-  # optional_build_grace (nixbot.toml) a build waits for every
-  # ignoreFailure attribute, up to the 3 h build timeout on a sleeping Mac.
+  # nixbot/effects, stalling gitea-mq until its check timeout.
   # A renamed or removed effect's last failed run would otherwise stay in
   # the web "N failing" count, since it never runs again to clear it.
   # Nothing would record an evaluation's memory peak against its ceiling,
@@ -72,8 +68,6 @@ in
   # (2026-09-20..10-14), against a hot upstream file to carry a patch on.
   flake.lib.nixbotPatches = [
     ./nixbot-gated-reuse-effects-summary.patch
-    ./nixbot-ignore-failure-dependents.patch
-    ./nixbot-abandon-optional-attributes.patch
     ./nixbot-failing-effects-defined.patch
     ./nixbot-evaluation-record.patch
     ./nixbot-upload-local-outputs.patch
@@ -159,8 +153,14 @@ in
 
         admins = [ "github:cameronraysmith" ];
 
-        # aarch64-darwin is built best-effort on whichever Mac magnetite can
-        # reach (modules/checks/nixbot-best-effort-darwin.nix). evalSystems
+        # Mac checks are required like every other check. They were
+        # best-effort (ignoreFailure) until 2026-11-25, which let a real Mac
+        # regression go green (build 2456) and left seven updates unproven
+        # on 2026-11-24 (builds 3001-3008). The cost: with no Mac builder
+        # reachable, nothing lands. In an emergency, `attribute =
+        # "checks.x86_64-linux"` in nixbot.toml restricts nixbot to Linux
+        # checks without a deploy. The alternative, telling an absent Mac
+        # from a failed check, is analysed in commit 7b4f12bb. evalSystems
         # matters because nixbot.toml's attribute is "checks": it is what
         # keeps aarch64-linux, which no builder here serves, unevaluated
         # (nixbot/nixbot/nix/select.nix:37-50).
@@ -174,9 +174,9 @@ in
         ];
 
         # Caps concurrent `nix build` client processes, not CPU: the default
-        # (the 16 cores) let best-effort darwin attributes, which wait on a
-        # remote Mac, hold every slot while stibnite slept, so no
-        # x86_64-linux attribute started for 2.5 h (builds 1381-1388). Local
+        # (the 16 cores) let darwin attributes, which wait on a remote Mac,
+        # hold every slot while stibnite slept, so no x86_64-linux attribute
+        # started for 2.5 h (builds 1381-1388). Local
         # CPU is capped by the daemon's max-jobs and each builder by its
         # nix.buildMachines maxJobs. Each attribute build holds one
         # auto-allocated uid range, so the bound is id-count / 65536

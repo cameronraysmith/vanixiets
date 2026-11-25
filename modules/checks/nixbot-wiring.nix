@@ -10,8 +10,8 @@
 # rather than a transcription of it. It also pins the facts that span modules
 # or upstream behaviour: the unit's memory/OOM knob set, the binary-cache
 # uploader set, that nixbot serves both GitHub repositories, that every
-# declared effect secret is used, and that darwin checks are best-effort
-# without changing their derivations. Values set as literals in
+# declared effect secret is used, and that darwin checks are required like
+# every other check, with their derivations unchanged. Values set as literals in
 # modules/nixos/nixbot.nix are not restated here.
 #
 # The repository-root config file is nixbot.toml. nixbot prefers that name over
@@ -122,10 +122,12 @@
             uploaderCommandsNonEmpty = lib.all (uploader: uploader.command != [ ]) nixbot.uploaders;
             legacyPostBuildStepNames = map (step: step.name) nixbot.postBuildSteps;
 
-            # Darwin checks are best-effort without changing what they build
-            # (modules/checks/nixbot-best-effort-darwin.nix). One mapAttrs
-            # marks every check, so the names and one representative prove it
-            # without forcing all darwin derivations here.
+            # Darwin checks are required: none carries hercules-ci's
+            # ignoreFailure, which nixbot reads per job to keep a failure out
+            # of the build's status (nixbot/nixbot/nix/apply.nix:6). Such a
+            # modifier is applied set-wide by one mapAttrs, so the names and
+            # one representative per system prove it without forcing all
+            # darwin derivations here.
             darwinCheckNamesUnchanged =
               sortedNames self.checks.aarch64-darwin == sortedNames config.allSystems.aarch64-darwin.checks;
             darwinRepresentative =
@@ -133,11 +135,11 @@
                 check = self.checks.aarch64-darwin.jj-pr-tags-rehearsal;
               in
               {
-                ignoreFailure = check.ignoreFailure or false;
+                ignoreFailure = check ? ignoreFailure;
                 sameDerivation =
                   check.drvPath == config.allSystems.aarch64-darwin.checks.jj-pr-tags-rehearsal.drvPath;
               };
-            linuxRepresentativeBestEffort = self.checks.x86_64-linux.jj-pr-tags-rehearsal ? ignoreFailure;
+            linuxRepresentativeIgnoreFailure = self.checks.x86_64-linux.jj-pr-tags-rehearsal ? ignoreFailure;
           };
           expected = {
             # Both repositories' secrets files are wired to nixbot's
@@ -157,10 +159,10 @@
             legacyPostBuildStepNames = [ ];
             darwinCheckNamesUnchanged = true;
             darwinRepresentative = {
-              ignoreFailure = true;
+              ignoreFailure = false;
               sameDerivation = true;
             };
-            linuxRepresentativeBestEffort = false;
+            linuxRepresentativeIgnoreFailure = false;
           };
         };
       };

@@ -51,7 +51,7 @@ Successful builds are pushed to the fleet's binary cache through its niks3 uploa
 Magnetite is a Hetzner CX53: 16 vCPU, 32 GiB of memory, and `/nix` under a 250 G ZFS quota with a free-space reaper.
 nixbot evaluates `x86_64-linux` and `aarch64-darwin` with six workers at 3 GiB each, sized by measurement in `modules/nixos/nixbot.nix`.
 Every nix-eval-jobs on the host, nixbot's included, queues on the host evaluation lock (`modules/nixos/nix-eval-lock.nix`), so a remote `just check-fast` evaluation never overlaps it.
-`aarch64-darwin` attributes are built best-effort on the darwin builders (see [Darwin build access](/concepts/darwin-build-access/)).
+`aarch64-darwin` attributes are built, and required, on the darwin builders (see [Darwin build access](/concepts/darwin-build-access/)).
 
 ## What this topology does not guarantee
 

@@ -2,10 +2,10 @@
 # the registry (flake.lib.hosts); dispatchers connect to them directly over
 # grpc:// and each builder's certificate names its own.
 #
-# nixbot on magnetite evaluates and builds checks.aarch64-darwin as
-# best-effort: every darwin check carries ignoreFailure
-# (modules/checks/nixbot-best-effort-darwin.nix), so a darwin builder that is
-# asleep or unreachable leaves a notice on the build instead of failing it.
+# nixbot on magnetite builds checks.aarch64-darwin, which it requires like
+# every other check, on the darwin builders magnetite admits below: stibnite
+# alone. With stibnite asleep or unreachable those checks fail, and nothing
+# lands (modules/nixos/nixbot.nix).
 { config, ... }:
 let
   inherit (config.flake.lib) hosts;

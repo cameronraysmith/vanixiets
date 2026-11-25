@@ -11,9 +11,8 @@
 # evaluation there (stibnite's drvPath: 3.0915 GB against 3.0865 GB for its
 # toplevel alone). A failure is an evaluation error of that attribute, not a
 # build failure: nixbot evaluates checks.aarch64-darwin on every pull request,
-# and an evaluation error fails the build before the best-effort modifier is
-# read (modules/checks/nixbot-best-effort-darwin.nix), so a Mac being asleep
-# does not hide it.
+# and an evaluation error fails the build without a builder, so a Mac being
+# asleep does not hide it.
 # Judging the real scripts here instead was measured at 4.08 GiB and 15.5 s
 # of evaluation for the drvPath (darwin-mesh-resolver-flags: 0.45 GiB, 1.2 s),
 # because rendering a darwin activation script on x86_64-linux evaluates most

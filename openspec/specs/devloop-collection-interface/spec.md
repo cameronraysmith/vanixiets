@@ -52,8 +52,9 @@ Each nixbot query SHALL select exactly its table's allow-listed columns in allow
 ### Requirement: The attribute query derives abandoned from the shared marker
 
 The attribute query SHALL compute `abandoned` as `status = 'ignored_failure' AND error IS NOT DISTINCT FROM <abandonMarker>`, where `<abandonMarker>` is `flake.lib.devloopCollection.abandonMarker`, rendered as a literal.
+The marker now reads stored history only: nixbot wrote it for rows before the darwin checks became required (2026-11-25), and no build writes it since.
 
-**Discharged by**: `checks.x86_64-linux.devloop-queries`' fixtures and its marker clause.
+**Discharged by**: `checks.x86_64-linux.devloop-queries`' fixtures.
 
 #### Scenario: Three kinds of ignored failure
 
@@ -316,22 +317,6 @@ Over the same day, the reconcile SHALL exit non-zero when the count of `/var/log
 - **WHEN** the check's schema dump differs from magnetite's for the three tables
 - **THEN** the check applies the migrations with nixbot's own migrator from the input instead, and the difference is recorded
 
-### Requirement: devloop-queries binds the abandonment marker to the patch's production code
-
-`checks.x86_64-linux.devloop-queries` SHALL fail unless `modules/nixos/nixbot-abandon-optional-attributes.patch` contains `flake.lib.devloopCollection.abandonMarker`, enclosed in double quotes, on the added line between `return AttributeStatus.ignored_failure, (` and `if outcome == BuildOutcome.abandoned`.
-
-**Discharged by**: the check's marker clause, which compares `abandonMarker` with the patch text; the measurement of the check's evaluation cost with `NIX_SHOW_STATS`.
-
-#### Scenario: The marker drifts from the patch
-
-- **WHEN** the marker differs from the patch's production literal by one character
-- **THEN** the check fails
-
-#### Scenario: Only the patch's tests carry the marker
-
-- **WHEN** the production literal changes while the patch's test assertions keep the old text
-- **THEN** the check fails, because only the production context satisfies it
-
 ### Requirement: The x86_64-linux NixOS machine checks carry the deploy-record snippet
 
 `modules/checks/machines.nix` SHALL, for every machine check it builds, fail unless the machine's activation script as the platform assembles it contains the script `deploy-record.nix` renders, read from `system.activationScripts.script` on NixOS and `system.activationScripts.script.text` on darwin, so the obligation fails however the entry is dropped.
@@ -346,7 +331,7 @@ Over the same day, the reconcile SHALL exit non-zero when the count of `/var/log
 #### Scenario: The obligation's coverage is reported
 
 - **WHEN** someone asks which machines CI holds to the obligation
-- **THEN** the answer is the five x86_64-linux NixOS machine checks; the four darwin machines' checks run best-effort, so their failure blocks no merge, and `scheelite`'s is deferred, so those five machines are shown carrying the snippet once by evaluation when it is introduced and are not described as held by CI
+- **THEN** the answer is the five x86_64-linux NixOS machine checks and the four darwin machine checks; `scheelite`'s is deferred, so it is shown carrying the snippet once by evaluation when it is introduced and is not described as held by CI
 
 ### Requirement: devloop-ingest shows the collection path and the reconcile able to fail
 

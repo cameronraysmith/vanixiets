@@ -272,7 +272,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | message body | — | the free text of a log record, as distinct from the named fields parsed out of it | shared |
 | free text | — | any value whose content is not drawn from a fixed or bounded set, such as an error message or a whole log line | world-only |
 | flaky attribute | — | within a window, an attribute whose one derivation both passed and failed on its own in builds there | shared |
-| abandoned attribute | — | an optional attribute the build service stopped waiting for once the required attributes had settled, which this fleet's patch to it marks with fixed error text | shared |
+| abandoned attribute | — | an optional attribute the build service stopped waiting for once the required attributes had settled, which this fleet's patch to it marked with fixed error text until 2026-11-25; stored rows from before then still carry it | shared |
 | formation-to-land | — | for one batch, the interval from the merge queue forming it to the merge queue announcing it done | shared |
 | queue wait | — | for one build, the interval from the build service accepting it to the build starting | shared |
 | event | dev-loop | one occurrence in the dev loop, such as an attribute finishing, a build finishing, a batch transition or a deploy, that one dev-loop record describes | shared |

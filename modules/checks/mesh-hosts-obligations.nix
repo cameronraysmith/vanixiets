@@ -10,7 +10,7 @@
 # nixos-<host> and darwin-<host> check, which already evaluates the
 # configuration; nixbot evaluates checks.aarch64-darwin on every pull request,
 # so a darwin failure is an evaluation error there whether or not a Mac is
-# awake (modules/checks/nixbot-best-effort-darwin.nix). No host is evaluated
+# awake. No host is evaluated
 # here; the fixtures are literals, so the check runs on x86_64-linux only.
 { self, lib, ... }:
 {

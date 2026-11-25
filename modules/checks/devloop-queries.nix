@@ -17,10 +17,10 @@
 # runs against the role exactly as under magnetite's peer authentication.
 #
 # The clauses, each relating two independently defined values:
-#   - marker: abandonMarker and the patch's production code (below);
 #   - abandoned: the query's value over fixture rows whose error text is
-#     the patch's marker, the marker inside other text, other text and null,
-#     and a failed row carrying the marker, and the fixture's expectation;
+#     the marker nixbot's local patch wrote until 2026-11-25, the marker
+#     inside other text, other text and null, and a failed row carrying the
+#     marker, and the fixture's expectation;
 #   - error cells: every cell the attribute query returns, and the error
 #     texts the fixtures stored, read back from the database;
 #   - outputs_out: the query's value over a row whose outputs is null and
@@ -380,29 +380,6 @@
         };
       };
 
-      # The marker clause (design D13, D15; plan review F11): the two values
-      # are flake.lib.devloopCollection.abandonMarker and the text of the
-      # nixbot patch magnetite applies. The marker must appear in the
-      # patch's production code, the three added lines of outcome_status
-      # (modules/nixos/nixbot-abandon-optional-attributes.patch:145-147), not
-      # merely somewhere in the patch, where its test literals (:379, :451)
-      # would satisfy a bare search.
-      patchText = builtins.readFile ../nixos/nixbot-abandon-optional-attributes.patch;
-      productionContext =
-        marker:
-        lib.concatStringsSep "\n" [
-          "+        return AttributeStatus.ignored_failure, ("
-          "+            \"${marker}\""
-          "+            if outcome == BuildOutcome.abandoned"
-        ];
-      markerHolds = text: marker: lib.hasInfix (productionContext marker) text;
-      markerClauses = [
-        {
-          label = "ok: the patch's production code returns abandonMarker as an abandoned attribute's error";
-          holds = markerHolds patchText dc.abandonMarker;
-        }
-      ];
-
       # run_<name>: builds database <db>, runs every query and assertion;
       # returns 1 at the first failure.
       runFunction = name: db: run: ''
@@ -478,14 +455,6 @@
                 END { if (!found) exit 1 }
               ' "$(result "$1" "$2")"
             }
-
-            ${lib.concatMapStrings (clause: ''
-              if [ ${lib.boolToString clause.holds} != true ]; then
-                echo ${lib.escapeShellArg "FAIL: ${clause.label}"}
-                exit 1
-              fi
-              echo ${lib.escapeShellArg clause.label}
-            '') markerClauses}
 
             psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres <<'SQL'
             CREATE ROLE "opentelemetry-collector" LOGIN;
