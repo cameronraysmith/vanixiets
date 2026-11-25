@@ -5,6 +5,12 @@
 #
 # modules/apps/langfuse-query wraps it with a read-only allow-list; on its own
 # it can call every write and delete operation the key permits.
+#
+# pin.json pins the version and the tarball's hash; Renovate proposes releases
+# from the npm registry and `nix run .#realize-pin -- langfuse-cli <version>`
+# realizes one. A new version can change the API contracts, so review the
+# allow-list in modules/apps/langfuse-query.sh against them; the
+# langfuse-query check builds from this package's contracts.
 {
   lib,
   stdenvNoCC,
@@ -13,13 +19,22 @@
   nodejs_22,
   versionCheckHook,
 }:
-stdenvNoCC.mkDerivation (finalAttrs: {
+let
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "langfuse-cli"; })
+    pin
+    pinPlan
+    ;
+  planned = pinPlan pin.version;
+in
+stdenvNoCC.mkDerivation {
   pname = "langfuse-cli";
-  version = "1.4.0";
+  inherit (pin) version;
 
+  # The registry records only sha512 and sha1 digests of the tarball, so
+  # pin.json's `tarball` hash is a prefetch of it.
   src = fetchurl {
-    url = "https://registry.npmjs.org/@langfuse/cli/-/cli-${finalAttrs.version}.tgz";
-    hash = "sha256-gzEsfy4MsIn6fAWm4HUvnoAIclQABREDJcMnSoCRA78=";
+    inherit (planned.artifacts.tarball.file) url;
+    inherit (pin.artifacts.tarball.file) hash;
   };
 
   nativeBuildInputs = [ makeWrapper ];
@@ -39,16 +54,18 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   nativeInstallCheckInputs = [ versionCheckHook ];
   doInstallCheck = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    inherit pin pinPlan;
+  };
 
   meta = {
     description = "Interact with the Langfuse API from the command line";
     homepage = "https://github.com/langfuse/langfuse-cli";
-    changelog = "https://github.com/langfuse/langfuse-cli/releases/tag/v${finalAttrs.version}";
+    changelog = "https://github.com/langfuse/langfuse-cli/releases/tag/v${pin.version}";
     downloadPage = "https://www.npmjs.com/package/@langfuse/cli";
     license = lib.licenses.mit;
     sourceProvenance = with lib.sourceTypes; [ binaryBytecode ];
     mainProgram = "langfuse";
     platforms = lib.platforms.unix;
   };
-})
+}

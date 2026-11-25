@@ -1,0 +1,22 @@
+{
+  "name": "langfuse-cli",
+  "version": "1.4.0",
+  "realizedVersion": "1.4.0",
+  "source": {
+    "npm": {
+      "package": "@langfuse/cli"
+    }
+  },
+  "artifacts": {
+    "tarball": {
+      "file": {
+        "urlTemplate": "https://registry.npmjs.org/@langfuse/cli/-/cli-{version}.tgz",
+        "checksum": {
+          "prefetch": {}
+        },
+        "hash": "sha256-gzEsfy4MsIn6fAWm4HUvnoAIclQABREDJcMnSoCRA78="
+      }
+    }
+  },
+  "companions": []
+}
