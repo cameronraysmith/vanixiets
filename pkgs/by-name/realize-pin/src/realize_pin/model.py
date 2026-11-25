@@ -151,7 +151,23 @@ class SourceBuild:
     deps_hash: DepsHash
 
 
-type Artifact = PlatformBinaries | SourceBuild
+@dataclass(frozen=True)
+class FileValue:
+    """A string read from a file of the release: the one group `regex` captures from its whole body."""
+
+    url_template: str
+    regex: str
+    value: str
+
+
+@dataclass(frozen=True)
+class RuntimeFetch:
+    """An artifact the program fetches when it runs, so it has no hash; the probe tells whether a version exists."""
+
+    probe_url_template: str
+
+
+type Artifact = PlatformBinaries | SourceBuild | FileValue | RuntimeFetch
 
 
 # companions
@@ -231,7 +247,18 @@ class PlanFetchFromGitHub:
     tag: str
 
 
-type PlanArtifact = PlanPlatformBinaries | PlanFetchFromGitHub
+@dataclass(frozen=True)
+class PlanFileValue:
+    url: str
+    regex: str
+
+
+@dataclass(frozen=True)
+class PlanRuntimeFetch:
+    probe_url: str
+
+
+type PlanArtifact = PlanPlatformBinaries | PlanFetchFromGitHub | PlanFileValue | PlanRuntimeFetch
 
 
 @dataclass(frozen=True)
@@ -348,12 +375,39 @@ def parse_deps_hash(value: Json, where: str) -> Result[DepsHash, str]:
     return Ok(deps[tag](h.ok))
 
 
+def file_value_pattern(regex: str, where: str) -> Result[re.Pattern[str], str]:
+    """Compile a `fileValue` regex, which must capture exactly one group."""
+    try:
+        pattern = re.compile(regex)
+    except re.error as e:
+        return Error(f"{where}: {regex!r} is not a regular expression: {e}")
+    if pattern.groups != 1:
+        return Error(f"{where}: {regex!r} captures {pattern.groups} groups, not exactly one")
+    return Ok(pattern)
+
+
 def parse_artifact(value: Json, where: str) -> Result[Artifact, str]:
-    split = _tag(value, where, ("platformBinaries", "sourceBuild"))
+    split = _tag(value, where, ("platformBinaries", "sourceBuild", "fileValue", "runtimeFetch"))
     if split.is_error():
         return Error(split.error)
     tag, f = split.ok
     w = f"{where}.{tag}"
+    if tag == "fileValue":
+        url = _str(f, "urlTemplate", w)
+        regex = _str(f, "regex", w)
+        got = _str(f, "value", w)
+        for r in (url, regex, got):
+            if r.is_error():
+                return Error(r.error)
+        pattern = file_value_pattern(regex.ok, f"{w}.regex")
+        if pattern.is_error():
+            return Error(pattern.error)
+        return Ok(FileValue(url.ok, regex.ok, got.ok))
+    if tag == "runtimeFetch":
+        probe = _str(f, "probeUrlTemplate", w)
+        if probe.is_error():
+            return Error(probe.error)
+        return Ok(RuntimeFetch(probe.ok))
     if tag == "platformBinaries":
         url = _str(f, "urlTemplate", w)
         platforms = _str_map(f, "platforms", w)
@@ -484,11 +538,26 @@ def parse_plan_checksum(value: Json, where: str) -> Result[PlanChecksum, str]:
 
 
 def parse_plan_artifact(value: Json, where: str) -> Result[PlanArtifact, str]:
-    split = _tag(value, where, ("platformBinaries", "sourceBuild"))
+    split = _tag(value, where, ("platformBinaries", "sourceBuild", "fileValue", "runtimeFetch"))
     if split.is_error():
         return Error(split.error)
     tag, f = split.ok
     w = f"{where}.{tag}"
+    if tag == "fileValue":
+        url = _str(f, "url", w)
+        regex = _str(f, "regex", w)
+        for r in (url, regex):
+            if r.is_error():
+                return Error(r.error)
+        pattern = file_value_pattern(regex.ok, f"{w}.regex")
+        if pattern.is_error():
+            return Error(pattern.error)
+        return Ok(PlanFileValue(url.ok, regex.ok))
+    if tag == "runtimeFetch":
+        probe = _str(f, "probeUrl", w)
+        if probe.is_error():
+            return Error(probe.error)
+        return Ok(PlanRuntimeFetch(probe.ok))
     if tag == "platformBinaries":
         platforms: dict[str, PlanPlatform] = {}
         for system, raw in f.items():

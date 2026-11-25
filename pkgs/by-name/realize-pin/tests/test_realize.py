@@ -19,7 +19,16 @@ from realize_pin.model import Json
 from realize_pin.policy import pin_path
 from realize_pin.realize import Deadline, Realization, RealizeError, Step, realize
 
-STAGE1 = ("ic-wasm-bin", "icp-cli-bin", "omnigraph", "mergify-cli-bin", "moshi-hook", "claude-code")
+RECORDED = (
+    "ic-wasm-bin",
+    "icp-cli-bin",
+    "omnigraph",
+    "mergify-cli-bin",
+    "moshi-hook",
+    "claude-code",
+    "greptimedb-bin",
+    "ouroboros",
+)
 APM = "modules/home/ai/plugins/version-control-and-forge/apm.yml"
 HASHES = "pkgs/by-name/apm-skills-compose/hashes.json"
 MERGIFY_REV = "e7c1ebbc281361f0b2b7827cf583f57339c97ebc"
@@ -50,13 +59,16 @@ def committed(package: str) -> dict[str, bytes]:
 
 
 def stale(files: dict[str, bytes]) -> dict[str, bytes]:
-    """The same files at an older version: every digest, rev and version moved."""
+    """The same files at an older version: every digest, rev, file value and version moved."""
     out: dict[str, bytes] = {}
     for path, data in files.items():
         text = SRI.sub(STALE_SRI, data.decode()).replace(MERGIFY_REV, "0" * 40)
         if path.endswith("pin.json"):
             doc = json.loads(text)
             doc["version"] = "0.0.1"
+            for artifact in doc["artifacts"].values():
+                if "fileValue" in artifact:
+                    artifact["fileValue"]["value"] = "0.0.0"
             text = json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
         out[path] = text.encode()
     return out
@@ -144,7 +156,7 @@ def scenario(
 
 def _plan_urls(node: Json) -> set[str]:
     if isinstance(node, dict):
-        urls = {v for k, v in node.items() if k == "url" and isinstance(v, str)}
+        urls = {v for k, v in node.items() if k in ("url", "probeUrl") and isinstance(v, str)}
         for v in node.values():
             urls |= _plan_urls(v)
         return urls
@@ -167,7 +179,7 @@ def assert_requests_within_policy(s: Scenario) -> None:
         assert urlsplit(remote).hostname == "github.com"
 
 
-@pytest.mark.parametrize("package", STAGE1)
+@pytest.mark.parametrize("package", RECORDED)
 def test_realizes_recorded_release(package: str, tmp_path: Path) -> None:
     s = scenario(package, tmp_path, stale(committed(package)))
     result = s.run()
@@ -180,7 +192,7 @@ def test_realizes_recorded_release(package: str, tmp_path: Path) -> None:
     assert_requests_within_policy(s)
 
 
-@pytest.mark.parametrize("package", STAGE1)
+@pytest.mark.parametrize("package", RECORDED)
 def test_second_run_changes_nothing(package: str, tmp_path: Path) -> None:
     s = scenario(package, tmp_path, stale(committed(package)))
     assert s.run().is_ok()
@@ -355,3 +367,101 @@ def test_source_and_deps_hash_from_the_hasher(tmp_path: Path) -> None:
     assert doc["artifacts"]["src"]["sourceBuild"]["hash"] == DEPS_SRC
     assert doc["artifacts"]["src"]["sourceBuild"]["depsHash"]["npm"]["hash"] == DEPS_GOT
     assert s.hasher.calls == [("deps-demo", Src()), ("deps-demo", NpmDeps())]
+
+
+GREPTIME_VERSION = "https://raw.githubusercontent.com/GreptimeTeam/greptimedb/v1.2.1/src/servers/dashboard/VERSION"
+OUROBOROS_PROBE = "https://pypi.org/pypi/ouroboros-ai/0.55.3/json"
+
+
+def _without(s: Scenario, url: str) -> None:
+    """Serve `url` as missing, as a 404 would."""
+    assert isinstance(s.http.bodies, dict)
+    del s.http.bodies[url]
+
+
+def _pin_doc(root: Path, package: str) -> Json:
+    return _load(root / pin_path(package))
+
+
+def test_file_value_reads_the_version_file_at_the_tag(tmp_path: Path) -> None:
+    s = scenario("greptimedb-bin", tmp_path, stale(committed("greptimedb-bin")))
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    doc = json.loads((tmp_path / pin_path("greptimedb-bin")).read_text())
+    assert doc["artifacts"]["dashboard"]["fileValue"]["value"] == "0.13.13"
+    assert ("GET", GREPTIME_VERSION) in s.http.requests
+
+
+def test_file_value_body_that_does_not_match(tmp_path: Path) -> None:
+    s = scenario("greptimedb-bin", tmp_path, stale(committed("greptimedb-bin")), bodies={GREPTIME_VERSION: b"nightly\n"})
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.FILE_VALUE
+    assert "does not match" in result.error.message
+    assert s.tree() == before
+
+
+def test_file_value_missing_restores_the_pin(tmp_path: Path) -> None:
+    s = scenario("greptimedb-bin", tmp_path, stale(committed("greptimedb-bin")))
+    _without(s, GREPTIME_VERSION)
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.FILE_VALUE
+    assert "404" in result.error.message
+    assert s.tree() == before
+
+
+def test_runtime_fetch_probe_writes_only_the_version(tmp_path: Path) -> None:
+    files = stale(committed("ouroboros"))
+    s = scenario("ouroboros", tmp_path, files)
+    old = _pin_doc(tmp_path, "ouroboros")
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    new = _pin_doc(tmp_path, "ouroboros")
+    assert isinstance(old, dict) and isinstance(new, dict)
+    assert new.pop("version") == "0.55.3"
+    assert old.pop("version") == "0.0.1"
+    assert new == old
+    assert result.ok.changed == (pin_path("ouroboros"),)
+    assert s.http.requests == [("GET", OUROBOROS_PROBE)]
+
+
+def test_runtime_fetch_probe_missing_restores_the_pin(tmp_path: Path) -> None:
+    s = scenario("ouroboros", tmp_path, stale(committed("ouroboros")))
+    _without(s, OUROBOROS_PROBE)
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.PROBE
+    assert "0.55.3 not found" in result.error.message
+    assert s.tree() == before
+
+
+def test_plan_without_a_pinned_artifact_is_refused(tmp_path: Path) -> None:
+    plan = _plan("greptimedb-bin")
+    artifacts = plan["artifacts"]
+    assert isinstance(artifacts, dict)
+    del artifacts["dashboard"]
+    s = scenario("greptimedb-bin", tmp_path, stale(committed("greptimedb-bin")), plan=plan)
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.EVALUATE
+    assert "differ" in result.error.message
+    assert s.tree() == before
+
+
+def test_plan_of_another_artifact_kind_is_refused(tmp_path: Path) -> None:
+    plan = _plan("greptimedb-bin")
+    artifacts = plan["artifacts"]
+    assert isinstance(artifacts, dict)
+    artifacts["dashboard"] = {"runtimeFetch": {"probeUrl": GREPTIME_VERSION}}
+    s = scenario("greptimedb-bin", tmp_path, stale(committed("greptimedb-bin")), plan=plan)
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.HASH
+    assert "dashboard: the plan has runtimeFetch where the pin has fileValue" in result.error.message
+    assert s.tree() == before

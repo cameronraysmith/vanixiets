@@ -29,9 +29,11 @@ from realize_pin.model import (
     COMMIT,
     SRI_SHA256,
     ApmRef,
+    Artifact,
     CargoDepsHash,
     Companion,
     DepsHash,
+    FileValue,
     FixedOutputHash,
     GitCommit,
     GithubRelease,
@@ -42,16 +44,21 @@ from realize_pin.model import (
     NpmDepsHash,
     Pin,
     Plan,
+    PlanArtifact,
     PlanFetchFromGitHub,
+    PlanFileValue,
     PlanPlatform,
     PlanPlatformBinaries,
+    PlanRuntimeFetch,
     PlanUpstreamFile,
     PlatformBinaries,
     Prefetch,
     Pypi,
+    RuntimeFetch,
     SourceBuild,
     VendorJson,
     VendorText,
+    file_value_pattern,
     parse_pin,
     parse_plan,
 )
@@ -71,6 +78,8 @@ class Step(StrEnum):
     EVALUATE = "evaluate"
     REV = "resolve rev"
     HASH = "hash artifacts"
+    FILE_VALUE = "fileValue"
+    PROBE = "runtimeFetch probe"
     APM_REF = "apmRef"
     DEPS_HASH = "depsHash"
     FIXED_OUTPUT_HASH = "fixedOutputHash"
@@ -299,11 +308,11 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
     if written.is_error():
         return Error(written.error)
     for name, artifact in pin.artifacts.items():
-        hashed = _hash_artifact(run, name, artifact, plan)
-        if hashed.is_error():
-            return Error(hashed.error)
-        for path, sri in hashed.ok:
-            done = set_in(doc, ("artifacts", name, *path), sri)
+        realized = _realize_artifact(run, name, artifact, plan)
+        if realized.is_error():
+            return Error(realized.error)
+        for path, value in realized.ok:
+            done = set_in(doc, ("artifacts", name, *path), value)
             if done.is_error():
                 return Error(run.fail(Step.HASH, done.error))
         written = _write_object(run, pin_path(pin.name), doc)
@@ -323,7 +332,7 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
                 done = _realize_deps_hash(run, pin.name, doc, name, deps)
                 if done.is_error():
                     return Error(done.error)
-            case PlatformBinaries():
+            case PlatformBinaries() | FileValue() | RuntimeFetch():
                 pass
     for companion in pin.companions:
         match companion.kind:
@@ -370,10 +379,27 @@ def _resolve_rev(run: _Run, pin: Pin, plan: Plan) -> Result[str | None, RealizeE
             return Error(run.fail(Step.REV, "rev needs a githubRelease or gitCommit source"))
 
 
-type _Hashes = list[tuple[tuple[str, ...], str]]
+type _Writes = list[tuple[tuple[str, ...], str]]
 
 
-def _hash_artifact(run: _Run, name: str, artifact: PlatformBinaries | SourceBuild, plan: Plan) -> Result[_Hashes, RealizeError]:
+def _plan_kind(planned: PlanArtifact) -> str:
+    match planned:
+        case PlanPlatformBinaries():
+            return "platformBinaries"
+        case PlanFetchFromGitHub():
+            return "sourceBuild"
+        case PlanFileValue():
+            return "fileValue"
+        case PlanRuntimeFetch():
+            return "runtimeFetch"
+
+
+def _mismatch(run: _Run, name: str, planned: PlanArtifact, pinned: str) -> RealizeError:
+    return run.fail(Step.HASH, f"{name}: the plan has {_plan_kind(planned)} where the pin has {pinned}")
+
+
+def _realize_artifact(run: _Run, name: str, artifact: Artifact, plan: Plan) -> Result[_Writes, RealizeError]:
+    """The values to write under the pin's `artifacts.<name>` for the planned version."""
     planned = plan.artifacts[name]
     match artifact:
         case PlatformBinaries(platforms=platforms):
@@ -383,15 +409,15 @@ def _hash_artifact(run: _Run, name: str, artifact: PlatformBinaries | SourceBuil
                         return Error(
                             run.fail(Step.HASH, f"{name}: plan systems {sorted(planned_platforms)} differ from pin systems {sorted(platforms)}")
                         )
-                    hashes: _Hashes = []
+                    hashes: _Writes = []
                     for system in sorted(planned_platforms):
                         sri = _hash_platform(run, f"{name}.{system}", planned_platforms[system])
                         if sri.is_error():
                             return Error(sri.error)
                         hashes.append((("platformBinaries", "hashes", system), sri.ok))
                     return Ok(hashes)
-                case PlanFetchFromGitHub():
-                    return Error(run.fail(Step.HASH, f"{name}: the plan has a sourceBuild where the pin has platformBinaries"))
+                case _:
+                    return Error(_mismatch(run, name, planned, "platformBinaries"))
         case SourceBuild():
             match planned:
                 case PlanFetchFromGitHub():
@@ -402,8 +428,61 @@ def _hash_artifact(run: _Run, name: str, artifact: PlatformBinaries | SourceBuil
                     if got.is_error():
                         return Error(got.error)
                     return Ok([(("sourceBuild", "hash"), got.ok)])
-                case PlanPlatformBinaries():
-                    return Error(run.fail(Step.HASH, f"{name}: the plan has platformBinaries where the pin has a sourceBuild"))
+                case _:
+                    return Error(_mismatch(run, name, planned, "sourceBuild"))
+        case FileValue():
+            match planned:
+                case PlanFileValue(url=url, regex=regex):
+                    value = _file_value(run, name, url, regex)
+                    if value.is_error():
+                        return Error(value.error)
+                    return Ok([(("fileValue", "value"), value.ok)])
+                case _:
+                    return Error(_mismatch(run, name, planned, "fileValue"))
+        case RuntimeFetch():
+            match planned:
+                case PlanRuntimeFetch(probe_url=url):
+                    probed = _probe(run, name, url)
+                    if probed.is_error():
+                        return Error(probed.error)
+                    return Ok([])
+                case _:
+                    return Error(_mismatch(run, name, planned, "runtimeFetch"))
+
+
+def _file_value(run: _Run, name: str, url: str, regex: str) -> Result[str, RealizeError]:
+    """The one group `regex` captures from the whole body at `url`."""
+    pattern = file_value_pattern(regex, f"{name}.fileValue.regex")
+    if pattern.is_error():
+        return Error(run.fail(Step.FILE_VALUE, pattern.error))
+    t = run.timeout(Step.FILE_VALUE)
+    if t.is_error():
+        return Error(t.error)
+    body = run.http.request("GET", url, t.ok)
+    if body.is_error():
+        return Error(run.fail(Step.FILE_VALUE, f"{name}: {body.error}"))
+    try:
+        text = body.ok.decode("utf-8")
+    except UnicodeDecodeError as e:
+        return Error(run.fail(Step.FILE_VALUE, f"{name}: {url} is not UTF-8: {e}"))
+    matched = pattern.ok.fullmatch(text)
+    if matched is None:
+        return Error(run.fail(Step.FILE_VALUE, f"{name}: the body of {url} does not match {regex!r}: {text[:80]!r}"))
+    value = matched.group(1)
+    if not value:
+        return Error(run.fail(Step.FILE_VALUE, f"{name}: {regex!r} captured an empty value from {url}"))
+    return Ok(value)
+
+
+def _probe(run: _Run, name: str, url: str) -> Result[None, RealizeError]:
+    """A runtime-fetched artifact has no hash; the version exists when its probe URL answers."""
+    t = run.timeout(Step.PROBE)
+    if t.is_error():
+        return Error(t.error)
+    body = run.http.request("GET", url, t.ok)
+    if body.is_error():
+        return Error(run.fail(Step.PROBE, f"{name}: {run.version} not found: {body.error}"))
+    return Ok(None)
 
 
 def _hash_platform(run: _Run, where: str, platform: PlanPlatform) -> Result[str, RealizeError]:

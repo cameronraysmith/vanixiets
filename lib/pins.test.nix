@@ -134,6 +134,50 @@ let
     ];
   };
 
+  greptimedb = {
+    name = "greptimedb-bin";
+    version = "1.2.1";
+    source.githubRelease = {
+      owner = "GreptimeTeam";
+      repo = "greptimedb";
+      tagTemplate = "v{version}";
+    };
+    artifacts = {
+      binaries.platformBinaries = {
+        urlTemplate = "https://github.com/GreptimeTeam/greptimedb/releases/download/{tag}/greptime-{platform}-{tag}.tar.gz";
+        platforms.x86_64-linux = "linux-amd64";
+        checksum.upstreamFile = {
+          urlTemplate = "https://github.com/GreptimeTeam/greptimedb/releases/download/{tag}/greptime-{platform}-{tag}.sha256sum";
+          format.sha256sum = { };
+        };
+        hashes.x86_64-linux = "sha256-Bi1b6xPeSZHE/sIBsuUHFRi/TKjw1SlH66dXp0wqVCA=";
+      };
+      dashboard.fileValue = {
+        urlTemplate = "https://raw.githubusercontent.com/GreptimeTeam/greptimedb/{tag}/src/servers/dashboard/VERSION";
+        regex = "v?([0-9]+\\.[0-9]+\\.[0-9]+)\\s*";
+        value = "0.13.13";
+      };
+    };
+  };
+
+  withDashboard =
+    fields:
+    greptimedb
+    // {
+      artifacts = greptimedb.artifacts // {
+        dashboard.fileValue = fields;
+      };
+    };
+
+  ouroboros = {
+    name = "ouroboros";
+    version = "0.55.3";
+    source.pypi.package = "ouroboros-ai";
+    artifacts.cli.runtimeFetch.probeUrlTemplate = "https://pypi.org/pypi/ouroboros-ai/{version}/json";
+  };
+
+  withProbe = runtimeFetch: ouroboros // { artifacts.cli.runtimeFetch = runtimeFetch; };
+
   withCompanion =
     companion:
     mergify
@@ -324,6 +368,101 @@ in
   testApmRefWithoutRevFails = {
     expr = (load "no-rev" "mergify-cli-bin" (removeAttrs mergify [ "rev" ])).pin;
     expectedError = fails "pin of package mergify-cli-bin\\) is malformed:${any}rev: required by an apmRef companion or a gitCommit source, and absent";
+  };
+
+  testValidFileValuePinParsesToItself = {
+    expr = (load "fileValue" "greptimedb-bin" greptimedb).pin;
+    expected = greptimedb // {
+      rev = null;
+      companions = [ ];
+    };
+  };
+
+  testPlanExpandsAFileValueAtTheTag = {
+    expr = ((load "fileValue" "greptimedb-bin" greptimedb).pinPlan "1.3.1").artifacts.dashboard;
+    expected.fileValue = {
+      url = "https://raw.githubusercontent.com/GreptimeTeam/greptimedb/v1.3.1/src/servers/dashboard/VERSION";
+      inherit (greptimedb.artifacts.dashboard.fileValue) regex;
+    };
+  };
+
+  testFileValueWithEmptyValueFails = {
+    expr =
+      (load "empty-value" "greptimedb-bin" (
+        withDashboard (greptimedb.artifacts.dashboard.fileValue // { value = ""; })
+      )).pin;
+    expectedError = fails "artifacts\\.dashboard\\.fileValue\\.value' is not of type `non-empty string'";
+  };
+
+  testFileValueWithoutRegexFails = {
+    expr =
+      (load "no-regex" "greptimedb-bin" (
+        withDashboard (removeAttrs greptimedb.artifacts.dashboard.fileValue [ "regex" ])
+      )).pin;
+    expectedError = fails "artifacts\\.dashboard\\.fileValue\\.regex' was accessed but has no value defined";
+  };
+
+  testPlanRejectsPlatformInAFileValue = {
+    expr =
+      (
+        (load "fileValue-platform" "greptimedb-bin" (
+          withDashboard (
+            greptimedb.artifacts.dashboard.fileValue
+            // {
+              urlTemplate = "https://raw.githubusercontent.com/GreptimeTeam/greptimedb/{tag}/{platform}/VERSION";
+            }
+          )
+        )).pinPlan
+          "1.2.1"
+      ).artifacts.dashboard.fileValue.url;
+    expectedError = fails "pinPlan of greptimedb-bin: template https://raw\\.githubusercontent\\.com/GreptimeTeam/greptimedb/\\{tag\\}/\\{platform\\}/VERSION uses a variable other than";
+  };
+
+  testValidRuntimeFetchPinParsesToItself = {
+    expr = (load "runtimeFetch" "ouroboros" ouroboros).pin;
+    expected = ouroboros // {
+      rev = null;
+      companions = [ ];
+    };
+  };
+
+  testPlanExpandsARuntimeFetchProbe = {
+    expr = (load "runtimeFetch" "ouroboros" ouroboros).pinPlan "0.65.7";
+    expected = {
+      version = "0.65.7";
+      tag = null;
+      artifacts.cli.runtimeFetch.probeUrl = "https://pypi.org/pypi/ouroboros-ai/0.65.7/json";
+    };
+  };
+
+  testPlanRejectsTagInAPypiProbe = {
+    expr =
+      (
+        (load "probe-tag" "ouroboros" (withProbe {
+          probeUrlTemplate = "https://pypi.org/pypi/ouroboros-ai/{tag}/json";
+        })).pinPlan
+          "0.55.3"
+      ).artifacts.cli.runtimeFetch.probeUrl;
+    expectedError = fails "pinPlan of ouroboros: template https://pypi\\.org/pypi/ouroboros-ai/\\{tag\\}/json uses a variable other than \\{version\\}";
+  };
+
+  testRuntimeFetchWithAHashFails = {
+    expr =
+      (load "probe-hash" "ouroboros" (withProbe {
+        inherit (ouroboros.artifacts.cli.runtimeFetch) probeUrlTemplate;
+        hash = "sha256-Bi1b6xPeSZHE/sIBsuUHFRi/TKjw1SlH66dXp0wqVCA=";
+      })).pin;
+    expectedError = fails "artifacts\\.cli\\.runtimeFetch\\.hash' does not exist";
+  };
+
+  testRuntimeFetchWithoutProbeFails = {
+    expr = (load "no-probe" "ouroboros" (withProbe { })).pin;
+    expectedError = fails "artifacts\\.cli\\.runtimeFetch\\.probeUrlTemplate' was accessed but has no value defined";
+  };
+
+  testEmptyArtifactsFail = {
+    expr = (load "no-artifacts" "ouroboros" (ouroboros // { artifacts = { }; })).pin;
+    expectedError = fails "pin of package ouroboros\\) is malformed:${any}artifacts: holds no artifact entry";
   };
 
   testEveryFixedOutputAttributeResolves = {

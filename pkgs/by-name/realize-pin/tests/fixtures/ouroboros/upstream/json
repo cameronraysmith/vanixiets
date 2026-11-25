@@ -1,0 +1,20 @@
+{
+  "info": {
+    "name": "ouroboros-ai",
+    "version": "0.55.3"
+  },
+  "urls": [
+    {
+      "filename": "ouroboros_ai-0.55.3-py3-none-any.whl",
+      "digests": {
+        "sha256": "b645e10b7873e32476bd5ce2f298f198c4241afe16a77cb5615983f42434a469"
+      }
+    },
+    {
+      "filename": "ouroboros_ai-0.55.3.tar.gz",
+      "digests": {
+        "sha256": "df633bbee60a5715baef6086cde43249c675464286a3a81b6f1ae84dbfdbf32b"
+      }
+    }
+  ]
+}

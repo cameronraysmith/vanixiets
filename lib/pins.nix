@@ -84,6 +84,12 @@ let
               none = { };
             });
           };
+          fileValue = {
+            urlTemplate = option str;
+            regex = option str;
+            value = option str;
+          };
+          runtimeFetch.probeUrlTemplate = option str;
         })
       );
       rev = mkOption {
@@ -158,6 +164,8 @@ let
                 extra != [ ]
               ) "${at}.hashes: hash for undeclared platform ${lib.concatStringsSep ", " extra}";
             sourceBuild = _: [ ];
+            fileValue = _: [ ];
+            runtimeFetch = _: [ ];
           }
         ) pin.artifacts
       );
@@ -280,6 +288,15 @@ let
         match entry {
           platformBinaries = pb: { platformBinaries = platformBinaries pb; };
           sourceBuild = sb: { sourceBuild = sourceBuild sb; };
+          fileValue = fv: {
+            fileValue = {
+              url = expand context releaseVars fv.urlTemplate;
+              inherit (fv) regex;
+            };
+          };
+          runtimeFetch = rf: {
+            runtimeFetch.probeUrl = expand context releaseVars rf.probeUrlTemplate;
+          };
         }
       ) pin.artifacts;
     };

@@ -1,0 +1,29 @@
+{
+  "version": "1.2.1",
+  "tag": "v1.2.1",
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "x86_64-linux": {
+          "url": "https://github.com/GreptimeTeam/greptimedb/releases/download/v1.2.1/greptime-linux-amd64-v1.2.1.tar.gz",
+          "checksum": {
+            "upstreamFile": {
+              "url": "https://github.com/GreptimeTeam/greptimedb/releases/download/v1.2.1/greptime-linux-amd64-v1.2.1.sha256sum",
+              "format": {
+                "sha256sum": {
+                  "asset": "greptime-linux-amd64-v1.2.1.tar.gz"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dashboard": {
+      "fileValue": {
+        "url": "https://raw.githubusercontent.com/GreptimeTeam/greptimedb/v1.2.1/src/servers/dashboard/VERSION",
+        "regex": "v?([0-9]+\\.[0-9]+\\.[0-9]+)\\s*"
+      }
+    }
+  }
+}

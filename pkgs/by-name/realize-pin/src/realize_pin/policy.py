@@ -16,7 +16,9 @@ from realize_pin.model import (
     Npm,
     Plan,
     PlanFetchFromGitHub,
+    PlanFileValue,
     PlanPlatformBinaries,
+    PlanRuntimeFetch,
     PlanUpstreamFile,
     Prefetch,
     Pin,
@@ -79,6 +81,10 @@ def plan_urls(plan: Plan) -> tuple[str, ...]:
                             pass
             case PlanFetchFromGitHub():
                 pass
+            case PlanFileValue(url=url):
+                urls.append(url)
+            case PlanRuntimeFetch(probe_url=url):
+                urls.append(url)
     return tuple(urls)
 
 

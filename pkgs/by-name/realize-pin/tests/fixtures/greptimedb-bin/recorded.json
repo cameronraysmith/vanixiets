@@ -1,0 +1,4 @@
+{
+  "https://github.com/GreptimeTeam/greptimedb/releases/download/v1.2.1/greptime-linux-amd64-v1.2.1.sha256sum": "greptime-linux-amd64-v1.2.1.sha256sum",
+  "https://raw.githubusercontent.com/GreptimeTeam/greptimedb/v1.2.1/src/servers/dashboard/VERSION": "VERSION"
+}

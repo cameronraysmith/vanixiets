@@ -150,3 +150,17 @@ def test_rejects_arguments(args: list[str], capsys: pytest.CaptureFixture[str]) 
         _ = main(args)
     assert exited.value.code == 2
     assert "realize-pin <package> <version>" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("regex", "fault"),
+    [("v?[0-9.]+", "captures 0 groups"), ("(v)?([0-9.]+)", "captures 2 groups"), ("v?([0-9.]+", "is not a regular expression")],
+)
+def test_file_value_regex_captures_exactly_one_group(regex: str, fault: str) -> None:
+    doc: Json = json.loads((FIXTURES / "greptimedb-bin" / "pin.json").read_text())
+    assert isinstance(doc, dict)
+    text = json.dumps(doc).replace(json.dumps("v?([0-9]+\\.[0-9]+\\.[0-9]+)\\s*"), json.dumps(regex))
+    parsed = parse_pin(json.loads(text))
+    assert parsed.is_error()
+    assert "pin.artifacts.dashboard.fileValue.regex" in parsed.error
+    assert fault in parsed.error
