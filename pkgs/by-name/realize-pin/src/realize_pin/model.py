@@ -167,7 +167,16 @@ class RuntimeFetch:
     probe_url_template: str
 
 
-type Artifact = PlatformBinaries | SourceBuild | FileValue | RuntimeFetch
+@dataclass(frozen=True)
+class File:
+    """One release asset that is the same on every platform, with one hash."""
+
+    url_template: str
+    checksum: Checksum
+    hash: str
+
+
+type Artifact = PlatformBinaries | SourceBuild | FileValue | RuntimeFetch | File
 
 
 # companions
@@ -230,14 +239,16 @@ type PlanChecksum = PlanUpstreamFile | Prefetch
 
 
 @dataclass(frozen=True)
-class PlanPlatform:
+class PlanAsset:
+    """One planned download: a platform's binary, or a `file` artifact."""
+
     url: str
     checksum: PlanChecksum
 
 
 @dataclass(frozen=True)
 class PlanPlatformBinaries:
-    platforms: Mapping[str, PlanPlatform]
+    platforms: Mapping[str, PlanAsset]
 
 
 @dataclass(frozen=True)
@@ -258,7 +269,12 @@ class PlanRuntimeFetch:
     probe_url: str
 
 
-type PlanArtifact = PlanPlatformBinaries | PlanFetchFromGitHub | PlanFileValue | PlanRuntimeFetch
+@dataclass(frozen=True)
+class PlanFile:
+    asset: PlanAsset
+
+
+type PlanArtifact = PlanPlatformBinaries | PlanFetchFromGitHub | PlanFileValue | PlanRuntimeFetch | PlanFile
 
 
 @dataclass(frozen=True)
@@ -387,7 +403,7 @@ def file_value_pattern(regex: str, where: str) -> Result[re.Pattern[str], str]:
 
 
 def parse_artifact(value: Json, where: str) -> Result[Artifact, str]:
-    split = _tag(value, where, ("platformBinaries", "sourceBuild", "fileValue", "runtimeFetch"))
+    split = _tag(value, where, ("platformBinaries", "sourceBuild", "fileValue", "runtimeFetch", "file"))
     if split.is_error():
         return Error(split.error)
     tag, f = split.ok
@@ -408,6 +424,16 @@ def parse_artifact(value: Json, where: str) -> Result[Artifact, str]:
         if probe.is_error():
             return Error(probe.error)
         return Ok(RuntimeFetch(probe.ok))
+    if tag == "file":
+        url = _str(f, "urlTemplate", w)
+        h = _str(f, "hash", w)
+        for r in (url, h):
+            if r.is_error():
+                return Error(r.error)
+        checksum = parse_checksum(f.get("checksum"), f"{w}.checksum")
+        if checksum.is_error():
+            return Error(checksum.error)
+        return Ok(File(url.ok, checksum.ok, h.ok))
     if tag == "platformBinaries":
         url = _str(f, "urlTemplate", w)
         platforms = _str_map(f, "platforms", w)
@@ -537,8 +563,21 @@ def parse_plan_checksum(value: Json, where: str) -> Result[PlanChecksum, str]:
     return Ok(PlanUpstreamFile(url.ok, PlanJsonPointer(pointer.ok)))
 
 
+def _parse_plan_asset(value: Json, where: str) -> Result[PlanAsset, str]:
+    entry = _obj(value, where)
+    if entry.is_error():
+        return Error(entry.error)
+    url = _str(entry.ok, "url", where)
+    if url.is_error():
+        return Error(url.error)
+    checksum = parse_plan_checksum(entry.ok.get("checksum"), f"{where}.checksum")
+    if checksum.is_error():
+        return Error(checksum.error)
+    return Ok(PlanAsset(url.ok, checksum.ok))
+
+
 def parse_plan_artifact(value: Json, where: str) -> Result[PlanArtifact, str]:
-    split = _tag(value, where, ("platformBinaries", "sourceBuild", "fileValue", "runtimeFetch"))
+    split = _tag(value, where, ("platformBinaries", "sourceBuild", "fileValue", "runtimeFetch", "file"))
     if split.is_error():
         return Error(split.error)
     tag, f = split.ok
@@ -558,19 +597,18 @@ def parse_plan_artifact(value: Json, where: str) -> Result[PlanArtifact, str]:
         if probe.is_error():
             return Error(probe.error)
         return Ok(PlanRuntimeFetch(probe.ok))
+    if tag == "file":
+        asset = _parse_plan_asset(f, w)
+        if asset.is_error():
+            return Error(asset.error)
+        return Ok(PlanFile(asset.ok))
     if tag == "platformBinaries":
-        platforms: dict[str, PlanPlatform] = {}
+        platforms: dict[str, PlanAsset] = {}
         for system, raw in f.items():
-            entry = _obj(raw, f"{w}.{system}")
-            if entry.is_error():
-                return Error(entry.error)
-            url = _str(entry.ok, "url", f"{w}.{system}")
-            if url.is_error():
-                return Error(url.error)
-            checksum = parse_plan_checksum(entry.ok.get("checksum"), f"{w}.{system}.checksum")
-            if checksum.is_error():
-                return Error(checksum.error)
-            platforms[system] = PlanPlatform(url.ok, checksum.ok)
+            asset = _parse_plan_asset(raw, f"{w}.{system}")
+            if asset.is_error():
+                return Error(asset.error)
+            platforms[system] = asset.ok
         return Ok(PlanPlatformBinaries(platforms))
     fetcher = _tag(f, w, ("fetchFromGitHub",))
     if fetcher.is_error():

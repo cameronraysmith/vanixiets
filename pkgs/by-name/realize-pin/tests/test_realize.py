@@ -465,3 +465,95 @@ def test_plan_of_another_artifact_kind_is_refused(tmp_path: Path) -> None:
     assert result.error.step == Step.HASH
     assert "dashboard: the plan has runtimeFetch where the pin has fileValue" in result.error.message
     assert s.tree() == before
+
+
+FILE_URL = "https://github.com/caffeinelabs/mops/releases/download/cli-v3.9.0/cli.tgz"
+FILE_SUMS = FILE_URL + ".sha256"
+EMPTY_HEX = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+EMPTY_SRI = "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+
+
+def _file_scenario(
+    root: Path,
+    checksum: dict[str, Json],
+    planned_checksum: dict[str, Json],
+    bodies: dict[str, bytes] | None = None,
+    prefetches: dict[str, str] | None = None,
+) -> Scenario:
+    """mops-bin's pin at an older version, with its single `file` artifact checked by `checksum`."""
+    pin: dict[str, Json] = {
+        "name": "mops-bin",
+        "version": "0.0.1",
+        "source": {"githubRelease": {"owner": "caffeinelabs", "repo": "mops", "tagTemplate": "cli-v{version}"}},
+        "artifacts": {
+            "cli": {
+                "file": {
+                    "urlTemplate": "https://github.com/caffeinelabs/mops/releases/download/{tag}/cli.tgz",
+                    "checksum": checksum,
+                    "hash": STALE_SRI,
+                }
+            }
+        },
+        "companions": [],
+    }
+    plan: dict[str, Json] = {
+        "version": "3.9.0",
+        "tag": "cli-v3.9.0",
+        "artifacts": {"cli": {"file": {"url": FILE_URL, "checksum": planned_checksum}}},
+    }
+    files = {pin_path("mops-bin"): (json.dumps(pin, indent=2) + "\n").encode()}
+    for path, data in files.items():
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        _ = (root / path).write_bytes(data)
+    return Scenario(
+        root=root,
+        package="mops-bin",
+        version="3.9.0",
+        http=FakeHttp(bodies or {}),
+        nix=FakeNix(root, {"3.9.0": plan}, prefetches or {}),
+        hasher=FakeHasher({}),
+        git=FakeGit(root, files),
+        clock=Clock(),
+    )
+
+
+def _sums_scenario(root: Path, sums: bytes) -> Scenario:
+    return _file_scenario(
+        root,
+        {"upstreamFile": {"urlTemplate": "{url}.sha256", "format": {"sha256sum": {}}}},
+        {"upstreamFile": {"url": FILE_SUMS, "format": {"sha256sum": {"asset": "cli.tgz"}}}},
+        bodies={FILE_SUMS: sums},
+    )
+
+
+def test_file_hash_from_a_prefetch(tmp_path: Path) -> None:
+    s = _file_scenario(tmp_path, {"prefetch": {}}, {"prefetch": {}}, prefetches={FILE_URL: EMPTY_SRI})
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    assert result.ok.changed == (pin_path("mops-bin"),)
+    doc = json.loads((tmp_path / pin_path("mops-bin")).read_text())
+    assert doc["version"] == "3.9.0"
+    assert doc["artifacts"]["cli"]["file"]["hash"] == EMPTY_SRI
+    assert doc["artifacts"]["cli"]["file"]["checksum"] == {"prefetch": {}}
+    assert s.http.requests == []
+
+
+def test_file_hash_from_a_checksum_file(tmp_path: Path) -> None:
+    s = _sums_scenario(tmp_path, f"{EMPTY_HEX}  cli.tgz\n".encode())
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    doc = json.loads((tmp_path / pin_path("mops-bin")).read_text())
+    assert doc["version"] == "3.9.0"
+    assert doc["artifacts"]["cli"]["file"]["hash"] == EMPTY_SRI
+    assert s.http.requests == [("GET", FILE_SUMS)]
+
+
+def test_file_checksum_without_its_line_restores_the_pin(tmp_path: Path) -> None:
+    s = _sums_scenario(tmp_path, f"{EMPTY_HEX}  cli-arm64.tgz\n".encode())
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.HASH
+    assert "cli: " in result.error.message
+    assert "no line for cli.tgz" in result.error.message
+    assert s.tree() == before

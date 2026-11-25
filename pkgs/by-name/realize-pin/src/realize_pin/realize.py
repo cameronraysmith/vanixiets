@@ -33,6 +33,7 @@ from realize_pin.model import (
     CargoDepsHash,
     Companion,
     DepsHash,
+    File,
     FileValue,
     FixedOutputHash,
     GitCommit,
@@ -45,9 +46,10 @@ from realize_pin.model import (
     Pin,
     Plan,
     PlanArtifact,
+    PlanAsset,
     PlanFetchFromGitHub,
+    PlanFile,
     PlanFileValue,
-    PlanPlatform,
     PlanPlatformBinaries,
     PlanRuntimeFetch,
     PlanUpstreamFile,
@@ -332,7 +334,7 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
                 done = _realize_deps_hash(run, pin.name, doc, name, deps)
                 if done.is_error():
                     return Error(done.error)
-            case PlatformBinaries() | FileValue() | RuntimeFetch():
+            case PlatformBinaries() | FileValue() | RuntimeFetch() | File():
                 pass
     for companion in pin.companions:
         match companion.kind:
@@ -392,6 +394,8 @@ def _plan_kind(planned: PlanArtifact) -> str:
             return "fileValue"
         case PlanRuntimeFetch():
             return "runtimeFetch"
+        case PlanFile():
+            return "file"
 
 
 def _mismatch(run: _Run, name: str, planned: PlanArtifact, pinned: str) -> RealizeError:
@@ -411,7 +415,7 @@ def _realize_artifact(run: _Run, name: str, artifact: Artifact, plan: Plan) -> R
                         )
                     hashes: _Writes = []
                     for system in sorted(planned_platforms):
-                        sri = _hash_platform(run, f"{name}.{system}", planned_platforms[system])
+                        sri = _hash_asset(run, f"{name}.{system}", planned_platforms[system])
                         if sri.is_error():
                             return Error(sri.error)
                         hashes.append((("platformBinaries", "hashes", system), sri.ok))
@@ -448,6 +452,15 @@ def _realize_artifact(run: _Run, name: str, artifact: Artifact, plan: Plan) -> R
                     return Ok([])
                 case _:
                     return Error(_mismatch(run, name, planned, "runtimeFetch"))
+        case File():
+            match planned:
+                case PlanFile(asset=asset):
+                    sri = _hash_asset(run, name, asset)
+                    if sri.is_error():
+                        return Error(sri.error)
+                    return Ok([(("file", "hash"), sri.ok)])
+                case _:
+                    return Error(_mismatch(run, name, planned, "file"))
 
 
 def _file_value(run: _Run, name: str, url: str, regex: str) -> Result[str, RealizeError]:
@@ -485,8 +498,8 @@ def _probe(run: _Run, name: str, url: str) -> Result[None, RealizeError]:
     return Ok(None)
 
 
-def _hash_platform(run: _Run, where: str, platform: PlanPlatform) -> Result[str, RealizeError]:
-    match platform.checksum:
+def _hash_asset(run: _Run, where: str, asset: PlanAsset) -> Result[str, RealizeError]:
+    match asset.checksum:
         case PlanUpstreamFile(url=url, format=fmt):
             t = run.timeout(Step.HASH)
             if t.is_error():
@@ -502,7 +515,7 @@ def _hash_platform(run: _Run, where: str, platform: PlanPlatform) -> Result[str,
                 return Error(run.fail(Step.HASH, f"{where}: {url}: {sri.error}"))
             return Ok(sri.ok)
         case Prefetch():
-            return _prefetch(run, where, platform.url)
+            return _prefetch(run, where, asset.url)
 
 
 def _prefetch(run: _Run, where: str, url: str) -> Result[str, RealizeError]:

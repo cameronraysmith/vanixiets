@@ -15,7 +15,9 @@ from realize_pin.model import (
     GithubRelease,
     Npm,
     Plan,
+    PlanAsset,
     PlanFetchFromGitHub,
+    PlanFile,
     PlanFileValue,
     PlanPlatformBinaries,
     PlanRuntimeFetch,
@@ -67,18 +69,23 @@ def source_url(source: Source) -> str:
             return url
 
 
+def _asset_urls(asset: PlanAsset) -> tuple[str, ...]:
+    match asset.checksum:
+        case PlanUpstreamFile(url=url):
+            return (asset.url, url)
+        case Prefetch():
+            return (asset.url,)
+
+
 def plan_urls(plan: Plan) -> tuple[str, ...]:
     urls: list[str] = []
     for artifact in plan.artifacts.values():
         match artifact:
             case PlanPlatformBinaries(platforms=platforms):
                 for platform in platforms.values():
-                    urls.append(platform.url)
-                    match platform.checksum:
-                        case PlanUpstreamFile(url=url):
-                            urls.append(url)
-                        case Prefetch():
-                            pass
+                    urls.extend(_asset_urls(platform))
+            case PlanFile(asset=asset):
+                urls.extend(_asset_urls(asset))
             case PlanFetchFromGitHub():
                 pass
             case PlanFileValue(url=url):

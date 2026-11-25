@@ -184,6 +184,23 @@ let
     // {
       companions = [ companion ];
     };
+
+  mops = {
+    name = "mops-bin";
+    version = "3.8.0";
+    source.githubRelease = {
+      owner = "caffeinelabs";
+      repo = "mops";
+      tagTemplate = "cli-v{version}";
+    };
+    artifacts.cli.file = {
+      urlTemplate = "https://github.com/caffeinelabs/mops/releases/download/{tag}/cli.tgz";
+      checksum.prefetch = { };
+      hash = "sha256-mHVzKVCzp8USfKW4cf3xPKySpScpHNDDxusACONfZuI=";
+    };
+  };
+
+  withFile = fields: mops // { artifacts.cli.file = fields; };
 in
 {
   testValidPinParsesToItself = {
@@ -458,6 +475,91 @@ in
   testRuntimeFetchWithoutProbeFails = {
     expr = (load "no-probe" "ouroboros" (withProbe { })).pin;
     expectedError = fails "artifacts\\.cli\\.runtimeFetch\\.probeUrlTemplate' was accessed but has no value defined";
+  };
+
+  testValidFilePinParsesToItself = {
+    expr = (load "file" "mops-bin" mops).pin;
+    expected = mops // {
+      rev = null;
+      companions = [ ];
+    };
+  };
+
+  testPlanExpandsAFileAtTheTag = {
+    expr = (load "file" "mops-bin" mops).pinPlan "3.9.0";
+    expected = {
+      version = "3.9.0";
+      tag = "cli-v3.9.0";
+      artifacts.cli.file = {
+        url = "https://github.com/caffeinelabs/mops/releases/download/cli-v3.9.0/cli.tgz";
+        checksum.prefetch = { };
+      };
+    };
+  };
+
+  testPlanExpandsAFileChecksumFile = {
+    expr =
+      (
+        (load "file-upstream" "mops-bin" (
+          withFile (
+            mops.artifacts.cli.file
+            // {
+              checksum.upstreamFile = {
+                urlTemplate = "{url}.sha256";
+                format.sha256sum = { };
+              };
+            }
+          )
+        )).pinPlan
+          "3.9.0"
+      ).artifacts.cli.file.checksum;
+    expected.upstreamFile = {
+      url = "https://github.com/caffeinelabs/mops/releases/download/cli-v3.9.0/cli.tgz.sha256";
+      format.sha256sum.asset = "cli.tgz";
+    };
+  };
+
+  testFileWithoutHashFails = {
+    expr =
+      (load "file-no-hash" "mops-bin" (withFile (removeAttrs mops.artifacts.cli.file [ "hash" ]))).pin;
+    expectedError = fails "artifacts\\.cli\\.file\\.hash' was accessed but has no value defined";
+  };
+
+  testPlanRejectsPlatformInAFile = {
+    expr =
+      (
+        (load "file-platform" "mops-bin" (
+          withFile (
+            mops.artifacts.cli.file
+            // {
+              urlTemplate = "https://github.com/caffeinelabs/mops/releases/download/{tag}/cli-{platform}.tgz";
+            }
+          )
+        )).pinPlan
+          "3.8.0"
+      ).artifacts.cli.file.url;
+    expectedError = fails "pinPlan of mops-bin: template https://github\\.com/caffeinelabs/mops/releases/download/\\{tag\\}/cli-\\{platform\\}\\.tgz uses a variable other than";
+  };
+
+  testFileWithInvalidSriFails = {
+    expr =
+      (load "file-hex" "mops-bin" (
+        withFile (
+          mops.artifacts.cli.file
+          // {
+            hash = "sha256:9875732950b3a7c5147ca5b871fdf03cac92a527291cd0c3c6eb0008e35f66e2";
+          }
+        )
+      )).pin;
+    expectedError = fails "option `artifacts\\.cli\\.file\\.hash' is not of type `string matching the pattern";
+  };
+
+  testFileWithUnknownChecksumTagFails = {
+    expr =
+      (load "file-checksum-tag" "mops-bin" (
+        withFile (mops.artifacts.cli.file // { checksum.sha512sums = { }; })
+      )).pin;
+    expectedError = fails "option `artifacts\\.cli\\.file\\.checksum' is not of type `attribute-tagged union${any}pin of package mops-bin";
   };
 
   testEmptyArtifactsFail = {

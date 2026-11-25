@@ -33,6 +33,19 @@ let
     repo = option str;
   };
 
+  # How a release asset's hash is obtained, shared by `platformBinaries` and
+  # `file`.
+  checksum = union {
+    upstreamFile = {
+      urlTemplate = option str;
+      format = option (union {
+        sha256sum = { };
+        jsonPointer.pointerTemplate = option str;
+      });
+    };
+    prefetch = { };
+  };
+
   pinModule = {
     options = {
       name = option str;
@@ -60,16 +73,7 @@ let
           platformBinaries = {
             urlTemplate = option str;
             platforms = option (types.attrsOf str);
-            checksum = option (union {
-              upstreamFile = {
-                urlTemplate = option str;
-                format = option (union {
-                  sha256sum = { };
-                  jsonPointer.pointerTemplate = option str;
-                });
-              };
-              prefetch = { };
-            });
+            checksum = option checksum;
             hashes = option (types.attrsOf sri);
           };
           sourceBuild = {
@@ -90,6 +94,14 @@ let
             value = option str;
           };
           runtimeFetch.probeUrlTemplate = option str;
+          # One release asset that is the same on every platform, such as a
+          # JavaScript bundle or a source archive: its URL takes no
+          # `{platform}`, and it has one hash.
+          file = {
+            urlTemplate = option str;
+            checksum = option checksum;
+            hash = option sri;
+          };
         })
       );
       rev = mkOption {
@@ -166,6 +178,7 @@ let
             sourceBuild = _: [ ];
             fileValue = _: [ ];
             runtimeFetch = _: [ ];
+            file = _: [ ];
           }
         ) pin.artifacts
       );
@@ -239,31 +252,33 @@ let
       }
       // lib.optionalAttrs (tag != null) { inherit tag; };
 
+      # One asset's `{ url; checksum; }` plan, with `vars` naming the template
+      # variables its URL, checksum URL and pointer may use.
+      asset =
+        vars: urlTemplate: checksum:
+        let
+          url = expand context vars urlTemplate;
+        in
+        {
+          inherit url;
+          checksum = match checksum {
+            upstreamFile = file: {
+              upstreamFile = {
+                url = expand context (vars // { inherit url; }) file.urlTemplate;
+                format = match file.format {
+                  sha256sum = _: { sha256sum.asset = baseNameOf url; };
+                  jsonPointer = p: { jsonPointer.pointer = expand context vars p.pointerTemplate; };
+                };
+              };
+            };
+            prefetch = _: { prefetch = { }; };
+          };
+        };
+
       platformBinaries =
         pb:
         lib.mapAttrs (
-          _system: platform:
-          let
-            vars = releaseVars // {
-              inherit platform;
-            };
-            url = expand context vars pb.urlTemplate;
-          in
-          {
-            inherit url;
-            checksum = match pb.checksum {
-              upstreamFile = file: {
-                upstreamFile = {
-                  url = expand context (vars // { inherit url; }) file.urlTemplate;
-                  format = match file.format {
-                    sha256sum = _: { sha256sum.asset = baseNameOf url; };
-                    jsonPointer = p: { jsonPointer.pointer = expand context vars p.pointerTemplate; };
-                  };
-                };
-              };
-              prefetch = _: { prefetch = { }; };
-            };
-          }
+          _system: platform: asset (releaseVars // { inherit platform; }) pb.urlTemplate pb.checksum
         ) pb.platforms;
 
       sourceBuild =
@@ -297,6 +312,7 @@ let
           runtimeFetch = rf: {
             runtimeFetch.probeUrl = expand context releaseVars rf.probeUrlTemplate;
           };
+          file = f: { file = asset releaseVars f.urlTemplate f.checksum; };
         }
       ) pin.artifacts;
     };
