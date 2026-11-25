@@ -1,7 +1,7 @@
 {
   "name": "moshi-hook",
-  "version": "0.4.64",
-  "realizedVersion": "0.4.64",
+  "version": "0.4.65",
+  "realizedVersion": "0.4.65",
   "source": {
     "vendorText": {
       "url": "https://cdn.getmoshi.app/hook/latest/version.txt",
@@ -27,10 +27,10 @@
           }
         },
         "hashes": {
-          "x86_64-linux": "sha256-HX79VliLRu1i56BREK0usIxOJcvGMshziPbZnSFOBVs=",
-          "aarch64-linux": "sha256-0VTgTfQiC++1aggscGhQfmk6ytSwKguVdb7lJIxtawQ=",
-          "x86_64-darwin": "sha256-wKawN4b87r1SaQ9Krr2gZe6ySm1ZyMrH4GWiSp9F8Cs=",
-          "aarch64-darwin": "sha256-/jg2me4P+a1Zi8Mh6EMG8VA/RvVjLiIvjTHEsdFRhCg="
+          "x86_64-linux": "sha256-UIImjy0vzh0yr80ytHeLq0AvNQzjyr7QQyNy9Gp2NTQ=",
+          "aarch64-linux": "sha256-BfHP3IbE1J0xYj1VXZlBNuFSfU0S5YjlUI4NalHvBNg=",
+          "x86_64-darwin": "sha256-uiCUnd1ZI80VyPfcPAZ3+5DAc7YXVGaj7eDjluIpO40=",
+          "aarch64-darwin": "sha256-ER3lhTwXpY5DyBOvJ7vdKzyYx/g/mwCmM/LXFLO0y6w="
         }
       }
     }
