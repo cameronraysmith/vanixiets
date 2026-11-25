@@ -120,14 +120,14 @@ nix build .#checks.x86_64-linux.perses-lint -L
 
 ### Upgrading Perses
 
-`pkgs/by-name/perses-bin/sources.json` holds the Perses version, the release tarballs' hashes and the plugin versions that release pins.
-Rewrite all three from the latest upstream release with:
+`pkgs/by-name/perses-bin/pin.json` holds the Perses version and the release tarballs' hashes, checked against the release's `perses_<version>_checksums.txt`.
+Renovate proposes each new release and lists it on the dependency dashboard, where it waits for approval because Perses runs as a stateful service on magnetite; once approved, its post-upgrade task rewrites the pin for that version, which can also be run by hand:
 
 ```sh
-nix run .#update-perses-bin
+nix run .#realize-pin -- perses-bin <version>
 ```
 
-The app runs `pkgs/by-name/perses-bin/update.sh`, which exits non-zero with "a partial update" when the version and the hashes did not all change or all stay the same.
+The plugin archives come with the release tarball, and the curated set the server loads is selected from them by name when it builds, so a release that drops a curated plugin or ships two archives of one fails that build.
 Before merging an upgrade, build the package and the two checks:
 
 ```sh

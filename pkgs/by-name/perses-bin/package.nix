@@ -1,8 +1,8 @@
 # perses-bin - upstream Perses release binaries with the plugin archives the
-# release tag pins (scripts/plugin/plugin.yaml). nixpkgs carries 0.54.0, whose
-# advisories 0.55.0 fixes; 0.55.1 adds further security fixes. sources.json
-# holds the version, the release checksums file's hashes in SRI form and the
-# plugin pins; update.sh rewrites all three together.
+# release tarball ships in plugins-archive. nixpkgs carries 0.54.0, whose
+# advisories 0.55.0 fixes; 0.55.1 adds further security fixes. pin.json holds
+# the version and the release checksums file's hashes; realize-pin rewrites
+# them per version.
 #
 # Only x86_64-linux and aarch64-darwin are packaged. On other systems this file
 # yields null, as pkgs/by-name/greptimedb-bin does, so the package and its
@@ -18,23 +18,24 @@
   versionCheckHook,
 }:
 let
-  sources = lib.importJSON ./sources.json;
-  systemToAsset = {
-    "x86_64-linux" = "linux_amd64";
-    "aarch64-darwin" = "darwin_arm64";
-  };
   inherit (stdenv.hostPlatform) system;
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "perses-bin"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
-if !(systemToAsset ? ${system}) then
+if !(planned ? ${system}) then
   null
 else
   stdenv.mkDerivation (finalAttrs: {
     pname = "perses-bin";
-    inherit (sources) version;
+    inherit (pin) version;
 
     src = fetchurl {
-      url = "https://github.com/perses/perses/releases/download/v${finalAttrs.version}/perses_${finalAttrs.version}_${systemToAsset.${system}}.tar.gz";
-      hash = sources.hashes.${system};
+      inherit (planned.${system}) url;
+      hash = binaries.hashes.${system};
     };
 
     # The tarball has no top-level directory.
@@ -52,20 +53,16 @@ else
       runHook postInstall
     '';
 
-    # The tag's plugin.yaml and the tarball's plugins-archive are published
-    # independently; each pinned archive must be present and no other.
+    # plugins-archive holds one <Name>-<version>.tar.gz per plugin; the
+    # curated selection (modules/checks/perses-lint.nix) picks archives by
+    # name, so no name may appear twice.
     doInstallCheck = true;
     installCheckPhase = ''
       runHook preInstallCheck
-      expected=$(printf '%s\n' ${
-        lib.escapeShellArgs (lib.mapAttrsToList (n: v: "${n}-${v}.tar.gz") finalAttrs.passthru.plugins)
-      } | sort)
-      actual=$(ls $out/share/perses/plugins-archive | sort)
-      if [ "$expected" != "$actual" ]; then
-        echo "perses-bin: installed archives differ from passthru.plugins"
-        diff <(echo "$expected") <(echo "$actual")
-        exit 1
-      fi
+      names=$(ls $out/share/perses/plugins-archive | sed -n 's/^\(.*\)-[0-9][0-9.]*\.tar\.gz$/\1/p' | sort)
+      [ -n "$names" ] || { echo "perses-bin: plugins-archive holds no plugin archive"; exit 1; }
+      dups=$(uniq -d <<<"$names")
+      [ -z "$dups" ] || { echo "perses-bin: plugins-archive holds more than one archive of: $dups"; exit 1; }
       runHook postInstallCheck
     '';
     nativeInstallCheckInputs = [ versionCheckHook ];
@@ -73,11 +70,10 @@ else
     versionCheckProgramArg = "version";
 
     passthru = {
-      inherit (sources) plugins;
+      inherit pin pinPlan;
       # finalPackage, not placeholder "out": consumers outside this build need
       # the real store path.
       pluginsArchive = "${finalAttrs.finalPackage}/share/perses/plugins-archive";
-      updateScript = ./update.sh;
     };
 
     meta = {
@@ -86,7 +82,7 @@ else
       changelog = "https://github.com/perses/perses/releases/tag/v${finalAttrs.version}";
       license = lib.licenses.asl20;
       mainProgram = "perses";
-      platforms = lib.attrNames systemToAsset;
+      platforms = lib.attrNames planned;
       sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     };
   })

@@ -1,0 +1,35 @@
+{
+  "name": "perses-bin",
+  "version": "0.55.1",
+  "realizedVersion": "0.55.1",
+  "source": {
+    "githubRelease": {
+      "owner": "perses",
+      "repo": "perses",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/perses/perses/releases/download/{tag}/perses_{version}_{platform}.tar.gz",
+        "platforms": {
+          "x86_64-linux": "linux_amd64",
+          "aarch64-darwin": "darwin_arm64"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://github.com/perses/perses/releases/download/{tag}/perses_{version}_checksums.txt",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-fDis5c5mXiLX1PgjuLwMjpH5vO84HyGNjFZOD+Yrp1A=",
+          "aarch64-darwin": "sha256-+oQkxosNGszgeGneyJZ9EC3Z2Sb2p+jrrr1bopKpfc8="
+        }
+      }
+    }
+  }
+}

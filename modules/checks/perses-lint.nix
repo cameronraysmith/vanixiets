@@ -25,14 +25,22 @@
     "Table"
     "Markdown"
   ];
+  # Picks each curated plugin's archive from the release's plugins-archive at
+  # build time, failing when a name matches no archive or more than one, so
+  # the selection follows whatever versions the pinned release ships.
   flake.lib.persesCuratedArchives =
     pkgs: perses-bin:
-    pkgs.linkFarm "perses-plugins-curated" (
-      map (n: rec {
-        name = "${n}-${perses-bin.passthru.plugins.${n}}.tar.gz";
-        path = "${perses-bin.passthru.pluginsArchive}/${name}";
-      }) config.flake.lib.persesCuratedPlugins
-    );
+    pkgs.runCommand "perses-plugins-curated" { } ''
+      mkdir $out
+      for n in ${lib.escapeShellArgs config.flake.lib.persesCuratedPlugins}; do
+        matches=(${perses-bin.passthru.pluginsArchive}/"$n"-[0-9]*.tar.gz)
+        if [ ''${#matches[@]} -ne 1 ] || [ ! -e "''${matches[0]}" ]; then
+          echo "perses-plugins-curated: expected one archive of $n in ${perses-bin.passthru.pluginsArchive}, found: ''${matches[*]}"
+          exit 1
+        fi
+        ln -s "''${matches[0]}" $out/
+      done
+    '';
 
   perSystem =
     {
