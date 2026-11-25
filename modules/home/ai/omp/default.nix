@@ -231,8 +231,8 @@ let
             # splits without pretending the three agents share a role vocabulary.
             #
             # Opus 5.5 runs the session, planning and delegated work, and
-            # the OpenAI family reviews, so a review never shares a family with
-            # the session that produced the work. The Anthropic roles run at
+            # Gemini reviews, so a review never shares a family with the
+            # session that produced the work. The Anthropic roles run at
             # medium for the same reason they do in atomic and claude-code.
             modelRoles = {
               # The session model.
@@ -244,12 +244,11 @@ let
               task = lib.mkDefault "anthropic/claude-opus-5-5:medium";
               # The `reviewer` agent carries model "@slow"
               # (src/prompts/agents/reviewer.md), and advisor reuses the slow
-              # chain without inheriting the primary. Astra rather than Sol: the
-              # two tie on DeepSWE pass@1, but Astra takes the fewest steps of
-              # any catalog row and leads document reasoning, and atomic's
-              # builtins already review on it.
-              slow = lib.mkDefault "openai-codex/gpt-6-astra:high";
-              advisor = lib.mkDefault "openai-codex/gpt-6-astra:high";
+              # chain without inheriting the primary. Neon has the highest
+              # intelligence score of the Gemini 4 rows the Antigravity CLI
+              # offers, and agy opens it at high.
+              slow = lib.mkDefault "antigravity-cli/gemini-4-neon:high";
+              advisor = lib.mkDefault "antigravity-cli/gemini-4-neon:high";
               # smol drives both `scout` and `sonic`, one exploratory and one
               # strictly mechanical; scout is raised on its own through
               # task.agentModelOverrides below.
@@ -269,15 +268,16 @@ let
             };
 
             # State the next hop for the four roles this file pins. The session
-            # falls back across families to Astra rather than to another Opus, so
-            # a provider outage does not take the fallback with it; omp's
-            # priority.json chains predate Astra and still head the slow chain
-            # with Sol. smol steps up to Opus rather than down to omp's implicit
-            # Haiku, keeping sonic and the other smol consumers on Anthropic.
+            # falls back across families to Neon rather than to another Opus, so
+            # a provider outage does not take the fallback with it. slow and
+            # advisor fall back to Carbon, because omp drops a chain entry that
+            # resolves to the primary's model. smol steps up to Opus rather than
+            # down to omp's implicit Haiku, keeping sonic and the other smol
+            # consumers on Anthropic.
             retry.fallbackChains = {
-              default = lib.mkDefault [ "openai-codex/gpt-6-astra" ];
-              slow = lib.mkDefault [ "openai-codex/gpt-5.6-sol" ];
-              advisor = lib.mkDefault [ "openai-codex/gpt-5.6-sol" ];
+              default = lib.mkDefault [ "antigravity-cli/gemini-4-neon:high" ];
+              slow = lib.mkDefault [ "antigravity-cli/gemini-4-carbon:high" ];
+              advisor = lib.mkDefault [ "antigravity-cli/gemini-4-carbon:high" ];
               smol = lib.mkDefault [ "anthropic/claude-opus-5-5" ];
             };
 
