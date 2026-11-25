@@ -33,12 +33,23 @@ let
         # account's cache rather than in the project's .direnv, so `use flake`
         # also works in repositories this account can read but not write, such
         # as a host-shared ghq tree.
+        #
+        # nix-direnv 3.2.0 touches every flake-profile-* in the layout on a
+        # cached load, the profile's .rc among them, and every shell or agent
+        # in the project watches that .rc: each load makes all the others
+        # reload at their next prompt, and their loads do the same to it, so
+        # `direnv: loading` repeats with no file changed (nix-community/
+        # nix-direnv#786). Upstream removed the refresh after 3.2.0 (94e4fe0);
+        # direnvrc is sourced after nix-direnv, so this definition replaces it.
+        # Delete it with the release that carries 94e4fe0 (deploy-stock-nix
+        # fails then).
         stdlib = ''
           direnv_layout_dir() {
             local hash
             hash=$(printf '%s' "$PWD" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/cut -c1-32)
             printf '%s\n' "''${XDG_CACHE_HOME:-$HOME/.cache}/direnv/layouts/$hash-''${PWD##*/}"
           }
+          _nix_refresh_gcroots() { :; }
         '';
       };
 

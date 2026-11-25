@@ -15,13 +15,21 @@
 # the guard, and upstream's direnvrc, downloaded in its place, restores the
 # PATH lookup; a missing guard fails too. Compared in the build, with sort -V,
 # so a failure is this check's message rather than an evaluation error.
+# And a home's direnvrc, sourced after that nix-direnv as direnv does, must
+# leave the layout's watched flake-profile .rc alone on a cached load, or each
+# shell's load makes every other shell in the project reload; once
+# nix-direnv's use_flake stops refreshing gcroots, the direnvrc's override is
+# dead and the check says to delete it.
 # Mutants, seen failing: pkgs.nh in place of flake.lib.withFleetNix in
 # modules/darwin/app.nix; `{{nix_cmd}}` in k3d-up; nixDirenv without its patch;
-# .envrc requiring a newer nix-direnv; .envrc without its version guard.
+# .envrc requiring a newer nix-direnv; .envrc without its version guard; the
+# home direnvrc without its `_nix_refresh_gcroots`.
 # One system: the apps and the devShell are the same expression on every system.
 { config, ... }:
 let
   flakeLib = config.flake.lib;
+  homeDirenvrc =
+    config.flake.homeConfigurations."crs58@x86_64-linux".config.xdg.configFile."direnv/direnvrc".source;
 in
 {
   perSystem =
@@ -135,6 +143,31 @@ in
             failed=1
           else
             echo ".envrc: requires nix-direnv $required, packaged is $packaged"
+          fi
+          rcTime=$(cd "$TMPDIR" && XDG_CACHE_HOME=$TMPDIR/cache bash -c '
+            log_error() { echo "$*" >&2; }
+            log_status() { :; }
+            has() { command -v "$1" >/dev/null; }
+            watch_file() { :; }
+            PATH_add() { :; }
+            direnv=true NIX_DIRENV_SKIP_VERSION_CHECK=1
+            source "$1"
+            source "$2"
+            layout=$(direnv_layout_dir)
+            mkdir -p "$layout"
+            touch -d @0 "$layout/flake-profile-x.rc"
+            _nix_refresh_gcroots
+            stat -c %Y "$layout/flake-profile-x.rc"
+          ' nix-direnv ${nixDirenv}/share/nix-direnv/direnvrc ${homeDirenvrc})
+          if [ "$rcTime" != 0 ]; then
+            echo "direnvrc: a cached load touches the watched flake-profile .rc"
+            failed=1
+          else
+            echo "direnvrc: a cached load leaves the watched flake-profile .rc alone"
+          fi
+          if ! grep -qx '[[:space:]]*_nix_refresh_gcroots' ${nixDirenv}/share/nix-direnv/direnvrc; then
+            echo "nix-direnv: use_flake no longer refreshes gcroots; delete _nix_refresh_gcroots from modules/home/terminal/direnv.nix"
+            failed=1
           fi
           if [ "$failed" -ne 0 ]; then exit 1; fi
           touch $out
