@@ -8,25 +8,40 @@
 {
   lib,
   stdenv,
-  fetchzip,
+  fetchurl,
+  unzip,
   # Runtime dependencies for binary patching
   openssl,
   autoPatchelfHook,
   zlib,
 }:
-
+let
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "git-xet"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
+in
 stdenv.mkDerivation (finalAttrs: {
   pname = "git-xet";
-  version = "0.2.1";
+  inherit (pin) version;
 
   src =
     finalAttrs.passthru.sources.${stdenv.hostPlatform.system}
       or (throw "${finalAttrs.pname}: unsupported platform ${stdenv.hostPlatform.system}");
 
+  # The release zip holds the bare `git-xet` executable at its root, with no
+  # directory for stdenv to select as sourceRoot.
+  sourceRoot = ".";
+
   dontConfigure = true;
   dontBuild = true;
 
-  nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [
+  nativeBuildInputs = [
+    unzip
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isLinux [
     autoPatchelfHook
   ];
 
@@ -64,24 +79,14 @@ stdenv.mkDerivation (finalAttrs: {
   '';
 
   passthru = {
-    sources = {
-      "x86_64-linux" = fetchzip {
-        url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-linux-x86_64.zip";
-        hash = "sha256-5kX0SNEDnPD0lRIIkRakSuch4tRkp1O2cpUwttMWMQM=";
-        stripRoot = false;
-      };
-      "aarch64-linux" = fetchzip {
-        url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-linux-aarch64.zip";
-        hash = "sha256-UOeK/urUqAzQYA0cPg2Ti69Vr1pd600hiujGhaUlaro=";
-        stripRoot = false;
-      };
-      "aarch64-darwin" = fetchzip {
-        url = "https://github.com/huggingface/xet-core/releases/download/git-xet-v${finalAttrs.version}/git-xet-macos-aarch64.zip";
-        hash = "sha256-LU2CAayNkipalSyCV/6xZmfOlD4acWL4Emk9qAHnJV0=";
-        stripRoot = false;
-      };
-    };
-    updateScript = ./update.sh;
+    inherit pin pinPlan;
+    sources = lib.mapAttrs (
+      system: platform:
+      fetchurl {
+        inherit (platform) url;
+        hash = binaries.hashes.${system};
+      }
+    ) planned;
   };
 
   meta = {

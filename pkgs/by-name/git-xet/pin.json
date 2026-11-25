@@ -1,0 +1,32 @@
+{
+  "name": "git-xet",
+  "version": "0.2.1",
+  "source": {
+    "githubRelease": {
+      "owner": "huggingface",
+      "repo": "xet-core",
+      "tagTemplate": "git-xet-v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/huggingface/xet-core/releases/download/{tag}/git-xet-{platform}.zip",
+        "platforms": {
+          "x86_64-linux": "linux-x86_64",
+          "aarch64-linux": "linux-aarch64",
+          "aarch64-darwin": "macos-aarch64"
+        },
+        "checksum": {
+          "prefetch": {}
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-5jVNVXBMyDjR/u157ie5uJ2ndSrpi9g99Xl8GAcA/bE=",
+          "aarch64-linux": "sha256-O6b29XtaD5NOJ0bctasoFh3bYCabd+gFKQ2X5JsbRkc=",
+          "aarch64-darwin": "sha256-tOiOd/D9CfmlWgt0AQ5VGS0PuRdWyD6XCKAHmpfWMrc="
+        }
+      }
+    }
+  },
+  "companions": []
+}
