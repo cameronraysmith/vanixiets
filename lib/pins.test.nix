@@ -254,6 +254,27 @@ let
     };
   };
   tmuxPaletteNext = "0123456789abcdef0123456789abcdef01234567";
+
+  # A dependency tree the package installs inside a fixed-output derivation
+  # from the npm tarball's lockfile.
+  derivedTree = {
+    name = "atomic";
+    version = "0.10.3";
+    realizedVersion = "0.10.3";
+    source.npm.package = "@bastani/atomic";
+    artifacts = {
+      src.file = {
+        urlTemplate = "https://registry.npmjs.org/@bastani/atomic/-/atomic-{version}.tgz";
+        checksum.prefetch = { };
+        hash = "sha256-Nb97/Kwx8K9pYO2EWvzGNirWbBngLdjR4Z/hSypiLcw=";
+      };
+      nodeModules.sourceBuild = {
+        fetcher.derived = { };
+        hash = "sha256-zv9j4t6H/9kAUJFnSI//DznC47O8Id/rGDbI82wYpQk=";
+        depsHash.none = { };
+      };
+    };
+  };
 in
 {
   testValidPinParsesToItself = {
@@ -749,6 +770,42 @@ in
         withFile (mops.artifacts.cli.file // { checksum.sha512sums = { }; })
       )).pin;
     expectedError = fails "option `artifacts\\.cli\\.file\\.checksum' is not of type `attribute-tagged union${any}pin of package mops-bin";
+  };
+
+  testValidDerivedPinParsesToItself = {
+    expr = (load "derived" "atomic" derivedTree).pin;
+    expected = derivedTree // {
+      rev = null;
+      companions = [ ];
+    };
+  };
+
+  testPlanOfADerivedFixedOutputHasNoUrl = {
+    expr = (load "derived" "atomic" derivedTree).pinPlan "0.10.10";
+    expected = {
+      version = "0.10.10";
+      tag = null;
+      artifacts = {
+        src.file = {
+          url = "https://registry.npmjs.org/@bastani/atomic/-/atomic-0.10.10.tgz";
+          checksum.prefetch = { };
+        };
+        nodeModules.sourceBuild.derived = { };
+      };
+    };
+  };
+
+  testDerivedSrcFails = {
+    expr =
+      (load "derived-src" "atomic" (
+        derivedTree
+        // {
+          artifacts = derivedTree.artifacts // {
+            src.sourceBuild = derivedTree.artifacts.nodeModules.sourceBuild;
+          };
+        }
+      )).pin;
+    expectedError = fails "pin of package atomic\\) is malformed:${any}artifacts\\.src\\.sourceBuild\\.fetcher: derived, but src must name the fetcher that fetches it";
   };
 
   testEmptyArtifactsFail = {

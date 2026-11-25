@@ -33,6 +33,9 @@ from realize_pin.model import (
     CargoDepsHash,
     Companion,
     DepsHash,
+    Derived,
+    FetchFromGitHub,
+    Fetcher,
     File,
     FileValue,
     FixedOutputHash,
@@ -47,6 +50,7 @@ from realize_pin.model import (
     Plan,
     PlanArtifact,
     PlanAsset,
+    PlanDerived,
     PlanFetchFromGitHub,
     PlanFile,
     PlanFileValue,
@@ -311,7 +315,7 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
     written = _write_object(run, pin_path(pin.name), doc)
     if written.is_error():
         return Error(written.error)
-    for name, artifact in pin.artifacts.items():
+    for name, artifact in _artifact_order(pin.artifacts):
         realized = _realize_artifact(run, name, artifact, plan)
         if realized.is_error():
             return Error(realized.error)
@@ -410,7 +414,9 @@ def _plan_kind(planned: PlanArtifact) -> str:
         case PlanPlatformBinaries():
             return "platformBinaries"
         case PlanFetchFromGitHub():
-            return "sourceBuild"
+            return "sourceBuild.fetchFromGitHub"
+        case PlanDerived():
+            return "sourceBuild.derived"
         case PlanFileValue():
             return "fileValue"
         case PlanRuntimeFetch():
@@ -443,10 +449,10 @@ def _realize_artifact(run: _Run, name: str, artifact: Artifact, plan: Plan) -> R
                     return Ok(hashes)
                 case _:
                     return Error(_mismatch(run, name, planned, "platformBinaries"))
-        case SourceBuild():
-            match planned:
-                case PlanFetchFromGitHub():
-                    attr = _source_attr(name)
+        case SourceBuild(fetcher=fetcher):
+            match fetcher, planned:
+                case (FetchFromGitHub(), PlanFetchFromGitHub()) | (Derived(), PlanDerived()):
+                    attr = _source_build_attr(name, fetcher)
                     if attr.is_error():
                         return Error(run.fail(Step.HASH, attr.error))
                     got = _fod_hash(run, Step.HASH, run.package, attr.ok)
@@ -454,7 +460,7 @@ def _realize_artifact(run: _Run, name: str, artifact: Artifact, plan: Plan) -> R
                         return Error(got.error)
                     return Ok([(("sourceBuild", "hash"), got.ok)])
                 case _:
-                    return Error(_mismatch(run, name, planned, "sourceBuild"))
+                    return Error(_mismatch(run, name, planned, f"sourceBuild.{_fetcher_kind(fetcher)}"))
         case FileValue():
             match planned:
                 case PlanFileValue(url=url, regex=regex):
@@ -607,6 +613,38 @@ def _source_attr(name: str) -> Result[FodAttr, str]:
     if ATTR_NAME.fullmatch(name) is None:
         return Error(f"artifact {name!r} is not an attribute name")
     return Ok(Custom(name))
+
+
+def _fetcher_kind(fetcher: Fetcher) -> str:
+    match fetcher:
+        case FetchFromGitHub():
+            return "fetchFromGitHub"
+        case Derived():
+            return "derived"
+
+
+def _source_build_attr(name: str, fetcher: Fetcher) -> Result[FodAttr, str]:
+    """The fixed output a sourceBuild entry names; a derived one is never fetched, so only the hasher computes it."""
+    match fetcher:
+        case FetchFromGitHub():
+            return _source_attr(name)
+        case Derived():
+            if name == "src":
+                return Error("artifact 'src' is derived, but src must name the fetcher that fetches it")
+            return _source_attr(name)
+
+
+def _is_derived(artifact: Artifact) -> bool:
+    match artifact:
+        case SourceBuild(fetcher=Derived()):
+            return True
+        case _:
+            return False
+
+
+def _artifact_order(artifacts: Mapping[str, Artifact]) -> list[tuple[str, Artifact]]:
+    """Every other artifact before the derived ones, which are built from them and so need their hashes written first."""
+    return sorted(artifacts.items(), key=lambda item: _is_derived(item[1]))
 
 
 def _deps_attr(deps: DepsHash) -> tuple[str, FodAttr] | None:

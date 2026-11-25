@@ -132,7 +132,12 @@ class FetchFromGitHub:
     repo: str
 
 
-type Fetcher = FetchFromGitHub
+@dataclass(frozen=True)
+class Derived:
+    """A fixed output the package computes from its other artifacts; nothing is fetched for it."""
+
+
+type Fetcher = FetchFromGitHub | Derived
 
 
 # artifacts
@@ -304,7 +309,12 @@ class PlanFile:
     asset: PlanAsset
 
 
-type PlanArtifact = PlanPlatformBinaries | PlanFetchFromGitHub | PlanFileValue | PlanRuntimeFetch | PlanFile
+@dataclass(frozen=True)
+class PlanDerived:
+    """The plan of a `derived` sourceBuild: no URL, only the fixed output's hash to recompute."""
+
+
+type PlanArtifact = PlanPlatformBinaries | PlanFetchFromGitHub | PlanDerived | PlanFileValue | PlanRuntimeFetch | PlanFile
 
 
 @dataclass(frozen=True)
@@ -477,19 +487,23 @@ def parse_artifact(value: Json, where: str) -> Result[Artifact, str]:
         if set(platforms.ok) != set(hashes.ok):
             return Error(f"{w}: platforms {sorted(platforms.ok)} and hashes {sorted(hashes.ok)} name different systems")
         return Ok(PlatformBinaries(url.ok, platforms.ok, checksum.ok, hashes.ok))
-    fetcher = _tag(f.get("fetcher"), f"{w}.fetcher", ("fetchFromGitHub",))
-    if fetcher.is_error():
-        return Error(fetcher.error)
-    _, ff = fetcher.ok
-    owner = _str(ff, "owner", f"{w}.fetcher.fetchFromGitHub")
-    repo = _str(ff, "repo", f"{w}.fetcher.fetchFromGitHub")
+    fetcher_split = _tag(f.get("fetcher"), f"{w}.fetcher", ("fetchFromGitHub", "derived"))
+    if fetcher_split.is_error():
+        return Error(fetcher_split.error)
+    fetcher_tag, ff = fetcher_split.ok
     h = _str(f, "hash", w)
-    for r in (owner, repo, h):
-        if r.is_error():
-            return Error(r.error)
+    if h.is_error():
+        return Error(h.error)
     deps = parse_deps_hash(f.get("depsHash"), f"{w}.depsHash")
     if deps.is_error():
         return Error(deps.error)
+    if fetcher_tag == "derived":
+        return Ok(SourceBuild(Derived(), h.ok, deps.ok))
+    owner = _str(ff, "owner", f"{w}.fetcher.fetchFromGitHub")
+    repo = _str(ff, "repo", f"{w}.fetcher.fetchFromGitHub")
+    for r in (owner, repo):
+        if r.is_error():
+            return Error(r.error)
     return Ok(SourceBuild(FetchFromGitHub(owner.ok, repo.ok), h.ok, deps.ok))
 
 
@@ -662,10 +676,12 @@ def parse_plan_artifact(value: Json, where: str) -> Result[PlanArtifact, str]:
                 return Error(asset.error)
             platforms[system] = asset.ok
         return Ok(PlanPlatformBinaries(platforms))
-    fetcher = _tag(f, w, ("fetchFromGitHub",))
+    fetcher = _tag(f, w, ("fetchFromGitHub", "derived"))
     if fetcher.is_error():
         return Error(fetcher.error)
-    _, ff = fetcher.ok
+    fetcher_tag, ff = fetcher.ok
+    if fetcher_tag == "derived":
+        return Ok(PlanDerived())
     fw = f"{w}.fetchFromGitHub"
     owner = _str(ff, "owner", fw)
     repo = _str(ff, "repo", fw)

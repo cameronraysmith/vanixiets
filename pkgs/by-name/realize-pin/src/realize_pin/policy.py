@@ -16,6 +16,7 @@ from realize_pin.model import (
     Npm,
     Plan,
     PlanAsset,
+    PlanDerived,
     PlanFetchFromGitHub,
     PlanFile,
     PlanFileValue,
@@ -86,7 +87,7 @@ def plan_urls(plan: Plan) -> tuple[str, ...]:
                     urls.extend(_asset_urls(platform))
             case PlanFile(asset=asset):
                 urls.extend(_asset_urls(asset))
-            case PlanFetchFromGitHub():
+            case PlanFetchFromGitHub() | PlanDerived():
                 pass
             case PlanFileValue(url=url):
                 urls.append(url)

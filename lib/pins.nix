@@ -88,6 +88,11 @@ let
           sourceBuild = {
             fetcher = option (union {
               fetchFromGitHub = repo;
+              # The package computes this fixed output from its other
+              # artifacts, such as a dependency tree installed from a
+              # lockfile inside the fixed-output derivation; nothing is
+              # fetched for it, so its plan holds no URL.
+              derived = { };
             });
             hash = option sri;
             depsHash = option (union {
@@ -192,7 +197,11 @@ let
               ++ lib.optional (
                 extra != [ ]
               ) "${at}.hashes: hash for undeclared platform ${lib.concatStringsSep ", " extra}";
-            sourceBuild = _: [ ];
+            sourceBuild =
+              sb:
+              lib.optional (
+                artifact == "src" && sb.fetcher ? derived
+              ) "artifacts.src.sourceBuild.fetcher: derived, but src must name the fetcher that fetches it";
             fileValue = _: [ ];
             runtimeFetch = _: [ ];
             file = _: [ ];
@@ -328,6 +337,7 @@ let
             }
             // gitRef;
           };
+          derived = _: { derived = { }; };
         };
     in
     {

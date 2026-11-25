@@ -758,3 +758,102 @@ def test_skill_hasher_error_restores_every_file(tmp_path: Path) -> None:
     assert result.error.step == Step.SKILL_HASH
     assert "Mergifyio/mergify-cli: builder for apm-skills-compose failed" in result.error.message
     assert s.tree() == before
+
+
+
+DERIVED_URL = "https://registry.npmjs.org/@bastani/atomic/-/atomic-0.10.10.tgz"
+DERIVED_SRC = "sha256-" + "S" * 43 + "="
+DERIVED_TREE = "sha256-" + "T" * 43 + "="
+DERIVED_PIN_TREE: dict[str, Json] = {"sourceBuild": {"fetcher": {"derived": {}}, "hash": STALE_SRI, "depsHash": {"none": {}}}}
+DERIVED_PIN_TARBALL: dict[str, Json] = {
+    "file": {
+        "urlTemplate": "https://registry.npmjs.org/@bastani/atomic/-/atomic-{version}.tgz",
+        "checksum": {"prefetch": {}},
+        "hash": STALE_SRI,
+    }
+}
+DERIVED_PLAN_TREE: dict[str, Json] = {"sourceBuild": {"derived": {}}}
+DERIVED_PLAN_TARBALL: dict[str, Json] = {"file": {"url": DERIVED_URL, "checksum": {"prefetch": {}}}}
+
+
+def _derived_scenario(root: Path, artifacts: dict[str, Json], planned: dict[str, Json]) -> Scenario:
+    """atomic's pin at an older version, whose `nodeModules` is installed from the tarball `src` inside a fixed output."""
+    pin: dict[str, Json] = {
+        "name": "atomic",
+        "version": "0.0.1",
+        "realizedVersion": "0.0.1",
+        "source": {"npm": {"package": "@bastani/atomic"}},
+        "artifacts": artifacts,
+        "companions": [],
+    }
+    plan: dict[str, Json] = {"version": "0.10.10", "tag": None, "artifacts": planned}
+    files = {pin_path("atomic"): (json.dumps(pin, indent=2) + "\n").encode()}
+    for path, data in files.items():
+        (root / path).parent.mkdir(parents=True, exist_ok=True)
+        _ = (root / path).write_bytes(data)
+
+    def ready(package: str, attr: FodAttr) -> str | None:
+        """The fixed output installs from the tarball the pin names, so the tarball's hash must be realized first."""
+        doc = json.loads((root / pin_path("atomic")).read_text())
+        if doc["artifacts"]["src"]["file"]["hash"] != DERIVED_SRC:
+            return "src still holds the stale tarball hash"
+        return None
+
+    return Scenario(
+        root=root,
+        package="atomic",
+        version="0.10.10",
+        http=FakeHttp({}),
+        nix=FakeNix(root, {"0.10.10": plan}, {DERIVED_URL: DERIVED_SRC}),
+        hasher=FakeHasher({("atomic", Custom("nodeModules")): DERIVED_TREE}, ready),
+        skills=FakeSkillHasher({}),
+        git=FakeGit(root, files),
+        clock=Clock(),
+    )
+
+
+def test_derived_fixed_output_is_hashed_by_the_hasher_after_its_inputs(tmp_path: Path) -> None:
+    """`nodeModules` comes first in the pin, so realizing in the pin's order would hash it from the stale tarball."""
+    s = _derived_scenario(
+        tmp_path,
+        {"nodeModules": DERIVED_PIN_TREE, "src": DERIVED_PIN_TARBALL},
+        {"nodeModules": DERIVED_PLAN_TREE, "src": DERIVED_PLAN_TARBALL},
+    )
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    doc = json.loads((tmp_path / pin_path("atomic")).read_text())
+    assert doc["version"] == doc["realizedVersion"] == "0.10.10"
+    assert doc["artifacts"]["src"]["file"]["hash"] == DERIVED_SRC
+    assert doc["artifacts"]["nodeModules"]["sourceBuild"]["hash"] == DERIVED_TREE
+    assert doc["artifacts"]["nodeModules"]["sourceBuild"]["fetcher"] == {"derived": {}}
+    assert s.hasher.calls == [("atomic", Custom("nodeModules"))]
+    assert s.http.requests == []
+
+
+def test_derived_src_is_refused(tmp_path: Path) -> None:
+    s = _derived_scenario(tmp_path, {"src": DERIVED_PIN_TREE}, {"src": DERIVED_PLAN_TREE})
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.HASH
+    assert "artifact 'src' is derived, but src must name the fetcher that fetches it" in result.error.message
+    assert s.hasher.calls == []
+    assert s.tree() == before
+
+
+def test_plan_of_another_fetcher_is_refused(tmp_path: Path) -> None:
+    s = _derived_scenario(
+        tmp_path,
+        {"nodeModules": DERIVED_PIN_TREE, "src": DERIVED_PIN_TARBALL},
+        {
+            "nodeModules": {"sourceBuild": {"fetchFromGitHub": {"owner": "bastani-inc", "repo": "atomic", "tag": "0.10.10"}}},
+            "src": DERIVED_PLAN_TARBALL,
+        },
+    )
+    before = s.tree()
+    result = s.run()
+    assert result.is_error()
+    assert result.error.step == Step.HASH
+    assert "nodeModules: the plan has sourceBuild.fetchFromGitHub where the pin has sourceBuild.derived" in result.error.message
+    assert s.hasher.calls == []
+    assert s.tree() == before
