@@ -75,13 +75,15 @@ let
         settings = {
           version = 1;
 
-          # magnetite's omnigraph-server behind cinnabar's Caddy, whose
-          # internal CA is appended here so the CLI trusts it on hosts that
-          # carry no OS trust entry for it. The token lives in the OS secure
-          # store: `omnigraph credentials set --target magnetite --stdin`.
+          # magnetite's omnigraph-server behind cinnabar's Caddy, reached by
+          # its tincr mesh name because Nix-built clients on the Macs cannot
+          # reach ZeroTier names. The Caddy internal CA is appended here so
+          # the CLI trusts it on hosts that carry no OS trust entry for it.
+          # The token lives in the OS secure store:
+          # `omnigraph credentials set --target magnetite --stdin`.
           targets.magnetite = {
             kind = "server";
-            endpoint = "https://omnigraph.zt";
+            endpoint = "https://omnigraph.${flake.lib.fleet.domain}";
             default_graph = "dev";
             auth = {
               provider = "token";
