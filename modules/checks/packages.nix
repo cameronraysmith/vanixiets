@@ -185,6 +185,11 @@
             # no longer apply (design D9)
             package-omnigraph.class = "small";
             # no nixbot runs yet, too few to class
+            package-omnigraph-cookbooks = {
+              class = "medium";
+              measured = false;
+            };
+            # no nixbot runs yet, too few to class
             package-omnigraph-studio = {
               class = "medium";
               measured = false;
@@ -403,6 +408,11 @@
             package-omnigent-worker-login.class = "medium";
             # nixbot: median 54 s, slowest 7695 s, all 4 runs 2026-10-07..2026-11-13
             package-omnigraph.class = "small";
+            # no nixbot runs yet, too few to class
+            package-omnigraph-cookbooks = {
+              class = "medium";
+              measured = false;
+            };
             # no nixbot runs yet, too few to class
             package-omnigraph-studio = {
               class = "medium";

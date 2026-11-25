@@ -225,9 +225,9 @@
       "addLabels": ["major"]
     },
     {
-      "description": "Pins that run as stateful services on fleet hosts are upgraded only after operator approval (openspec automate-package-version-bumps design D7, permanent): greptimedb-bin is services.greptimedb.package on magnetite, and a new version may change its storage format, so data it writes may not be readable after a downgrade. Before approving, read the upstream release notes for storage-format and compatibility changes, run the VM tests that exercise the store (greptimedb-pipeline, fleet-ingress, devloop-ingest), and plan magnetite's deploy with a rollback that accounts for that downgrade incompatibility. perses-bin is services.perses.package on magnetite, whose database holds the dashboards; before approving, read its release notes for database and plugin compatibility changes and run the perses-greptimedb VM test.",
+      "description": "Pins that run as stateful services on fleet hosts are upgraded only after operator approval (openspec automate-package-version-bumps design D7, permanent): greptimedb-bin is services.greptimedb.package on magnetite, and a new version may change its storage format, so data it writes may not be readable after a downgrade. Before approving, read the upstream release notes for storage-format and compatibility changes, run the VM tests that exercise the store (greptimedb-pipeline, fleet-ingress, devloop-ingest), and plan magnetite's deploy with a rollback that accounts for that downgrade incompatibility. perses-bin is services.perses.package on magnetite, whose database holds the dashboards; before approving, read its release notes for database and plugin compatibility changes and run the perses-greptimedb VM test. omnigraph is services.omnigraph.package on magnetite, a graph database whose releases can change the storage format new graphs are created in (0.16 creates graphs that 0.15 cannot open), so before approving, read its release notes for storage-format and cluster changes and plan magnetite's deploy with a rollback that accounts for them.",
       "matchManagers": ["custom.jsonata"],
-      "matchDepNames": ["greptimedb-bin", "perses-bin"],
+      "matchDepNames": ["greptimedb-bin", "perses-bin", "omnigraph"],
       "dependencyDashboardApproval": true
     },
     {

@@ -1,0 +1,29 @@
+{
+  "name": "omnigraph-cookbooks",
+  "version": "c80ebb93f794931be19319e80af68b0b8cebcd7b",
+  "realizedVersion": "c80ebb93f794931be19319e80af68b0b8cebcd7b",
+  "source": {
+    "gitCommit": {
+      "owner": "ModernRelay",
+      "repo": "omnigraph-cookbooks",
+      "branch": "main"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "ModernRelay",
+            "repo": "omnigraph-cookbooks"
+          }
+        },
+        "hash": "sha256-LPamclMRneS+lfLRBFxLo4pa+q/YzmEg/Oc81eWyDpY=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}

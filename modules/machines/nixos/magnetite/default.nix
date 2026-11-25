@@ -20,13 +20,6 @@ in
       ...
     }:
     let
-      omnigraphCookbooks = pkgs.fetchFromGitHub {
-        owner = "ModernRelay";
-        repo = "omnigraph-cookbooks";
-        rev = "c13bac144fcf5692fab38b83fc09705d37789d6e";
-        hash = "sha256-807iN/pe/JVlPPcKuz8+KfGXv72UJGl18fo5x4ElpWQ=";
-      };
-
       # The telemetry store's dataset (ADR-007 E7.3; design D5): one source for
       # the boot oneshots below and for greptimedb-envelope's environment.
       # disko.nix repeats the values as its install-time declaration, and
@@ -533,9 +526,13 @@ in
             };
           };
 
+          # The dev graph's schema and stored queries come from the cookbooks
+          # commit pinned in pkgs/by-name/omnigraph-cookbooks/pin.json. A new
+          # commit changes the rendered configuration only; the cluster takes
+          # it when omnigraph-cluster-apply is run by hand.
           extraFiles = {
-            "schema.pg" = "${omnigraphCookbooks}/dev-graph/schema.pg";
-            "queries" = "${omnigraphCookbooks}/dev-graph/queries";
+            "schema.pg" = "${pkgs.omnigraph-cookbooks}/dev-graph/schema.pg";
+            "queries" = "${pkgs.omnigraph-cookbooks}/dev-graph/queries";
             "policies/dev.policy.yaml" = ./omnigraph/dev.policy.yaml;
             "policies/server.policy.yaml" = ./omnigraph/server.policy.yaml;
           };
