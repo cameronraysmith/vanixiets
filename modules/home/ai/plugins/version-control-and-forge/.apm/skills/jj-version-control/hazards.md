@@ -18,8 +18,9 @@ Verify `jj diff --from <clan-commit> --to <wip>` is empty before folding.
 
 ## `wip` bookmark slide on exhausted `@`
 
-A `--from @` squash that empties `@` slides the pushed `wip` bookmark down onto the join.
+A `--from @` squash that empties `@` slides the pushed `wip` bookmark down onto the join, and a path-scoped squash whose paths exhaust `@` does the same.
 Machines rebuild from that bookmark, so restore it with `jj bookmark set wip -r @`.
+The bookmark can instead be left conflicted: on 2026-11-25, in a working copy two sessions shared, a path-scoped `jj squash --from @ --into <change>` without `--keep-emptied` exhausted `@`, jj abandoned it and created a new working-copy change, and `wip` was left as `wip??` with three targets until `jj bookmark set wip -r @ --allow-backwards` set it back onto `@`.
 
 ## Snapshot size gating is new-files-only
 
@@ -38,6 +39,14 @@ jj snapshots the entire working copy rather than the file an agent touched, so c
 A wholesale `--from @` squash sweeps a concurrent session's work into your chain, so path-scope every squash; the scoping protects only the routing.
 Check for `(divergent)` and `wip??` before squashing.
 A subagent is the sole editor of one chain, never of the working copy.
+
+## Concurrent jj commands fork the join and `@`
+
+jj does not serialize operations: each command commits against the operation it started from, and the next command merges concurrent operations, keeping both rewrites of a commit as a divergent change (jj `docs/technical/concurrency.md` §"Merging divergent operations").
+On 2026-11-25 six agents in one working copy each ran `jj rebase -s <join> -d …` at the same moment to add a chain to the join, which left divergent copies of the join and of `@`, shown as `(divergent)` in `jj log`.
+Recover by abandoning the empty duplicates with `jj abandon <commit-id>`, naming commit ids because the copies share a change id; recovery for the destructive class is top-level `jj undo`.
+Then confirm that `@` and the join are each a single non-divergent change and that the `wip` bookmark is on `@`.
+Prevent it by running every jj command that mutates the repository or snapshots the working copy as `flock <lock> jj …` against one lock file for the checkout; with `/tmp/vanixiets-jj.lock` in place from shortly after that failure, no further fork occurred that day.
 
 ## Auto-rebase changes commit ids, not content
 

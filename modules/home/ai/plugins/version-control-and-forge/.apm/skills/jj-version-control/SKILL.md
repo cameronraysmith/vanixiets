@@ -601,7 +601,7 @@ When known concurrent agent activity exists on a development join — the user h
 Recovery is mechanical: `jj abandon <superseded-commit-hash>` to drop the losing side of the divergence, then `jj bookmark set wip -r <keeper-commit-hash>` to point the deploy bookmark at the surviving one, using commit hashes throughout to disambiguate across the divergence.
 Neither verb moves `@`, so the shared editing surface the other agents are concurrently writing survives the repair.
 Do not recover with `jj edit <survivor>`: retargeting `@` is exactly what invariant (iii-b) prohibits, and under concurrency it deletes the surface the repair is meant to preserve.
-Pause-and-serialize prevents the failure altogether.
+Pause-and-serialize prevents the failure altogether, by running every mutating or snapshotting jj command as `flock <lock> jj …` on one lock file for the checkout (`hazards.md` §"Concurrent jj commands fork the join and `@`").
 When the other activity is a separate top-level session with its own chains, follow §"Coordinating concurrent sessions on one join" as well.
 
 ### The edit-route cycle
@@ -845,8 +845,9 @@ Coordination protocol for parallel agents:
 - `jj absorb` as a fallback for batch routing when blame ancestry is clear (auto-preserves `[wip]`)
 - If two agents edit different hunks in the same file, `jj absorb <path>` can separate them by blame ancestry after the fact
 
-The orchestrator routes changes to the correct chain via `jj squash --from @ --into ... --keep-emptied` or `jj absorb` after each subagent completes.
-Subagent prompts specify which files to edit and the target chain context but do not include jj routing commands.
+The orchestrator routes changes to the correct chain via `jj squash --from @ --into ... --keep-emptied` or `jj absorb` after each subagent that only edits files completes.
+A prompt for a subagent that only edits files specifies which files to edit and the target chain context and includes no jj routing commands.
+A prompt for a subagent that routes its own work also carries the chain, the squash form `jj squash --into <chain> --use-destination-message --keep-emptied <paths>`, and the lock file path with the `flock <lock> jj …` form.
 
 One file per agent is not sufficient isolation.
 Each concurrent editor triggers its own `snapshot working copy` operation, and jj snapshots the whole working copy rather than the file that agent touched, so the editors race the snapshot even with no content overlap; the resulting divergence and its mechanical recovery are covered in §"Pre-dispatch concurrent-agent coordination", and `jj status` showing `(divergent)` or a conflicted `wip??` bookmark is the signal to triage before any squash.

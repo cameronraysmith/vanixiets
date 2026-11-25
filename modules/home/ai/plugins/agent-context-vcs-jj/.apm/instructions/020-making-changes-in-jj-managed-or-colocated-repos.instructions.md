@@ -22,6 +22,11 @@ Change the join's parents only with a destination derived from its current paren
 Add a new chain to the join immediately after creating it, before any edit, since a squash into a chain outside the join removes those paths from the working copy; and when a landing moves the trunk, rebase your own remaining chains onto it and rebuild the join the same way before reporting the landing.
 The rest of the protocol, which a harness with inter-session messaging carries over that channel, is the `jj-version-control` skill §"Coordinating concurrent sessions on one join".
 
+When more than one agent or session works in one jj working copy, serialize every jj command that mutates the repository or snapshots the working copy, which is every command without `--ignore-working-copy`, through one lock file for that checkout: `flock <lock> jj …`.
+jj does not serialize operations itself: each command commits against the operation it started from, and concurrent rewrites of the join or of `@` are merged into divergent copies of both.
+The first session to dispatch concurrent agents names the lock and announces its path to the other sessions; by convention it is a path under `/tmp` named for the repository, such as `/tmp/vanixiets-jj.lock`.
+Every subagent brief carries that path, and a long-running script takes the lock around each jj command rather than holding it for the whole run.
+
 Read-only inspection takes the global `--ignore-working-copy` so it does not snapshot and race a concurrent session.
 Recovery for the destructive class is top-level `jj undo`; there is no `jj op undo`.
 See the `jj-version-control` skill for the diamond workflow.
