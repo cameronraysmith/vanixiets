@@ -58,10 +58,7 @@ stdenv.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/icp";
   doInstallCheck = true;
 
-  passthru = {
-    inherit pin pinPlan;
-    updateScript = ./update.sh;
-  };
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     description = "Internet Computer CLI for building and deploying canisters (prebuilt release binary)";

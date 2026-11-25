@@ -61,7 +61,6 @@ stdenv.mkDerivation (finalAttrs: {
 
   passthru = {
     inherit pin pinPlan;
-    updateScript = ./update.sh;
     # Commit the release tag points at; structure-release-alignment-mergify-cli
     # requires the mergify-stack skill's apm.yml ref to equal it.
     sourceRev = pin.rev;

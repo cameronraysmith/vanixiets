@@ -68,7 +68,6 @@ stdenv.mkDerivation (finalAttrs: {
         inherit (pin.artifacts.skillSrc.sourceBuild) hash;
       }
     );
-    updateScript = ./update.sh;
   };
 
   meta = {

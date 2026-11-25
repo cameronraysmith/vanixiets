@@ -9,7 +9,7 @@
 # instead ships a `moshi-hook-app_Darwin_<arch>` .app bundle; both kinds of
 # asset are listed in the same checksums.txt.
 #
-# The vendor's checksums.txt is the hash source; `update.sh` reads it rather
+# The vendor's checksums.txt is the hash source; realize-pin reads it rather
 # than re-hashing downloads, which keeps the pinned digests provably equal to
 # the ones the vendor published.
 {
@@ -68,10 +68,7 @@ stdenv.mkDerivation (finalAttrs: {
   doInstallCheck = true;
   nativeInstallCheckInputs = [ versionCheckHook ];
 
-  passthru = {
-    inherit pin pinPlan;
-    updateScript = ./update.sh;
-  };
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     homepage = "https://getmoshi.app";

@@ -5,7 +5,7 @@
 # fetches platform-specific binaries from the official gcs release bucket.
 # version and SRI hashes tracked in pin.json alongside this file.
 #
-# update: nix run .#update-claude-code
+# update: nix run .#realize-pin -- claude-code <version>
 # source: https://github.com/anthropics/claude-code
 {
   lib,
@@ -85,10 +85,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   strictDeps = true;
 
-  passthru = {
-    inherit pin pinPlan;
-    updateScript = ./update.sh;
-  };
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     description = "Agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster";

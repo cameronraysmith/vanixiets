@@ -4,7 +4,10 @@
 # invoke nix-update directly, e.g.:
 #   nix-update --flake <package> --version=branch=main
 #
-# nix run .#update-claude-code
+# Packages with a pin.json have no app here; they are realized with
+# nix run .#realize-pin -- <package> <version>
+#
+# nix run .#update-atomic
 { ... }:
 {
   perSystem =
@@ -18,11 +21,6 @@
       apps.update-pi-acp = {
         type = "app";
         program = "${config.packages.pi-acp.updateScript}";
-      };
-
-      apps.update-claude-code = {
-        type = "app";
-        program = "${config.packages.claude-code.updateScript}";
       };
 
       apps.update-devin-cli = {
@@ -48,16 +46,6 @@
       apps.update-golem-binary = {
         type = "app";
         program = "${config.packages.golem-binary.updateScript}";
-      };
-
-      apps.update-icp-cli-bin = {
-        type = "app";
-        program = "${config.packages.icp-cli-bin.updateScript}";
-      };
-
-      apps.update-ic-wasm-bin = {
-        type = "app";
-        program = "${config.packages.ic-wasm-bin.updateScript}";
       };
 
       apps.update-mops-bin = {
@@ -96,24 +84,9 @@
         program = "${config.packages.worktrunk-bin.updateScript}";
       };
 
-      apps.update-mergify-cli-bin = {
-        type = "app";
-        program = "${config.packages.mergify-cli-bin.updateScript}";
-      };
-
       apps.update-buzz-source = {
         type = "app";
         program = "${config.packages.buzz-source.updateScript}";
-      };
-
-      apps.update-omnigraph = {
-        type = "app";
-        program = "${config.packages.omnigraph.updateScript}";
-      };
-
-      apps.update-moshi-hook = {
-        type = "app";
-        program = "${config.packages.moshi-hook.updateScript}";
       };
     };
 }

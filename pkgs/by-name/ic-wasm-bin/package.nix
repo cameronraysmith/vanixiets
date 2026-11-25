@@ -55,10 +55,7 @@ stdenv.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/ic-wasm";
   doInstallCheck = true;
 
-  passthru = {
-    inherit pin pinPlan;
-    updateScript = ./update.sh;
-  };
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     description = "Internet Computer canister Wasm transformer (prebuilt release binary)";
