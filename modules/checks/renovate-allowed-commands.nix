@@ -7,18 +7,21 @@
 # so the check cannot pass vacuously.
 #
 # Renovate matches the compiled command (openspec automate-package-version-bumps
-# design D8), so a templated command is rendered with the `name`, `version` and
-# `rev` of every pkgs/by-name/*/pin.json before matching, and fails when no pin
-# exists to render it with. Each templated command rendered with the version
-# `1.0.0;id` must be refused.
+# design D8), so a templated command is rendered with the `name` and `version`
+# of every pkgs/by-name/*/pin.json before matching, and fails when no pin
+# exists to render it with. `{{{newDigest}}}` is rendered only with gitCommit
+# pins, whose version is the commit Renovate proposes as the digest; no other
+# pin has a digest update to run it for. Each templated command rendered with
+# the version `1.0.0;id` must be refused.
 #
 # Renovate commits a postUpgradeTasks write only when the file matches the
 # task's fileFilters (execute-post-upgrade-commands.ts) and drops the rest
-# silently, so the pin rule's fileFilters must cover every path the realizer
-# may write (design D5): each pin's pkgs/by-name/<name>/pin.json and each
-# companion `path`, apmRef and fixedOutputHash alike. The paths are matched
-# with Renovate's own minimatch wrapper and options, `{ dot: true }`, and the
-# check fails naming every pin and path left uncovered.
+# silently, so each custom.jsonata rule's fileFilters must cover every path
+# the realizer may write (design D5) for each pin the rule applies to, by its
+# matchDatasources: each pin's pkgs/by-name/<name>/pin.json and each companion
+# `path`, apmRef and fixedOutputHash alike. The paths are matched with
+# Renovate's own minimatch wrapper and options, `{ dot: true }`, and the check
+# fails naming every rule, pin and path left uncovered.
 #
 # The check reads static flake data and repository files only; it evaluates no
 # host configuration and no package. Matching uses jq's Oniguruma `test`; the
@@ -59,7 +62,20 @@
                 in
                 {
                   inherit (pin) name version;
-                  rev = pin.rev or null;
+                  gitCommit = pin.source ? gitCommit;
+                  # The datasource the jsonata manager's query in
+                  # .github/renovate.json gives this pin.
+                  datasource =
+                    if pin.source ? githubRelease then
+                      "github-releases"
+                    else if pin.source ? npm then
+                      "npm"
+                    else if pin.source ? pypi then
+                      "pypi"
+                    else if pin.source ? gitCommit then
+                      "git-refs"
+                    else
+                      "custom.${pin.name}";
                   companions = map (companion: companion.path) (pin.companions or [ ]);
                 }
               ) pinFiles;
@@ -79,25 +95,32 @@
             const pinRules = input.repoRules.filter(
               (rule) => (rule.matchManagers ?? []).includes("custom.jsonata") && rule.postUpgradeTasks,
             );
-            if (pinRules.length !== 1) {
-              fail("expected exactly one custom.jsonata rule with postUpgradeTasks, found " + pinRules.length);
+            if (pinRules.length === 0) {
+              fail("expected a custom.jsonata rule with postUpgradeTasks, found none");
             }
-            // Renovate's default when fileFilters is absent.
-            const filters = pinRules[0].postUpgradeTasks.fileFilters ?? ["**/*"];
-            const paths = input.pins.flatMap((pin) =>
-              ["pkgs/by-name/" + pin.name + "/pin.json", ...pin.companions].map((path) => [pin.name, path]),
-            );
-            const uncovered = paths.filter(
-              ([, path]) => !filters.some((pattern) => minimatch(pattern, { dot: true }).match(path)),
-            );
+            let checked = 0;
+            const uncovered = pinRules.flatMap((rule, index) => {
+              // Renovate's default when fileFilters is absent.
+              const filters = rule.postUpgradeTasks.fileFilters ?? ["**/*"];
+              const pins = input.pins.filter(
+                (pin) => rule.matchDatasources === undefined || rule.matchDatasources.includes(pin.datasource),
+              );
+              const paths = pins.flatMap((pin) =>
+                ["pkgs/by-name/" + pin.name + "/pin.json", ...pin.companions].map((path) => [pin.name, path]),
+              );
+              checked += paths.length;
+              return paths
+                .filter(([, path]) => !filters.some((pattern) => minimatch(pattern, { dot: true }).match(path)))
+                .map(([name, path]) => "  custom.jsonata rule " + index + ": " + name + ": " + path);
+            });
             if (uncovered.length > 0) {
               fail(
-                "realizer writes not matched by the pin rule's postUpgradeTasks.fileFilters, which Renovate would drop:\n" +
-                  uncovered.map(([name, path]) => "  " + name + ": " + path).join("\n"),
+                "realizer writes not matched by the postUpgradeTasks.fileFilters of the rule that runs the realizer, which Renovate would drop:\n" +
+                  uncovered.join("\n"),
               );
             }
             console.log(
-              "OK: " + paths.length + " realizer write paths of " + input.pins.length + " pins matched by the pin rule's fileFilters",
+              "OK: " + checked + " realizer write paths of " + input.pins.length + " pins matched by the fileFilters of " + pinRules.length + " custom.jsonata rules",
             );
           '';
         in
@@ -121,7 +144,9 @@
                   | .postUpgradeTasks.commands // [] | .[] ] as $cmds
               | [ $cmds[] | select(contains("{{")) ] as $templated
               | ([ $cmds[] | select(contains("{{") | not) ]
-                 + [ $templated[] as $t | $pins[] as $p | $t | render($p.name; $p.version; $p.rev // "") ]) as $rendered
+                 + [ $templated[] as $t | $pins[] as $p
+                     | select(($t | contains("{{{newDigest}}}") | not) or $p.gitCommit)
+                     | $t | render($p.name; $p.version; $p.version) ]) as $rendered
               | [ $templated[] as $t | $pins[] as $p | $t | render($p.name; "1.0.0;id"; "1.0.0;id") ] as $negatives
               | if ($cmds | length) == 0 then
                   "renovate-allowed-commands: no postUpgradeTasks command found; the check would be vacuous" | halt_error(1)

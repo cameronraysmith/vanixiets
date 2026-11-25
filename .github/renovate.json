@@ -21,12 +21,12 @@
       "datasourceTemplate": "github-tags"
     },
     {
-      "description": "One dependency per package pin (openspec automate-package-version-bumps design D6): depName is the pin's name and its source tag selects the datasource. githubRelease reads github-releases for owner/repo with an extractVersion built from tagTemplate, its literal text regex-escaped and {version} as the version group; npm and pypi read their registries; vendorJson and vendorText read the custom datasource named custom.<name>, and a vendorText pin's regex is its extractVersion; gitCommit reads git-refs on its branch with the pin's rev as currentDigest. currentValue is the pin's version, or a gitCommit pin's branch. The realizer's test fixtures under pkgs/by-name/realize-pin/tests are excluded by config:recommended's ignorePaths.",
+      "description": "One dependency per package pin (openspec automate-package-version-bumps design D6): depName is the pin's name and its source tag selects the datasource. githubRelease reads github-releases for owner/repo with an extractVersion built from tagTemplate, its literal text regex-escaped and {version} as the version group; npm and pypi read their registries; vendorJson and vendorText read the custom datasource named custom.<name>, and a vendorText pin's regex is its extractVersion; gitCommit reads git-refs on its branch with the pin's version, which is the commit, as currentDigest, so a digest update rewrites the field realizedVersion is checked against. currentValue is the pin's version, or a gitCommit pin's branch. The realizer's test fixtures under pkgs/by-name/realize-pin/tests are excluded by config:recommended's ignorePaths.",
       "customType": "jsonata",
       "fileFormat": "json",
       "managerFilePatterns": ["pkgs/by-name/**/pin.json"],
       "matchStrings": [
-        "{\"depName\": name, \"currentValue\": $exists(source.gitCommit) ? source.gitCommit.branch : version, \"currentDigest\": $exists(source.gitCommit) ? rev, \"datasource\": $exists(source.githubRelease) ? \"github-releases\" : $exists(source.npm) ? \"npm\" : $exists(source.pypi) ? \"pypi\" : ($exists(source.vendorJson) or $exists(source.vendorText)) ? \"custom.\" & name : $exists(source.gitCommit) ? \"git-refs\", \"packageName\": $exists(source.githubRelease) ? source.githubRelease.owner & \"/\" & source.githubRelease.repo : $exists(source.npm) ? source.npm.package : $exists(source.pypi) ? source.pypi.package : $exists(source.gitCommit) ? \"https://github.com/\" & source.gitCommit.owner & \"/\" & source.gitCommit.repo, \"extractVersion\": $exists(source.githubRelease) ? \"^\" & $join($map($split(source.githubRelease.tagTemplate, \"{version}\"), function($s) { $replace($s, /[\\\\.*+?^${}()|\\[\\]]/, function($m) { \"\\\\\" & $m.match }) }), \"(?<version>.+)\") & \"$\" : $exists(source.vendorText) ? source.vendorText.regex}"
+        "{\"depName\": name, \"currentValue\": $exists(source.gitCommit) ? source.gitCommit.branch : version, \"currentDigest\": $exists(source.gitCommit) ? version, \"datasource\": $exists(source.githubRelease) ? \"github-releases\" : $exists(source.npm) ? \"npm\" : $exists(source.pypi) ? \"pypi\" : ($exists(source.vendorJson) or $exists(source.vendorText)) ? \"custom.\" & name : $exists(source.gitCommit) ? \"git-refs\", \"packageName\": $exists(source.githubRelease) ? source.githubRelease.owner & \"/\" & source.githubRelease.repo : $exists(source.npm) ? source.npm.package : $exists(source.pypi) ? source.pypi.package : $exists(source.gitCommit) ? \"https://github.com/\" & source.gitCommit.owner & \"/\" & source.gitCommit.repo, \"extractVersion\": $exists(source.githubRelease) ? \"^\" & $join($map($split(source.githubRelease.tagTemplate, \"{version}\"), function($s) { $replace($s, /[\\\\.*+?^${}()|\\[\\]]/, function($m) { \"\\\\\" & $m.match }) }), \"(?<version>.+)\") & \"$\" : $exists(source.vendorText) ? source.vendorText.regex}"
       ]
     }
   ],
@@ -192,6 +192,23 @@
       "branchConcurrentLimit": 0,
       "postUpgradeTasks": {
         "commands": ["nix run .#realize-pin -- {{{depName}}} {{{newVersion}}}"],
+        "fileFilters": [
+          "pkgs/by-name/*/pin.json",
+          "pkgs/by-name/*/hashes.json",
+          "pkgs/by-name/*/skills.json",
+          "modules/home/ai/plugins/*/apm.yml"
+        ],
+        "executionMode": "update"
+      }
+    },
+    {
+      "description": "Commit pins (openspec automate-package-version-bumps design D7, stage 2 wave 5): a gitCommit pin's update is a git-refs digest update to the head of its branch, for which newVersion is empty, so the task passes newDigest, the commit the realizer writes as the pin's version. postUpgradeTasks are not merged across rules, so this task replaces the pin rule's, with the same fileFilters and executionMode; checks.renovate-allowed-commands renders it with each gitCommit pin. The window, Monday 14:00 to 15:59 UTC with updateNotScheduled false, confines a commit pin's branch creation and rebases to the two hourly runs that fall in it each week: the skill repositories commit most days, every update rebuilds the home closures, and minimumReleaseAge cannot space them because git-refs releases carry no timestamp.",
+      "matchManagers": ["custom.jsonata"],
+      "matchDatasources": ["git-refs"],
+      "schedule": ["* 14-15 * * 1"],
+      "updateNotScheduled": false,
+      "postUpgradeTasks": {
+        "commands": ["nix run .#realize-pin -- {{{depName}}} {{{newDigest}}}"],
         "fileFilters": [
           "pkgs/by-name/*/pin.json",
           "pkgs/by-name/*/hashes.json",
