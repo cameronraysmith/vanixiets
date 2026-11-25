@@ -82,7 +82,7 @@ Settled with Q4: a clean cutover per package. A migrated package loses its `upda
 
 - R1 [INFERENCE at the time]: the deployed Renovate's support for `customType: "jsonata"` was unverified.
 - R2: post-upgrade prefetches and builds run on magnetite, nixbot's host, so they need timeouts and Renovate's concurrency limits.
-- R3: nixbot gates only x86_64-linux before a pull request merges; aarch64-darwin is best-effort (`modules/checks/nixbot-best-effort-darwin.nix`), so a darwin breakage presents as an ignored failure.
+- R3: nixbot gates only x86_64-linux before a pull request merges; aarch64-darwin is best-effort (`modules/checks/nixbot-best-effort-darwin.nix`), so a darwin breakage presents as an ignored failure. Superseded on 2026-11-25 by #4290, which deleted that file and the `ignoreFailure` on Mac checks: aarch64-darwin now gates a merge too, and every pull request needs stibnite reachable as a builder (design R3, R5).
 - R4: when the realizer fails, Renovate still opens the pull request with an artifact error, and nixbot's hash mismatch fails it safely.
 
 ## Constraints from the workspace orchestrator (2026-11-24)

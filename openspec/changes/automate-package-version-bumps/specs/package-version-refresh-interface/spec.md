@@ -167,7 +167,7 @@ A package with a `pin.json` SHALL have no `update.sh` in its directory, no `pass
 
 The properties above SHALL be read as guaranteeing only what the repository controls: the pin contract and its type, the fetch plan shared by build and realizer, what the realizer reads and writes, the Renovate configuration and allowlist entry the repository declares, and the checks that guard them.
 
-**Outside the boundary**: they SHALL NOT be read as guaranteeing when Renovate runs or which releases it finds and how it orders them, what an upstream publishes or whether its checksum file matches its artifacts, the deployed Renovate's honouring of the configuration, or whether a release builds on a platform the build service gates only on a best-effort basis.
+**Outside the boundary**: they SHALL NOT be read as guaranteeing when Renovate runs or which releases it finds and how it orders them, what an upstream publishes or whether its checksum file matches its artifacts, the deployed Renovate's honouring of the configuration, or whether a release builds on a platform, which the build service's required checks on x86_64-linux and aarch64-darwin record, and which they record only while a builder for that platform is reachable.
 
 #### Scenario: A guarantee outside the boundary is claimed
 

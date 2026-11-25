@@ -19,8 +19,29 @@
         "\\.url\\s*=\\s*\"github:(?<depName>argoproj/argo-helm)/(?<currentValue>argo-cd-[0-9]+\\.[0-9]+\\.[0-9]+)\""
       ],
       "datasourceTemplate": "github-tags"
+    },
+    {
+      "description": "One dependency per package pin (openspec automate-package-version-bumps design D6): depName is the pin's name and its source tag selects the datasource. githubRelease reads github-releases for owner/repo with an extractVersion built from tagTemplate, its literal text regex-escaped and {version} as the version group; npm and pypi read their registries; vendorJson and vendorText read the custom datasource named custom.<name>, and a vendorText pin's regex is its extractVersion; gitCommit reads git-refs on its branch with the pin's rev as currentDigest. currentValue is the pin's version, or a gitCommit pin's branch. The realizer's test fixtures under pkgs/by-name/realize-pin/tests are excluded by config:recommended's ignorePaths.",
+      "customType": "jsonata",
+      "fileFormat": "json",
+      "managerFilePatterns": ["pkgs/by-name/**/pin.json"],
+      "matchStrings": [
+        "{\"depName\": name, \"currentValue\": $exists(source.gitCommit) ? source.gitCommit.branch : version, \"currentDigest\": $exists(source.gitCommit) ? rev, \"datasource\": $exists(source.githubRelease) ? \"github-releases\" : $exists(source.npm) ? \"npm\" : $exists(source.pypi) ? \"pypi\" : ($exists(source.vendorJson) or $exists(source.vendorText)) ? \"custom.\" & name : $exists(source.gitCommit) ? \"git-refs\", \"packageName\": $exists(source.githubRelease) ? source.githubRelease.owner & \"/\" & source.githubRelease.repo : $exists(source.npm) ? source.npm.package : $exists(source.pypi) ? source.pypi.package : $exists(source.gitCommit) ? \"https://github.com/\" & source.gitCommit.owner & \"/\" & source.gitCommit.repo, \"extractVersion\": $exists(source.githubRelease) ? \"^\" & $join($map($split(source.githubRelease.tagTemplate, \"{version}\"), function($s) { $replace($s, /[\\\\.*+?^${}()|\\[\\]]/, function($m) { \"\\\\\" & $m.match }) }), \"(?<version>.+)\") & \"$\" : $exists(source.vendorText) ? source.vendorText.regex}"
+      ]
     }
   ],
+  "customDatasources": {
+    "moshi-hook": {
+      "description": "moshi-hook's vendorText source: the url of pkgs/by-name/moshi-hook/pin.json, one line such as v0.4.64; the pin's regex is applied as extractVersion by the jsonata manager.",
+      "defaultRegistryUrlTemplate": "https://cdn.getmoshi.app/hook/latest/version.txt",
+      "format": "plain"
+    },
+    "claude-code": {
+      "description": "claude-code's vendorText source: the url of pkgs/by-name/claude-code/pin.json, the bare version its latest pointer names; the pin's regex is applied as extractVersion by the jsonata manager.",
+      "defaultRegistryUrlTemplate": "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/latest",
+      "format": "plain"
+    }
+  },
   "packageRules": [
     {
       "description": "Disable nix manager for playwright-web-flake to avoid conflict with custom regex manager",
@@ -138,6 +159,26 @@
           "bun.nix"
         ],
         "executionMode": "branch"
+      }
+    },
+    {
+      "description": "The pin rule (openspec automate-package-version-bumps design D7): one branch renovate/<p> per package, whose single task runs the realizer for the proposed version; fileFilters repeats the realizer's write confinement, every pin plus the migrated pins' companion paths. The window is Monday and Thursday 14:00-17:59 UTC, clear of the flake-update effect and harmonia-gc, and updateNotScheduled false keeps rebases and realizer runs inside it. The limits bound the builds these branches cause on magnetite, which also runs nixbot; prCommitsPerRunLimit is global-only and set to 4 by the instance (modules/nixos/renovate.nix). Merge authorization stays with the operator: no automerge, and ignoreUnstable is left at its default.",
+      "matchManagers": ["custom.jsonata"],
+      "branchTopic": "{{{depName}}}",
+      "commitMessageTopic": "{{{depName}}}",
+      "schedule": ["* 14-17 * * 1,4"],
+      "updateNotScheduled": false,
+      "prHourlyLimit": 2,
+      "prConcurrentLimit": 6,
+      "branchConcurrentLimit": 6,
+      "postUpgradeTasks": {
+        "commands": ["nix run .#realize-pin -- {{{depName}}} {{{newVersion}}}"],
+        "fileFilters": [
+          "pkgs/by-name/**/pin.json",
+          "modules/home/ai/plugins/version-control-and-forge/apm.yml",
+          "pkgs/by-name/apm-skills-compose/hashes.json"
+        ],
+        "executionMode": "update"
       }
     }
   ]
