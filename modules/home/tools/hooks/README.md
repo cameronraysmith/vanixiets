@@ -28,9 +28,9 @@ Several scripts (`enforce-branch-before-edit.sh`, `gate-worktree-surfaces.sh`, `
 Because shell has no `import`, `default.nix` composes this in textually, prepending `repoContextLib` (the file's contents, read once) to the consuming script's `text`.
 Each consumer only calls a subset of the shared helpers, so `default.nix` also sets `excludeShellChecks = repoContextShellChecks` (`[ "SC2329" ]`) on those derivations; omitting that exclusion fails the build on the helpers a given script does not happen to call.
 
-`gate-mutating-http` allows curl and wget commands that do not mutate, and a mutating one only when it is a single curl command whose every URL's host is exactly one of `trustedHttpMutationHosts` in `default.nix`, with no option that sends the bytes elsewhere (`--next`, `-K`, `--connect-to`, `--resolve`, a proxy, `-L`, a Unix socket).
-Any other mutating request asks, and so does anything the text alone cannot settle: a second command, a pipe or loop, a variable or substitution, an unknown option, a host in another form, and every wget mutation, since wget follows redirects.
-`checks.<system>.hook-gate-mutating-http` (`modules/checks/hooks.nix`) runs its cases against the rendered script, `flake.lib.gateMutatingHttpScript`, with the notifier stubbed, plus a mutant restoring the old whole-command match and one reading `--connect-to` as an ordinary option.
+`gate-mutating-http` asks for every curl or wget command that mutates (a mutating method, data, a form, an upload or `--json`, including inside a short-option cluster such as `-sd`), whatever its host, and allows one that does not; agents notify through `ntfy-send`, which the gate does not judge.
+It matches curl and wget as words anywhere in the command, so xargs, loops and environment-assignment prefixes reach it, and it does not see other HTTP clients or proxies set in the environment.
+`checks.<system>.hook-gate-mutating-http` (`modules/checks/hooks.nix`) runs its cases against the script with the notifier stubbed, plus a mutant that matches curl only where a command opens and one without the cluster rule.
 
 Finally, flake sources in this repository are git-tracked only.
 A new `.sh` file, or a `default.nix` edit that reads one, is invisible to a flake build until the file is tracked by git (`jj file track` in this jj-colocated repository), regardless of whether it exists on disk.
