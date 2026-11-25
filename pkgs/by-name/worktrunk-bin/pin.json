@@ -1,6 +1,7 @@
 {
   "name": "worktrunk-bin",
   "version": "0.81.0",
+  "realizedVersion": "0.81.0",
   "source": {
     "githubRelease": {
       "owner": "max-sixty",

@@ -1,6 +1,7 @@
 {
   "name": "ic-wasm-bin",
   "version": "1.0.0",
+  "realizedVersion": "1.0.0",
   "source": {
     "githubRelease": {
       "owner": "dfinity",

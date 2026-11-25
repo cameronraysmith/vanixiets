@@ -1,6 +1,7 @@
 {
   "name": "ouroboros",
   "version": "0.55.3",
+  "realizedVersion": "0.55.3",
   "source": {
     "pypi": {
       "package": "ouroboros-ai"

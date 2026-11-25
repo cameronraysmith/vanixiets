@@ -1,6 +1,7 @@
 {
   "name": "omnigraph",
   "version": "0.15.0",
+  "realizedVersion": "0.15.0",
   "source": {
     "githubRelease": {
       "owner": "ModernRelay",

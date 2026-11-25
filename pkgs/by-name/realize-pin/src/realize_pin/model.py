@@ -215,8 +215,11 @@ class Companion:
 
 @dataclass(frozen=True)
 class Pin:
+    """A package pin; `realized_version` is the version realize-pin last completed, None before its first run."""
+
     name: str
     version: str
+    realized_version: str | None
     source: Source
     artifacts: Mapping[str, Artifact]
     rev: str | None
@@ -563,7 +566,10 @@ def parse_pin(value: Json) -> Result[Pin, str]:
         if companion.is_error():
             return Error(companion.error)
         companions.append(companion.ok)
-    return Ok(Pin(name.ok, version.ok, source.ok, artifacts, rev, tuple(companions)))
+    raw_realized = o.get("realizedVersion")
+    if raw_realized is not None and not isinstance(raw_realized, str):
+        return Error("pin.realizedVersion: expected a string or null")
+    return Ok(Pin(name.ok, version.ok, raw_realized, source.ok, artifacts, rev, tuple(companions)))
 
 
 def parse_plan_checksum(value: Json, where: str) -> Result[PlanChecksum, str]:

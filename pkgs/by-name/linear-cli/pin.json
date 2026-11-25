@@ -1,6 +1,7 @@
 {
   "name": "linear-cli",
   "version": "3.1.0",
+  "realizedVersion": "3.1.0",
   "source": {
     "githubRelease": {
       "owner": "schpet",

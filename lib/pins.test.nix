@@ -29,6 +29,7 @@ let
   icWasm = {
     name = "ic-wasm-bin";
     version = "1.0.0";
+    realizedVersion = "1.0.0";
     source.githubRelease = {
       owner = "dfinity";
       repo = "ic-wasm";
@@ -59,6 +60,7 @@ let
   omnigraph = {
     name = "omnigraph";
     version = "0.15.0";
+    realizedVersion = "0.15.0";
     source.githubRelease = {
       owner = "ModernRelay";
       repo = "omnigraph";
@@ -88,6 +90,7 @@ let
   claudeCode = {
     name = "claude-code";
     version = "2.1.331";
+    realizedVersion = "2.1.331";
     source.vendorText = {
       url = "https://downloads.example/claude-code-releases/latest";
       regex = "^(?<version>\\S+)$";
@@ -106,6 +109,7 @@ let
   mergify = {
     name = "mergify-cli-bin";
     version = "2026.9.16.1";
+    realizedVersion = "2026.9.16.1";
     source.githubRelease = {
       owner = "Mergifyio";
       repo = "mergify-cli";
@@ -140,6 +144,7 @@ let
   greptimedb = {
     name = "greptimedb-bin";
     version = "1.2.1";
+    realizedVersion = "1.2.1";
     source.githubRelease = {
       owner = "GreptimeTeam";
       repo = "greptimedb";
@@ -175,6 +180,7 @@ let
   ouroboros = {
     name = "ouroboros";
     version = "0.55.3";
+    realizedVersion = "0.55.3";
     source.pypi.package = "ouroboros-ai";
     artifacts.cli.runtimeFetch.probeUrlTemplate = "https://pypi.org/pypi/ouroboros-ai/{version}/json";
   };
@@ -214,6 +220,7 @@ let
   mops = {
     name = "mops-bin";
     version = "3.8.0";
+    realizedVersion = "3.8.0";
     source.githubRelease = {
       owner = "caffeinelabs";
       repo = "mops";
@@ -234,6 +241,29 @@ in
     expected = icWasm // {
       rev = null;
     };
+  };
+
+  # realizedVersion is enforced at build time by pin-realized, never at
+  # evaluation (design D4): a pin whose realizedVersion is stale, missing or
+  # not a string still loads.
+  testUnrealizedVersionLoads = {
+    expr =
+      (load "unrealized" "ic-wasm-bin" (icWasm // { realizedVersion = "0.9.0"; })).pin.realizedVersion;
+    expected = "0.9.0";
+  };
+
+  testMissingRealizedVersionLoadsAsNull = {
+    expr =
+      (load "no-realized-version" "ic-wasm-bin" (removeAttrs icWasm [ "realizedVersion" ]))
+      .pin.realizedVersion;
+    expected = null;
+  };
+
+  testNonStringRealizedVersionLoads = {
+    expr =
+      (load "numeric-realized-version" "ic-wasm-bin" (icWasm // { realizedVersion = 1; }))
+      .pin.realizedVersion;
+    expected = 1;
   };
 
   testValidPinWithCompanionsParsesToItself = {

@@ -1,6 +1,7 @@
 {
   "name": "golem-binary",
   "version": "1.6.3",
+  "realizedVersion": "1.6.3",
   "source": {
     "githubRelease": {
       "owner": "golemcloud",

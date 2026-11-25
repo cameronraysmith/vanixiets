@@ -1,6 +1,7 @@
 {
   "name": "uncomment-bin",
   "version": "3.12.1",
+  "realizedVersion": "3.12.1",
   "source": {
     "githubRelease": {
       "owner": "polylint",

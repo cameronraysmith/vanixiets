@@ -11,9 +11,9 @@ from urllib.parse import urlsplit
 import pytest
 from expression import Result
 
-from fakes import FIXTURES, Clock, FakeGit, FakeHasher, FakeHttp, FakeNix, FakeSkillHasher
+from fakes import FIXTURES, Clock, FakeGit, FakeHasher, FakeHttp, FakeNix, FakeSkillHasher, RecordingFiles
 from realize_pin.adapters import TreeFiles
-from realize_pin.capabilities import Capabilities, Custom, FodAttr, NpmDeps, Src
+from realize_pin.capabilities import Capabilities, Custom, Files, FodAttr, NpmDeps, Src
 from realize_pin.cli import main
 from realize_pin.model import Json
 from realize_pin.policy import pin_path
@@ -69,7 +69,7 @@ def _stale_skill_index(data: bytes) -> bytes:
 
 
 def stale(files: dict[str, bytes]) -> dict[str, bytes]:
-    """The same files at an older version: every digest, rev, file value and version moved."""
+    """The same files at an older version, realized there: every digest, rev, file value and version moved."""
     out: dict[str, bytes] = {}
     for path, data in files.items():
         if path == SKILLS:
@@ -79,6 +79,7 @@ def stale(files: dict[str, bytes]) -> dict[str, bytes]:
         if path.endswith("pin.json"):
             doc = json.loads(text)
             doc["version"] = "0.0.1"
+            doc["realizedVersion"] = "0.0.1"
             for artifact in doc["artifacts"].values():
                 if "fileValue" in artifact:
                     artifact["fileValue"]["value"] = "0.0.0"
@@ -99,13 +100,18 @@ class Scenario:
     git: FakeGit
     clock: Clock
 
-    def capabilities(self) -> Capabilities:
+    def capabilities(self, files: Files | None = None) -> Capabilities:
         return Capabilities(
-            http=self.http, nix=self.nix, hasher=self.hasher, skills=self.skills, git=self.git, files=TreeFiles(self.root)
+            http=self.http,
+            nix=self.nix,
+            hasher=self.hasher,
+            skills=self.skills,
+            git=self.git,
+            files=TreeFiles(self.root) if files is None else files,
         )
 
-    def run(self) -> Result[Realization, RealizeError]:
-        return realize(self.package, self.version, self.capabilities(), Deadline.start(self.clock))
+    def run(self, files: Files | None = None) -> Result[Realization, RealizeError]:
+        return realize(self.package, self.version, self.capabilities(files), Deadline.start(self.clock))
 
     def tree(self) -> dict[str, bytes]:
         return {str(p.relative_to(self.root)): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
@@ -245,6 +251,65 @@ def test_checksum_file_missing_a_platform(tmp_path: Path) -> None:
     assert s.tree() == before
 
 
+def _realized_version(data: bytes) -> Json:
+    doc: Json = json.loads(data)
+    assert isinstance(doc, dict)
+    return doc.get("realizedVersion")
+
+
+@pytest.mark.parametrize("package", RECORDED)
+def test_realization_marks_the_version_realized(package: str, tmp_path: Path) -> None:
+    s = scenario(package, tmp_path, stale(committed(package)))
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    doc = _pin_doc(tmp_path, package)
+    assert isinstance(doc, dict)
+    assert doc["realizedVersion"] == doc["version"] == s.version
+
+
+def test_artifact_failure_never_marks_the_version_realized(tmp_path: Path) -> None:
+    """The restore puts pin.json back byte for byte, and no state written before it marks the new version
+    realized, so a run killed before its restore still fails pin-realized."""
+    sums = (FIXTURES / "mergify-cli-bin" / "upstream" / "SHA256SUMS").read_text()
+    without = "".join(line + "\n" for line in sums.splitlines() if "x86_64-apple-darwin" not in line)
+    url = "https://github.com/Mergifyio/mergify-cli/releases/download/2026.9.16.1/SHA256SUMS"
+    s = scenario("mergify-cli-bin", tmp_path, stale(committed("mergify-cli-bin")), bodies={url: without.encode()})
+    files = RecordingFiles(TreeFiles(tmp_path))
+    before = s.tree()
+    result = s.run(files)
+    assert result.is_error()
+    assert result.error.step == Step.HASH
+    assert s.tree() == before
+    pin_writes = [data for path, data in files.writes if path == pin_path("mergify-cli-bin")]
+    assert any(json.loads(data)["version"] == s.version for data in pin_writes), "the version never moved"
+    assert [_realized_version(data) for data in pin_writes] == ["0.0.1"] * len(pin_writes)
+
+
+@pytest.mark.parametrize("package", RECORDED)
+def test_realizing_the_current_version_keeps_it_realized(package: str, tmp_path: Path) -> None:
+    s = scenario(package, tmp_path, committed(package))
+    before = s.tree()
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    assert result.ok.changed == ()
+    assert s.tree() == before
+    doc = _pin_doc(tmp_path, package)
+    assert isinstance(doc, dict)
+    assert doc["realizedVersion"] == doc["version"] == s.version
+
+
+def test_realization_adds_a_missing_realized_version(tmp_path: Path) -> None:
+    files = stale(committed("ic-wasm-bin"))
+    path = pin_path("ic-wasm-bin")
+    doc = json.loads(files[path])
+    del doc["realizedVersion"]
+    files[path] = (json.dumps(doc, indent=2) + "\n").encode()
+    s = scenario("ic-wasm-bin", tmp_path, files)
+    result = s.run()
+    assert result.is_ok(), result.error.render() if result.is_error() else ""
+    assert _realized_version((tmp_path / path).read_bytes()) == s.version
+
+
 def test_hasher_error(tmp_path: Path) -> None:
     failure: dict[tuple[str, FodAttr], str | Exception] = {
         ("apm-skills-compose", Custom("deps")): RuntimeError("nix-update failed: builder for apm-deps failed")
@@ -340,6 +405,7 @@ def test_forge_api_host_is_refused(tmp_path: Path) -> None:
 DEPS_PIN: dict[str, Json] = {
     "name": "deps-demo",
     "version": "0.0.1",
+    "realizedVersion": "0.0.1",
     "source": {"githubRelease": {"owner": "example", "repo": "deps-demo", "tagTemplate": "v{version}"}},
     "artifacts": {
         "src": {
@@ -392,7 +458,7 @@ def test_source_and_deps_hash_from_the_hasher(tmp_path: Path) -> None:
     result = s.run()
     assert result.is_ok(), result.error.render() if result.is_error() else ""
     doc = json.loads((tmp_path / pin_path("deps-demo")).read_text())
-    assert doc["version"] == "1.2.3"
+    assert doc["version"] == doc["realizedVersion"] == "1.2.3"
     assert doc["artifacts"]["src"]["sourceBuild"]["hash"] == DEPS_SRC
     assert doc["artifacts"]["src"]["sourceBuild"]["depsHash"]["npm"]["hash"] == DEPS_GOT
     assert s.hasher.calls == [("deps-demo", Src()), ("deps-demo", NpmDeps())]
@@ -450,8 +516,8 @@ def test_runtime_fetch_probe_writes_only_the_version(tmp_path: Path) -> None:
     assert result.is_ok(), result.error.render() if result.is_error() else ""
     new = _pin_doc(tmp_path, "ouroboros")
     assert isinstance(old, dict) and isinstance(new, dict)
-    assert new.pop("version") == "0.55.3"
-    assert old.pop("version") == "0.0.1"
+    assert new.pop("version") == new.pop("realizedVersion") == "0.55.3"
+    assert old.pop("version") == old.pop("realizedVersion") == "0.0.1"
     assert new == old
     assert result.ok.changed == (pin_path("ouroboros"),)
     assert s.http.requests == [("GET", OUROBOROS_PROBE)]
@@ -513,6 +579,7 @@ def _file_scenario(
     pin: dict[str, Json] = {
         "name": "mops-bin",
         "version": "0.0.1",
+        "realizedVersion": "0.0.1",
         "source": {"githubRelease": {"owner": "caffeinelabs", "repo": "mops", "tagTemplate": "cli-v{version}"}},
         "artifacts": {
             "cli": {

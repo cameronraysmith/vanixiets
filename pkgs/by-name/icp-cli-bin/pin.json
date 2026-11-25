@@ -1,6 +1,7 @@
 {
   "name": "icp-cli-bin",
   "version": "1.8.0",
+  "realizedVersion": "1.8.0",
   "source": {
     "githubRelease": {
       "owner": "dfinity",

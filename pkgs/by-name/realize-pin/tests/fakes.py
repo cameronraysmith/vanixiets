@@ -15,7 +15,7 @@ from typing import override
 
 from expression import Error, Ok, Result
 
-from realize_pin.capabilities import FixedOutputHasher, FodAttr, Git, Http, Method, Nix, SkillHasher, Sri, sri
+from realize_pin.capabilities import FixedOutputHasher, FodAttr, Files, Git, Http, Method, Nix, SkillHasher, Sri, sri
 from realize_pin.model import Json
 from realize_pin.policy import pin_path
 
@@ -159,6 +159,27 @@ class FakeGit(Git):
         paths = {p for p, data in present.items() if self.committed.get(p) != data}
         paths |= {p for p in self.committed if p not in present}
         return Ok(frozenset(paths))
+
+
+@dataclass
+class RecordingFiles(Files):
+    """Delegates to `inner` and records every write, so a test sees states a restore later undoes."""
+
+    inner: Files
+    writes: list[tuple[str, bytes]] = field(default_factory=lambda: [])
+
+    @override
+    def read(self, path: str) -> Result[bytes | None, str]:
+        return self.inner.read(path)
+
+    @override
+    def write(self, path: str, data: bytes) -> Result[None, str]:
+        self.writes.append((path, data))
+        return self.inner.write(path, data)
+
+    @override
+    def remove(self, path: str) -> Result[None, str]:
+        return self.inner.remove(path)
 
 
 class Clock:

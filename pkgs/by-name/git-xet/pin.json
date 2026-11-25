@@ -1,6 +1,7 @@
 {
   "name": "git-xet",
   "version": "0.2.1",
+  "realizedVersion": "0.2.1",
   "source": {
     "githubRelease": {
       "owner": "huggingface",

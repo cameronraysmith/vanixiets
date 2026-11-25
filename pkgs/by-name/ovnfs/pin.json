@@ -1,6 +1,7 @@
 {
   "name": "ovnfs",
   "version": "0.6.0",
+  "realizedVersion": "0.6.0",
   "source": {
     "githubRelease": {
       "owner": "stencil-hq",

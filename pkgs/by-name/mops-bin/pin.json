@@ -1,6 +1,7 @@
 {
   "name": "mops-bin",
   "version": "3.8.0",
+  "realizedVersion": "3.8.0",
   "source": {
     "githubRelease": {
       "owner": "caffeinelabs",

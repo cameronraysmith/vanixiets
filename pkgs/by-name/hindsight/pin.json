@@ -1,6 +1,7 @@
 {
   "name": "hindsight",
   "version": "0.10.2",
+  "realizedVersion": "0.10.2",
   "source": {
     "githubRelease": {
       "owner": "vectorize-io",

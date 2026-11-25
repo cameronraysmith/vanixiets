@@ -1,6 +1,7 @@
 {
   "name": "mergify-cli-bin",
   "version": "2026.9.16.1",
+  "realizedVersion": "2026.9.16.1",
   "source": {
     "githubRelease": {
       "owner": "Mergifyio",

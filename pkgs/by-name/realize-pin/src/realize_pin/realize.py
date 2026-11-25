@@ -346,8 +346,8 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
                     return Error(done.error)
             case ApmRef() | RemoteSkillHashes():
                 pass
-    # Last: the compose these hashes come from builds from the apm.yml refs and
-    # the apmDepsHash written above.
+    # After every fixedOutputHash: the compose these hashes come from builds
+    # from the apm.yml refs and the apmDepsHash written above.
     for companion in pin.companions:
         match companion.kind:
             case RemoteSkillHashes():
@@ -356,7 +356,11 @@ def _apply(run: _Run, pin: Pin, plan: Plan) -> Result[None, RealizeError]:
                     return Error(done.error)
             case ApmRef() | FixedOutputHash():
                 pass
-    return Ok(None)
+    # The final write: checks.<system>.pin-realized fails any pin whose
+    # realizedVersion differs from its version, so a run that stops before
+    # this point, restored or not, never leaves the new version marked realized.
+    doc["realizedVersion"] = run.version
+    return _write_object(run, pin_path(pin.name), doc)
 
 
 def _resolve_rev(run: _Run, pin: Pin, plan: Plan) -> Result[str | None, RealizeError]:

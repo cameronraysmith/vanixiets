@@ -63,6 +63,17 @@ def test_parse_pin_rejects_an_unknown_source_tag() -> None:
     assert parsed.is_error() and "gitlabRelease" in parsed.error
 
 
+@pytest.mark.parametrize("realized", ["2026.9.16.1", "2026.1.1", None])
+def test_parse_pin_reads_the_realized_version(realized: str | None) -> None:
+    parsed = parse_pin(_pin(realizedVersion=realized))
+    assert parsed.is_ok() and parsed.ok.realized_version == realized
+
+
+def test_parse_pin_rejects_a_non_string_realized_version() -> None:
+    parsed = parse_pin(_pin(realizedVersion=1))
+    assert parsed.is_error() and "realizedVersion" in parsed.error
+
+
 def test_parse_pin_rejects_a_platform_without_a_hash() -> None:
     doc = _pin()
     artifacts = doc["artifacts"]

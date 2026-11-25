@@ -50,6 +50,15 @@ let
     options = {
       name = option str;
       version = option str;
+      # The version realize-pin last completed, written as its final step. It
+      # is accepted untyped and never checked here: checks.<system>.pin-realized
+      # compares it with `version` at build time, because an evaluation error
+      # drops the package from nixbot's evaluation instead of failing it
+      # (design D4).
+      realizedVersion = mkOption {
+        type = types.anything;
+        default = null;
+      };
       source = option (union {
         githubRelease = repo // {
           tagTemplate = option str;

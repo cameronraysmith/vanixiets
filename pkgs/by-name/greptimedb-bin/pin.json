@@ -1,6 +1,7 @@
 {
   "name": "greptimedb-bin",
   "version": "1.2.1",
+  "realizedVersion": "1.2.1",
   "source": {
     "githubRelease": {
       "owner": "GreptimeTeam",

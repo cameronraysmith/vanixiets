@@ -1,6 +1,7 @@
 {
   "name": "quarto-bin",
   "version": "1.10.18",
+  "realizedVersion": "1.10.18",
   "source": {
     "githubRelease": {
       "owner": "quarto-dev",
