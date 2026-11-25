@@ -1,7 +1,7 @@
 {
   "name": "pi-vim",
-  "version": "0.14.2",
-  "realizedVersion": "0.14.2",
+  "version": "0.16.0",
+  "realizedVersion": "0.16.0",
   "source": {
     "npm": {
       "package": "pi-vim"
@@ -14,7 +14,7 @@
         "checksum": {
           "prefetch": {}
         },
-        "hash": "sha256-BJkHE2C/SIBYHyINCD971+ew+yDS+X0yU5xjkNks4rg="
+        "hash": "sha256-u/0bGx8EvIgecC4xliVU1I5ll3XaOhghaKqAQc3pKLw="
       }
     }
   },
