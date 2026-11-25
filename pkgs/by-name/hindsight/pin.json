@@ -1,7 +1,7 @@
 {
   "name": "hindsight",
-  "version": "0.10.2",
-  "realizedVersion": "0.10.2",
+  "version": "1.3.0",
+  "realizedVersion": "1.3.0",
   "source": {
     "githubRelease": {
       "owner": "vectorize-io",
@@ -23,10 +23,10 @@
           "prefetch": {}
         },
         "hashes": {
-          "x86_64-linux": "sha256-vofGNxT/BGrI7WaEZcoMh1+U5v8Kie2D2n6zhzExl68=",
-          "aarch64-linux": "sha256-E9AB1eONniAHqjwQbfuCMyVX3Wx6rlPB8m5uDxvwYaE=",
-          "x86_64-darwin": "sha256-pYqVd8ha16qSRIHPKiXTmWGjiDLSlimjR06ItLCYjHo=",
-          "aarch64-darwin": "sha256-nNBxkvA4xgUBJCZIwlBBvXBzBP946CYlFdr1+4MsR/Q="
+          "x86_64-linux": "sha256-+/7SHV7TBys6X45mfaYEgm4BjLsKzJJyarzIAPT7vsc=",
+          "aarch64-linux": "sha256-UbnSEqfEdOHLfeA6oO21qt5pUQ27WNVXbX7QJvK+6t0=",
+          "x86_64-darwin": "sha256-EVBXffABzWNDIFqjPp0DR9Ha662wgnN5mrw+9+QvrFE=",
+          "aarch64-darwin": "sha256-sF9H1vNCOgKe6eBena7f7thnpbQtc3W9sN7M3PvtAYg="
         }
       }
     }
