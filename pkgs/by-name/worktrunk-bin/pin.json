@@ -1,0 +1,59 @@
+{
+  "name": "worktrunk-bin",
+  "version": "0.81.0",
+  "source": {
+    "githubRelease": {
+      "owner": "max-sixty",
+      "repo": "worktrunk",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/max-sixty/worktrunk/releases/download/{tag}/worktrunk-{platform}.tar.xz",
+        "platforms": {
+          "x86_64-linux": "x86_64-unknown-linux-musl",
+          "aarch64-linux": "aarch64-unknown-linux-musl",
+          "x86_64-darwin": "x86_64-apple-darwin",
+          "aarch64-darwin": "aarch64-apple-darwin"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://github.com/max-sixty/worktrunk/releases/download/{tag}/sha256.sum",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-DCU/IWmFzpzXsgKhFga1zmqpNLEBn9H7ubfOK0exx0o=",
+          "aarch64-linux": "sha256-ejNNLmTFd6/QJH4kEe/2czYKsfGIl1ZPLS5dU3T710s=",
+          "x86_64-darwin": "sha256-IR+jWFr6DOJD3g8Af74ti4bFyIyF7aF9CTEbMuhTNxQ=",
+          "aarch64-darwin": "sha256-ucPy+AcVVM+IUARm1l014YrV7a1XYkeaHxS83dWreII="
+        }
+      }
+    }
+  },
+  "rev": "e42f0f6fef2fdbd98fc92e5cd6c3cbea55b65b38",
+  "companions": [
+    {
+      "path": "modules/home/ai/plugins/version-control-and-forge/apm.yml",
+      "kind": {
+        "apmRef": {
+          "git": "max-sixty/worktrunk"
+        }
+      }
+    },
+    {
+      "path": "pkgs/by-name/apm-skills-compose/hashes.json",
+      "kind": {
+        "fixedOutputHash": {
+          "package": "apm-skills-compose",
+          "attr": "apmDepsHash",
+          "fodAttr": "deps"
+        }
+      }
+    }
+  ]
+}

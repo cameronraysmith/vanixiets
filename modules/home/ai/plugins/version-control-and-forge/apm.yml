@@ -7,8 +7,8 @@ dependencies:
     # github-hosted apm dependency in object form. The commit is pinned here
     # only; Nix downloads it in apm-deps (pkgs/by-name/apm-skills-compose/deps.nix).
     # It must equal pkgs.worktrunk-bin.sourceRev
-    # (structure-release-alignment-worktrunk); pkgs/by-name/worktrunk-bin/update.sh
-    # rewrites both in step.
+    # (structure-release-alignment-worktrunk); realize-pin keeps this ref and the
+    # pin's sourceRev in step through the pin's apmRef companion.
     # Upstream's tag series is not monotonic: `apm outdated` reported v0.1.4
     # (b08d381f...) as "latest", but that tag is an orphan not reachable from
     # main (verify ancestry via `gh api .../compare/<sha>...main` before
@@ -30,7 +30,8 @@ dependencies:
       skills: [gh-stack]
     # The commit is pinned here only; Nix downloads it in apm-deps. It must equal
     # pkgs.mergify-cli-bin.sourceRev (structure-release-alignment-mergify-cli);
-    # pkgs/by-name/mergify-cli-bin/update.sh rewrites both in step.
+    # realize-pin keeps this ref and the pin's sourceRev in step through the
+    # pin's apmRef companion.
     - git: Mergifyio/mergify-cli
       ref: e7c1ebbc281361f0b2b7827cf583f57339c97ebc
       skills: [mergify-stack]

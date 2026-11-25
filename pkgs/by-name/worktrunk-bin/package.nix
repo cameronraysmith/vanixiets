@@ -7,33 +7,21 @@
 }:
 let
   inherit (stdenv.hostPlatform) system;
-  systemToPlatform = {
-    "x86_64-linux" = {
-      asset = "x86_64-unknown-linux-musl";
-      hash = "sha256-DCU/IWmFzpzXsgKhFga1zmqpNLEBn9H7ubfOK0exx0o=";
-    };
-    "aarch64-linux" = {
-      asset = "aarch64-unknown-linux-musl";
-      hash = "sha256-ejNNLmTFd6/QJH4kEe/2czYKsfGIl1ZPLS5dU3T710s=";
-    };
-    "x86_64-darwin" = {
-      asset = "x86_64-apple-darwin";
-      hash = "sha256-IR+jWFr6DOJD3g8Af74ti4bFyIyF7aF9CTEbMuhTNxQ=";
-    };
-    "aarch64-darwin" = {
-      asset = "aarch64-apple-darwin";
-      hash = "sha256-ucPy+AcVVM+IUARm1l014YrV7a1XYkeaHxS83dWreII=";
-    };
-  };
-  platform = systemToPlatform.${system} or (throw "worktrunk-bin: unsupported platform ${system}");
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "worktrunk-bin"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "worktrunk-bin";
-  version = "0.81.0";
+  inherit (pin) version;
 
   src = fetchurl {
-    url = "https://github.com/max-sixty/worktrunk/releases/download/v${finalAttrs.version}/worktrunk-${platform.asset}.tar.xz";
-    hash = platform.hash;
+    url = planned.${system}.url or (throw "worktrunk-bin: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
   };
 
   # cargo-dist archive unpacks to a single worktrunk-<triple>/ directory that
@@ -57,10 +45,10 @@ stdenv.mkDerivation (finalAttrs: {
   doInstallCheck = true;
 
   passthru = {
-    updateScript = ./update.sh;
+    inherit pin pinPlan;
     # Commit the release tag points at; structure-release-alignment-worktrunk
     # requires the worktrunk skills' apm.yml ref to equal it.
-    sourceRev = "e42f0f6fef2fdbd98fc92e5cd6c3cbea55b65b38";
+    sourceRev = pin.rev;
   };
 
   meta = {
@@ -72,7 +60,7 @@ stdenv.mkDerivation (finalAttrs: {
       asl20
     ];
     mainProgram = "wt";
-    platforms = lib.attrNames systemToPlatform;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     maintainers = with lib.maintainers; [ cameronraysmith ];
   };

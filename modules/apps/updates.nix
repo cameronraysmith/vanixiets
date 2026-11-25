@@ -79,11 +79,6 @@
         program = "${config.packages.quarto-bin.updateScript}";
       };
 
-      apps.update-worktrunk-bin = {
-        type = "app";
-        program = "${config.packages.worktrunk-bin.updateScript}";
-      };
-
       apps.update-buzz-source = {
         type = "app";
         program = "${config.packages.buzz-source.updateScript}";
