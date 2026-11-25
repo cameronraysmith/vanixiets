@@ -93,6 +93,7 @@
     "nix-flake-pr-cycle",
     "nixpkgs-broken-package",
     "nucleus-platform",
+    "openspec",
     "openspec-apply-change",
     "openspec-archive-change",
     "openspec-bdd-bridge",

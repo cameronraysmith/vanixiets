@@ -4,13 +4,13 @@
 # apm package.
 #
 # openspec stores its skill bodies as compiled javascript, not as static files,
-# so the markdown payloads must be produced by running openspec's own code. since
-# 2.1 (Fission-AI/OpenSpec#2241) `openspec init` fetches the skills with git from
-# the release tag on GitHub and verifies them against `expectedSkillContents`;
-# this script calls that function from the pinned package directly, through
-# modules/home/ai/openspec/generate-skills.mjs, so it needs no network and
-# produces the bytes init would install. the openspec-vendored-skills check uses
-# the same generator, so the two can never disagree.
+# so the markdown payloads must be produced by running openspec's own code.
+# `openspec init` and `openspec update` install every file of each skill from
+# the package's `expectedSkillFiles`; this script calls that function from the
+# pinned package directly, through modules/home/ai/openspec/generate-skills.mjs,
+# so it needs no network and produces the bytes init would install. the
+# openspec-vendored-skills check uses the same generator, so the two can never
+# disagree.
 #
 # the generated skills are version-portable: no working directory or absolute
 # path is embedded, and since 2.1 they carry no `generatedBy` line. upstream's
@@ -31,7 +31,7 @@ usage() {
   cat <<'EOF'
 Usage: openspec-refresh-vendored-artifacts [-h|--help]
 
-Regenerates the 12 vendored openspec-* skills in
+Regenerates the vendored OpenSpec skills (openspec and openspec-*) in
 modules/home/ai/plugins/planning-and-development/.apm/skills offline from the
 flake-pinned openspec package, in a sandboxed temp directory.
 Hand-authored skills in that directory are left untouched.
@@ -61,7 +61,7 @@ done
 repo_root="$(git rev-parse --show-toplevel)"
 generator="${repo_root}/modules/home/ai/openspec/generate-skills.mjs"
 
-# the 12 generated openspec-* skills are vendored into the planning-and-development
+# the generated openspec skills are vendored into the planning-and-development
 # apm package so they ship through apm-skills-compose; this directory ALSO holds
 # four hand-authored skills (agentic-planning-development-workflow,
 # openspec-bdd-bridge, openspec-linear-sync, linear-project-management) which this script
@@ -135,8 +135,8 @@ fi
 # assert the full set was generated, so a partial generation or a change in the
 # number of upstream skills fails loudly here rather than vendoring a subset.
 skill_count=$(fd -t d -d 1 . "${generated_skills}" | wc -l | tr -d ' ')
-if [[ "${skill_count}" -ne 12 ]]; then
-  echo "error: expected 12 skills, got ${skill_count} skills" >&2
+if [[ "${skill_count}" -ne 13 ]]; then
+  echo "error: expected 13 skills, got ${skill_count} skills" >&2
   exit 1
 fi
 

@@ -1,24 +1,23 @@
-# openspec-vendored-skills - the vendored openspec-* skills are exactly what
-# the pinned OpenSpec CLI generates.
+# openspec-vendored-skills - the vendored OpenSpec skills are exactly what the
+# pinned OpenSpec CLI generates.
 #
-# The 12 skills in planning-and-development are refreshed by hand with
+# The OpenSpec skills in planning-and-development are refreshed by hand with
 # `nix run .#openspec-refresh-vendored-artifacts`, so an llm-agents bump that
 # changes OpenSpec's skill text went unnoticed until someone refreshed. This
 # check regenerates the skills offline from the pinned package and fails with
 # the diff when the vendored copies differ, so that bump fails until the
 # refresh is committed alongside it.
 #
-# `openspec init` cannot run here: since 2.1 (Fission-AI/OpenSpec#2241) it
-# fetches the skills with git from the release tag. The check instead runs
-# modules/home/ai/openspec/generate-skills.mjs, the generator the refresh also
-# uses, which calls `expectedSkillContents` from the package's own dist (the
-# function `init` verifies its fetched install against), so it needs no network
+# The check does not run `openspec init`, which writes into a project's skills
+# folders. It runs modules/home/ai/openspec/generate-skills.mjs, the generator
+# the refresh also uses, which calls `expectedSkillFiles` from the package's own
+# dist (the map `init` installs every skill file from), so it needs no network
 # and no import-from-derivation.
 #
 # The vendored set is every skill whose frontmatter carries upstream's
 # `author: openspec`, the marker that distinguishes generated skills from the
-# hand-authored ones beside them; the comparison covers names and contents in
-# both directions.
+# hand-authored ones beside them; the comparison covers names and every file's
+# contents in both directions.
 { inputs, lib, ... }:
 {
   perSystem =
@@ -71,14 +70,14 @@
               done
 
               count="$(ls "$TMPDIR/expected" | wc -l)"
-              if [ "$count" -ne 12 ]; then
-                echo "openspec ${openspec.version} generates $count skills, not 12; review the refresh script and this check" >&2
+              if [ "$count" -ne 13 ]; then
+                echo "openspec ${openspec.version} generates $count skills, not 13; review the refresh script and this check" >&2
                 exit 1
               fi
 
               if ! diff -ru "$TMPDIR/vendored" "$TMPDIR/expected"; then
                 echo "" >&2
-                echo "The vendored openspec-* skills differ from what openspec ${openspec.version} generates" >&2
+                echo "The vendored OpenSpec skills differ from what openspec ${openspec.version} generates" >&2
                 echo "(--- vendored, +++ generated). Run: nix run .#openspec-refresh-vendored-artifacts" >&2
                 exit 1
               fi

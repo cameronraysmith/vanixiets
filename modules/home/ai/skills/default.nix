@@ -64,10 +64,20 @@ let
       # `flake.lib.linearSkills` (pkgs.linear-cli.skillSrc/skills/linear-cli) only where the
       # linear module or the user opts in, so it is withheld from the unconditional
       # compose delivery. Both paths ship the same pin (pkgs.linear-cli.skillSrc.rev).
+      #
+      # `openspec` is the router skill OpenSpec 2.2 generates. Its text tells agents
+      # to run `openspec init`, `openspec update` and `openspec config profile`,
+      # which overwrite the apm-managed `.agents/` tree and the home-manager-managed
+      # global config.json (see ../openspec/README.md), and to send
+      # `openspec feedback` to the OpenSpec maintainers. It stays vendored in
+      # planning-and-development so the openspec-vendored-skills check compares the
+      # full generated set. Re-include it when the generated text no longer
+      # instructs those commands, or when this repository wraps them safely.
       excludedUpstreamSkills = [
         "tdd"
         "writing-for-agents"
         "linear-cli"
+        "openspec"
       ];
 
       allSkills =
