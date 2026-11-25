@@ -1,7 +1,7 @@
 {
   "name": "dbt-fusion",
-  "version": "2.0.6",
-  "realizedVersion": "2.0.6",
+  "version": "2.0.13",
+  "realizedVersion": "2.0.13",
   "source": {
     "vendorJson": {
       "url": "https://public.cdn.getdbt.com/fs/versions.json",
@@ -27,10 +27,10 @@
           }
         },
         "hashes": {
-          "x86_64-linux": "sha256-ZGEaODSDg+roakg0YRz8eG+WzbyQf735OCXFVg0gwZc=",
-          "aarch64-linux": "sha256-57iF2oEQkN+IYxuHkWdr7TGVO6xlMqf6DD+94WRaV60=",
-          "x86_64-darwin": "sha256-2+bf5n76s/Iml3nJVtCWWGbOp+iUWTg7bb5+ijNrr6A=",
-          "aarch64-darwin": "sha256-H/jpQhScnELgomQZ8pTDKT5QC4QmTMuVof+bZYXIjds="
+          "x86_64-linux": "sha256-hfpJIVcrQWFJZsCtdeP2y4q1KI8ZwhIUoz9FTdrkf4c=",
+          "aarch64-linux": "sha256-GlD96Xx2T6XADKMRdxCUUhQFhtUZBZtlPpJxGLNFG+Y=",
+          "x86_64-darwin": "sha256-mLlReiEEd9Tn3Gt16qYDMJWVTX9oxfbJ3Z9SBasySNY=",
+          "aarch64-darwin": "sha256-kxnTjK3oF6+kR/PyCjAQ9hv2LQ53LstmYO31UYv5T38="
         }
       }
     }
