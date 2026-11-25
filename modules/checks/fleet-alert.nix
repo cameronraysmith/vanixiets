@@ -54,6 +54,9 @@
 # - sizeRuleClause (declare-test-size-classes design D10): CheckOutgrewItsClass
 #   renders one VALUES tuple per gated check with its class limit, and the
 #   mutants sizeRenderLimitOff and sizeRenderDropped must each fail.
+# - withdrawnClause (declare-test-size-classes design D10): the withdrawn
+#   CheckOutgrewItsClass is in neither the evaluator's rule list nor
+#   promtool's file, and the mutant withdrawnReEnabled must fail.
 # - staleRenderClause (declare-test-size-classes design D11):
 #   EnormousTestStale renders one VALUES row per lib.enormousTests entry, and
 #   the mutant staleRenderDropped must fail.
@@ -1318,11 +1321,12 @@
           (throw "fleet-alert check: no CheckOutgrewItsClass")
           (self.lib.fleetAlertRules { inherit lib hosts checkSizes; }).rules
         ).expr;
-      sizeActual = sizeRuleFindings self.lib.checkSizes (ruleNamed "CheckOutgrewItsClass").expr;
+      sizeActual = sizeRuleFindings self.lib.checkSizes (sizeExprOf self.lib.checkSizes);
       sizeMutants = {
         sizeRenderLimitOff = sizeRuleFindings self.lib.checkSizes (
-          builtins.replaceStrings [ "'medium', 300, " ] [ "'medium', 3000, " ]
-            (ruleNamed "CheckOutgrewItsClass").expr
+          builtins.replaceStrings [ "'medium', 300, " ] [ "'medium', 3000, " ] (
+            sizeExprOf self.lib.checkSizes
+          )
         );
         sizeRenderDropped =
           let
@@ -1343,6 +1347,55 @@
           ${lib.concatMapStrings (n: ''
             echo ${lib.escapeShellArg "mutant ${n} rejected: ${builtins.head sizeMutants.${n}}"}
           '') (builtins.attrNames sizeMutants)}
+          touch "$out"
+        '';
+
+      # CheckOutgrewItsClass is withdrawn from the deployed rules
+      # (declare-test-size-classes design D10, 2026-11-25): from magnetite's
+      # reboot at 23:31Z on 2026-11-24 to 00:01Z its query exceeded
+      # GreptimeDB's 512 MiB query memory limit on every run, so the store answered no
+      # devloop query, every devloop instance froze and StoreQueryFailing
+      # fired. It stays in `rules`, rendered and pinned by sizeRuleClause,
+      # and must be in neither the evaluator's list nor promtool's file
+      # until its cost is bounded; the mutant withdrawnReEnabled, the table
+      # rendered with nothing withdrawn, must fail.
+      withdrawnRules = [ "CheckOutgrewItsClass" ];
+      withdrawnFindings =
+        rendered:
+        let
+          names = map (r: r.alert) (builtins.fromJSON rendered.json);
+          promtoolNames =
+            lib.concatMap (g: map (r: r.alert) g.rules)
+              (builtins.fromJSON rendered.yaml).groups;
+        in
+        map (n: "${n} is withdrawn and in the evaluator's rules") (
+          lib.filter (n: builtins.elem n names) withdrawnRules
+        )
+        ++ map (n: "${n} is withdrawn and in promtool's rules") (
+          lib.filter (n: builtins.elem n promtoolNames) withdrawnRules
+        );
+      withdrawnActual = withdrawnFindings rules;
+      withdrawnMutants = {
+        withdrawnReEnabled = withdrawnFindings (
+          self.lib.fleetAlertRules {
+            inherit lib hosts;
+            withdrawn = [ ];
+          }
+        );
+      };
+      withdrawnClause =
+        assert lib.assertMsg (
+          withdrawnActual == [ ]
+        ) "fleet-alert withdrawn rules deployed: ${builtins.toJSON withdrawnActual}";
+        assert lib.assertMsg (lib.all (f: f != [ ]) (lib.attrValues withdrawnMutants))
+          "fleet-alert accepted a withdrawn-rule mutant: ${
+            builtins.toJSON (builtins.attrNames (lib.filterAttrs (_: f: f == [ ]) withdrawnMutants))
+          }";
+        pkgs.runCommand "fleet-alert-withdrawn-clause" { } ''
+          echo ${lib.escapeShellArg "ok: withdrawn and not deployed: ${builtins.toJSON withdrawnRules}"}
+          ${lib.concatMapStrings (n: ''
+            echo ${lib.escapeShellArg "mutant ${n} rejected: ${builtins.head withdrawnMutants.${n}}"}
+          '') (builtins.attrNames withdrawnMutants)}
           touch "$out"
         '';
 
@@ -3341,6 +3394,7 @@
                   pingTransport
                   deadmanClause
                   sizeRuleClause
+                  withdrawnClause
                   staleRenderClause
                   ;
               };
@@ -3356,6 +3410,7 @@
               test -e ${pingTransport}
               test -e ${deadmanClause}
               test -e ${sizeRuleClause}
+              test -e ${withdrawnClause}
               test -e ${staleRenderClause}
               touch "$out"
             '';

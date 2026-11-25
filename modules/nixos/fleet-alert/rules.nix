@@ -2,11 +2,14 @@
 # D10, D14, D16; tasks.md 4.1).
 #
 # One Nix source for the evaluator and for promtool. fleetAlertRules returns
-# `rules`; `json`, the evaluator's rule list with `for` in seconds; and
-# `yaml`, a Prometheus rules file of the `promql` rules, written as
-# JSON (which YAML accepts) and read only by checks.x86_64-linux.fleet-alert's
-# promtool pass. The expressions are ADR-009's rule table as amended
-# (ADR-009-alerting.md:102-119), measured on magnetite on 2026-10-18
+# `rules`, the whole table, withdrawn rules included; `json`, the
+# evaluator's rule list with `for` in seconds and without the withdrawn
+# rules; and
+# `yaml`, a Prometheus rules file of the `promql` rules, also without the
+# withdrawn rules, written as JSON (which YAML accepts) and read only by
+# checks.x86_64-linux.fleet-alert's promtool pass. The expressions are
+# ADR-009's rule table as amended (ADR-009-alerting.md:102-119), measured
+# on magnetite on 2026-10-18
 # (logs/s3/series-labels.md): each carries its threshold, because an instant
 # query returns every input series otherwise, and SystemdUnitFailed writes
 # its literal dot as `[.]`, because GreptimeDB 1.2.1 rejects `\.` in
@@ -77,6 +80,16 @@
       # EnormousTestStale over fixture tests (declare-test-size-classes
       # design D11).
       enormousTests ? config.flake.lib.enormousTests,
+      # Rules kept in `rules`, so their rendering and fixtures stay tested,
+      # and left out of `json` and `yaml`, so no evaluator runs them. A
+      # parameter so checks.x86_64-linux.fleet-alert can render a withdrawn
+      # rule re-enabled as its mutant.
+      # CheckOutgrewItsClass (declare-test-size-classes design D10),
+      # withdrawn 2026-11-25: from magnetite's reboot at 23:31Z on
+      # 2026-11-24 to 00:01Z its query exceeded GreptimeDB's 512 MiB query
+      # memory limit on every run, which froze every devloop instance and raised
+      # StoreQueryFailing; it returns when its cost is bounded.
+      withdrawn ? [ "CheckOutgrewItsClass" ],
     }:
     let
       # A host is expected, or always-on, only once it collects (S4 design
@@ -689,15 +702,20 @@
           ;
         labels.severity = r.severity;
       };
+      deployed =
+        assert lib.assertMsg (lib.all (n: lib.any (r: r.alert == n) rules)
+          withdrawn
+        ) "fleetAlertRules: every withdrawn name must name a rule; got ${builtins.toJSON withdrawn}";
+        builtins.filter (r: !builtins.elem r.alert withdrawn) rules;
     in
     {
       inherit rules;
-      json = builtins.toJSON (map (r: r // { for = seconds r.for; }) rules);
+      json = builtins.toJSON (map (r: r // { for = seconds r.for; }) deployed);
       yaml = builtins.toJSON {
         groups = [
           {
             name = "fleet-alert";
-            rules = map promRule (builtins.filter (r: r ? expr && r.language == "promql") rules);
+            rules = map promRule (builtins.filter (r: r ? expr && r.language == "promql") deployed);
           }
         ];
       };
