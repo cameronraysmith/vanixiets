@@ -29,6 +29,7 @@ A bump is done when every pin was derived by a tool (none written by hand), the 
   - none: the bump is manual, so derive each hash from a mismatch build (set the hash to `lib.fakeHash`, build, copy the `got:` value). Never type a hash in.
 
 Changed 2026-11-25 (CAM-124): a package with `pin.json` is realized by realize-pin, by hand or in Renovate's pull request, and the updater lookup above applies only to packages without one.
+xsra is deliberately not automated, because its `Cargo.lock` is regenerated against crates.io on the day it runs, and it is bumped with `nix run .#update-xsra`.
 
 ## 3. Run the updater
 

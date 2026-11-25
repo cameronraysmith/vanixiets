@@ -1,3 +1,7 @@
+## Purpose
+
+Keeping each package built from a pinned upstream release current without a person running a script: every new stable release is proposed in an update pull request of its own, with every digest the package needs already derived and checked, and a person still decides whether it merges.
+
 ## ADDED Requirements
 
 ### Requirement: Each new stable release of a package with a package pin is proposed in an update pull request of its own

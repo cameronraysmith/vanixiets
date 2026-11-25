@@ -1,3 +1,8 @@
+## Purpose
+
+The machine-side contract that delivers package version refresh: the typed package pin and its checks, the one realizer that derives a release's digests and writes only the pin and its declared companions, and the Renovate manager, rule and allowlist entry that run it.
+Trust boundary: it guarantees only what the repository controls, not when Renovate runs, what an upstream publishes, or whether a release builds on a platform.
+
 ## ADDED Requirements
 
 ### Requirement: Every package pin is validated when the flake is evaluated
