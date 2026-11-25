@@ -1,7 +1,7 @@
 {
   "name": "nix-fast-build",
-  "version": "2.0.4",
-  "realizedVersion": "2.0.4",
+  "version": "2.1.0",
+  "realizedVersion": "2.1.0",
   "source": {
     "githubRelease": {
       "owner": "Mic92",
@@ -18,7 +18,7 @@
             "repo": "nix-fast-build"
           }
         },
-        "hash": "sha256-sc/NZIHkRhgyAzK8Xn6G++vGrl/Uf7QHh+J5fnZ/o4s=",
+        "hash": "sha256-W356WzCAIrkCq8nQeZHpg541uA3drlotn0KarZTgXOc=",
         "depsHash": {
           "none": {}
         }
