@@ -1,0 +1,29 @@
+{
+  "name": "agent-plugins-huggingface-skills",
+  "version": "7bf59b7f85b79c74207b10d5e425934514e8b089",
+  "realizedVersion": "7bf59b7f85b79c74207b10d5e425934514e8b089",
+  "source": {
+    "gitCommit": {
+      "owner": "huggingface",
+      "repo": "skills",
+      "branch": "main"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "huggingface",
+            "repo": "skills"
+          }
+        },
+        "hash": "sha256-nvzixYHZbZEh4LEFOojt3bOP2Hki8/HmLogsIxPmhSo=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}

@@ -1,7 +1,26 @@
-{ fetchFromGitHub }:
-fetchFromGitHub {
-  owner = "huggingface";
-  repo = "skills";
-  rev = "7bf59b7f85b79c74207b10d5e425934514e8b089";
-  hash = "sha256-nvzixYHZbZEh4LEFOojt3bOP2Hki8/HmLogsIxPmhSo=";
-}
+# The commit and the source hash are in pin.json: Renovate proposes the head
+# of the branch it names, and realize-pin rewrites both. passthru.src is this
+# fetch itself, so the realizer's src step hashes
+# `.#agent-plugins-huggingface-skills.src`.
+{ lib, fetchFromGitHub }:
+let
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json {
+      name = "agent-plugins-huggingface-skills";
+    })
+    pin
+    pinPlan
+    ;
+
+  self = fetchFromGitHub (
+    (pinPlan pin.version).artifacts.src.sourceBuild.fetchFromGitHub
+    // {
+      inherit (pin.artifacts.src.sourceBuild) hash;
+      passthru = {
+        inherit pin pinPlan;
+        src = self;
+      };
+    }
+  );
+in
+self
