@@ -17,38 +17,22 @@
 
 let
   inherit (stdenv.hostPlatform) system;
-  # Hashes are the release's per-asset .sha256 files converted to SRI, not
-  # values guessed by a prefetch.
-  systemToPlatform = {
-    "x86_64-linux" = {
-      triple = "x86_64-unknown-linux-gnu";
-      hash = "sha256-XJq6C9Z2RQIneTh/ONI6UdFYYkGWzk66F1rroGXrIic=";
-    };
-    "aarch64-linux" = {
-      triple = "aarch64-unknown-linux-gnu";
-      hash = "sha256-UX5JRlIH5flwdF0D/s1oPJnuAiC8/wIhkpPqiIp8SgY=";
-    };
-    "x86_64-darwin" = {
-      triple = "x86_64-apple-darwin";
-      hash = "sha256-lsLxvEfICsrmy4RyYjGKCNDYjpIi1BzTnzymQGaiYBQ=";
-    };
-    "aarch64-darwin" = {
-      triple = "aarch64-apple-darwin";
-      hash = "sha256-PHIVbyDNIbjlFZn/NLSW8D60AJPfTt3zdOurOMjDZD0=";
-    };
-  };
-  platform = systemToPlatform.${system} or (throw "icp-cli-bin: unsupported platform ${system}");
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "icp-cli-bin"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "icp-cli-bin";
-  # Upstream tags carry a `v` prefix; the version here does not.
-  version = "1.8.0";
+  inherit (pin) version;
 
   # Each archive holds a single icp-cli-<triple>/ directory with the `icp`
   # binary, which stdenv's unpack descends into.
   src = fetchurl {
-    url = "https://github.com/dfinity/icp-cli/releases/download/v${finalAttrs.version}/icp-cli-${platform.triple}.tar.xz";
-    hash = platform.hash;
+    url = planned.${system}.url or (throw "icp-cli-bin: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
   };
 
   dontConfigure = true;
@@ -74,7 +58,10 @@ stdenv.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/icp";
   doInstallCheck = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    inherit pin pinPlan;
+    updateScript = ./update.sh;
+  };
 
   meta = {
     description = "Internet Computer CLI for building and deploying canisters (prebuilt release binary)";
@@ -82,7 +69,7 @@ stdenv.mkDerivation (finalAttrs: {
     changelog = "https://github.com/dfinity/icp-cli/releases/tag/v${finalAttrs.version}";
     license = lib.licenses.asl20;
     mainProgram = "icp";
-    platforms = lib.attrNames systemToPlatform;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     maintainers = with lib.maintainers; [ cameronraysmith ];
   };

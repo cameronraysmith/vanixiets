@@ -15,10 +15,11 @@
   # apmDeps.
   upstreamDeps ? [ ],
 
-  # NAR hash of the apm-deps download. After a remote ref or apm version change
-  # the download is renamed and fails with a hash mismatch printing the new
-  # value to put here.
-  apmDepsHash ? "sha256-4ELGyWHWhpyAODdyXvNbf4heYCBhwjDiFP6Plgm3Td8=",
+  # NAR hash of the apm-deps download, in hashes.json, which the realizer
+  # rewrites as mergify-cli-bin's fixedOutputHash companion. After a remote ref
+  # or apm version change the download is renamed and fails with a hash
+  # mismatch printing the new value to put there.
+  apmDepsHash ? (lib.importJSON ./hashes.json).apmDepsHash,
 
   # Every remote apm dependency, downloaded once (deps.nix, design D1).
   apmDeps ? callPackage ./deps.nix { inherit apm apmDepsHash; },

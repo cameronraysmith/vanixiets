@@ -9,9 +9,16 @@
   autoPatchelfHook,
   versionCheckHook,
 }:
+let
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "omnigraph"; })
+    pin
+    pinPlan
+    ;
+  planned = (pinPlan pin.version).artifacts;
+in
 stdenv.mkDerivation (finalAttrs: {
   pname = "omnigraph";
-  version = "0.15.0";
+  inherit (pin) version;
 
   src = finalAttrs.passthru.sources.${stdenv.hostPlatform.system};
 
@@ -45,28 +52,22 @@ stdenv.mkDerivation (finalAttrs: {
   '';
 
   passthru = {
-    sources = {
-      "x86_64-linux" = fetchurl {
-        url = "https://github.com/ModernRelay/omnigraph/releases/download/v${finalAttrs.version}/omnigraph-linux-x86_64.tar.gz";
-        hash = "sha256-1zEs5Jq8pHprtHlWtph9MvZQ+pFni+Gr0Q4Cgkk3uxU=";
-      };
-      "aarch64-linux" = fetchurl {
-        url = "https://github.com/ModernRelay/omnigraph/releases/download/v${finalAttrs.version}/omnigraph-linux-arm64.tar.gz";
-        hash = "sha256-+hCCY2uzkn1h3PnSK7TgjrD7RG0I50ZziGnkDDY7R1U=";
-      };
-      "aarch64-darwin" = fetchurl {
-        url = "https://github.com/ModernRelay/omnigraph/releases/download/v${finalAttrs.version}/omnigraph-macos-arm64.tar.gz";
-        hash = "sha256-x4PcnQ42YLdKnC5sVZG/Hk35p2POMilYUmwIcunKGuw=";
-      };
-    };
+    inherit pin pinPlan;
+    sources = lib.mapAttrs (
+      system: artifact:
+      fetchurl {
+        inherit (artifact) url;
+        hash = pin.artifacts.binaries.platformBinaries.hashes.${system};
+      }
+    ) planned.binaries.platformBinaries;
     # The release archives carry only the executables; the upstream agent skill
     # (deployed by modules/home/tools/omnigraph.nix) comes from the tagged tree.
-    skillSrc = fetchFromGitHub {
-      owner = "ModernRelay";
-      repo = "omnigraph";
-      tag = "v${finalAttrs.version}";
-      hash = "sha256-fDjXKhh/jAXST0SGoPsGkFDIZtpGF9NxCxGd7H4snBA=";
-    };
+    skillSrc = fetchFromGitHub (
+      planned.skillSrc.sourceBuild.fetchFromGitHub
+      // {
+        inherit (pin.artifacts.skillSrc.sourceBuild) hash;
+      }
+    );
     updateScript = ./update.sh;
   };
 

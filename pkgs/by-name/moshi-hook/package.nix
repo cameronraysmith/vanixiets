@@ -20,35 +20,22 @@
 }:
 let
   inherit (stdenv.hostPlatform) system;
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "moshi-hook"; })
+    pin
+    pinPlan
+    ;
   # Upstream names assets by `uname -s` and `uname -m` output rather than by
   # target triple: Darwin/Linux crossed with x86_64/arm64.
-  systemToAsset = {
-    "aarch64-darwin" = {
-      label = "Darwin_arm64";
-      hash = "sha256-/jg2me4P+a1Zi8Mh6EMG8VA/RvVjLiIvjTHEsdFRhCg=";
-    };
-    "x86_64-darwin" = {
-      label = "Darwin_x86_64";
-      hash = "sha256-wKawN4b87r1SaQ9Krr2gZe6ySm1ZyMrH4GWiSp9F8Cs=";
-    };
-    "aarch64-linux" = {
-      label = "Linux_arm64";
-      hash = "sha256-0VTgTfQiC++1aggscGhQfmk6ytSwKguVdb7lJIxtawQ=";
-    };
-    "x86_64-linux" = {
-      label = "Linux_x86_64";
-      hash = "sha256-HX79VliLRu1i56BREK0usIxOJcvGMshziPbZnSFOBVs=";
-    };
-  };
-  asset = systemToAsset.${system} or (throw "moshi-hook: unsupported platform ${system}");
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "moshi-hook";
-  version = "0.4.64";
+  inherit (pin) version;
 
   src = fetchurl {
-    url = "https://cdn.getmoshi.app/hook/v${finalAttrs.version}/moshi-hook_${asset.label}.tar.gz";
-    inherit (asset) hash;
+    url = planned.${system}.url or (throw "moshi-hook: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
   };
 
   # The tarball holds the executable, README.md, and docs/ at its root with no
@@ -81,7 +68,10 @@ stdenv.mkDerivation (finalAttrs: {
   doInstallCheck = true;
   nativeInstallCheckInputs = [ versionCheckHook ];
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    inherit pin pinPlan;
+    updateScript = ./update.sh;
+  };
 
   meta = {
     homepage = "https://getmoshi.app";
@@ -96,7 +86,7 @@ stdenv.mkDerivation (finalAttrs: {
     license = lib.licenses.unfree;
     mainProgram = "moshi-hook";
     maintainers = with lib.maintainers; [ cameronraysmith ];
-    platforms = lib.attrNames systemToAsset;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
 })

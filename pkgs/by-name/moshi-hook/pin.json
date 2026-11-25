@@ -1,0 +1,38 @@
+{
+  "name": "moshi-hook",
+  "version": "0.4.64",
+  "source": {
+    "vendorText": {
+      "url": "https://cdn.getmoshi.app/hook/latest/version.txt",
+      "regex": "^v(?<version>\\S+)$"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://cdn.getmoshi.app/hook/v{version}/moshi-hook_{platform}.tar.gz",
+        "platforms": {
+          "x86_64-linux": "Linux_x86_64",
+          "aarch64-linux": "Linux_arm64",
+          "x86_64-darwin": "Darwin_x86_64",
+          "aarch64-darwin": "Darwin_arm64"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://cdn.getmoshi.app/hook/v{version}/checksums.txt",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-HX79VliLRu1i56BREK0usIxOJcvGMshziPbZnSFOBVs=",
+          "aarch64-linux": "sha256-0VTgTfQiC++1aggscGhQfmk6ytSwKguVdb7lJIxtawQ=",
+          "x86_64-darwin": "sha256-wKawN4b87r1SaQ9Krr2gZe6ySm1ZyMrH4GWiSp9F8Cs=",
+          "aarch64-darwin": "sha256-/jg2me4P+a1Zi8Mh6EMG8VA/RvVjLiIvjTHEsdFRhCg="
+        }
+      }
+    }
+  },
+  "companions": []
+}

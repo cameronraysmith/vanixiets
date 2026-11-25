@@ -335,4 +335,14 @@ in
     expr = lib.mapAttrs (_: pin: pin.name) packagePins;
     expected = lib.mapAttrs (name: _: name) packagePins;
   };
+
+  testSomePackageHasAPin = {
+    expr = packagePins != { };
+    expected = true;
+  };
+
+  testSomeFixedOutputIsRecorded = {
+    expr = fixedOutputs != [ ];
+    expected = true;
+  };
 }

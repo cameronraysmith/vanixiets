@@ -1,0 +1,39 @@
+{
+  "name": "ic-wasm-bin",
+  "version": "1.0.0",
+  "source": {
+    "githubRelease": {
+      "owner": "dfinity",
+      "repo": "ic-wasm",
+      "tagTemplate": "{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/dfinity/ic-wasm/releases/download/{tag}/ic-wasm-{platform}.tar.xz",
+        "platforms": {
+          "x86_64-linux": "x86_64-unknown-linux-gnu",
+          "aarch64-linux": "aarch64-unknown-linux-gnu",
+          "x86_64-darwin": "x86_64-apple-darwin",
+          "aarch64-darwin": "aarch64-apple-darwin"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "{url}.sha256",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-9tQNZ1lvvpGl8sLNusKs4WIwUkbdNbzTDjQjDn+R3/g=",
+          "aarch64-linux": "sha256-WpvJ1HWrPrjr2sEKwqZWTjcpLgpHJTZG/lC/mQfe4qg=",
+          "x86_64-darwin": "sha256-XWWCVJDBcr6rz0RElrbkfIKTlRvcDppScF37kku+Re0=",
+          "aarch64-darwin": "sha256-mfPY2vFvh9UnhlKZx1ws/VC8ndS7FmRQq9H1ziYYmQo="
+        }
+      }
+    }
+  },
+  "companions": []
+}

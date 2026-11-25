@@ -16,38 +16,22 @@
 
 let
   inherit (stdenv.hostPlatform) system;
-  # Hashes are the release's per-asset .sha256 files converted to SRI, not
-  # values guessed by a prefetch.
-  systemToPlatform = {
-    "x86_64-linux" = {
-      triple = "x86_64-unknown-linux-gnu";
-      hash = "sha256-9tQNZ1lvvpGl8sLNusKs4WIwUkbdNbzTDjQjDn+R3/g=";
-    };
-    "aarch64-linux" = {
-      triple = "aarch64-unknown-linux-gnu";
-      hash = "sha256-WpvJ1HWrPrjr2sEKwqZWTjcpLgpHJTZG/lC/mQfe4qg=";
-    };
-    "x86_64-darwin" = {
-      triple = "x86_64-apple-darwin";
-      hash = "sha256-XWWCVJDBcr6rz0RElrbkfIKTlRvcDppScF37kku+Re0=";
-    };
-    "aarch64-darwin" = {
-      triple = "aarch64-apple-darwin";
-      hash = "sha256-mfPY2vFvh9UnhlKZx1ws/VC8ndS7FmRQq9H1ziYYmQo=";
-    };
-  };
-  platform = systemToPlatform.${system} or (throw "ic-wasm-bin: unsupported platform ${system}");
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "ic-wasm-bin"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "ic-wasm-bin";
-  # Bare semver with no `v` prefix, matching the upstream tag exactly.
-  version = "1.0.0";
+  inherit (pin) version;
 
   # Each archive holds a single ic-wasm-<triple>/ directory with the `ic-wasm`
   # binary, which stdenv's unpack descends into.
   src = fetchurl {
-    url = "https://github.com/dfinity/ic-wasm/releases/download/${finalAttrs.version}/ic-wasm-${platform.triple}.tar.xz";
-    hash = platform.hash;
+    url = planned.${system}.url or (throw "ic-wasm-bin: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
   };
 
   dontConfigure = true;
@@ -71,7 +55,10 @@ stdenv.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/ic-wasm";
   doInstallCheck = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    inherit pin pinPlan;
+    updateScript = ./update.sh;
+  };
 
   meta = {
     description = "Internet Computer canister Wasm transformer (prebuilt release binary)";
@@ -79,7 +66,7 @@ stdenv.mkDerivation (finalAttrs: {
     changelog = "https://github.com/dfinity/ic-wasm/releases/tag/${finalAttrs.version}";
     license = lib.licenses.asl20;
     mainProgram = "ic-wasm";
-    platforms = lib.attrNames systemToPlatform;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     maintainers = with lib.maintainers; [ cameronraysmith ];
   };

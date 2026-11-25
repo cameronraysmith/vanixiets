@@ -3,7 +3,7 @@
 # https://github.com/mirkolenz/nixos/tree/main/pkgs/derivations/claude-code-bin
 #
 # fetches platform-specific binaries from the official gcs release bucket.
-# version and checksums tracked in manifest.json alongside this file.
+# version and SRI hashes tracked in pin.json alongside this file.
 #
 # update: nix run .#update-claude-code
 # source: https://github.com/anthropics/claude-code
@@ -22,26 +22,22 @@
   ripgrep,
 }:
 let
-  manifest = lib.importJSON ./manifest.json;
-  platforms = {
-    x86_64-linux = "linux-x64";
-    aarch64-linux = "linux-arm64";
-    aarch64-darwin = "darwin-arm64";
-  };
-  platform = platforms.${stdenvNoCC.hostPlatform.system};
+  inherit (stdenvNoCC.hostPlatform) system;
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "claude-code"; })
+    pin
+    pinPlan
+    ;
+  binary = pin.artifacts.binary.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binary.platformBinaries;
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "claude-code";
-  version = manifest.version or "unstable";
+  inherit (pin) version;
 
-  src =
-    let
-      gcsBucket = "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases";
-    in
-    fetchurl {
-      url = "${gcsBucket}/${finalAttrs.version}/${platform}/claude";
-      sha256 = manifest.platforms.${platform}.checksum;
-    };
+  src = fetchurl {
+    url = planned.${system}.url or (throw "claude-code: unsupported platform ${system}");
+    hash = binary.hashes.${system};
+  };
 
   dontUnpack = true;
   dontBuild = true;
@@ -89,7 +85,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   strictDeps = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    inherit pin pinPlan;
+    updateScript = ./update.sh;
+  };
 
   meta = {
     description = "Agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster";
@@ -99,6 +98,6 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     license = lib.licenses.unfree;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     mainProgram = "claude";
-    platforms = lib.attrNames platforms;
+    platforms = lib.attrNames binary.platforms;
   };
 })

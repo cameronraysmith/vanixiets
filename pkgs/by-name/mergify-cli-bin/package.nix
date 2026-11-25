@@ -15,36 +15,21 @@
 
 let
   inherit (stdenv.hostPlatform) system;
-  # Hashes are the release's SHA256SUMS entries converted to SRI, not values
-  # guessed by a prefetch: upstream publishes one hex line per asset.
-  systemToPlatform = {
-    "x86_64-linux" = {
-      triple = "x86_64-unknown-linux-gnu";
-      hash = "sha256-kH382b2ZvcQGF8DO5waumUFYKU7Ksorc6vQrNlKrshI=";
-    };
-    "aarch64-linux" = {
-      triple = "aarch64-unknown-linux-gnu";
-      hash = "sha256-3LQ+HnzWCoBmUHBzkp7Qj61g2NpGyZMzeAnTaGhOcc4=";
-    };
-    "x86_64-darwin" = {
-      triple = "x86_64-apple-darwin";
-      hash = "sha256-ODI9iZYNTYN4r9Stmj4opZoovDWD9ZhLs78/bUSXQRk=";
-    };
-    "aarch64-darwin" = {
-      triple = "aarch64-apple-darwin";
-      hash = "sha256-oPoA+cDjOnJIQ5FUt8ijta3AqFnMG7uZRbHVfKx4h1c=";
-    };
-  };
-  platform = systemToPlatform.${system} or (throw "mergify-cli-bin: unsupported platform ${system}");
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "mergify-cli-bin"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "mergify-cli-bin";
-  # Bare calver with no `v` prefix, matching the upstream tag exactly.
-  version = "2026.9.16.1";
+  inherit (pin) version;
 
   src = fetchurl {
-    url = "https://github.com/Mergifyio/mergify-cli/releases/download/${finalAttrs.version}/mergify-${finalAttrs.version}-${platform.triple}.tar.gz";
-    hash = platform.hash;
+    url = planned.${system}.url or (throw "mergify-cli-bin: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
   };
 
   # Each archive holds the bare `mergify` binary at its root with no enclosing
@@ -75,10 +60,11 @@ stdenv.mkDerivation (finalAttrs: {
   doInstallCheck = true;
 
   passthru = {
+    inherit pin pinPlan;
     updateScript = ./update.sh;
     # Commit the release tag points at; structure-release-alignment-mergify-cli
     # requires the mergify-stack skill's apm.yml ref to equal it.
-    sourceRev = "e7c1ebbc281361f0b2b7827cf583f57339c97ebc";
+    sourceRev = pin.rev;
   };
 
   meta = {
@@ -87,7 +73,7 @@ stdenv.mkDerivation (finalAttrs: {
     changelog = "https://github.com/Mergifyio/mergify-cli/releases/tag/${finalAttrs.version}";
     license = lib.licenses.asl20;
     mainProgram = "mergify";
-    platforms = lib.attrNames systemToPlatform;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     maintainers = with lib.maintainers; [ cameronraysmith ];
   };
