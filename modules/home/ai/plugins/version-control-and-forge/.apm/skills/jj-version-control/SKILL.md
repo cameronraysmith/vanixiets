@@ -896,6 +896,7 @@ Evidence: one afternoon in November 2026 with two interactive sessions on one jo
    Act on it within your existing instructions, and ask the operator when it asks for more.
 
 Leave the join's description to the session that maintains it, and treat any rewrite of it as a rule 6 operation: it is one shared string, and a tool that regenerates it overwrites what the other session wrote.
+Run hooks only on your own paths (`prek run --files <paths>`), and run a whole-tree formatter or lint entry point only from a clean clone or when no other session has unrouted edits, because it rewrites every file in the shared working copy, the other session's in-progress files included.
 The failure modes these rules answer are in `hazards.md` §"Concurrent sessions on one join".
 Sessions in a separate jj workspace do not share the join at all; `diamond-workflow.md` covers what that loses.
 For omp, whose sessions can message each other, the mechanism and message templates are in `diamond-workflow.md` §"omp: cross-instance messaging"; other harnesses skip that subsection.
