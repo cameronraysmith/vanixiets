@@ -1,7 +1,7 @@
 # buzz - shared source tree and vendored cargo dependencies.
 #
-# Sibling packages in this directory take `source` as a plain callPackage
-# argument; the nested pkgs-by-name scope resolves it to this derivation.
+# buzz-cli, buzz-git-credential-nostr and buzz-git-sign-nostr take
+# `buzz-source` as a plain callPackage argument, so this pin drives all four.
 #
 # The tag is the newest non-prerelease trunk snapshot carrying a GitHub
 # Release. It is not parity with the installed desktop app: upstream cuts
@@ -24,36 +24,45 @@
 # cargoDeps short-circuits before cargoHash is read and a stale or fabricated
 # hash sitting beside it would never produce an error.
 #
+# The version and both hashes are in pin.json, which realize-pin rewrites.
+# passthru.src is this fetch itself: the realizer hashes `.#buzz-source.src`,
+# and this package has no other src to name.
+#
 # Source: https://github.com/block/buzz
 {
+  lib,
   fetchFromGitHub,
   rustPlatform,
 }:
 let
-  version = "0.5.26";
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "buzz-source"; })
+    pin
+    pinPlan
+    ;
+  planned = (pinPlan pin.version).artifacts;
+  inherit (pin.artifacts.src) sourceBuild;
+  inherit (pin) version;
 
   # Self-reference is safe because `passthru` never becomes a derivation input:
   # fetchFromGitHub forwards it to the fetcher (fetchgithub/default.nix:210-213)
   # and mkDerivation excludes it from the derivation proper, so forcing
   # `self.passthru.cargoDeps` does not force a cycle through `self`.
-  self = fetchFromGitHub {
-    name = "buzz-source-${version}";
-    owner = "block";
-    repo = "buzz";
-    tag = "desktop-v${version}";
-    hash = "sha256-w/CHknkyFT+iHv4jd5Anv1Q/5kOZ7H1DEKB9dwqQHiE=";
+  self = fetchFromGitHub (
+    planned.src.sourceBuild.fetchFromGitHub
+    // {
+      name = "buzz-source-${version}";
+      inherit (sourceBuild) hash;
 
-    passthru = {
-      inherit version;
-      rev = "2b4b138dc5cf2d9cc1a0ceb21d9063ff56fe8bf4";
-
-      cargoDeps = rustPlatform.fetchCargoVendor {
+      passthru = {
+        inherit version pin pinPlan;
         src = self;
-        hash = "sha256-A/lpudjM3ZahSNiWHxW8UKFlBhdBuAEQL87c8Q+C7Q4=";
-      };
 
-      updateScript = ./update.sh;
-    };
-  };
+        cargoDeps = rustPlatform.fetchCargoVendor {
+          src = self;
+          inherit (sourceBuild.depsHash.cargo) hash;
+        };
+      };
+    }
+  );
 in
 self

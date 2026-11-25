@@ -1,0 +1,31 @@
+{
+  "name": "buzz-source",
+  "version": "0.5.26",
+  "realizedVersion": "0.5.26",
+  "source": {
+    "githubRelease": {
+      "owner": "block",
+      "repo": "buzz",
+      "tagTemplate": "desktop-v{version}"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "block",
+            "repo": "buzz"
+          }
+        },
+        "hash": "sha256-w/CHknkyFT+iHv4jd5Anv1Q/5kOZ7H1DEKB9dwqQHiE=",
+        "depsHash": {
+          "cargo": {
+            "hash": "sha256-A/lpudjM3ZahSNiWHxW8UKFlBhdBuAEQL87c8Q+C7Q4="
+          }
+        }
+      }
+    }
+  },
+  "companions": []
+}

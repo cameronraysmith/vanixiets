@@ -23,15 +23,15 @@
 {
   lib,
   rustPlatform,
-  source,
+  buzz-source,
   cmake,
   pkg-config,
   aws-lc,
 }:
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "buzz-cli";
-  inherit (source) version cargoDeps;
-  src = source;
+  inherit (buzz-source) version cargoDeps;
+  src = buzz-source;
 
   # --bin names the expected binary explicitly. Redundant at this pin, where the
   # crate declares exactly one [[bin]], but it makes an upstream addition of a

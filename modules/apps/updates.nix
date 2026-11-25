@@ -30,10 +30,5 @@
         type = "app";
         program = "${../../pkgs/by-name/perses-bin/update.sh}";
       };
-
-      apps.update-buzz-source = {
-        type = "app";
-        program = "${config.packages.buzz-source.updateScript}";
-      };
     };
 }
