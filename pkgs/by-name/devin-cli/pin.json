@@ -1,7 +1,7 @@
 {
   "name": "devin-cli",
-  "version": "3000.14.30821",
-  "realizedVersion": "3000.14.30821",
+  "version": "3000.15.14",
+  "realizedVersion": "3000.15.14",
   "source": {
     "vendorJson": {
       "url": "https://static.devin.ai/cli/current/manifest.json",
@@ -28,9 +28,9 @@
           }
         },
         "hashes": {
-          "x86_64-linux": "sha256-TcQ+PkOIus5g/iqoAQy7OZQC5ySJLXF1hFsc3vAOfds=",
-          "aarch64-linux": "sha256-PeuK9rAmBg6XXtNxk24TmBgCDl3Fq7y6B83gOfRzpaU=",
-          "aarch64-darwin": "sha256-Ru8addi9hRZlF54Ta345rVl9PXkTuV1n/SuI6civAGE="
+          "x86_64-linux": "sha256-0hn4he1gHRQkri7N9bN0Qc9g8Vo4pJYdKm8LQeyRPyg=",
+          "aarch64-linux": "sha256-ZqhNif//FrsMSs3YWXEC11Kz9L9KtT/ySWN6xuxpj4c=",
+          "aarch64-darwin": "sha256-I5Ef35tcRevvo4Llf/GZbnYsKzCi/h9LU2+mM+L8vR8="
         }
       }
     }
