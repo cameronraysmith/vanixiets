@@ -16,7 +16,6 @@
         "platforms": {
           "x86_64-linux": "x86_64-unknown-linux-gnu",
           "aarch64-linux": "aarch64-unknown-linux-gnu",
-          "x86_64-darwin": "x86_64-apple-darwin",
           "aarch64-darwin": "aarch64-apple-darwin"
         },
         "checksum": {
@@ -30,7 +29,6 @@
         "hashes": {
           "x86_64-linux": "sha256-XJq6C9Z2RQIneTh/ONI6UdFYYkGWzk66F1rroGXrIic=",
           "aarch64-linux": "sha256-UX5JRlIH5flwdF0D/s1oPJnuAiC8/wIhkpPqiIp8SgY=",
-          "x86_64-darwin": "sha256-lsLxvEfICsrmy4RyYjGKCNDYjpIi1BzTnzymQGaiYBQ=",
           "aarch64-darwin": "sha256-PHIVbyDNIbjlFZn/NLSW8D60AJPfTt3zdOurOMjDZD0="
         }
       }
