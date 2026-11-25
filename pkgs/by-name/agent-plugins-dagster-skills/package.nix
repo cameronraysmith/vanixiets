@@ -1,7 +1,26 @@
-{ fetchFromGitHub }:
-fetchFromGitHub {
-  owner = "dagster-io";
-  repo = "skills";
-  rev = "fa3d023d6700767d3950f94ebe8ea73b5abbd015";
-  hash = "sha256-By4rYeYst34BSxfYGicA756b2Qyl7it4Ul1pAVgeQUY=";
-}
+# The release version and the source hash are in pin.json: Renovate proposes
+# upstream's GitHub releases, and realize-pin rewrites both. passthru.src is
+# this fetch itself, so the realizer's src step hashes
+# `.#agent-plugins-dagster-skills.src`.
+{ lib, fetchFromGitHub }:
+let
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json {
+      name = "agent-plugins-dagster-skills";
+    })
+    pin
+    pinPlan
+    ;
+
+  self = fetchFromGitHub (
+    (pinPlan pin.version).artifacts.src.sourceBuild.fetchFromGitHub
+    // {
+      inherit (pin.artifacts.src.sourceBuild) hash;
+      passthru = {
+        inherit pin pinPlan;
+        src = self;
+      };
+    }
+  );
+in
+self
