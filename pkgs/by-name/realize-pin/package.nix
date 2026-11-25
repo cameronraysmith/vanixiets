@@ -33,10 +33,11 @@ python3Packages.buildPythonApplication {
     python3Packages.expression
   ];
 
-  # nix-update is prefixed: the fixed-output hasher needs 1.17.0 or later,
-  # whatever the caller has. nix and git are suffixed so that the caller's,
-  # which match its daemon and configuration, take precedence. Separate
-  # elements: with __structuredAttrs makeWrapperArgs is not word-split.
+  # nix-update is prefixed: the fixed-output hasher needs 1.17.0 or later
+  # (pkgs/by-name/nix-update until nixpkgs ships it), whatever the caller has.
+  # nix and git are suffixed so that the caller's, which match its daemon and
+  # configuration, take precedence. Separate elements: with __structuredAttrs
+  # makeWrapperArgs is not word-split.
   makeWrapperArgs = [
     "--prefix"
     "PATH"

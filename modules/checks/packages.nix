@@ -167,6 +167,11 @@
             };
             # nixbot: median 12 s, slowest 51 s, all 11 runs 2026-08-31..2026-11-11
             package-moshi-hook.class = "small";
+            # nixbot: 0 runs, too few to class (design D4)
+            package-nix-update = {
+              class = "small";
+              measured = false;
+            };
             # nixbot: median 5.4 s, slowest 54 s, all 13 runs 2026-09-04..2026-10-23
             package-nixidy.class = "small";
             # nixbot: median 18 s, slowest 33 s, all 3 runs 2026-10-21..2026-11-11
@@ -378,6 +383,11 @@
             };
             # nixbot: median 6.4 s, slowest 94 s, 3 runs in 30 days
             package-moshi-hook.class = "small";
+            # nixbot: 0 runs, too few to class (design D4)
+            package-nix-update = {
+              class = "small";
+              measured = false;
+            };
             # nixbot: median 122 s, slowest 266 s, all 5 runs 2026-10-07..2026-11-11
             package-nixidy.class = "medium";
             # nixbot: median 107 s, slowest 340 s, all 4 runs 2026-10-21..2026-11-11
