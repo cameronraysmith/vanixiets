@@ -25,35 +25,23 @@
 }:
 let
   inherit (stdenv.hostPlatform) system;
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "hindsight"; })
+    pin
+    pinPlan
+    ;
   # Upstream names its assets by its own os-arch labels rather than by target
-  # triple, and ships them as bare executables rather than archives.
-  systemToPlatform = {
-    "x86_64-linux" = {
-      asset = "linux-amd64";
-      hash = "sha256-vofGNxT/BGrI7WaEZcoMh1+U5v8Kie2D2n6zhzExl68=";
-    };
-    "aarch64-linux" = {
-      asset = "linux-arm64";
-      hash = "sha256-E9AB1eONniAHqjwQbfuCMyVX3Wx6rlPB8m5uDxvwYaE=";
-    };
-    "x86_64-darwin" = {
-      asset = "darwin-amd64";
-      hash = "sha256-pYqVd8ha16qSRIHPKiXTmWGjiDLSlimjR06ItLCYjHo=";
-    };
-    "aarch64-darwin" = {
-      asset = "darwin-arm64";
-      hash = "sha256-nNBxkvA4xgUBJCZIwlBBvXBzBP946CYlFdr1+4MsR/Q=";
-    };
-  };
-  platform = systemToPlatform.${system} or (throw "hindsight: unsupported platform ${system}");
+  # triple, and ships them as bare executables rather than archives. A release
+  # carries no checksum file for them, so the pin's hashes are prefetched.
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "hindsight";
-  version = "0.10.2";
+  inherit (pin) version;
 
   src = fetchurl {
-    url = "https://github.com/vectorize-io/hindsight/releases/download/v${finalAttrs.version}/hindsight-${platform.asset}";
-    hash = platform.hash;
+    url = planned.${system}.url or (throw "hindsight: unsupported platform ${system}");
+    hash = binaries.hashes.${system};
   };
 
   # The asset is a bare executable, so there is nothing to unpack and stdenv's
@@ -82,7 +70,7 @@ stdenv.mkDerivation (finalAttrs: {
   doInstallCheck = true;
   nativeInstallCheckInputs = [ versionCheckHook ];
 
-  passthru.updateScript = ./update.sh;
+  passthru = { inherit pin pinPlan; };
 
   meta = {
     homepage = "https://github.com/vectorize-io/hindsight";
@@ -91,7 +79,7 @@ stdenv.mkDerivation (finalAttrs: {
     license = lib.licenses.mit;
     mainProgram = "hindsight";
     maintainers = with lib.maintainers; [ cameronraysmith ];
-    platforms = lib.attrNames systemToPlatform;
+    platforms = lib.attrNames binaries.platforms;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
   };
 })

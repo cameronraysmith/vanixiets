@@ -38,11 +38,6 @@
         program = "${config.packages.git-xet.updateScript}";
       };
 
-      apps.update-hindsight = {
-        type = "app";
-        program = "${config.packages.hindsight.updateScript}";
-      };
-
       apps.update-golem-binary = {
         type = "app";
         program = "${config.packages.golem-binary.updateScript}";

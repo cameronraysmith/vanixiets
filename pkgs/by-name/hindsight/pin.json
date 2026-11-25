@@ -1,0 +1,34 @@
+{
+  "name": "hindsight",
+  "version": "0.10.2",
+  "source": {
+    "githubRelease": {
+      "owner": "vectorize-io",
+      "repo": "hindsight",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/vectorize-io/hindsight/releases/download/{tag}/hindsight-{platform}",
+        "platforms": {
+          "x86_64-linux": "linux-amd64",
+          "aarch64-linux": "linux-arm64",
+          "x86_64-darwin": "darwin-amd64",
+          "aarch64-darwin": "darwin-arm64"
+        },
+        "checksum": {
+          "prefetch": {}
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-vofGNxT/BGrI7WaEZcoMh1+U5v8Kie2D2n6zhzExl68=",
+          "aarch64-linux": "sha256-E9AB1eONniAHqjwQbfuCMyVX3Wx6rlPB8m5uDxvwYaE=",
+          "x86_64-darwin": "sha256-pYqVd8ha16qSRIHPKiXTmWGjiDLSlimjR06ItLCYjHo=",
+          "aarch64-darwin": "sha256-nNBxkvA4xgUBJCZIwlBBvXBzBP946CYlFdr1+4MsR/Q="
+        }
+      }
+    }
+  },
+  "companions": []
+}
