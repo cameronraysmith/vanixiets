@@ -54,7 +54,7 @@ Recovery for the second is `jj undo`; the first needs nothing.
 
 ## Concurrent sessions on one join
 
-These six failures occurred while two or more sessions shared one join; the rules that answer them are in `SKILL.md` §"Coordinating concurrent sessions on one join".
+These seven failures occurred while two or more sessions shared one join; the rules that answer them are in `SKILL.md` §"Coordinating concurrent sessions on one join".
 
 ### An explicit parent list drops another session's chains
 
@@ -89,6 +89,13 @@ Treat any rewrite of the join's description as an announced join operation, and 
 
 An agent that leaves an undescribed commit behind leaves it for someone else to find.
 Run the stray checks in `diamond-workflow.md` §"Reading the shared state" before reporting; describe, route or abandon your own and report anyone else's.
+
+### A whole-tree formatter rewrites another session's files
+
+A whole-tree formatter or lint entry point (`just lint`, `prek run --all-files`, treefmt over the tree) formats every file in the shared working copy, including files another session is editing and has not yet routed into its chain.
+The symptom is a formatting diff in a path you did not edit; on 2026-11-24 one session's `just lint` reformatted `modules/checks/fleet-alert.nix` while another session's agent was editing it.
+Do not restore or route the reformatted paths, because restoring a file also discards the owner's unrouted edits; name them to the session that owns them, which checks each file before routing it.
+Prevent it by running hooks only on your own paths (`prek run --files <paths>`) and the whole-tree lint only from a clean clone or when no other session has unrouted edits.
 
 ## Worktree interop
 
