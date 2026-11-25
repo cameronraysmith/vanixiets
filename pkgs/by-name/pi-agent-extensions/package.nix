@@ -1,25 +1,33 @@
+# The commit and the source hash are in pin.json: Renovate proposes the head of
+# the branch it names, and realize-pin rewrites both. The version shows the
+# commit's first seven characters.
 {
   fetchFromGitHub,
   lib,
   stdenvNoCC,
 }:
 let
-  rev = "c700f300707db5345727052682c88e3064030aa2";
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "pi-agent-extensions"; })
+    pin
+    pinPlan
+    ;
 in
 stdenvNoCC.mkDerivation {
   pname = "pi-agent-extensions";
-  version = "0.1.0-unstable-2026-07-28";
+  version = "0.1.0-unstable-${builtins.substring 0 7 pin.version}";
 
-  src = fetchFromGitHub {
-    owner = "rytswd";
-    repo = "pi-agent-extensions";
-    inherit rev;
-    hash = "sha256-RLtDi9ahKONSJBuuYkYo/oIIxDX6PWiZ7rlevOStUUk=";
-  };
+  src = fetchFromGitHub (
+    (pinPlan pin.version).artifacts.src.sourceBuild.fetchFromGitHub
+    // {
+      inherit (pin.artifacts.src.sourceBuild) hash;
+    }
+  );
 
   # Prevent a stale direnv ctx in the debounce timer from crashing the agent.
-  # Upstream HEAD (1667a5c, 2026-08-25) still has the bug; drop this patch when
-  # upstream carries an equivalent fix.
+  # Drop this patch when upstream carries an equivalent fix. It is applied as
+  # is to every commit, so a commit that moves the code it touches fails the
+  # build and the patch is rebased by hand.
   patches = [ ./direnv-stale-context.patch ];
 
   dontConfigure = true;
@@ -47,5 +55,9 @@ stdenvNoCC.mkDerivation {
     license = lib.licenses.mit;
     sourceProvenance = with lib.sourceTypes; [ fromSource ];
     platforms = lib.platforms.all;
+  };
+
+  passthru = {
+    inherit pin pinPlan;
   };
 }

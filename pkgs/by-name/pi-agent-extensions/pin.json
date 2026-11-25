@@ -1,0 +1,29 @@
+{
+  "name": "pi-agent-extensions",
+  "version": "c700f300707db5345727052682c88e3064030aa2",
+  "realizedVersion": "c700f300707db5345727052682c88e3064030aa2",
+  "source": {
+    "gitCommit": {
+      "owner": "rytswd",
+      "repo": "pi-agent-extensions",
+      "branch": "main"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "rytswd",
+            "repo": "pi-agent-extensions"
+          }
+        },
+        "hash": "sha256-RLtDi9ahKONSJBuuYkYo/oIIxDX6PWiZ7rlevOStUUk=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}
