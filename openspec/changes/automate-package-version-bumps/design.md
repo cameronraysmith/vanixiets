@@ -1,0 +1,243 @@
+## Context
+
+`pkgs/by-name` holds the repository's own packages, about forty of which track an upstream release.
+None of them is updated automatically.
+Renovate on magnetite (CAM-106) updates rev- and tag-pinned flake inputs, the bun workspace, the Rust toolchain and Typst imports, and its `.github/renovate.json` has no manager that matches `pkgs/by-name/**`.
+nixbot's scheduled `flake-update` effect (CAM-108) refreshes branch-tracking flake inputs.
+Both changes put per-package updates out of scope.
+
+Today a package moves when a person runs `just update-package <p>` (`justfile:601-610`, ADR 0002) or `nix run .#update-<p>`, following `packages/docs/src/content/docs/development/operations/bump-procedure.md`.
+There are 23 `update.sh` scripts and one `nix-update-script` user, and `modules/apps/updates.nix` hand-lists 20 apps.
+The scripts share no code; they rewrite `package.nix` with anchored `sed`, filter prereleases inconsistently and, in four cases, take the first release in API order rather than the highest.
+worktrunk and mergify leave `apmDepsHash` for a person to update, and buzz leaves a placeholder vendor hash.
+About fifteen upstream-versioned packages have no updater, eight of which pin an upstream commit.
+
+numtide/llm-agents.nix (`d70dfebd`) solves the same problem with a GitHub Actions matrix over a typed stdlib-Python updater library.
+Each package keeps a `hashes.json` that its build and its updater both read through one URL template and platform map, and its updater configuration is validated at evaluation time.
+Its weaknesses are that nothing builds before the pull request, its runtime configuration is an untyped dictionary, and nothing closes a stale pull request.
+
+The operator settled the approach on 2026-11-24 (brainstorm.md, D-a to D-f); this document turns it into a design.
+Stakeholders: the operator, who reviews and enqueues update pull requests; Renovate on magnetite, which discovers releases and runs the realizer; nixbot, which builds every pushed commit and shares magnetite with Renovate; gitea-mq, which lands enqueued pull requests.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- Renovate proposes each new stable release of a migrated package as one pull request on `renovate/<p>`, and every commit it pushes is complete: version, every platform's digest and every companion file agree, with no follow-up commit and no instruction to a person.
+- A package's upstream, artifacts and companion files are data in one typed file, validated when the flake is evaluated, and read by both the build and the realizer.
+- One realizer, total over every source and artifact kind, replaces the per-package scripts and is tested offline.
+- Per-package pull requests fire only in a stated window that never overlaps the flake-update effect or magnetite's store collection, in stated numbers.
+- Each migrated package has exactly one updater.
+
+**Non-Goals:**
+
+- Auto-enqueueing or auto-merging; the operator enqueues every update pull request into gitea-mq.
+- Flake inputs of any kind (CAM-106, CAM-108), and packages whose version comes from a flake input (playwright-cli, omp-browser-relay-extension, vanixiets-docs and its parts).
+- First-party packages under `pkgs/by-name`, and `pkgs/disabled/*`.
+- Any change to Renovate's NixOS module, its timer, its App, or to nixbot and gitea-mq.
+- A version-ordering policy of our own; Renovate's versioning decides what is newer.
+
+## Decisions
+
+### D1: Renovate owns discovery; the package owns realization (operator D-a)
+
+- **Choice**: Renovate finds a package's next release, orders it, decides whether it is stable, and owns the branch, pull request, dashboard entry and stale-branch cleanup. The package owns everything Renovate cannot know: where each artifact lives, how its digest is obtained, and which other files must move with it. These are declared in the package's `pin.json` and carried out by the realizer. The interface between them is two strings, the package name and the version, passed to `nix run .#realize-pin -- <p> <version>`.
+- **Rationale**: Renovate already does lookup, ordering, prerelease filtering and the pull-request lifecycle for every other dependency on this host, with an allowlist for the commands it may run. What it cannot do is compute a Nix hash. Splitting there keeps each side's knowledge in one place: no lookup logic lives in the repository, and no Nix knowledge lives in Renovate's configuration.
+- **Alternatives considered**: O2, a nixbot scheduled effect that discovers and realizes (it rebuilds Renovate's lookup and pull-request lifecycle, and a third updater writes to the repository); O3, llm-agents.nix's GitHub Actions matrix (puts a hosted runner back on the update path that CAM-108 removed); O4, scheduling the existing scripts (keeps their inconsistencies and their manual leftovers).
+- **Boundary**: vendored-versus-first-party. Renovate's lookup, versioning and limits are vendored behaviour at 44.247.1, recorded as A226–A229 with a version trigger; the pin contract and the realizer are first-party.
+
+### D2: `pin.json` is the per-package data contract, validated at evaluation time
+
+- **Choice**: each migrated package has `pkgs/by-name/<p>/pin.json`. Its `package.nix` reads it through one shared helper, `flake.lib.pins.load ./pin.json { name = "<p>"; }`, which parses it with `builtins.fromJSON` and checks it with `lib.evalModules` against the pin type (D3) before returning it. A malformed pin therefore fails evaluation of the package, which fails `nixbot/nix-eval` and `nix flake check`. The helper also returns `pinPlan`, a function from a version to the fetch plan for that version (each artifact's URL per platform, each checksum-file URL, each `sourceBuild` fetcher's arguments, and the release tag), and the package builds its fetches from `pinPlan pin.version`. Both are exposed as `passthru.pin` and `passthru.pinPlan`.
+- **Example** (ic-wasm-bin, abridged):
+
+  ```json
+  {
+    "name": "ic-wasm-bin",
+    "version": "1.0.0",
+    "source": { "githubRelease": { "owner": "dfinity", "repo": "ic-wasm", "tagTemplate": "{version}" } },
+    "artifacts": {
+      "binaries": {
+        "platformBinaries": {
+          "urlTemplate": "https://github.com/dfinity/ic-wasm/releases/download/{tag}/ic-wasm-{platform}.tar.xz",
+          "platforms": { "x86_64-linux": "x86_64-unknown-linux-gnu", "aarch64-darwin": "aarch64-apple-darwin" },
+          "checksum": { "upstreamFile": { "urlTemplate": "{url}.sha256", "format": { "sha256sum": {} } } },
+          "hashes": { "x86_64-linux": "sha256-…", "aarch64-darwin": "sha256-…" }
+        }
+      }
+    },
+    "companions": []
+  }
+  ```
+
+- **Rationale**: the build and the realizer cannot drift, because the realizer obtains every URL by evaluating `pinPlan` (`nix eval --json .#<p>.passthru.pinPlan --apply 'f: f "<version>"'`) rather than restating any template, which is llm-agents.nix's `platformSource` idea with a typed contract in place of its untyped `hashes.json`. The realizer writes JSON and never Nix source, which removes the anchored-`sed` failure mode.
+- **Alternatives considered**: keep pins in `package.nix` and rewrite them (the current failure mode); llm-agents.nix's `hashes.json` with a per-flow schema (untyped, and the updater configuration lives elsewhere); one central pins file (every update conflicts with every other).
+- **Boundary**: source-versus-delivered. `pin.json` is source; the delivered package is whatever `package.nix` builds from it. The checks in D9 evaluate the helper, not the JSON text.
+
+### D3: Two tagged unions and typed companions
+
+- **Choice**: the pin type uses `lib.types.attrTag` for both unions, so exactly one tag is present and each tag's fields are typed:
+  - `source = githubRelease { owner, repo, tagTemplate } | npm { package } | pypi { package } | vendorJson { url, pointer } | vendorText { url, regex } | gitCommit { owner, repo, branch }`. It says where a release comes from, which is what Renovate's lookup needs (D6).
+  - `artifacts` is a non-empty named set of artifact entries (operator D-e), each `platformBinaries { urlTemplate, platforms, checksum, hashes } | sourceBuild { fetcher, hash, depsHash }`, with `checksum = upstreamFile { urlTemplate, format } | prefetch {}` and `depsHash = npm { hash } | cargo { hash } | go { hash } | none {}`. It says what a release pins. omnigraph's pin holds `binaries` (`platformBinaries`) and `skillSrc` (`sourceBuild` with `fetcher = fetchFromGitHub` at the tag, `depsHash = none`). A `sourceBuild` entry named `src` is the package's `src`; every other `sourceBuild` entry is exposed on the package's `passthru` under its artifact name (omnigraph's `passthru.skillSrc`), so the hasher can name it (D4), and `pin-contract` asserts that each such name resolves to an attribute with an `outputHash`.
+  - `upstreamFile.format = sha256sum {} | jsonPointer { pointerTemplate }`: `sha256sum` reads the first field of the line naming the asset, or of the only line, which covers the per-asset `.sha256` files, `SHA256SUMS` and `checksums.txt`; `jsonPointer` reads claude-code's `manifest.json` at `/platforms/{platform}/checksum`.
+  - `rev`: the release tag's commit, present exactly when an artifact's fetcher or a companion needs it (mergify-cli-bin's `sourceRev` and its `apmRef`).
+  - `companions = [ { path, kind } ]` with `kind = apmRef { git } | fixedOutputHash { package, attr, fodAttr }` (operator D-e; `fodAttr` added by operator decision, 2026-11-24).
+- **Companion rule (operator D-e)**: a file outside `pkgs/by-name/<p>/` may change with a package's update only through a typed companion entry. `apmRef { git }` sets the `ref:` following `git: <git>` in an `apm.yml` to `rev`, which the release-alignment structure checks compare with the package. `fixedOutputHash { package, attr, fodAttr }` sets key `attr` of a JSON file to the hash `FixedOutputHasher` reports for the fixed-output derivation `package.<fodAttr>` (D4). The realizer's write confinement is computed from these entries (D5). For mergify-cli-bin the companions are `modules/home/ai/plugins/version-control-and-forge/apm.yml` (`apmRef`) and `pkgs/by-name/apm-skills-compose/hashes.json` (`fixedOutputHash { package = "apm-skills-compose"; attr = "apmDepsHash"; fodAttr = "deps"; }`). That means stage 1 moves `apmDepsHash` out of `apm-skills-compose/package.nix`'s default argument into that JSON file, read by `package.nix`, so the realizer never edits Nix.
+- **`fodAttr` is required, a single attribute name, and never inferred (operator, 2026-11-24)**: `fodAttr` is one attribute name of `package`, matching `[A-Za-z_][A-Za-z0-9_'-]*`, naming the fixed-output derivation whose hash `attr` records. It is a name, not an attribute path, because nix-update's `--custom-dep` reads `pkg.${name}.outputHash` (nix-update 1.17.0 `eval.nix:122`), so a dotted value would be taken as one name. The JSON key and the derivation's attribute differ: for apm-skills-compose the key is `apmDepsHash` and the derivation is `passthru.deps`. A default taken from `attr` would silently target the wrong attribute, so the type has no default for `fodAttr`, and `pin-contract` rejects a missing, empty or dotted one.
+- **Rationale**: a tagged union makes the realizer total by construction: each tag has one handler, and an unhandled tag is a type error in the realizer (basedpyright exhaustiveness over a closed union), not a run-time `KeyError`. A typed companion tells the realizer what to write, where a bare path list would not.
+- **Alternatives considered**: a single `artifacts` value, as first sketched (cannot describe omnigraph or mergify-cli-bin, both in stage 1); companions as bare paths (the realizer would need per-package knowledge to edit them); a per-package escape hatch such as a custom script field (reintroduces unchecked per-package code). A later package that fits no tag extends a union by a design amendment, never by an escape hatch.
+
+### D4: One realizer, in typed Python, with injectable capabilities
+
+- **Choice**: `pkgs/by-name/realize-pin/` builds a Python application exposed as `apps.realize-pin`. Its static types are checked with basedpyright in strict mode, and beartype checks them at run time at module boundaries. Results at I/O boundaries are `expression.Result` values, never exceptions crossing a boundary. The pin is parsed into frozen dataclasses mirroring D3, with `match` statements over each union. Network, nix evaluation and prefetch, git, file access and fixed-output hashing sit behind five `Protocol` capabilities (`Http`, `Nix`, `Git`, `Files`, `FixedOutputHasher`), passed in at the entry point, so unit tests run offline with fakes. `Nix` offers evaluation and prefetch only; it has no `build`, and the realizer has no dummy-hash write path. The steps:
+  1. evaluate `passthru.pin` and `passthru.pinPlan <version>`;
+  2. resolve `rev` with `git ls-remote`, preferring the peeled tag commit;
+  3. hash each `platformBinaries` entry (checksum file converted to SRI, or `nix store prefetch-file`);
+  4. obtain each `sourceBuild` hash, each `depsHash` and each `fixedOutputHash` from `FixedOutputHasher`, after every `apmRef`;
+  5. write the companions.
+  `pin.json` is written as each step completes. Each file is snapshotted before its first write and restored on any failure. The overall deadline is 10 minutes.
+- **Fixed-output hashes are delegated to nix-update (operator, 2026-11-24)**: any hash that needs a build comes from `FixedOutputHasher.hash(package, attr: FodAttr, timeout) -> Result[Sri, str]`.
+  - `FodAttr` is a closed union `Src | CargoDeps | GoModules | NpmDeps | Custom(name)`. The mapping is fixed: a `sourceBuild` entry named `src` maps to `Src`, and any other `sourceBuild` entry maps to `Custom(<entry name>)`, the attribute D3 exposes on `passthru` (omnigraph's `skillSrc` is `Custom("skillSrc")`); `depsHash` tags `cargo`, `go` and `npm` map to `CargoDeps`, `GoModules` and `NpmDeps`; and a `fixedOutputHash { package, attr, fodAttr }` companion maps to `Custom(fodAttr)` on `package`, never `Custom(attr)` (mergify-cli-bin's companion is `Custom("deps")` on apm-skills-compose).
+  - The union has a single handler, which runs nix-update 1.17.0 through plain `subprocess` with an argv list. nix-update is a subprocess boundary, never an imported library. Its answer is parsed into an `Sri` or an error string, and the realizer, not nix-update, writes the SRI through `Files`, so confinement (D5) still sees every write.
+  - Handler mechanism, as implemented: the handler evaluates the derivation's current `outputHash`, writes `{"hash": "<current>"}` to a scratch file under the repository's git directory (`git rev-parse --absolute-git-dir`), runs `nix-update --flake --version=skip --override-filename <scratch> --system <host> --option access-tokens ""` with `--src-only` for `Src`, `--no-src` for `CargoDeps`, `GoModules` and `NpmDeps`, and `--no-src --custom-dep <name>` for `Custom(name)`, and reads the new hash back from the scratch file. No repository file is passed to nix-update.
+  - Known limitation of nix-update 1.17.0: it has no print-only hash mode, and it runs `git diff` on the override path, which exits 128 for a path outside the repository; that is why the scratch file sits under the git directory, where neither `git status` nor jj sees it. The limitation is contained in the single `FixedOutputHasher` handler, which is the only place that changes if nix-update's behaviour changes.
+  - Rationale: the fake-hash method has a long tail of special cases (`goModules` ordering per nixpkgs#358844, lockfile regeneration, pnpm, yarn, nuget, gradle). Mic92 maintains them upstream in nix-update, where they are widely exercised. The pin model keeps what nix-update cannot do: per-platform binaries from upstream checksum files without builders, vendor JSON pointers, `apmRef` companions, write confinement, the deadline and the request policy.
+  - nix-update is used as released, with no local patch.
+  - Version: the locked nixpkgs ships nix-update 1.16.0, so a temporary override at `pkgs/by-name/nix-update` supplies 1.17.0. The override is withheld from the fleet overlay through the existing `customPackageExcludes = [ "nix-update" ]` (`modules/nixpkgs/overlays-option.nix`), set in `modules/apps/realize-pin.nix`. Machines and homes keep nixpkgs' 1.16.0, and only `packages.<system>.nix-update` and realize-pin's wrapper get 1.17.0, which an unchanged home activation `drvPath` shows. The override and the exclude are removed together when the locked nixpkgs reaches 1.17.0 (task 2.4).
+  - Alternatives considered: the realizer's own fake-hash build with rollback, as first designed (reimplements nix-update's special cases locally); plumbum for the subprocess calls (rejected: no fleet convention, the repository's 16 Python files use `subprocess`, and single argv calls gain nothing from it).
+- **Rationale**: one implementation for every package, typed at the boundary the llm-agents.nix review found untyped. Offline tests make the realizer's behaviour a gated property rather than a hope. The 10-minute deadline keeps four realizations, the most Renovate makes per run (`prCommitsPerRunLimit = 4`), inside the unit's 55-minute `RuntimeMaxSec`.
+- **Alternatives considered**: vendoring llm-agents.nix's `scripts/updater` (stdlib-only and untyped at its configuration boundary, and organized around its own `hashes.json` flows); a nix-update-based realizer as a whole (cannot read upstream checksum files or write typed companions, so it is used only behind `FixedOutputHasher`); keeping shell (no exhaustiveness, no offline tests).
+- **Downgrade and ordering**: the realizer does not compare versions; Renovate owns ordering (D1, A229). It realizes exactly the version it is given, and fails if that version's artifacts do not exist.
+- **Boundary**: vendored-versus-first-party. Python, basedpyright, beartype and Expression come from the locked nixpkgs, and nix-update from the temporary override until nixpkgs reaches 1.17.0; the realizer is first-party, and nix-update's behaviour is consumed through `FixedOutputHasher` without local patches.
+
+### D5: Write confinement and no forge calls
+
+- **Choice (as implemented)**: before any write, the realizer computes the allowed set: `pkgs/by-name/<p>/pin.json` plus each companion `path`.
+  - Snapshot: before the first write, it records each path that `git status --porcelain=v1 -z --untracked-files=all` lists, with that path's content hash or its absence.
+  - Stray test: after the last write, a path outside the allowed set is a stray if it is new in that listing or its content hash differs from the snapshot. On any stray the realizer restores its own writes and exits non-zero naming each stray. In a clean checkout, the usual case under Renovate, this reduces to the strict rule that nothing outside the allowed set changes. A dirty local checkout keeps the changes it already had, without false strays.
+  - Write order: `pin.json` is written as each step completes, so a failure restores only what the completed steps wrote.
+  - Second layer: Renovate's `fileFilters` for the task (D7) repeats the same set.
+- **Request policy**: the realizer sends only `GET` and `HEAD` requests, to hosts named by the evaluated plan and the source, and calls no forge API: release assets are fetched from `releases/download/…` URLs, which are not API calls, and tag commits come from `git ls-remote`. The host policy checks the requested URL, not a redirect's target, so a release asset redirected to its storage host is admitted. nix and git run with an allowlisted environment and `--option access-tokens ""`, so no forge credential reaches them even when the operator runs the realizer locally. Under `gate-mutating-http` (#4253) there is therefore nothing to approve, and the task needs no token; Renovate gives it none (A228).
+- **Rationale**: llm-agents.nix's confinement, computed from typed data instead of a side file read from `main`, and robust to a checkout that was not clean before the run.
+
+### D6: Renovate discovers pins through one jsonata custom manager and custom datasources
+
+- **Choice**: `.github/renovate.json` gains one `customType: "jsonata"` manager with `fileFormat: "json"` over `pkgs/by-name/**/pin.json` (A226; R1 resolved: magnetite runs Renovate 44.247.1 at `/nix/store/wazpcbgy75zxr1fw6bq7swm5s48pzdcw-renovate-44.247.1`, which ships `dist/modules/manager/custom/jsonata`, and the locked nixpkgs evaluates `renovate.version` to `44.247.1`). Its queries emit one dependency per pin: `depName` is `name`, `currentValue` is `version`, and the `source` tag selects the datasource:
+  - `githubRelease` uses `github-releases` with `packageName` `owner/repo` and an `extractVersion` derived from `tagTemplate`;
+  - `npm` and `pypi` use their datasources;
+  - `vendorJson` and `vendorText` use `custom.<name>`, declared under `customDatasources` with format `json` and a `transformTemplates` entry from `pointer`, or format `plain` with `regex`;
+  - `gitCommit` uses `git-refs` on `branch`, with `currentDigest` set from `rev`.
+  The set of packages is whatever `pin.json` files exist, and the pkgs-by-name wiring discovers the same set for the checks. There is no hand-maintained list.
+- **Rationale**: one manager for every pin; a JSON query is less fragile than a regex over JSON text.
+- **Alternatives considered**: a `custom.regex` manager (the fallback if A226 fails); one manager per package (a hand-maintained list).
+- **Branch namespace**: Renovate's branches are `renovate/<p>` and the flake-update effect's are `update-<input>`, so they cannot collide.
+
+### D7: The pin rule: branch, task, window and limits (operator D-f)
+
+- **Choice**: one `packageRules` entry with `matchManagers: ["custom.jsonata"]`, appended after the existing rules without reordering them. The lazyvim-nix `allowedVersions` rule, which another chain adds, stays as it is. The entry sets:
+  - `branchTopic: "{{{depName}}}"`, giving branches `renovate/<p>`, and `commitMessageTopic: "{{{depName}}}"`, giving titles of the form `chore(deps): update <p> to <version>`, the commit convention `bump-procedure.md` already uses;
+  - `schedule: ["* 14-17 * * 1,4"]`, which is Monday and Thursday from 14:00 to 17:59 UTC, and `updateNotScheduled: false`, so that an open pin branch is not rebased, and the realizer not re-run, outside the window (A227: the default is true);
+  - `prHourlyLimit: 2`, `prConcurrentLimit: 6`, `branchConcurrentLimit: 6`;
+  - `postUpgradeTasks: { commands: ["nix run .#realize-pin -- {{{depName}}} {{{newVersion}}}"], fileFilters: [the pin and companion globs], executionMode: "update" }`. Commit-pinned packages in stage 4 use `{{{newDigest}}}` in the same position.
+  It sets no `automerge`, no queue label, and does not override `ignoreUnstable`. The repository-wide `labels: ["dependencies"]` applies.
+- **Window and bound**: Renovate's timer fires at minute 17 of every even hour UTC, with up to 10 minutes' random delay (`modules/nixos/renovate.nix`), so two runs fall in each window, at about 14:17 and 16:17. With `prHourlyLimit: 2`, each run opens at most 2 per-package pull requests, so a window opens at most 4 and a week at most 8, and `prConcurrentLimit: 6` keeps no more than 6 open. The hourly count resets at the top of each UTC hour (A227). A run that starts at 14:27 and is still running past 15:00 could open 2 more in the new hour, so the hard ceiling per window is 2 per clock hour across 14:00–17:59, which is at most 8, and never more than 6 open. Renovate counts these limits over all its branches (A227), so other Renovate pull requests consume the same ceilings: the limits are an upper bound on per-package pull requests, not a reservation for them.
+- **Clear of the flake-update effect and harmonia-gc**: the flake-update effect runs on Tuesday and Friday, at 10:00 UTC per the in-flight commit `pzolkvnx` (22:00 UTC on `main` until it lands), and its burst of up to 24 pull requests held nixbot at load 113 for more than 30 minutes. magnetite's harmonia-gc runs at 04:00 New York time, 09:00 UTC in winter and 08:00 in summer. The window shares no day with the effect under either schedule, and starts at least five hours after harmonia-gc.
+- **Rationale**: per-package builds must not stack onto the flake-update burst on the host that runs nixbot and Renovate. Monday and Thursday split the week between the effect's days, and the afternoon UTC slot is morning in New York, when the operator can review.
+- **Alternatives considered**: no schedule (pin pull requests could open on Tuesday or Friday during or right after the effect's burst); a nightly window (lands builds near harmonia-gc and the effect's 22:00 slot on `main`).
+- **The burst limit is a host-safety limit on magnetite, not a courtesy (operator, 2026-11-24)**: magnetite runs nixbot, Renovate, gitea, tincr and the binary cache. On 2026-11-24 (peer 91001's record), the flake-update effect opened 24 pull requests at 22:00 UTC; within 75 minutes their builds had put magnetite under memory pressure, tincr and gitea missed their 30-second watchdogs at 23:23Z, the host hard-reset at 23:31Z, and nixbot then took 56 minutes to evaluate an unrelated pull request. The limit on per-package pull requests is therefore enforced by Renovate itself, not left to review:
+  - `prConcurrentLimit: 6` and `branchConcurrentLimit: 6` bound how many pin branches exist, and so how many nixbot builds they cause, at once;
+  - `prHourlyLimit: 2` bounds how many open per clock hour;
+  - `schedule: ["* 14-17 * * 1,4"]` with `updateNotScheduled: false` keeps both new branches and rebases of open ones inside the window.
+  The accepted gap: 4 per window normally, 8 if a run straddles an hour boundary (the hourly count resets at the top of the UTC hour, A227), and never more than 6 open.
+  The realizer's own work belongs to the same bound. Its prefetches and the builds nix-update runs for `FixedOutputHasher` happen on magnetite inside the Renovate unit, under that unit's `MemoryHigh = 4G` and `MemoryMax = 8G`, before nixbot builds anything. Two things keep that work bounded: the realizer's 10-minute deadline (D4), which also bounds each `FixedOutputHasher` call through its `timeout`, and systemd starting no second Renovate run while one is active (the dependency-update capability's world assumption on timers), so at most one realization runs at a time and at most four per run (`prCommitsPerRunLimit = 4`). Loosening any of these values loosens the host-safety bound, and needs the same evidence as changing the limits.
+- **The window falls inside the operator's working hours, deliberately (operator, 2026-11-24)**: Monday and Thursday 14:00–17:59 UTC is 09:00–12:59 US Eastern in winter (EST, UTC−5) and 10:00–13:59 in summer (EDT, UTC−4).
+  - Reason: the pull requests are built while someone can watch magnetite and enqueue promptly. The 22:00 UTC flake-update burst reset the host with nobody watching.
+  - Accepted trade-off: per-package builds compete with the operator's own pull-request CI on nixbot during the day.
+  - What would change it: a measured nixbot queue delay on the operator's pull requests during the window, read from nixbot's queue wait for those builds against the same hours outside the window (task 7.4 records the first comparison).
+
+### D8: One allowlist entry, and a check that renders templates before matching
+
+- **Choice**: `flake.lib.renovateSettings.allowedCommands` gains `^nix run \.#realize-pin -- [a-z0-9][a-z0-9-]* [0-9A-Za-z][0-9A-Za-z.+_-]*$`. Renovate matches the compiled command (A228), so the existing check, which matches the uncompiled strings in `.github/renovate.json`, would reject the template. `checks.renovate-allowed-commands` therefore renders each templated command with the `name` and `version` of every `pin.json` in the tree before matching, and fails if no pin exists to render it with, which keeps it from passing vacuously. It also matches a fixed negative case, `1.0.0;id`, which the entry must reject.
+- **Rationale**: the allowlist stays one anchored pattern with no shell metacharacters, and the check still ties repository and instance together as CAM-106 intended.
+- **Deployment coupling**: the allowlist is instance configuration and reaches Renovate only when magnetite deploys. Until it does, the pin rule's task is refused and every pin pull request carries an artifact error. The migration plan therefore deploys the allowlist before the first pin lands.
+- **Boundary**: source-versus-delivered. The entry is source in `modules/lib/renovate-settings.nix`; the delivered value is the one in magnetite's running unit, read in task 6.2.
+
+### D9: Checks and their size classes
+
+- **Choice**: two new checks on `x86_64-linux`, each declared in `testSizes.checks` as `small` with `measured = false` until three nixbot runs exist, and therefore listed by `checks.x86_64-linux.test-size-classes`:
+  - `pin-contract` evaluates the pin type against valid and malformed fixtures (unknown tag, missing platform hash, `..` in a companion path, `name` mismatch, `fixedOutputHash` on a non-JSON path, `fixedOutputHash` with a missing, empty or dotted `fodAttr`), asserts that each non-`src` `sourceBuild` entry name and each companion's `fodAttr` resolves on its package to an attribute with an `outputHash`, and evaluates every migrated package's `passthru.pin`;
+  - `realize-pin-tests` runs basedpyright and the realizer's offline unit tests with fake capabilities, including one recorded realization per stage-1 pin.
+  The existing `renovate-allowed-commands` (`medium`, unmeasured) and `renovate-config` (`small`) keep their classes, and each changes in content only. A migrated package's own build is not a check and gains no class.
+- **Rationale**: both new checks assert configuration and pure functions, which the size-class rules place in `small`, and neither waits on time or reaches the network.
+
+### D10: Staged delivery and clean per-package cutover (operator D-b, D-d)
+
+- **Stage 1**: the pin type and helper, the realizer and its checks, the Renovate manager, rule and allowlist entry, and ic-wasm-bin, icp-cli-bin, omnigraph, mergify-cli-bin, moshi-hook and claude-code. These six publish checksum files (A230), so stage 1 needs only `platformBinaries` with `upstreamFile`, plus omnigraph's `sourceBuild` and mergify-cli-bin's two companions. moshi-hook (`version.txt`) and claude-code (the `latest` pointer) exercise `vendorText` through custom datasources.
+- **The claude-code drvPath exception (operator, 2026-11-24)**: claude-code is the one stage-1 conversion whose `drvPath` changes. Its `manifest.json` held hexadecimal checksums; its `pin.json` stores SRI hashes and passes `hash` to `fetchurl`, so the fixed-output derivations record the same digest in a different `outputHash` format. The proof that the delivered package is unchanged is that the `src` output paths are equal for every platform, plus a `nix derivation show` diff that differs only in the `outputHash` format. Every other stage-1 package keeps its `drvPath`.
+- **Stage 2**: the remaining packages with an `update.sh` or `nix-update-script`: atomic, buzz-source (and its three dependants), dbt-fusion, devin-cli, git-xet, golem-binary, greptimedb-bin, hindsight, langfuse-cli, linear-cli, mops-bin, perses-bin, pi-acp, quarto-bin, uncomment-bin, worktrunk-bin, xsra, nix-fast-build.
+- **Stage 3**: the upstream-versioned packages with no updater today: skill-validator, ovnfs, markdown-tree-parser, omnigent (with its two siblings), pi-vim, impressive, ouroboros, radicle-desktop.
+- **Stage 4**: the commit-pinned packages through `gitCommit` and Renovate's `git-refs` digest updates: the five `agent-plugins-*`, pi-agent-extensions, pi-openai-server-compaction, tmux-command-palette.
+- **Fit before migrating**: each later stage first records, per package, which tags it needs. Packages known not to fit stage 1's tags today are atomic (a regenerated repairs patch), xsra (a generated `Cargo.lock`), perses-bin (plugin pins from a file in the tag) and buzz (a vendor hash). Each is handled by a design amendment extending a union, or the package stays on its script with the reason recorded; neither choice is made silently.
+- **Cutover per package**: the commit that adds a package's `pin.json` also deletes its `update.sh`, its `passthru.updateScript`, and its `apps.update-*` entry in `modules/apps/updates.nix`. When stage 1 lands, `just update-package` becomes `nix run .#realize-pin -- {{package}} {{version}}`, and `bump-procedure.md`'s updater lookup order becomes "realize a version", with the manual `lib.fakeHash` route kept for packages not yet migrated.
+
+## Risks / Trade-offs
+
+- [Risk] R1, resolved: the deployed Renovate's support for `customType: "jsonata"` was unverified. Read on 2026-11-24: 44.247.1 at `/nix/store/wazpcbgy75zxr1fw6bq7swm5s48pzdcw-renovate-44.247.1` ships it (A226). A Renovate bump that drops it voids A226; task 7.3 compares the running version with 44.247.1 at each stage's close-out, and `custom.regex` is the fallback.
+- [Risk] R2: post-upgrade prefetches and nix-update's hash builds run in Renovate's unit on magnetite, nixbot's host → Mitigation: the window and limits of D7; the realizer's 10-minute deadline and each `FixedOutputHasher` call's `timeout`; the unit's existing `Nice = 10`, `CPUWeight = 20`, `MemoryHigh = 4G`, `MemoryMax = 8G`; stage 1 needs builds only for mergify-cli-bin's `apmDepsHash`, and every other stage-1 hash comes from a checksum file.
+- [Risk] R3: only x86_64-linux gates a merge; aarch64-darwin is best-effort (`modules/checks/nixbot-best-effort-darwin.nix`), so a darwin artifact that fails to build shows as an ignored failure → Mitigation: the digests of darwin artifacts still come from the upstream's checksum file, so a digest error fails the fetch on any platform. A darwin-only runtime breakage is caught only by a local `just check-fast` on a Mac, which the operator runs before enqueueing a package used on darwin; this is the same exposure as every other darwin change.
+- [Risk] R4: when the realizer fails, Renovate still commits its own edit of `version` in `pin.json` and opens or updates the pull request with an artifact error (A228) → accepted: the stale digests then fail the fixed-output fetch in `nixbot/nix-build`, so the pull request cannot pass its required checks, and the artifact error tells the operator why.
+- [Risk] A vendor that moves its `latest` pointer back to withdraw a release (claude-code's GCS `latest`, which llm-agents.nix follows with `follow_pointer`) gets no rollback proposal, because Renovate proposes only newer versions (A229) → accepted; the operator moves such a package back by hand, as the behavioral requirement on withdrawals states.
+- [Trade-off] Per-package pull requests can wait up to three and a half days for the next window → accepted for packages that are not security-critical; the operator can still realize a version by hand at any time.
+- [Trade-off] The limits are repository-wide ceilings (A227), so a backlog of other Renovate pull requests can hold pin pull requests back → accepted; the dependency dashboard lists what is held.
+- [Trade-off] Moving `apmDepsHash` into `apm-skills-compose/hashes.json` touches a package outside stage 1's six → accepted; it is the only way to keep the realizer from editing Nix.
+
+## Migration Plan
+
+1. Add the pin type, helper and `pin-contract` check, and the realizer with `realize-pin-tests` (groups 1–3).
+2. Convert the six stage-1 packages, and move `apmDepsHash` to JSON. For each package, confirm that `nix eval` of its `drvPath` is unchanged from before conversion, so the delivered package is identical; for claude-code, the one exception, confirm equal `src` output paths and a `nix derivation show` diff limited to the `outputHash` format (D10). Then delete each package's `update.sh` and app (group 4).
+3. Add the allowlist entry and the rendering check; land, then deploy magnetite so the running Renovate admits the command (groups 5 and 6).
+4. Only after step 3's deploy, add the custom manager, datasources and pin rule to `.github/renovate.json`, and land them (group 5, task 5.4).
+5. Watch the first window: extraction lists six packages, any pull requests stay within the bound, each pushed commit is complete, and none carries merge authorization (group 7).
+6. Update `justfile`, `bump-procedure.md`, ADR 0002's recipe text and the CI/CD documentation (group 8).
+
+Hosts: magnetite only, for the allowlist.
+Rollback: before step 4, revert; nothing reads the pins except the packages themselves. After step 4, remove the pin rule and manager from `.github/renovate.json` (Renovate stops at its next run and its dashboard marks the branches abandoned), and restore the scripts from the reverted commits if per-package updates must continue by hand.
+
+## Gate 1 modality verdicts
+
+This table is the pre-apply spec-and-feature alignment record, one row per requirement in this change's three delta specs.
+No row routes to a Gherkin scenario, so the change lays out no `.feature` file. The repository has no BDD runner, and every observable here is either a property of the evaluated flake (witnessed by `nix eval` and flake checks), a behaviour of the realizer against fake capabilities (witnessed by its offline tests), or an observation of Renovate, nixbot and the forge (witnessed by the integration tasks as smoke tests).
+
+| Requirement | Capability | Stratum | Modality | Witness |
+|---|---|---|---|---|
+| Each new stable release of a package with a package pin is proposed in an update pull request of its own | `package-version-refresh` | behavioral | smoke (forge) | tasks 5.5, 7.1, 7.2; "The upstream publishes again before the pull request merges" is observed only if it occurs, and recorded as pending otherwise |
+| Package updates never move a package to an older release, or from a stable release to an unstable release | `package-version-refresh` | behavioral | world assumption, configuration read | A229; task 5.4 (no `ignoreUnstable` override) |
+| Every pushed package update commit is a consistent commit | `package-version-refresh` | behavioral | unit (offline tests), smoke (forge) | tasks 3.3, 7.2 |
+| An update that cannot be completed never lands with a stale digest | `package-version-refresh` | behavioral | unit (offline tests), negative control | tasks 3.3, 3.5 |
+| A malformed package pin fails a required check before it can merge | `package-version-refresh` | behavioral | build gate (`pin-contract`), negative control | tasks 1.3, 1.4 |
+| Each package has exactly one updater | `package-version-refresh` | behavioral | content search | task 4.5 |
+| Package update pull requests open only inside the update window, and in bounded numbers | `package-version-refresh` | behavioral | configuration read, smoke (forge) | tasks 5.4, 7.1, 7.4 |
+| Merge authorization for package updates stays with people | `package-version-refresh` | behavioral | configuration read, smoke (forge) | tasks 5.4, 7.2 |
+| Every package pin is validated when the flake is evaluated | `package-version-refresh-interface` | interface | build gate | tasks 1.3, 1.4 |
+| A file outside the package's directory changes only through a typed companion entry | `package-version-refresh-interface` | interface | build gate | task 1.3 |
+| The build and the realizer share one URL template and platform map | `package-version-refresh-interface` | interface | eval comparison | tasks 1.2, 4.2 |
+| The realizer realizes one version of one package, total over every source and artifact kind | `package-version-refresh-interface` | interface | unit (offline tests) | tasks 3.2, 3.3, 4.4 |
+| The realizer leaves every file as it was when it fails or runs out of time | `package-version-refresh-interface` | interface | unit (offline tests), negative control | tasks 3.3, 3.5, 3.6 |
+| The realizer writes only the package pin and the files its typed companions name | `package-version-refresh-interface` | interface | unit (offline tests), negative control | tasks 3.3, 3.5 |
+| The realizer makes no forge call and no mutating request | `package-version-refresh-interface` | interface | unit (recorded requests) | task 3.3 |
+| One custom manager reads every package pin and names the package | `package-version-refresh-interface` | interface | extraction dry run | task 5.5 |
+| Vendor endpoints are read through declared custom datasources | `package-version-refresh-interface` | interface | extraction dry run | task 5.5 |
+| The pin rule fixes the branch, the task and the update window | `package-version-refresh-interface` | interface | configuration read, `renovate-config` | task 5.4 |
+| The realizer's command is admitted by one allowlist entry, and the check renders it before matching | `package-version-refresh-interface` | interface | build gate, negative control, host read | tasks 5.1, 5.2, 5.3, 6.2 |
+| The pin contract and the realizer are each guarded by a small check with a declared size class | `package-version-refresh-interface` | interface | eval | task 3.4 |
+| A migrated package keeps no updater of its own | `package-version-refresh-interface` | interface | content search | task 4.5 |
+| This capability states its own trust boundary | `package-version-refresh-interface` | interface | capability text | specs text, task 8.3 |
+| A226–A230 | `world-assumptions` | world | violation-condition witness | each its own scenario; A226 and A227 are re-read at each close-out (task 7.3) |
+| Grounded vocabulary for behavioral requirements | `world-assumptions` | world | designation table and its lint | the table itself; task 9.2 re-merges it before archive |
+
+The realizer's offline tests are example-based; no row carries an `est-property`, `est-contract` or `est-symbolic` modality, so the change carries no executable-specification-testing obligation.
+
+## Open Questions
+
+- None blocking. The exact `extractVersion` expression per `tagTemplate` and the `transformTemplates` for each vendor datasource are settled by the extraction dry run of task 5.5, not here.
+- Ordering with CAM-106, CAM-108 and CAM-123: this change's `world-assumptions` delta carries main's designation table plus its own rows. Rows those in-flight changes add (for example CAM-108's `hosted runner`) are re-merged by whichever change archives later (task 9.2).
