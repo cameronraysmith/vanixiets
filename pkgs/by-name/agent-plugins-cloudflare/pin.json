@@ -1,0 +1,29 @@
+{
+  "name": "agent-plugins-cloudflare",
+  "version": "12520fd63a1e958be217a93f48ce1f04bc9055f3",
+  "realizedVersion": "12520fd63a1e958be217a93f48ce1f04bc9055f3",
+  "source": {
+    "gitCommit": {
+      "owner": "cloudflare",
+      "repo": "skills",
+      "branch": "main"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "cloudflare",
+            "repo": "skills"
+          }
+        },
+        "hash": "sha256-dkKTLFcAiQ86dgkD58VwS0Y4986hBC6XMOfpmfQpc5Y=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}
