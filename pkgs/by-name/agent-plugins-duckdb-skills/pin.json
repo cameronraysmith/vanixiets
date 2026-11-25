@@ -1,0 +1,29 @@
+{
+  "name": "agent-plugins-duckdb-skills",
+  "version": "7feda8e01e22bc0886c86123f3884947e36d8c69",
+  "realizedVersion": "7feda8e01e22bc0886c86123f3884947e36d8c69",
+  "source": {
+    "gitCommit": {
+      "owner": "duckdb",
+      "repo": "duckdb-skills",
+      "branch": "main"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "duckdb",
+            "repo": "duckdb-skills"
+          }
+        },
+        "hash": "sha256-OmsODyirf2MzmoDMRx+c8xbkJWq2qOlMhXjKDV7PUv4=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}

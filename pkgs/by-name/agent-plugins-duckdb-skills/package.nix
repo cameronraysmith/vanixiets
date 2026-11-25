@@ -1,7 +1,26 @@
-{ fetchFromGitHub }:
-fetchFromGitHub {
-  owner = "duckdb";
-  repo = "duckdb-skills";
-  rev = "7feda8e01e22bc0886c86123f3884947e36d8c69";
-  hash = "sha256-OmsODyirf2MzmoDMRx+c8xbkJWq2qOlMhXjKDV7PUv4=";
-}
+# The commit and the source hash are in pin.json: Renovate proposes the head
+# of the branch it names, and realize-pin rewrites both. passthru.src is this
+# fetch itself, so the realizer's src step hashes
+# `.#agent-plugins-duckdb-skills.src`.
+{ lib, fetchFromGitHub }:
+let
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json {
+      name = "agent-plugins-duckdb-skills";
+    })
+    pin
+    pinPlan
+    ;
+
+  self = fetchFromGitHub (
+    (pinPlan pin.version).artifacts.src.sourceBuild.fetchFromGitHub
+    // {
+      inherit (pin.artifacts.src.sourceBuild) hash;
+      passthru = {
+        inherit pin pinPlan;
+        src = self;
+      };
+    }
+  );
+in
+self
