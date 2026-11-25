@@ -74,7 +74,7 @@ Core nix operations for building, checking, and managing the flake.
 | `bisect-nixpkgs-manual` | `command` | Bisect nixpkgs commits (manual mode) | No |
 | `bootstrap-shell` | - | Shell with bootstrap dependencies | No |
 | `update` | - | Update all nix flake inputs | No |
-| `update-package` | `package` | Update a package using its updateScript | No |
+| `update-package` | `package version?` | Realize `version` with `nix run .#realize-pin` when `pkgs/by-name/<package>/pin.json` exists (and exit with how to obtain one when `version` is omitted); otherwise run the package's updateScript, which takes no `version` | No |
 
 **CI:** nixbot builds `checks.x86_64-linux` and `checks.aarch64-darwin`, both required, directly rather than calling these recipes; `just check-fast auto off x86_64-linux` builds the same x86_64-linux set, and `just check-fast` on a Mac builds the darwin set.
 

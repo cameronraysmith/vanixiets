@@ -598,15 +598,32 @@ nixos-test profile="aarch64":
 update:
   {{nix_cmd}} flake update
 
-# Update a package using its updateScript
-# Note: claude-code-bin and ccstatusline are now from llm-agents and update via flake update
+# A package with pkgs/by-name/<package>/pin.json takes a version and is realized by realize-pin:
+#   just update-package ic-wasm-bin 1.0.0
+# Any other package takes no version and runs its updateScript, if it has one:
+#   just update-package xsra
+# Update a package: realize-pin for a pinned package, its updateScript otherwise
 [group('nix')]
-update-package package="atuin-format":
+update-package package version="":
   #!/usr/bin/env bash
   set -euo pipefail
-  UPDATE_SCRIPT=$({{nix_cmd}} build .#{{ package }}.updateScript --no-link --print-out-paths)
-  echo "Running updateScript for {{ package }}..."
-  $UPDATE_SCRIPT
+  if [ -f "pkgs/by-name/{{ package }}/pin.json" ]; then
+    if [ -z "{{ version }}" ]; then
+      echo "{{ package }} is pinned by pkgs/by-name/{{ package }}/pin.json; name the version to realize:" >&2
+      echo "  just update-package {{ package }} <version>" >&2
+      echo "Renovate's pull request for this package (branch renovate/{{ package }}) or its Dependency Dashboard issue names the newest release." >&2
+      exit 2
+    fi
+    {{nix_cmd}} run .#realize-pin -- "{{ package }}" "{{ version }}"
+  else
+    if [ -n "{{ version }}" ]; then
+      echo "{{ package }} has no pin.json; its updateScript chooses the version, so run: just update-package {{ package }}" >&2
+      exit 2
+    fi
+    UPDATE_SCRIPT=$({{nix_cmd}} build .#{{ package }}.updateScript --no-link --print-out-paths)
+    echo "Running updateScript for {{ package }}..."
+    $UPDATE_SCRIPT
+  fi
   echo "Update complete. Review changes with: git diff"
 
 ## bun

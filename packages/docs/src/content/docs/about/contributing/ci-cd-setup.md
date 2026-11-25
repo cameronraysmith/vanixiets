@@ -273,7 +273,7 @@ It acts as its own GitHub App, `vanixiets-renovate`, installed on this repositor
 Each run's privileged `ExecStartPre` mints a one-hour installation token from the App's private key, the `renovate-github-app-secret-key` clan vars generator on magnetite, and the key itself never reaches Renovate's process; `RuntimeMaxSec` stops a run at 55 minutes, before the token expires.
 To replace the key, generate a new one on the App's settings page, store it with `clan vars set magnetite renovate-github-app-secret-key/key.pem`, delete the old one on GitHub, and redeploy magnetite.
 
-The timer starts a run every two hours at 17 minutes past, plus up to ten minutes of random delay.
+The timer starts a run every hour at 17 minutes past, plus up to ten minutes of random delay, and systemd starts no second run while one is active.
 To run it now, `systemctl start renovate.service` on magnetite; `journalctl -u renovate.service` shows the run.
 Renovate pull requests go through nixbot like any other and are not enqueued automatically: a person enqueues each one into gitea-mq.
 
@@ -283,6 +283,7 @@ Every commit Renovate pushes is complete, so nixbot passes it without a fix-up c
 |--------|--------------------------|
 | A `flake.nix` reference bumped by a custom regex manager (an input pinned to a version tag) | `nix flake lock` |
 | A `package.json` dependency (bun manager) | `nix run .#regenerate-bun-nix` |
+| A `pkgs/by-name/<package>/pin.json` version (`custom.jsonata` manager; see [Package pins](#package-pins)) | `nix run .#realize-pin -- <package> <version>` |
 | The `playwright-web-flake` tag | `nix flake lock`, `just bun-repin-playwright`, `bun install --ignore-scripts`, `nix run .#regenerate-bun-nix`, so npm `playwright` equals the flake's driver version |
 
 npm `playwright` and `@playwright/test` are never updated on their own; they follow the flake input.
@@ -291,6 +292,33 @@ Renovate may run only the commands in its `allowedCommands` (`flake.lib.renovate
 Flake inputs are split between two updaters, so no input has two.
 Renovate updates the inputs pinned to a revision (its `nix` manager, which re-locks the input itself) or to a version tag (the regex managers above); lock file maintenance is off, so it never refreshes the rest.
 Inputs that track a branch are refreshed one pull request per input by the scheduled [`flake-update` effect](#flake-update), which excludes `playwright-web-flake`.
+
+### Package pins
+
+A package with `pkgs/by-name/<package>/pin.json` declares in that file its version, its upstream (a GitHub release, an npm or PyPI package, or a vendor's release manifest read through one of the custom datasources in `.github/renovate.json`), the hash of every artifact it fetches, and the companion files that move with the version; `lib/pins.nix` evaluates the pin into the fetches the package builds from.
+Renovate's `custom.jsonata` manager matches `pkgs/by-name/**/pin.json`, so adding a pin is all it takes for Renovate to track a package; there is no list to maintain.
+Packages without a pin keep their `update.sh` updater, or have none, and Renovate never touches them; [Bumping a package](/development/operations/bump-procedure/) covers both routes.
+
+The pin rule in `.github/renovate.json` gives each package one branch, `renovate/<package>`, and one pull request titled `chore(deps): update <package> to <version>`, straight to its newest stable version, whose version must contain a dot.
+A rule after it labels an update that crosses a major version `major`.
+The rule's one post-upgrade task, `nix run .#realize-pin -- <package> <version>`, runs in the branch before the commit, and Renovate commits only the task's writes that match its `fileFilters`: `pin.json`, `hashes.json`, `pkgs/by-name/apm-skills-compose/skills.json` and the `apm.yml` files under `modules/home/ai/plugins`.
+realize-pin derives each hash from the upstream's checksum file or by prefetching, writes `version` first, then each hash and companion file, and `realizedVersion` last, and stops after ten minutes.
+When it fails, Renovate still commits its own edit of `version` and reports an artifact error on the pull request; `checks.<system>.pin-realized`, required on x86_64-linux and aarch64-darwin, then fails because that pin's `realizedVersion` differs from its `version`, naming the pin, so an unrealized version cannot land.
+The allowlist admits the task through one anchored pattern, `^nix run \.#realize-pin -- [a-z0-9][a-z0-9-]* [0-9A-Za-z][0-9A-Za-z.+_-]*$`, and `checks.x86_64-linux.renovate-allowed-commands` renders the templated command with the name and version of every pin in the tree before matching it, and requires the pattern to reject the version `1.0.0;id`.
+
+Pin pull requests open at any hour of any day, at most 4 per hour.
+Two limits hold that bound: the instance's `prCommitsPerRunLimit = 4` with one run per hour, and the pin rule's `prHourlyLimit: 4`, which counts every pull request Renovate created on a `renovate/` branch in the current clock hour, so Renovate's other pull requests share those 4.
+The number of pin pull requests open at once is not limited (`prConcurrentLimit` and `branchConcurrentLimit` are 0).
+Since pin branches have no schedule, they can open and rebase during the flake-update effect's burst on Tuesday and Friday at 10:00 UTC.
+realize-pin's prefetches and hash builds run on magnetite inside the Renovate unit, under its `Nice = 10`, `CPUWeight = 20`, `MemoryHigh = 4G` and `MemoryMax = 8G`.
+Every pin pull request needs stibnite, the aarch64-darwin builder, reachable to go green, and none is merged automatically: a person enqueues each into gitea-mq.
+The first decision, a Monday and Thursday window from 14:00 to 17:59 UTC with at most 2 pull requests per hour and 6 open, was superseded on 2026-11-25 by the hourly cadence above (design D7 of the `automate-package-version-bumps` change).
+
+greptimedb-bin, which runs as `services.greptimedb.package` on magnetite, gets no branch until its update is approved on Renovate's Dependency Dashboard; the review it needs before approval and before enqueueing is in [Bumping a package](/development/operations/bump-procedure/#2-realize-a-version).
+Any pinned package can also be realized by hand at any time with `just update-package <package> <version>`.
+
+What the repository guarantees here is limited to what it controls: the pin contract and its type, the fetch plan the build and realize-pin share, what realize-pin reads and writes, the Renovate configuration and allowlist entry it declares, and the checks that guard them.
+When Renovate runs, which releases it finds and how it orders them, what an upstream publishes and whether its checksum file matches its artifacts, whether the deployed Renovate honours the configuration, and whether a release builds on a platform are not; the last is recorded by nixbot's required checks on x86_64-linux and aarch64-darwin, and only while a builder for that platform is reachable.
 
 ## Secrets
 

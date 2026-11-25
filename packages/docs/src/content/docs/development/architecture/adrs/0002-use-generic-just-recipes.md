@@ -145,17 +145,20 @@ just cache-linux-package <any-package>
 
 #### update-package
 ```just
-update-package package="ccstatusline":
+update-package package version="":
     # Generic package updater
-    # Works with any package that has updateScript
-    # Note: claude-code-bin now from llm-agents, auto-updates daily
+    # A package with pkgs/by-name/<package>/pin.json: nix run .#realize-pin -- <package> <version>
+    # Any other package: its updateScript, which takes no version
 ```
 
 **Usage**:
 ```bash
-just update-package                    # default
-just update-package bitwarden-cli      # specific
+just update-package ic-wasm-bin 1.0.0  # pinned: realize this version
+just update-package xsra               # not pinned: run its updateScript
 ```
+
+Updated 2026-11-25 (CAM-124): the recipe previously ran only `updateScript` and defaulted `package` to one package.
+It now takes `package` without a default and dispatches on whether the package has a `pin.json`, so one generic recipe covers both kinds of package; the decision this ADR records is unchanged.
 
 #### build-container
 ```just

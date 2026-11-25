@@ -241,13 +241,22 @@ Run it now with `nbo schedule run flake-update flake-update -f`; see [CI/CD Setu
 
 ## Dependency updates
 
-Renovate runs on magnetite every two hours at 17 minutes past, as the GitHub App `vanixiets-renovate`, and opens pull requests that nixbot builds like any other; see [CI/CD Setup](/about/contributing/ci-cd-setup/#dependency-updates) for its task chains and flake-input split.
+Renovate runs on magnetite every hour at 17 minutes past, as the GitHub App `vanixiets-renovate`, and opens pull requests that nixbot builds like any other; see [CI/CD Setup](/about/contributing/ci-cd-setup/#dependency-updates) for its task chains and flake-input split.
 The flake inputs that track a branch are refreshed instead by the scheduled [`flake-update` effect](#flake-update).
+
+Renovate also discovers new versions for every `pkgs/by-name/<package>/pin.json` and opens one pull request per package, on the branch `renovate/<package>`, whose commit carries what `nix run .#realize-pin -- <package> <version>` wrote in the same branch.
+Pin pull requests open at any hour of any day, at most 4 per hour (`prHourlyLimit: 4`, shared with Renovate's other pull requests, and `prCommitsPerRunLimit = 4` with one run per hour), with no limit on how many are open; the Monday and Thursday window first decided was superseded on 2026-11-25.
+greptimedb-bin waits for approval on Renovate's Dependency Dashboard.
+`just update-package <package> <version>` realizes a version by hand; packages without a pin keep their `update.sh`, or have no updater.
+See [CI/CD Setup](/about/contributing/ci-cd-setup/#package-pins) for the pin rule, the limits and this capability's trust boundary, and [Bumping a package](/development/operations/bump-procedure/) for the review.
 
 | Unit | Purpose | Local equivalent |
 |------|---------|------------------|
 | `renovate.service` (timer `renovate.timer`) | Update dependencies in `.github/renovate.json`'s scope, running each update's post-upgrade tasks in the same commit | `systemctl start renovate.service` and `journalctl -u renovate.service` on magnetite |
-| `checks.x86_64-linux.renovate-allowed-commands` | Every post-upgrade task command is on the instance's allowlist | `nix build .#checks.x86_64-linux.renovate-allowed-commands` |
+| `checks.x86_64-linux.renovate-allowed-commands` | Every post-upgrade task command is on the instance's allowlist, the realize-pin task rendered with every pin's name and version | `nix build .#checks.x86_64-linux.renovate-allowed-commands` |
+| `checks.<system>.pin-realized` (x86_64-linux, aarch64-darwin) | Every `pin.json` has a `realizedVersion` equal to its `version`, so a version whose realization did not complete fails | `nix build .#checks.aarch64-darwin.pin-realized` |
+| `checks.x86_64-linux.pin-contract` | Every package pin evaluates against the pin type, with valid and malformed fixtures | `nix build .#checks.x86_64-linux.pin-contract` |
+| `checks.x86_64-linux.realize-pin-tests` | realize-pin's strict basedpyright run and its offline tests with fake capabilities | `nix build .#checks.x86_64-linux.realize-pin-tests` |
 
 ## GitHub Actions workflows
 
