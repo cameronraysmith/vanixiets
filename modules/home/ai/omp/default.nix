@@ -52,6 +52,43 @@ let
       cfg = config.programs.omp;
       relayExtension = cfg.browserRelay.extension;
       yamlFormat = pkgs.formats.yaml { };
+      # omp's agyCredentialEnv sets only SSH_TTY to keep agy off the OS keychain,
+      # which agy 1.5.13 and later ignore on macOS: /login then fails with "did
+      # not write its isolated credential file" and overwrites the user's own agy
+      # keychain entry (can1357/oh-my-pi#20363). AGY_CLI_FORCE_FILE_TOKEN_STORAGE
+      # makes agy 1.5.17 write antigravity-cli/antigravity-oauth-token, the file
+      # omp reads. omp passes --app-data-dir as an absolute path, which agy nests
+      # under --gemini-dir; its default is the directory omp names, so it is
+      # dropped. Remove this once an omp release sets the variable itself.
+      agyFileTokenStorage = pkgs.writeShellApplication {
+        name = "agy";
+        text = ''
+          args=()
+          while (($#)); do
+            if [[ $1 == --app-data-dir ]]; then
+              shift 2
+              continue
+            fi
+            args+=("$1")
+            shift
+          done
+          export AGY_CLI_FORCE_FILE_TOKEN_STORAGE=1
+          exec ${
+            lib.getExe flake.inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.antigravity-cli
+          } "''${args[@]}"
+        '';
+      };
+      # PI_AGY_PATH also stops omp installing and updating its own agy, so agy
+      # moves only with the llm-agents input.
+      ompWithAgyFileTokenStorage = pkgs.symlinkJoin {
+        name = "omp-${cfg.package.version}";
+        paths = [ cfg.package ];
+        nativeBuildInputs = [ pkgs.makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/omp --set-default PI_AGY_PATH ${lib.getExe agyFileTokenStorage}
+        '';
+        inherit (cfg.package) meta;
+      };
     in
     {
       imports = [ managedConfigsModule ];
@@ -363,7 +400,7 @@ let
           }
         ];
 
-        home.packages = lib.mkIf cfg.enable [ cfg.package ];
+        home.packages = lib.mkIf cfg.enable [ ompWithAgyFileTokenStorage ];
 
         home.activation.ompBrowserRelayExtension = lib.mkIf (cfg.enable && relayExtension.enable) (
           lib.hm.dag.entryAfter [ "writeBoundary" ] ''

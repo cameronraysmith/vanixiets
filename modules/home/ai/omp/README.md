@@ -31,6 +31,16 @@ Bitwarden is installed by hand in each Helium profile.
 Force-installing it would need a macOS configuration profile that has to be approved manually.
 Helium also ignores extension update URLs that do not go through its proxy on Macs not enrolled in MDM.
 
+## Antigravity CLI sign-in
+
+omp signs in to the `antigravity-cli` provider by running agy, the Antigravity CLI, and reading the token agy writes into a private directory.
+omp 19.2.0 asks agy for file storage only by setting `SSH_TTY`, which agy 1.5.13 and later ignore on macOS: `/login` fails with "Antigravity CLI did not write its isolated credential file" and agy overwrites the user's own keychain entry (`security find-generic-password -s gemini -a antigravity`) instead ([can1357/oh-my-pi#20363](https://github.com/can1357/oh-my-pi/issues/20363)).
+
+The installed `omp` is therefore wrapped to set `PI_AGY_PATH` to a script that runs the llm-agents `antigravity-cli` with `AGY_CLI_FORCE_FILE_TOKEN_STORAGE=1` and without omp's `--app-data-dir` argument.
+With that variable agy 1.5.17 writes `antigravity-cli/antigravity-oauth-token`, the file omp reads; agy's default app-data directory is the one omp names, while omp's absolute path is nested under `--gemini-dir` by agy.
+`PI_AGY_PATH` also stops omp installing and updating its own agy under `~/.omp/antigravity-cli/bin`, so agy changes only with the llm-agents input.
+Remove the wrapper once an omp release sets the variable itself.
+
 ## Cross-instance agent messaging
 
 The `ai` aggregate sets `task.crossInstance: true` in `config.yml`, so the interactive omp sessions of one user in one project directory can list each other with `agent://peers`, read each other's agent outputs and transcripts through `agent://<pid>/<id>`, and send messages that wake each other's agents.
