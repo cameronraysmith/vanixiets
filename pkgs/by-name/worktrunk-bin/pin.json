@@ -54,6 +54,18 @@
           "fodAttr": "deps"
         }
       }
+    },
+    {
+      "path": "pkgs/by-name/apm-skills-compose/skills.json",
+      "kind": {
+        "remoteSkillHashes": {
+          "git": "max-sixty/worktrunk",
+          "skills": [
+            "worktrunk",
+            "wt-switch-create"
+          ]
+        }
+      }
     }
   ]
 }

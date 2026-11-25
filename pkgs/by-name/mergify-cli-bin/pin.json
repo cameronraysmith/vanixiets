@@ -54,6 +54,17 @@
           "fodAttr": "deps"
         }
       }
+    },
+    {
+      "path": "pkgs/by-name/apm-skills-compose/skills.json",
+      "kind": {
+        "remoteSkillHashes": {
+          "git": "Mergifyio/mergify-cli",
+          "skills": [
+            "mergify-stack"
+          ]
+        }
+      }
     }
   ]
 }

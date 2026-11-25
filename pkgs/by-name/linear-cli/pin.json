@@ -68,6 +68,17 @@
           "fodAttr": "deps"
         }
       }
+    },
+    {
+      "path": "pkgs/by-name/apm-skills-compose/skills.json",
+      "kind": {
+        "remoteSkillHashes": {
+          "git": "schpet/linear-cli",
+          "skills": [
+            "linear-cli"
+          ]
+        }
+      }
     }
   ]
 }
