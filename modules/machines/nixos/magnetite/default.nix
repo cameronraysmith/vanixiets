@@ -501,6 +501,15 @@ in
           "omnigraph.${fleet.domain}"
         ];
 
+        # omnigraph-server stops itself when two thirds of its cluster lock's
+        # lease pass without an acknowledged heartbeat to R2, and requests to
+        # the bucket stall for 8 to 20 s without an error. A 120 s lease
+        # tolerates about 39 s, where the default 30 s tolerates about 9 s; a
+        # successor then waits 180 s instead of 45 s to take over a crashed
+        # server's lock (OMNIGRAPH_CLUSTER_LEASE_SECONDS, omnigraph
+        # docs/user/operations/storage-failures.md).
+        extraEnvironment.OMNIGRAPH_CLUSTER_LEASE_SECONDS = "120";
+
         environmentFile = config.clan.core.vars.generators.omnigraph-r2.files."env".path;
         bearerTokensFile =
           config.clan.core.vars.generators.omnigraph-bearer-tokens.files."tokens.json".path;

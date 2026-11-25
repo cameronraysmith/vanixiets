@@ -39,8 +39,8 @@
 # basename once trailing slashes are stripped (`s3://bucket/`, `/`), which
 # has no parent to hold its marker.
 #
-# applyProgram is the caller's converge program (apply, then release the
-# admission lock it retains); it is invoked, never reimplemented here.
+# applyProgram is the caller's converge program (apply, then release an
+# admission lock the apply retained); it is invoked, never reimplemented here.
 { lib, ... }:
 let
   markerDirName = "_omnigraph-markers";

@@ -79,12 +79,16 @@ in
             exit 1
           fi
 
-          # A direct apply keeps its unleased admission lock after it exits,
-          # and the server refuses to boot past it. This process has exited,
-          # so its storage I/O has settled and the lock it reported may be
-          # released; any other holder (a server's leased lock, an earlier
-          # writer) is left alone for an operator to investigate.
-          appliedLock=$(sed -n 's/^Admission lock: \([^;]*\);.*/\1/p' "$applyErr")
+          # A converged apply on a local or S3 root releases its admission
+          # lock itself, and a release it cannot confirm fails the apply
+          # above. A lock still held here was either retained by this apply,
+          # as omnigraph 0.16 does on an Azure root, or belongs to another
+          # holder; the server refuses to boot past either. This process has
+          # exited, so its storage I/O has settled and the lock it reported
+          # (`Admission lock: <LOCK_ID>` on stderr) may be released; any other
+          # holder (a server's leased lock, an earlier writer) is left alone
+          # for an operator to investigate.
+          appliedLock=$(sed -n 's/^Admission lock: \([^;]*\).*/\1/p' "$applyErr")
           if ! statusOutput=$(omnigraph --target "$storage" cluster status --json); then
             printf '%s\n' "$statusOutput" >&2
             printf 'omnigraph cluster status failed after apply; the admission lock %s was not released\n' \
@@ -436,13 +440,16 @@ in
               must run as root; it refuses with that instruction rather than
               falling through to the instance metadata service and hanging.
 
-              Every direct writer, `omnigraph-cluster apply` included, retains
-              the cluster's admission lock after it exits, and the server
-              refuses to boot past it. Stop `omnigraph-server` before a direct
-              write, then release the lock the command reported with
-              `omnigraph-cluster force-unlock <LOCK_ID>` before starting it
-              again. The `omnigraph-cluster-apply` unit does that release
-              itself.
+              Stop `omnigraph-server` before any direct write: a direct writer
+              needs the cluster's admission lock, which the server holds while
+              it runs. A converged `omnigraph-cluster apply` on a local or S3
+              root releases that lock when it exits. Every other direct writer
+              (`optimize`, recovery, and an apply whose accepted work does not
+              converge or that runs on an Azure root) retains it,
+              and the server refuses to boot past it: release the lock the
+              command reported with `omnigraph-cluster force-unlock <LOCK_ID>`
+              before starting the server again. The `omnigraph-cluster-apply`
+              unit releases a lock its own converged apply retained.
 
               Disable to serve a cluster whose configuration is applied from
               elsewhere; {option}`services.omnigraph.storageUri` alone is then
@@ -519,8 +526,18 @@ in
             type = lib.types.str;
             default = "system";
             description = ''
-              Actor recorded against every change `omnigraph cluster apply`
-              executes.
+              Actor passed as `--as` by `omnigraph cluster apply` (the
+              `omnigraph-cluster-apply` unit and the `omnigraph-cluster`
+              wrapper) and by the `omnigraph-optimize` unit, and recorded
+              against every change they make.
+
+              omnigraph judges a direct write to a cluster graph by the policy
+              the cluster applied to that graph, and denies an actor that
+              policy does not permit. Each graph's policy must therefore grant
+              this actor `schema_apply` on `main` for a schema change or its
+              recovery, `read` and `schema_apply` for deleting the graph, and
+              `maintain` for optimize. Policy changes themselves are not judged
+              by the applied policy on a direct apply.
             '';
           };
 
@@ -531,9 +548,10 @@ in
               Whether to run `omnigraph cluster apply` automatically: at boot,
               and again whenever the rendered configuration directory changes.
 
-              A direct apply requires the server stopped, and the unit releases
-              the admission lock its apply leaves behind once the deployment
-              converges. A run while `omnigraph-server` holds the cluster's lock
+              A direct apply requires the server stopped; a converged apply on
+              a local or S3 root releases the cluster's admission lock itself,
+              and the unit releases one its apply retained (on an Azure root).
+              A run while `omnigraph-server` holds the cluster's lock
               is refused, so a configuration change re-triggered on a running
               server fails until the server is stopped.
 
@@ -625,6 +643,12 @@ in
               holds that lock, and a run while the server is stopped retains
               its own lock, which then blocks the server's next start until
               `omnigraph-cluster force-unlock <LOCK_ID>` releases it.
+
+              The unit runs as {option}`services.omnigraph.cluster.actor`
+              (`--as`), which the policy applied to each graph in
+              {option}`services.omnigraph.optimize.graphs` must grant
+              `maintain`; a denied run changes nothing but still retains the
+              lock.
             '';
           };
 
@@ -894,6 +918,8 @@ in
               graph:
               lib.escapeShellArgs [
                 (lib.getExe cfg.package)
+                "--as"
+                cfg.cluster.actor
                 "optimize"
                 "--target"
                 cfg.storageUri

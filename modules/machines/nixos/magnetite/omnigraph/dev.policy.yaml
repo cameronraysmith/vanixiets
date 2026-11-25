@@ -1,6 +1,11 @@
 version: 1
 groups:
   operators: [admin]
+  # The host's own identity: `services.omnigraph.cluster.actor`, which the
+  # omnigraph-cluster wrapper, the omnigraph-cluster-apply unit and the
+  # omnigraph-optimize unit pass as `--as`. Direct writes to a cluster graph
+  # are judged by this policy, and a direct actor it does not name is denied.
+  cluster-operators: [magnetite]
 rules:
   # Loading any policy engine replaces the default-deny fallback that
   # implicitly permits `read`, so omitting `read` here revokes all access.
@@ -13,3 +18,18 @@ rules:
     allow:
       actors: { group: operators }
       actions: [schema_apply, branch_create, branch_delete, branch_merge]
+  # `cluster apply` checks `schema_apply` on `main` before it changes this
+  # graph's schema, and recovering a started schema change with
+  # `cluster apply --deployment-id ID --writers-stopped` checks it again.
+  # Deleting the graph by removing its declaration, and recovering that
+  # deletion, check `read` as well.
+  - id: cluster-operator-schema
+    allow:
+      actors: { group: cluster-operators }
+      actions: [read, schema_apply]
+  # `omnigraph optimize` checks `maintain` on `main`. Nothing here runs
+  # `cleanup`, so the actor holds no `reclaim`.
+  - id: cluster-operator-maintenance
+    allow:
+      actors: { group: cluster-operators }
+      actions: [maintain]
