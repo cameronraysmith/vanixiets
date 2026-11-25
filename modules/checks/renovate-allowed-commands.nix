@@ -21,7 +21,11 @@
 # matchDatasources: each pin's pkgs/by-name/<name>/pin.json and each companion
 # `path`, apmRef and fixedOutputHash alike. The paths are matched with
 # Renovate's own minimatch wrapper and options, `{ dot: true }`, and the check
-# fails naming every rule, pin and path left uncovered.
+# fails naming every rule, pin and path left uncovered. A custom.jsonata
+# manager with no such rule fails, and so does a custom.jsonata rule with no
+# manager. With neither, pins are not automated (the rollback of design D7):
+# the coverage step reports that and passes, and the command step still
+# requires the remaining commands to be admitted.
 #
 # The check reads static flake data and repository files only; it evaluates no
 # host configuration and no package. Matching uses jq's Oniguruma `test`; the
@@ -45,6 +49,7 @@
       checks.renovate-allowed-commands =
         let
           inherit (config.flake.lib) renovateSettings;
+          repoConfig = lib.importJSON ../../.github/renovate.json;
           byName = ../../pkgs/by-name;
           pinFiles = lib.filter builtins.pathExists (
             map (name: byName + "/${name}/pin.json") (
@@ -54,7 +59,8 @@
           input = pkgs.writeText "renovate-allowed-commands-input.json" (
             builtins.toJSON {
               allowed = renovateSettings.allowedCommands;
-              repoRules = (lib.importJSON ../../.github/renovate.json).packageRules or [ ];
+              repoRules = repoConfig.packageRules or [ ];
+              customManagerTypes = map (manager: manager.customType) (repoConfig.customManagers or [ ]);
               pins = map (
                 file:
                 let
@@ -92,9 +98,17 @@
               process.exit(1);
             };
             const input = JSON.parse(readFileSync(process.argv[2], "utf8"));
-            const pinRules = input.repoRules.filter(
-              (rule) => (rule.matchManagers ?? []).includes("custom.jsonata") && rule.postUpgradeTasks,
-            );
+            const jsonataRules = input.repoRules.filter((rule) => (rule.matchManagers ?? []).includes("custom.jsonata"));
+            if (!input.customManagerTypes.includes("jsonata")) {
+              if (jsonataRules.length > 0) {
+                fail(
+                  jsonataRules.length + " custom.jsonata rules but no custom.jsonata manager; remove the rules or restore the manager",
+                );
+              }
+              console.log("pins not automated: no custom.jsonata manager");
+              process.exit(0);
+            }
+            const pinRules = jsonataRules.filter((rule) => rule.postUpgradeTasks);
             if (pinRules.length === 0) {
               fail("expected a custom.jsonata rule with postUpgradeTasks, found none");
             }
