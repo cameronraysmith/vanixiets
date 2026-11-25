@@ -3,21 +3,24 @@
   fetchFromGitHub,
   python3Packages,
   nix-eval-jobs,
-  nix-update-script,
   bashInteractive,
 }:
-
+let
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "nix-fast-build"; })
+    pin
+    pinPlan
+    ;
+  planned = (pinPlan pin.version).artifacts;
+in
 python3Packages.buildPythonApplication (finalAttrs: {
   pname = "nix-fast-build";
-  version = "2.0.4";
+  inherit (pin) version;
   pyproject = true;
 
-  src = fetchFromGitHub {
-    owner = "Mic92";
-    repo = "nix-fast-build";
-    tag = finalAttrs.version;
-    hash = "sha256-sc/NZIHkRhgyAzK8Xn6G++vGrl/Uf7QHh+J5fnZ/o4s=";
-  };
+  src = fetchFromGitHub (
+    planned.src.sourceBuild.fetchFromGitHub // { inherit (pin.artifacts.src.sourceBuild) hash; }
+  );
 
   build-system = [ python3Packages.setuptools ];
 
@@ -47,7 +50,7 @@ python3Packages.buildPythonApplication (finalAttrs: {
   '';
 
   passthru = {
-    updateScript = nix-update-script { };
+    inherit pin pinPlan;
   };
 
   meta = {
