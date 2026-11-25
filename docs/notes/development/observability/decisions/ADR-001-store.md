@@ -7,6 +7,7 @@ title: "ADR-001: Telemetry store"
 Accepted (human gate, 2026-10-15).
 Amended in place under charter v11 (2026-10-16): the store package is `greptimedb-bin` because its upstream release tarball embeds the dashboard ADR-002 adopts, and R1.1 requires a stable release that serves that dashboard.
 Amended in place on 2026-11-22 under OpenSpec change `agent-session-telemetry` (Linear CAM-120; operator's ratification, the change's decision record D17): the Context records that 1.2.1's built-in `greptime_trace_v1` model carries the agent spans that change stores, so `greptime_trace_v2` is not required.
+Amended in place on 2026-11-25 under OpenSpec change `automate-package-version-bumps` (Linear CAM-124): `greptimedb-bin`'s version, tarball hash and dashboard version are pinned in its `pin.json` and realized by `nix run .#realize-pin -- greptimedb-bin <version>`, which replaced its `update.sh` and `apps.update-greptimedb-bin`; the Implementation surface follows.
 
 ## Context
 
@@ -124,7 +125,7 @@ External alerting prevents a design that silently depends on an enterprise-only 
 ## Implementation surface
 
 - No new flake input.
-- `pkgs/by-name/greptimedb-bin/{package.nix,update.sh}`: the upstream release tarball for `x86_64-linux`, with `passthru.embedsDashboard = true`, and `apps.update-greptimedb-bin`; its build details are specified in ADR-007.
+- `pkgs/by-name/greptimedb-bin/{package.nix,pin.json}`: the upstream release tarball for `x86_64-linux`, with `passthru.embedsDashboard = true`, and a `pin.json` realized by `nix run .#realize-pin -- greptimedb-bin <version>`; its build details are specified in ADR-007.
 - `modules/nixos/greptimedb.nix`: the store module and the assertions R1.1, R1.2 and R1.4; its file list, options and secrets are specified in ADR-007.
 - `modules/vm-tests/greptimedb-pipeline.nix`: S1's on-demand container test, carrying the runtime case of R1.1.
 - The magnetite collector configuration that carries the histogram conversion is listed in ADR-003.

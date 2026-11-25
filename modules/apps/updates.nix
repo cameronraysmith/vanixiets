@@ -53,14 +53,6 @@
         program = "${config.packages.mops-bin.updateScript}";
       };
 
-      # greptimedb-bin exists only on x86_64-linux (its package.nix yields null
-      # elsewhere); the updater is host-agnostic, so the app runs the script
-      # itself and is available on every system, stibnite included.
-      apps.update-greptimedb-bin = {
-        type = "app";
-        program = "${../../pkgs/by-name/greptimedb-bin/update.sh}";
-      };
-
       # perses-bin exists only on x86_64-linux and aarch64-darwin (its
       # package.nix yields null on aarch64-linux); the updater is
       # host-agnostic, so the app runs the script itself on every system.

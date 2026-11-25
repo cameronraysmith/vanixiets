@@ -5,9 +5,9 @@
 # omits. `passthru.embedsDashboard` records that property where the store
 # module's evaluation-time assertion (R1.1) reads it; `passthru.dashboardVersion`
 # is src/servers/dashboard/VERSION at the release tag, without its leading `v`,
-# and update.sh refreshes it with the version. The `-bin` pname keeps this
-# package from shadowing `pkgs.greptimedb` through the overlay merge
-# (modules/nixpkgs/compose.nix).
+# which pin.json records as its `dashboard` fileValue and realize-pin refreshes
+# with the version. The `-bin` pname keeps this package from shadowing
+# `pkgs.greptimedb` through the overlay merge (modules/nixpkgs/compose.nix).
 #
 # Only x86_64-linux is packaged. On other systems this file yields null, so the
 # package and its package-* check are absent there rather than throwing at
@@ -21,12 +21,21 @@
   autoPatchelfHook,
   versionCheckHook,
 }:
+let
+  inherit
+    ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "greptimedb-bin"; })
+    pin
+    pinPlan
+    ;
+  binaries = pin.artifacts.binaries.platformBinaries;
+  planned = (pinPlan pin.version).artifacts.binaries.platformBinaries;
+in
 if stdenv.hostPlatform.system != "x86_64-linux" then
   null
 else
   stdenv.mkDerivation (finalAttrs: {
     pname = "greptimedb-bin";
-    version = "1.2.1";
+    inherit (pin) version;
 
     src = finalAttrs.passthru.sources.${stdenv.hostPlatform.system};
 
@@ -54,15 +63,16 @@ else
     doInstallCheck = true;
 
     passthru = {
-      sources = {
-        "x86_64-linux" = fetchurl {
-          url = "https://github.com/GreptimeTeam/greptimedb/releases/download/v${finalAttrs.version}/greptime-linux-amd64-v${finalAttrs.version}.tar.gz";
-          hash = "sha256-Bi1b6xPeSZHE/sIBsuUHFRi/TKjw1SlH66dXp0wqVCA=";
-        };
-      };
+      inherit pin pinPlan;
+      sources = lib.mapAttrs (
+        system: platform:
+        fetchurl {
+          inherit (platform) url;
+          hash = binaries.hashes.${system};
+        }
+      ) planned;
       embedsDashboard = true;
-      dashboardVersion = "0.13.13";
-      updateScript = ./update.sh;
+      dashboardVersion = pin.artifacts.dashboard.fileValue.value;
     };
 
     meta = {

@@ -1,0 +1,40 @@
+{
+  "name": "greptimedb-bin",
+  "version": "1.2.1",
+  "source": {
+    "githubRelease": {
+      "owner": "GreptimeTeam",
+      "repo": "greptimedb",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/GreptimeTeam/greptimedb/releases/download/{tag}/greptime-{platform}-{tag}.tar.gz",
+        "platforms": {
+          "x86_64-linux": "linux-amd64"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://github.com/GreptimeTeam/greptimedb/releases/download/{tag}/greptime-{platform}-{tag}.sha256sum",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-Bi1b6xPeSZHE/sIBsuUHFRi/TKjw1SlH66dXp0wqVCA="
+        }
+      }
+    },
+    "dashboard": {
+      "fileValue": {
+        "urlTemplate": "https://raw.githubusercontent.com/GreptimeTeam/greptimedb/{tag}/src/servers/dashboard/VERSION",
+        "regex": "v?([0-9]+\\.[0-9]+\\.[0-9]+)\\s*",
+        "value": "0.13.13"
+      }
+    }
+  },
+  "companions": []
+}
