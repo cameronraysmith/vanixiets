@@ -84,8 +84,17 @@
         # before forming a batch, capped at 2 min from the oldest. Unpatched,
         # batch 120 formed 1.4 s after the first of four serial enqueues
         # (members=1), costing the other three a second full CI run.
+        # Mirror while testing (local patch, applies on top of the settle
+        # patch): a gitea-mq/<check> mirror is written only once the batch
+        # guard confirms the batch is still testing that SHA. Unpatched, a
+        # poll snapshot applied after its batch landed left a pending mirror
+        # that nothing updates (gitea-mq/docs-preview on #4297). Drop it once
+        # upstream no longer mirrors a check for a batch that is not testing.
         package = options.services.gitea-mq.package.default.overrideAttrs (old: {
-          patches = (old.patches or [ ]) ++ [ ./gitea-mq-batch-settle.patch ];
+          patches = (old.patches or [ ]) ++ [
+            ./gitea-mq-batch-settle.patch
+            ./gitea-mq-mirror-while-testing.patch
+          ];
         });
       };
 

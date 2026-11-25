@@ -1,0 +1,218 @@
+diff --git a/internal/batch/batch_test.go b/internal/batch/batch_test.go
+index 07ca031..cba8f0e 100644
+--- a/internal/batch/batch_test.go
++++ b/internal/batch/batch_test.go
+@@ -330,7 +330,7 @@ func TestBuild_UpToDateSingletonLandsHead(t *testing.T) {
+ 	}
+ 
+ 	rep, _ := svc.GetEntry(ctx, e.RepoID, 10)
+-	if err := e.HandleCheck(ctx, rep, "ci", pg.CheckStateSuccess, ""); err != nil {
++	if err := e.HandleCheck(ctx, rep, "ci", forge.Check{State: pg.CheckStateSuccess}); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if f.target != "sha10" {
+@@ -353,7 +353,7 @@ func TestHandleCheck_EvaluatesAndDispatches(t *testing.T) {
+ 	}
+ 	rep, _ := svc.GetEntry(ctx, e.RepoID, 10)
+ 
+-	if err := e.HandleCheck(ctx, rep, "ci", pg.CheckStateSuccess, ""); err != nil {
++	if err := e.HandleCheck(ctx, rep, "ci", forge.Check{State: pg.CheckStateSuccess}); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if b, _ := svc.GetLiveBatch(ctx, e.RepoID, "main"); b != nil {
+@@ -541,7 +541,7 @@ func TestHandleCheck_DropsStaleSHA(t *testing.T) {
+ 		t.Fatalf("rebuild produced same sha %q", b.BranchSha.String)
+ 	}
+ 
+-	if err := e.HandleCheck(ctx, stale, "ci", pg.CheckStateFailure, ""); err != nil {
++	if err := e.HandleCheck(ctx, stale, "ci", forge.Check{State: pg.CheckStateFailure}); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	got := mustLive(t, svc, ctx, e.RepoID)
+diff --git a/internal/batch/mirror_test.go b/internal/batch/mirror_test.go
+new file mode 100644
+index 0000000..5cc23ca
+--- /dev/null
++++ b/internal/batch/mirror_test.go
+@@ -0,0 +1,82 @@
++package batch_test
++
++import (
++	"context"
++	"slices"
++	"testing"
++
++	"github.com/Mic92/gitea-mq/internal/forge"
++	"github.com/Mic92/gitea-mq/internal/monitor"
++	"github.com/Mic92/gitea-mq/internal/store/pg"
++)
++
++// The poller applies one snapshot of merge-branch checks in map order. When
++// the last required check lands the batch before a still-running check is
++// applied, that check must not be mirrored as pending onto the PR head:
++// nothing updates the mirror once the PR has left the queue.
++func TestApplyCheck_NoMirrorAfterLanding(t *testing.T) {
++	for _, tc := range []struct {
++		name     string
++		prs      []int64
++		upToDate bool
++	}{
++		{"up-to-date singleton", []int64{10}, true},
++		{"two members", []int64{10, 20}, false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			e, f, svc, ctx := setup(t, tc.prs...)
++			for _, n := range tc.prs {
++				f.merged[n] = true
++			}
++			f.GetRequiredChecksFn = func(context.Context, string, string, string) ([]string, error) {
++				return []string{"ci"}, nil
++			}
++			if tc.upToDate {
++				e.SkipIfUpToDate = true
++				f.IsUpToDateFn = func(_ context.Context, _, _, _, head string) (bool, error) {
++					return head == "sha10", nil
++				}
++				f.FastForwardFn = func(_ context.Context, _, _, _, sha string) error {
++					f.target = sha
++					return nil
++				}
++			}
++			if _, err := e.FormAndBuild(ctx, "main"); err != nil {
++				t.Fatal(err)
++			}
++			rep, _ := svc.GetEntry(ctx, e.RepoID, 10)
++			deps := &monitor.Deps{Forge: f.MockForge, Queue: svc, Owner: e.Owner, Repo: e.Repo, RepoID: e.RepoID, Batch: e}
++
++			for _, c := range []struct {
++				name  string
++				state pg.CheckState
++			}{{"ci", pg.CheckStateSuccess}, {"docs-preview", pg.CheckStatePending}} {
++				if err := monitor.ApplyCheck(ctx, deps, rep, c.name, forge.Check{State: c.state}); err != nil {
++					t.Fatal(err)
++				}
++			}
++			if b, _ := svc.GetLiveBatch(ctx, e.RepoID, "main"); b != nil {
++				t.Fatalf("batch still live: %+v", b)
++			}
++
++			landed := false
++			var beforeLanding []string
++			for _, call := range f.Calls {
++				switch call.Method {
++				case "FastForward":
++					landed = true
++				case "MirrorCheck":
++					name, check := call.Args[3].(string), call.Args[4].(forge.Check)
++					if !landed {
++						beforeLanding = append(beforeLanding, name)
++					} else if check.State == pg.CheckStatePending {
++						t.Errorf("%s mirrored as pending after the batch landed", name)
++					}
++				}
++			}
++			if !slices.Equal(beforeLanding, []string{"gitea-mq/ci"}) {
++				t.Errorf("mirrored before landing = %v, want [gitea-mq/ci]", beforeLanding)
++			}
++		})
++	}
++}
+diff --git a/internal/batch/monitor.go b/internal/batch/monitor.go
+index 7ede955..3af9547 100644
+--- a/internal/batch/monitor.go
++++ b/internal/batch/monitor.go
+@@ -3,16 +3,18 @@ package batch
+ import (
+ 	"context"
+ 
++	"github.com/Mic92/gitea-mq/internal/forge"
+ 	"github.com/Mic92/gitea-mq/internal/monitor"
+ 	"github.com/Mic92/gitea-mq/internal/store/pg"
+ )
+ 
+ // HandleCheck implements monitor.BatchHandler. It is the single entry point
+ // from the check pipeline into the batch engine: lock, guard against stale
+-// SHAs, and only then persist the check and evaluate. Persisting after the
+-// guard is what stops a late event for a superseded build from polluting the
+-// ledger that decides the current one.
+-func (e *Engine) HandleCheck(ctx context.Context, entry *pg.QueueEntry, checkCtx string, state pg.CheckState, targetURL string) error {
++// SHAs, and only then mirror and persist the check and evaluate. Persisting
++// after the guard is what stops a late event for a superseded build from
++// polluting the ledger that decides the current one; mirroring after it stops
++// a check applied after landing from leaving a pending mirror on the PR head.
++func (e *Engine) HandleCheck(ctx context.Context, entry *pg.QueueEntry, checkCtx string, c forge.Check) error {
+ 	defer e.lock(entry.TargetBranch)()
+ 
+ 	b, err := e.Queue.GetBatch(ctx, entry.ActiveBatchID.Int64)
+@@ -23,7 +25,8 @@ func (e *Engine) HandleCheck(ctx context.Context, entry *pg.QueueEntry, checkCtx
+ 		return nil
+ 	}
+ 
+-	if err := e.Queue.SaveCheckStatus(ctx, entry.ID, checkCtx, state, targetURL); err != nil {
++	monitor.MirrorCheck(ctx, e.Forge, e.Owner, e.Repo, entry, checkCtx, c)
++	if err := e.Queue.SaveCheckStatus(ctx, entry.ID, checkCtx, c.State, c.TargetURL); err != nil {
+ 		return err
+ 	}
+ 	required, err := monitor.ResolveRequiredChecks(ctx, e.Forge, e.Owner, e.Repo, b.TargetBranch, e.FallbackChecks)
+diff --git a/internal/monitor/monitor.go b/internal/monitor/monitor.go
+index e2a5b4d..caa7128 100644
+--- a/internal/monitor/monitor.go
++++ b/internal/monitor/monitor.go
+@@ -34,11 +34,12 @@ type Deps struct {
+ 
+ // BatchHandler dispatches a raw check event to the batch engine. Defined
+ // here so monitor does not import internal/batch (the engine imports monitor
+-// for ResolveRequiredChecks/EvaluateChecks). The engine persists the check
+-// itself, after its stale-SHA guard, so a late event cannot pollute the
+-// ledger of a newer build.
++// for ResolveRequiredChecks/EvaluateChecks). The engine mirrors and persists
++// the check itself, after its stale-SHA guard, so a late event can neither
++// pollute the ledger of a newer build nor leave a mirror on a PR head after
++// its batch stopped testing.
+ type BatchHandler interface {
+-	HandleCheck(ctx context.Context, entry *pg.QueueEntry, checkCtx string, state pg.CheckState, targetURL string) error
++	HandleCheck(ctx context.Context, entry *pg.QueueEntry, checkCtx string, c forge.Check) error
+ }
+ 
+ type CheckResult int
+@@ -217,23 +218,30 @@ func removeFromQueue(ctx context.Context, deps *Deps, entry *pg.QueueEntry, stat
+ 
+ // ApplyCheck mirrors an external merge-branch check onto the PR head and feeds
+ // it to the monitor. Shared by the webhook handler (Gitea status events) and
+-// the poller's status poll (Forgejo, which has no status webhook).
++// the poller's status poll (Forgejo, which has no status webhook). Batch
++// members are handed to the batch engine, which mirrors only while the batch
++// is still testing that SHA.
+ func ApplyCheck(ctx context.Context, deps *Deps, entry *pg.QueueEntry, checkCtx string, c forge.Check) error {
+-	mirrorCtx := forge.MirrorContextPrefix + checkCtx
+-	if err := deps.Forge.MirrorCheck(ctx, deps.Owner, deps.Repo, entry.PrHeadSha, mirrorCtx, c); err != nil {
+-		slog.Warn("failed to mirror status to PR head", "pr", entry.PrNumber, "context", mirrorCtx, "err", err)
++	if deps.Batch != nil && entry.ActiveBatchID.Valid {
++		return deps.Batch.HandleCheck(ctx, entry, checkCtx, c)
+ 	}
++	MirrorCheck(ctx, deps.Forge, deps.Owner, deps.Repo, entry, checkCtx, c)
+ 	return ProcessCheckStatus(ctx, deps, entry, checkCtx, c.State, c.TargetURL)
+ }
+ 
+-// ProcessCheckStatus is the main entry point called when a webhook delivers
+-// a commit status event for a merge branch. It records the status, evaluates
+-// checks, and triggers success/failure handling as appropriate.
+-func ProcessCheckStatus(ctx context.Context, deps *Deps, entry *pg.QueueEntry, checkContext string, checkState pg.CheckState, targetURL string) error {
+-	if deps.Batch != nil && entry.ActiveBatchID.Valid {
+-		return deps.Batch.HandleCheck(ctx, entry, checkContext, checkState, targetURL)
++// MirrorCheck copies an external merge-branch check onto the PR head under
++// the gitea-mq/ prefix.
++func MirrorCheck(ctx context.Context, f forge.Forge, owner, repo string, entry *pg.QueueEntry, checkCtx string, c forge.Check) {
++	mirrorCtx := forge.MirrorContextPrefix + checkCtx
++	if err := f.MirrorCheck(ctx, owner, repo, entry.PrHeadSha, mirrorCtx, c); err != nil {
++		slog.Warn("failed to mirror status to PR head", "pr", entry.PrNumber, "context", mirrorCtx, "err", err)
+ 	}
++}
+ 
++// ProcessCheckStatus is the single-PR path for a merge-branch check: it
++// records the status, evaluates checks, and triggers success/failure
++// handling as appropriate.
++func ProcessCheckStatus(ctx context.Context, deps *Deps, entry *pg.QueueEntry, checkContext string, checkState pg.CheckState, targetURL string) error {
+ 	if err := deps.Queue.SaveCheckStatus(ctx, entry.ID, checkContext, checkState, targetURL); err != nil {
+ 		return fmt.Errorf("save check status for PR #%d: %w", entry.PrNumber, err)
+ 	}
