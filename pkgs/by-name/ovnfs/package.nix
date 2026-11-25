@@ -7,21 +7,23 @@
   fuse3,
   go_1_27,
 }:
-
+let
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "ovnfs"; })
+    pin
+    pinPlan
+    ;
+  planned = (pinPlan pin.version).artifacts;
+  inherit (pin.artifacts.src) sourceBuild;
+in
 # go.mod declares `go 1.27.3`, which the default buildGoModule's toolchain
 # (go 1.26) refuses under the GOTOOLCHAIN=local that nixpkgs builds with.
 buildGo127Module (finalAttrs: {
   pname = "ovnfs";
-  version = "0.6.0";
+  inherit (pin) version;
 
-  src = fetchFromGitHub {
-    owner = "stencil-hq";
-    repo = "ovnfs";
-    tag = "v${finalAttrs.version}";
-    hash = "sha256-yu3Qo0n5ooF9IN7a9+MosucDbZPM+yJKK6PDN6fmr0M=";
-  };
+  src = fetchFromGitHub (planned.src.sourceBuild.fetchFromGitHub // { inherit (sourceBuild) hash; });
 
-  vendorHash = "sha256-BBC1CkTN/7WDqMX0+L9GuSNIogKxKamBSuY3TQwIC9Q=";
+  vendorHash = sourceBuild.depsHash.go.hash;
 
   # Matches upstream's release builds (.goreleaser.yaml). On Darwin this also
   # leaves out the cgo-only FSEvents watcher (watch/watch_darwin.go) and the
@@ -61,6 +63,10 @@ buildGo127Module (finalAttrs: {
     "$out/bin/ovnfs" version | grep -Fx "ovnfs (devel) go${go_1_27.version} ${stdenv.hostPlatform.go.GOOS}/${stdenv.hostPlatform.go.GOARCH}"
     runHook postInstallCheck
   '';
+
+  passthru = {
+    inherit pin pinPlan;
+  };
 
   meta = {
     description = "Copy-on-write checkouts of any folder, served to agents over NFS, FUSE or SMB";

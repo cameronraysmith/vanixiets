@@ -1,0 +1,30 @@
+{
+  "name": "ovnfs",
+  "version": "0.6.0",
+  "source": {
+    "githubRelease": {
+      "owner": "stencil-hq",
+      "repo": "ovnfs",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "stencil-hq",
+            "repo": "ovnfs"
+          }
+        },
+        "hash": "sha256-yu3Qo0n5ooF9IN7a9+MosucDbZPM+yJKK6PDN6fmr0M=",
+        "depsHash": {
+          "go": {
+            "hash": "sha256-BBC1CkTN/7WDqMX0+L9GuSNIogKxKamBSuY3TQwIC9Q="
+          }
+        }
+      }
+    }
+  },
+  "companions": []
+}
