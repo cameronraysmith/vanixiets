@@ -1,7 +1,7 @@
 {
   "name": "ovnfs",
-  "version": "0.6.0",
-  "realizedVersion": "0.6.0",
+  "version": "0.11.0",
+  "realizedVersion": "0.11.0",
   "source": {
     "githubRelease": {
       "owner": "stencil-hq",
@@ -18,10 +18,10 @@
             "repo": "ovnfs"
           }
         },
-        "hash": "sha256-yu3Qo0n5ooF9IN7a9+MosucDbZPM+yJKK6PDN6fmr0M=",
+        "hash": "sha256-kzkEJ937gootqwiicV5wPzeORPBX01G3X+M6QCpaEQA=",
         "depsHash": {
           "go": {
-            "hash": "sha256-BBC1CkTN/7WDqMX0+L9GuSNIogKxKamBSuY3TQwIC9Q="
+            "hash": "sha256-ShqWmuWZ1jdiLCox+HRxc/VC8FuG3xNRN+HumC9PIUw="
           }
         }
       }
