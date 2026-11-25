@@ -41,11 +41,6 @@
         program = "${../../pkgs/by-name/perses-bin/update.sh}";
       };
 
-      apps.update-linear-cli = {
-        type = "app";
-        program = "${config.packages.linear-cli.updateScript}";
-      };
-
       apps.update-buzz-source = {
         type = "app";
         program = "${config.packages.buzz-source.updateScript}";

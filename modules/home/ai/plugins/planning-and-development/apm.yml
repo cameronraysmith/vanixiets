@@ -41,10 +41,10 @@ dependencies:
     # CLI. openspec-linear-sync in this plugin is linear-cli-driven, so marketplace
     # consumers need the skill propagated with the plugin; the skills subset takes
     # only that skill directory with its references/ and scripts/ siblings. The
-    # commit is pinned here only; Nix downloads it in apm-deps. It is the v3.1.0
+    # commit is pinned here only; Nix downloads it in apm-deps. It is the release
     # tag commit and must equal pkgs.linear-cli.skillSrc.rev
-    # (structure-release-alignment-linear-cli); pkgs/by-name/linear-cli/update.sh
-    # rewrites both in step.
+    # (structure-release-alignment-linear-cli); realize-pin keeps this ref and
+    # the pin's rev in step through the pin's apmRef companion.
     - git: schpet/linear-cli
       ref: 02571d34be662e5487204841fb80bf23ed79b4f0
       skills: [linear-cli]

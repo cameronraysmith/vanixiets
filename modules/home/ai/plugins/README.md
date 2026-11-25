@@ -59,7 +59,7 @@ Five tools ship their agent skill in the same upstream release as their CLI, and
 | `github/gh-stack` | `gh-stack.sourceRev` (`modules/nixpkgs/overlays/gh-stack.nix`) |
 
 `modules/checks/structure/cli-skill-release-alignment.nix` holds one check per pair, a negative control, a refetch of `github/gh-stack` at the recorded commit with nixpkgs' source hash, and a byte comparison of the delivered `playwright-cli` skill with the CLI's source.
-The updaters of `mergify-cli-bin`, `worktrunk-bin` and `linear-cli` rewrite the recorded commit and the `apm.yml` ref together; the `apmDepsHash` update follows from the next build.
+For `mergify-cli-bin`, `worktrunk-bin` and `linear-cli`, `realize-pin` (`nix run .#realize-pin -- <package> <version>`) rewrites the recorded commit and the `apm.yml` ref together through each pin's `apmRef` companion, and recomputes `apmDepsHash` in `pkgs/by-name/apm-skills-compose/hashes.json` through its `fixedOutputHash` companion.
 
 ### For marketplace users
 

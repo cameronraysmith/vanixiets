@@ -1,0 +1,73 @@
+{
+  "name": "linear-cli",
+  "version": "3.1.0",
+  "source": {
+    "githubRelease": {
+      "owner": "schpet",
+      "repo": "linear-cli",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "binaries": {
+      "platformBinaries": {
+        "urlTemplate": "https://github.com/schpet/linear-cli/releases/download/{tag}/linear-{platform}.tar.xz",
+        "platforms": {
+          "x86_64-linux": "x86_64-unknown-linux-gnu",
+          "aarch64-linux": "aarch64-unknown-linux-gnu",
+          "x86_64-darwin": "x86_64-apple-darwin",
+          "aarch64-darwin": "aarch64-apple-darwin"
+        },
+        "checksum": {
+          "upstreamFile": {
+            "urlTemplate": "https://github.com/schpet/linear-cli/releases/download/{tag}/sha256.sum",
+            "format": {
+              "sha256sum": {}
+            }
+          }
+        },
+        "hashes": {
+          "x86_64-linux": "sha256-v3cSCXzmoB6KN53oNX7KZtV0gFAgHTNrp4e2rTaH8+c=",
+          "aarch64-linux": "sha256-SwsVtpRk6LamZSkNcCgXZUviEkzx1Y+tfX7VdU+UMdc=",
+          "x86_64-darwin": "sha256-2ePOpPVwO/wqPJhifku2nXUyrzmp1SMWUCWpAVOS4Lc=",
+          "aarch64-darwin": "sha256-u6gc884Z80hvGtpSz5hBqNdJ/KcWM46mhOazsIpwaVQ="
+        }
+      }
+    },
+    "skillSrc": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "schpet",
+            "repo": "linear-cli"
+          }
+        },
+        "hash": "sha256-Bk4UPFqKVFH51iqiEhCSVfy/CX8CBnD8pHMMCIT83Pw=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "rev": "02571d34be662e5487204841fb80bf23ed79b4f0",
+  "companions": [
+    {
+      "path": "modules/home/ai/plugins/planning-and-development/apm.yml",
+      "kind": {
+        "apmRef": {
+          "git": "schpet/linear-cli"
+        }
+      }
+    },
+    {
+      "path": "pkgs/by-name/apm-skills-compose/hashes.json",
+      "kind": {
+        "fixedOutputHash": {
+          "package": "apm-skills-compose",
+          "attr": "apmDepsHash",
+          "fodAttr": "deps"
+        }
+      }
+    }
+  ]
+}

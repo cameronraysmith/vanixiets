@@ -9,9 +9,16 @@
   autoPatchelfHook,
   versionCheckHook,
 }:
+let
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "linear-cli"; })
+    pin
+    pinPlan
+    ;
+  planned = (pinPlan pin.version).artifacts;
+in
 stdenv.mkDerivation (finalAttrs: {
   pname = "linear-cli";
-  version = "3.1.0";
+  inherit (pin) version;
 
   src = finalAttrs.passthru.sources.${stdenv.hostPlatform.system};
 
@@ -37,34 +44,25 @@ stdenv.mkDerivation (finalAttrs: {
   doInstallCheck = true;
 
   passthru = {
-    sources = {
-      "aarch64-darwin" = fetchurl {
-        url = "https://github.com/schpet/linear-cli/releases/download/v${finalAttrs.version}/linear-aarch64-apple-darwin.tar.xz";
-        hash = "sha256-u6gc884Z80hvGtpSz5hBqNdJ/KcWM46mhOazsIpwaVQ=";
-      };
-      "x86_64-darwin" = fetchurl {
-        url = "https://github.com/schpet/linear-cli/releases/download/v${finalAttrs.version}/linear-x86_64-apple-darwin.tar.xz";
-        hash = "sha256-2ePOpPVwO/wqPJhifku2nXUyrzmp1SMWUCWpAVOS4Lc=";
-      };
-      "x86_64-linux" = fetchurl {
-        url = "https://github.com/schpet/linear-cli/releases/download/v${finalAttrs.version}/linear-x86_64-unknown-linux-gnu.tar.xz";
-        hash = "sha256-v3cSCXzmoB6KN53oNX7KZtV0gFAgHTNrp4e2rTaH8+c=";
-      };
-      "aarch64-linux" = fetchurl {
-        url = "https://github.com/schpet/linear-cli/releases/download/v${finalAttrs.version}/linear-aarch64-unknown-linux-gnu.tar.xz";
-        hash = "sha256-SwsVtpRk6LamZSkNcCgXZUviEkzx1Y+tfX7VdU+UMdc=";
-      };
-    };
+    inherit pin pinPlan;
+    sources = lib.mapAttrs (
+      system: artifact:
+      fetchurl {
+        inherit (artifact) url;
+        hash = pin.artifacts.binaries.platformBinaries.hashes.${system};
+      }
+    ) planned.binaries.platformBinaries;
     # The release archives carry only the executable; the upstream agent skill
     # (flake.lib.linearSkills, apm-skills-compose) comes from the tagged tree.
-    # `rev` is the full tag commit because the apm.yml drift guard compares it.
+    # It is fetched at the pin's `rev`, the tag commit, rather than at the
+    # planned tag: structure-release-alignment-linear-cli compares `skillSrc.rev`
+    # with the apm.yml ref, which realize-pin keeps equal to `rev` through the
+    # pin's apmRef companion.
     skillSrc = fetchFromGitHub {
-      owner = "schpet";
-      repo = "linear-cli";
-      rev = "02571d34be662e5487204841fb80bf23ed79b4f0";
-      hash = "sha256-Bk4UPFqKVFH51iqiEhCSVfy/CX8CBnD8pHMMCIT83Pw=";
+      inherit (planned.skillSrc.sourceBuild.fetchFromGitHub) owner repo;
+      inherit (pin) rev;
+      inherit (pin.artifacts.skillSrc.sourceBuild) hash;
     };
-    updateScript = ./update.sh;
   };
 
   meta = {
