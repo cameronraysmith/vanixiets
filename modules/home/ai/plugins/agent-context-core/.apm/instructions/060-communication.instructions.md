@@ -33,12 +33,13 @@ Take every noun from the repository — a package, file, option, check, systemd 
 Use a term we coined only where the text says what it means.
 A name points to more detail; it never replaces saying what changed.
 
-Labels invented to coordinate the work meet neither requirement, so they stay in conversation, subagent briefs and the plan that defines them: stage, wave or task numbers, codes such as Q1 or D3, agent and session names, jj change ids of unpublished work, and "the plan" or "the earlier fix" when the text does not say which.
-An OpenSpec change's own files may use its task numbers and design ids; cited from anywhere else, state the task or the decision, then give the file.
+Labels invented to coordinate the work meet neither requirement, so they stay in conversation, subagent briefs and the plan that defines them: stage, wave or task numbers, codes such as Q1 or D3, agent and session names, "the operator" as the one who decides, jj change ids of unpublished work, and "the plan" or "the earlier fix" when the text does not say which.
+An OpenSpec change's own files (`openspec/changes/**`) may use its task numbers and design ids and, like ADRs and other decision records, hold the dated record of who decided what; cited from anywhere else, state what the task does or the reason the decision gives, then give the file.
 A new heading in those files should name its content rather than an ordinal.
-For a decision the operator made, state what was decided and when, not only that a decision exists.
+Everywhere else, state what the repository now does and the reason, never who chose it or that and when it was decided, approved or authorized: no "the operator", "we decided", "per the decision of <date>", "approved by" or "at the request of".
+When the only reason is that it was chosen, state the fact alone.
 
 Do `refactor(pkgs): move six vendored and registry packages to pin.json`, not `refactor(pkgs): stage 2 wave 3 — vendor and registry pins`.
-Do `docs(openspec): record the first day of collector memory checks on stibnite`, not `docs(openspec): record darwin-agent-session-telemetry 12.5 first-day c5 reads`.
+Do "xsra keeps its `update.sh` and is updated by hand, because a `Cargo.lock` regenerated against crates.io cannot be reproduced later", not "xsra stays on its `update.sh`, by the operator's decision of 2026-11-25".
 Do `feat(otel): drop omp caption spans from Langfuse, exempt the session collector from the fleet envelope`, not `feat(otel): apply the operator's 2026-11-24 telemetry decisions`.
 Do `# Reverting to the stock evaluator replaces the one line below.`, not `# Reverting to the stock evaluator, the safety valve of CAM-111 design D9, replaces the one line below.`

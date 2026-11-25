@@ -42,15 +42,16 @@ Independent authors use the same policy directly for their own PRs and stacks.
 ## Cold read before publishing
 
 Before a pull request is opened or a stack is pushed, the publisher (the orchestrator, or an author publishing their own work) has the titles, bodies and commit messages read by someone with none of the conversation: a fresh subagent given only that text and the diff, or, when no subagent is available, the publisher rereading them alone.
-The reader lists every term it cannot resolve from that text and the repository.
-The publisher replaces each listed term with what it refers to, or defines it where it stands, following the outward-facing writing rule in `agent-context-core`, and then publishes.
+The reader lists every term it cannot resolve from that text and the repository, and every sentence that justifies a change by who decided it rather than by a reason.
+The publisher replaces each listed term with what it refers to, or defines it where it stands, and each listed sentence with the reason, following the outward-facing writing rule in `agent-context-core`, and then publishes.
 Nothing enforces this step; it is not a gate.
 Give the reader this prompt:
 
 ```text
 You have only the pull-request titles, bodies, commit messages and diff below, and this repository at the diff's head commit.
 Quote every word, number or label in the titles, bodies and commit messages whose meaning you cannot work out from them or from the repository.
-For each, say what you would need to know. Report nothing else and change nothing.
+Also quote every sentence that justifies a change by who decided or approved it rather than by a reason.
+For each quote, say what you would need to know. Report nothing else and change nothing.
 ```
 
 ## Queue authorization
