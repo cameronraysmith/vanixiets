@@ -8,6 +8,10 @@
 # at runtime. The declared `buffer` dependency is not shipped and not needed:
 # its one bare `buffer` import resolves to node's builtin module. No build,
 # only node (package.json engines: >=22).
+#
+# pin.json pins the version and cli.tgz's hash; Renovate proposes releases
+# from the cli-v* GitHub releases and `nix run .#realize-pin -- mops-bin
+# <version>` realizes one.
 {
   lib,
   stdenvNoCC,
@@ -16,15 +20,22 @@
   nodejs_22,
   versionCheckHook,
 }:
-stdenvNoCC.mkDerivation (finalAttrs: {
+let
+  inherit ((import ../../../lib/pins.nix { inherit lib; }).load ./pin.json { name = "mops-bin"; })
+    pin
+    pinPlan
+    ;
+  planned = pinPlan pin.version;
+in
+stdenvNoCC.mkDerivation {
   pname = "mops-bin";
-  version = "3.8.0";
+  inherit (pin) version;
 
-  # The release publishes no checksum file; this equals the sha256 digest
-  # GitHub records for the asset.
+  # The release publishes no checksum file, so pin.json's `cli` hash is a
+  # prefetch of the asset; it equals the sha256 digest GitHub records for it.
   src = fetchurl {
-    url = "https://github.com/caffeinelabs/mops/releases/download/cli-v${finalAttrs.version}/cli.tgz";
-    hash = "sha256-mHVzKVCzp8USfKW4cf3xPKySpScpHNDDxusACONfZuI=";
+    inherit (planned.artifacts.cli.file) url;
+    inherit (pin.artifacts.cli.file) hash;
   };
 
   nativeBuildInputs = [ makeWrapper ];
@@ -48,12 +59,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/mops";
   doInstallCheck = true;
 
-  passthru.updateScript = ./update.sh;
+  passthru = {
+    inherit pin pinPlan;
+  };
 
   meta = {
     description = "Motoko package manager CLI (upstream prebuilt bundle)";
     homepage = "https://mops.one";
-    changelog = "https://github.com/caffeinelabs/mops/releases/tag/cli-v${finalAttrs.version}";
+    changelog = "https://github.com/caffeinelabs/mops/releases/tag/${planned.tag}";
     license = lib.licenses.mit;
     mainProgram = "mops";
     platforms = [
@@ -66,4 +79,4 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     sourceProvenance = with lib.sourceTypes; [ binaryBytecode ];
     maintainers = with lib.maintainers; [ cameronraysmith ];
   };
-})
+}

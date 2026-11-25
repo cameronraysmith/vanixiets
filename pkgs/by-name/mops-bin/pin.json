@@ -1,0 +1,23 @@
+{
+  "name": "mops-bin",
+  "version": "3.8.0",
+  "source": {
+    "githubRelease": {
+      "owner": "caffeinelabs",
+      "repo": "mops",
+      "tagTemplate": "cli-v{version}"
+    }
+  },
+  "artifacts": {
+    "cli": {
+      "file": {
+        "urlTemplate": "https://github.com/caffeinelabs/mops/releases/download/{tag}/cli.tgz",
+        "checksum": {
+          "prefetch": {}
+        },
+        "hash": "sha256-mHVzKVCzp8USfKW4cf3xPKySpScpHNDDxusACONfZuI="
+      }
+    }
+  },
+  "companions": []
+}

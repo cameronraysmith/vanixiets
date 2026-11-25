@@ -48,11 +48,6 @@
         program = "${config.packages.golem-binary.updateScript}";
       };
 
-      apps.update-mops-bin = {
-        type = "app";
-        program = "${config.packages.mops-bin.updateScript}";
-      };
-
       # perses-bin exists only on x86_64-linux and aarch64-darwin (its
       # package.nix yields null on aarch64-linux); the updater is
       # host-agnostic, so the app runs the script itself on every system.
