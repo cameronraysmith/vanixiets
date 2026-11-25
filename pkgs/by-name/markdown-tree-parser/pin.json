@@ -1,0 +1,31 @@
+{
+  "name": "markdown-tree-parser",
+  "version": "1.6.1",
+  "realizedVersion": "1.6.1",
+  "source": {
+    "githubRelease": {
+      "owner": "ksylvan",
+      "repo": "markdown-tree-parser",
+      "tagTemplate": "v{version}"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "ksylvan",
+            "repo": "markdown-tree-parser"
+          }
+        },
+        "hash": "sha256-r6c6tpk7R2pWNJmRyIS1ScfX2L6nTVorOXNrGByJpgE=",
+        "depsHash": {
+          "npm": {
+            "hash": "sha256-2oDTln7l03RHk/uOP8vEOeOc9kO5ezXnMBEQYMVoNEo="
+          }
+        }
+      }
+    }
+  },
+  "companions": []
+}
