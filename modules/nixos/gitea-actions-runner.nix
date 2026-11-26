@@ -100,10 +100,27 @@
             rpc:       files
             NSSWITCH
 
+            superseded="$STATE_DIRECTORY/superseded-images"
+            previous=$(podman image inspect --format '{{.Id}}' gitea-runner-nix 2>/dev/null || true)
             tar -cv . | podman import - gitea-runner-nix
+            current=$(podman image inspect --format '{{.Id}}' gitea-runner-nix)
+
+            # Each import leaves the previously tagged image untagged. podman rmi
+            # refuses an image a job container still uses, so such ids stay in the
+            # state file and are retried on the next start.
+            touch "$superseded"
+            retained=()
+            for image in $(sort -u "$superseded" <(echo "$previous")); do
+              if [ "$image" = "$current" ] || ! podman image exists "$image"; then
+                continue
+              fi
+              podman rmi "$image" || retained+=("$image")
+            done
+            printf '%s\n' "''${retained[@]}" > "$superseded"
           '';
           serviceConfig = {
             RuntimeDirectory = "gitea-runner-nix-image";
+            StateDirectory = "gitea-runner-nix-image";
             WorkingDirectory = "/run/gitea-runner-nix-image";
             Type = "oneshot";
             RemainAfterExit = true;
