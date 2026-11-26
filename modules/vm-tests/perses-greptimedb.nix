@@ -25,7 +25,8 @@
 # through nginx and sent directly to Perses, and as admin through
 # greptimedb-sql-open sent directly (the negative control), so allowHeaders
 # is what protects the store from a caller that bypasses nginx and the
-# strip works on its own; /metrics is 404 through nginx and 200 directly.
+# strip works on its own; /metrics is 404 through nginx and 200 directly;
+# /api/config serves the module's frontend.information, the home page text.
 #
 # What it does not establish: Kanidm's refusal and admission, TLS and ACME,
 # R2 storage, OOM behaviour (a container shares the host's kernel), or that
@@ -714,6 +715,12 @@
                   failures = views_failures({"fleet-hosts": mutant["fleet-hosts"]})
                   assert len(failures) == 1 and failures[0][2] == "system_memory_usage_bytes_nope", failures
                   ok("views case rejects the mutant view query")
+
+              with subtest("15: the home page carries the configured information"):
+                  rendered = json.loads(machine.succeed("cat /run/perses/config.yaml"))["frontend"]["information"]
+                  status, body = curl("/api/config")
+                  assert status == 200 and rendered and json.loads(body)["frontend"]["information"] == rendered, (status, body)
+                  ok("/api/config serves frontend.information from the rendered configuration")
             '';
           };
       };

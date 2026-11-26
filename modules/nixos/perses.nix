@@ -314,6 +314,14 @@ in
                 }
               ];
             };
+            # The home page always shows a card whose default text and buttons
+            # offer project and dashboard creation, which readonly and the
+            # read-only guest permissions refuse; information replaces the text.
+            frontend.information = ''
+              ### Fleet observability
+
+              Read-only dashboards provisioned from the vanixiets repository, in the [Fleet](/projects/fleet) project.
+            '';
             datasource.proxy.allowed_networks = [ "127.0.0.0/8" ];
             database.file = {
               folder = "/var/lib/perses/db";
