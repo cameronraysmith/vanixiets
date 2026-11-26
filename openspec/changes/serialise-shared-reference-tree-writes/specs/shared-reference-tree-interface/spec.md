@@ -2,8 +2,8 @@
 
 ### Requirement: The writer acts on one repository at a time
 
-Each request that writes a repository SHALL hold, for its whole operation, an exclusive lock on a file in `/var/lib/ghq-writer`, a directory outside the shared root owned by the writer with mode `0700`, named by the SHA-256 of the repository's path relative to the resolved shared root, case-folded, so every spelling of one repository, and one not yet cloned, names one lock.
-Requests for different repositories SHALL NOT wait for each other.
+Each request that writes a repository SHALL hold, for its whole operation, an exclusive lock on a file in `/var/lib/ghq-writer`, the writer's `0700` directory outside the root, named by the SHA-256 of the repository's case-folded path under the resolved shared root, so every spelling of a repository, cloned or not, names one lock.
+Requests for repositories whose paths differ by more than letter case SHALL NOT wait for each other; those differing only in case share a lock and run in sequence.
 
 #### Scenario: Two requests for one repository
 
@@ -14,17 +14,24 @@ Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "Two updates of one rep
 
 #### Scenario: Requests for different repositories
 
-- **WHEN** requests for two different repositories arrive together
+- **WHEN** requests for two repositories whose paths differ by more than letter case arrive together
 - **THEN** their fetches overlap in time and neither request waits
 
 Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "Updates of two repositories run side by side".
 
 #### Scenario: Spellings of one repository
 
-- **WHEN** requests name one repository as `host/owner/repo`, `owner/repo`, an `https` or `scp`-style URL with or without credentials, a path with a trailing slash, a path inside the clone, a path through a symbolic link to the shared root, or a spelling differing only in letter case
+- **WHEN** requests name one repository as `host/owner/repo`, `owner/repo`, an `https` or `scp`-style URL with or without credentials, a path with a trailing slash, a path inside the clone, a path through a symbolic link to the shared root, or, on a case-insensitive file system such as darwin's, a spelling differing only in letter case
 - **THEN** they all name one lock, and a repository not yet cloned has a lock name too
 
 Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "Every spelling of a repository, and a repository not cloned yet, names one lock; two names differing only in case share it".
+
+#### Scenario: Repositories differing only in letter case
+
+- **WHEN** a request names a repository whose path differs only in letter case from one whose lock is held, as two clones can only on a case-sensitive host
+- **THEN** it takes the same lock, and so waits for the request holding it
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "Every spelling of a repository, and a repository not cloned yet, names one lock; two names differing only in case share it", in which the second name's request finds the lock held.
 
 #### Scenario: The lock directory
 
@@ -73,15 +80,47 @@ Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "Every spelling of a re
 
 ### Requirement: The writer logs each request without its target
 
-Each accepted request SHALL leave a line on the writer's standard error when it starts, while it waits for its lock, and when it ends, each carrying a UTC timestamp, the handler's process id, the caller's uid, user name and process id, the verb and the repository, the last adding the exit status and the duration.
-No line SHALL carry the target as the caller gave it, which may hold credentials.
+Each accepted request SHALL log a line on the writer's standard error when it starts, while it waits for its lock, and when it ends, each with a UTC timestamp, the handler's pid, the caller's uid, user name and pid, the verb and the repository; the last adds the exit status, the duration and a failure's reason, naming a command by program and subcommand only.
+No line, nor the reply to a timed-out or unexpectedly failed request, SHALL carry the target as given, which may hold credentials.
 
 #### Scenario: Log lines
 
 - **WHEN** a request is accepted, waits for its lock, and ends
-- **THEN** the writer's standard error holds a line for each, of the form `<UTC timestamp> ghq-writer pid=<pid> uid=<uid> user=<user> caller-pid=<pid> verb=<verb> repo=<repository>` followed by `start`, `waiting held-by: <holder>` or `exit status=<status> duration=<seconds>s`, and no line holds the target's URL
+- **THEN** the writer's standard error holds a line for each, of the form `<UTC timestamp> ghq-writer pid=<pid> uid=<uid> user=<user> caller-pid=<pid> verb=<verb> repo=<repository>` followed by `start`, `waiting held-by: <holder>` or `exit status=<status> duration=<seconds>s`, the last followed by ` reason: <reason>` when the request fails, and no line holds the target's URL
 
 Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "Log lines: a UTC timestamp, the handler's pid, the caller, verb and repository, at start and exit; a waiting request logs its wait too".
+
+#### Scenario: A command fails
+
+- **WHEN** a command the request runs exits non-zero, for a target holding credentials
+- **THEN** the exit line ends `reason: <program> <subcommand> exited <status>`, such as `git fetch exited 128`, and no line holds the credentials or a URL
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A command that fails: the update of a clone whose remote is gone fails at its first fetch".
+
+#### Scenario: A command times out
+
+- **WHEN** a `get`'s clone, or a git step of an update, outlasts the command limit, for a target holding credentials
+- **THEN** the caller receives exit status 124 and a message, and the exit line ends `reason: timed out after <limit> s running ghq get` or `running git <subcommand>`, neither holding the credentials, a URL or a traceback
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, cases "A get whose clone outlasts the command timeout: ghq and the git it started are stopped, and git removes its partial clone" and "A git step that outlasts the command timeout: an update's first step lists the remote".
+
+#### Scenario: An unexpected error
+
+- **WHEN** the handler raises an error it does not expect, whose message holds the target
+- **THEN** the caller receives exit status 70, the exit line ends `reason: unexpected <type>: <message>` with the target replaced by `<target>`, and the handler exits non-zero
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "An unexpected error whose message holds the target: the handler exits non-zero after replying and logging the error's type and its message with the target replaced".
+
+### Requirement: A command that outlasts its limit is stopped with all it started
+
+Each command the writer runs SHALL be given at most 3600 s; one that outlasts it SHALL be stopped together with every process it started, first with `SIGTERM` so git can remove a partial clone, then with `SIGKILL`, and its request SHALL end with exit status 124, a reply and its lock released.
+
+#### Scenario: A clone hangs
+
+- **WHEN** a `get`'s clone, or a git step of an update, waits on its remote past the command limit
+- **THEN** no process the command started still waits on the remote, the repository's lock is free, and no partial clone is left
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, cases "A get whose clone outlasts the command timeout: ghq and the git it started are stopped, and git removes its partial clone" and "A git step that outlasts the command timeout: an update's first step lists the remote", each run with a 1 s limit.
 
 ### Requirement: A caller that disconnects does not stop its request
 

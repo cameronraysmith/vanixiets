@@ -24,13 +24,13 @@ The runtime test that witnesses the writer reached 50 to 52 s of its 60 s limit 
 
 **Writer concurrency**
 - From: the spec says the service starts one handler per connection and is silent on two requests for one repository.
-- To: requests for one repository run one at a time under a lock outside the tree, requests for different repositories overlap, and a request waits at most 3600 s before failing with exit status 75.
+- To: requests for one repository run one at a time under a lock outside the tree, requests for repositories whose paths differ by more than letter case overlap, and a request waits at most 3600 s before failing with exit status 75.
 - Reason: the collision above.
 - Impact: non-breaking; records behaviour already on `main`.
 
 **Request protocol**
 - From: one request line per connection.
-- To: an optional second line `{"accept": ["note"]}` lets the writer tell a waiting caller so; a `get` whose target names no directory under the root is refused; each request leaves log lines with a UTC timestamp, the caller, the verb, the repository, the status and the duration, never the target; a caller that disconnects does not stop its operation.
+- To: an optional second line `{"accept": ["note"]}` lets the writer tell a waiting caller so; a `get` whose target names no directory under the root is refused; each request leaves log lines with a UTC timestamp, the caller, the verb, the repository, the status, the duration and a failure's reason, never the target; a command that outlasts its limit is stopped with every process it started, and its request ends with a reply; a caller that disconnects does not stop its operation.
 - Reason: a caller that waits must know why; the log must say who wrote what without recording credentials a target may carry.
 - Impact: non-breaking; older clients send no second line and get their reply alone.
 
@@ -48,14 +48,15 @@ None.
 
 ### Modified Capabilities
 
-- `shared-reference-tree-interface` (stratum: `interface`): adds `The writer acts on one repository at a time` (the lock, its directory and its name), `A request waits a bounded time for its repository, and only a caller that asks is told` (3600 s, exit status 75, the note line), `The writer refuses a get that names no directory under the shared root`, `The writer logs each request without its target`, `A caller that disconnects does not stop its request` and `Each runtime test of the shared tree fits its size class`; modifies `Each property is backed by evidence that can fail` to speak of runtime tests in the plural. Every new scenario names its witness. `Acquisition is delegated to the writer through a socket-activated entry point` and `The writer accepts only constrained requests` keep their text, which stays true: one handler still starts per connection, and the note line is an option, not a second request. Trust boundary: the lock orders the writer's own handlers on one host and nothing else that writes a clone, such as root or an administrator acting as the writer; a wait is bounded by the holder's own git timeouts, not by the lock.
+- `shared-reference-tree-interface` (stratum: `interface`): adds `The writer acts on one repository at a time` (the lock, its directory and its name), `A request waits a bounded time for its repository, and only a caller that asks is told` (3600 s, exit status 75, the note line), `The writer refuses a get that names no directory under the shared root`, `The writer logs each request without its target`, `A command that outlasts its limit is stopped with all it started`, `A caller that disconnects does not stop its request` and `Each runtime test of the shared tree fits its size class`; modifies `Each property is backed by evidence that can fail` to speak of runtime tests in the plural. Every new scenario names its witness. `Acquisition is delegated to the writer through a socket-activated entry point` and `The writer accepts only constrained requests` keep their text, which stays true: one handler still starts per connection, and the note line is an option, not a second request. Trust boundary: the lock orders the writer's own handlers on one host and nothing else that writes a clone, such as root or an administrator acting as the writer; a wait is bounded by the holder's own git timeouts, not by the lock.
 
 The behavioral capability `shared-reference-tree` is unchanged: the lock orders the writer's own work and gives no other account a write, and "A missing reference repository can be requested without a person" already demands that each well-formed request is carried out.
 `world-assumptions` is unchanged: no assumption names the writer's concurrency or the runtime test.
 
 ## Impact
 
-- Specs: `openspec/specs/shared-reference-tree-interface/spec.md`, six requirements added and one modified.
+- Specs: `openspec/specs/shared-reference-tree-interface/spec.md`, seven requirements added and one modified.
 - Test: `modules/vm-tests/shared-reference-tree.nix` defines `shared-reference-tree` and `shared-reference-tree-migration` from one `mkTest` and declares both in `testSizes.vmTests`; `checks.x86_64-linux.test-size-classes` reads the new name.
-- Unchanged: `pkgs/by-name/ghq-shared` (the behaviour is merged), the NixOS and darwin modules, and the weekly runner, which evaluates every `vmTests.x86_64-linux` attribute by itself.
+- Writer: `pkgs/by-name/ghq-shared/ghq-writer-handler.py` stops a timed-out command with its process group and ends every failure with a reply and a logged reason; `test_handler.py` covers both.
+- Unchanged: the NixOS and darwin modules, and the weekly runner, which evaluates every `vmTests.x86_64-linux` attribute by itself.
 - Evidence logs are under `logs/` (git-ignored), named `srt-split-<test>-pyrite-<timestamp>-run<n>.log`.

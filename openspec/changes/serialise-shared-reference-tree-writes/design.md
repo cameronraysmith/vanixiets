@@ -8,7 +8,9 @@ The commit "fix(ghq-shared): serialise writer requests per repository" (`ebd5daa
 The runtime test `vmTests.x86_64-linux.shared-reference-tree` is class `small`, whose driver timeout is 60 s of script.
 With the lock's subtest its script measured 51.76 and 50.04 s on pyrite on 2026-11-26, about 20 to 22 s of it boot to `multi-user.target`.
 
-Both boundaries named by the repository's rules are untouched: the change edits first-party sources only (a spec and a test module), and the test is source that the weekly runner on pyrite evaluates from `main`, not a delivered artifact.
+Both boundaries named by the repository's rules are untouched: the change edits first-party sources only (a spec, a test module, and the writer and its package test), and the test is source that the weekly runner on pyrite evaluates from `main`, not a delivered artifact.
+
+Verification of the merged behaviour found two gaps between the spec and the writer: a command that outlasted its 3600 s limit raised `subprocess.TimeoutExpired`, which nothing caught, so Python's traceback, holding the command's arguments and with them the target as given, went to the writer's log, and the request ended with no exit line and no reply; and the lock requirement said both that requests for different repositories never wait for each other and that the lock is named by the case-folded path.
 
 ## Goals / Non-Goals
 
@@ -18,7 +20,7 @@ Both boundaries named by the repository's rules are untouched: the change edits 
 - `shared-reference-tree` keeps its name and its history in `devloop.runtime_test_result`.
 
 **Non-Goals:**
-- Changing the writer, its client, its package tests or the NixOS and darwin modules.
+- Changing the writer beyond how it ends a failed or timed-out request, its client, or the NixOS and darwin modules.
 - Making the lock cover writes that do not go through the writer.
 - Running mutation variants on a schedule.
 
@@ -59,6 +61,19 @@ Both boundaries named by the repository's rules are untouched: the change edits 
 
 - **Choice**: `passthru.mutations.group-writable` and `passthru.mutations.broken-control` stay on `shared-reference-tree` and build its case set.
 - **Rationale**: they break the permission model and the control, whose cases stay there. Nothing in the repository builds them on a schedule or as a check, so each is built on demand after the split to show it still fails for its reason.
+
+### D7: One lock for paths differing only in letter case, on every host
+
+- **Choice**: keep the lock name the SHA-256 of the case-folded path, and state in the spec that repositories whose paths differ only in letter case share a lock and run in sequence.
+- **Rationale**: on a case-insensitive file system such as stibnite's, `github.com/O/r` and `github.com/o/r` are one clone, so two requests spelling it differently must take one lock. On a case-sensitive host they are two clones, which can only be made deliberately, and waiting for each other costs them time and nothing else. One rule on every host keeps the lock name independent of the platform and of whether the file system beneath the root folds case.
+- **Alternatives considered**: folding case only on darwin, or probing the root's file system for case sensitivity. Rejected: either makes the key depend on the host, for no gain beyond letting two such clones run side by side.
+
+### D8: A command that outlasts its limit is stopped with its process group, and its request ends like any other failure
+
+- **Choice**: the handler starts each command in a process group of its own (`process_group=0`); when the command outlasts its limit (3600 s, `commandTimeout` in the handler's configuration for tests), the handler sends `SIGTERM` to the group, waits up to 10 s for every process in it to exit, then sends `SIGKILL` to the group, and ends the request with exit status 124 (as `timeout(1)` does), a reply and an exit line whose reason names the program and its subcommand only. Every failure ends with ` reason: <reason>` on its exit line; an exception nothing else handles is caught at the outermost level, logged by its type and its message with the target replaced, answered with exit status 70 (`EX_SOFTWARE`), and ends the handler with that status. Commands run with standard input from `/dev/null` rather than the caller's connection. A requirement of its own states the stopping.
+- **Rationale**: `subprocess.run` kills only the command it started, so a `git` started by `ghq` kept running and writing the repository after its request ended. `SIGTERM` first lets `git clone` remove its partial clone, which `repo_dir` would otherwise take for a clone. The exception's default text is not logged because `TimeoutExpired` and `CalledProcessError` format the whole argument list.
+- **Alternatives considered**: a new session (`start_new_session`), which also detaches the commands from the handler's controlling terminal, of which it has none, and gains nothing over a process group.
+- **Boundary**: a process that moves itself to another process group escapes the signal. The package test shows that none of the processes of a local clone or fetch does; transports over ssh are not exercised.
 
 ## Risks / Trade-offs
 

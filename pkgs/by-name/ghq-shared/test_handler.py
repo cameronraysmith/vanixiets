@@ -7,15 +7,20 @@ LFS path fast-forwards to its pointer file, and hydrate fetches the blobs a
 revision needs. Requests for one repository run one after another, the later one
 telling its caller it waits and giving up after the lock timeout; requests for
 different repositories overlap; a caller that disconnects leaves its update to
-finish, with no traceback, and its lock released.
+finish, with no traceback, and its lock released. A command that fails, or
+outlasts the command timeout, and an unexpected error each end with a reply and
+an exit log line giving the reason, naming neither the target nor a command's
+arguments; a timed-out command is stopped with every process it started.
 """
 
+import errno
 import grp
 import hashlib
 import importlib.machinery
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -45,21 +50,35 @@ locks = os.path.join(work, "locks")
 os.makedirs(locks)
 
 
-def config(group=own_group, protocols=("https",), lock_timeout=None):
-    path = os.path.join(work, f"config-{group}-{'-'.join(protocols)}-{lock_timeout}.json")
+def config(group=own_group, protocols=("https",), lock_timeout=None, command_timeout=None):
+    path = os.path.join(work, f"config-{group}-{'-'.join(protocols)}-{lock_timeout}-{command_timeout}.json")
     settings = {"root": root, "group": group, "allowedProtocols": list(protocols), "lockDir": locks}
     if lock_timeout is not None:
         settings["lockTimeout"] = lock_timeout
+    if command_timeout is not None:
+        settings["commandTimeout"] = command_timeout
     with open(path, "w") as handle:
         json.dump(settings, handle)
     return path
 
 
-def start(request, cfg):
+# Runs the handler after executing a patch against it as a module, for faults no
+# request can cause.
+DRIVER = ("import importlib.machinery, sys, types\n"
+          "loader = importlib.machinery.SourceFileLoader('handler', sys.argv[1])\n"
+          "handler = types.ModuleType('handler')\n"
+          "loader.exec_module(handler)\n"
+          "exec(sys.argv[3], {'handler': handler})\n"
+          "sys.argv = sys.argv[1:3]\n"
+          "handler.main()\n")
+
+
+def start(request, cfg, patch=None):
     ours, theirs = socket.socketpair()
+    argv = [HANDLER, cfg] if patch is None else [sys.executable, "-c", DRIVER, HANDLER, cfg, patch]
     # launchd starts each inetd-style handler with umask 022 whatever the job's Umask
     # key says; the handler must set the writer's umask itself.
-    proc = subprocess.Popen([HANDLER, cfg], stdin=theirs, stdout=theirs, stderr=subprocess.PIPE,
+    proc = subprocess.Popen(argv, stdin=theirs, stdout=theirs, stderr=subprocess.PIPE,
                             preexec_fn=lambda: os.umask(0o022))
     theirs.close()
     ours.sendall((request if isinstance(request, bytes) else json.dumps(request).encode()) + b"\n")
@@ -67,12 +86,20 @@ def start(request, cfg):
     return proc, ours
 
 
-def finish(proc, ours):
-    """The handler's reply, with the notes sent before it and its log lines."""
+def finish(proc, ours, within=None):
+    """The handler's reply, exit None when it sent none, with the notes sent before it and its log lines.
+
+    A handler that has not replied within `within` seconds is killed.
+    """
+    messages = []
+    ours.settimeout(within)
     with ours, ours.makefile("rb") as lines:
-        messages = [json.loads(line) for line in lines]
+        try:
+            messages = [json.loads(line) for line in lines]
+        except TimeoutError:
+            proc.kill()
     _, log = proc.communicate()
-    reply = messages[-1]
+    reply = messages[-1] if messages else {"stdout": "", "stderr": "", "exit": None}
     reply["notes"] = [message["note"] for message in messages[:-1]]
     reply["log"] = log.decode()
     return reply
@@ -621,6 +648,100 @@ except handler.Busy:
     pass
 finally:
     os.close(held)
+
+# A command that outlasts the command timeout. The remote's packed-refs is a FIFO
+# with no writer, so whatever reads the remote's refs blocks, as on a stalled
+# connection. The get clones over https with invented credentials, rewritten to
+# the local remote by configuration added to the handler's git environment: git
+# clone ignores remote.origin.uploadpack and runs upload-pack from its own exec
+# path, so no upload-pack wrapper can stand in for the remote under ghq.
+_, hang_bare = upstream("hang")
+hang_step = os.path.join(root, "github.com", "o", "hang-step")
+git("clone", "-q", f"file://{hang_bare}", hang_step)
+hang_fifo = os.path.join(hang_bare, "packed-refs")
+os.unlink(hang_fifo)
+os.mkfifo(hang_fifo)
+hang_cfg = config(protocols=("https", "file"), command_timeout=1)
+rewrite = f"url.file://{hang_bare.removesuffix('.git')}.insteadOf=https://u:secret@github.com/o/hang"
+through_rewrite = f"handler.LFS_POLICY = handler.LFS_POLICY + [{rewrite!r}]"
+
+
+def left_running():
+    """Whether a process still reads the hung remote; probing releases it."""
+    time.sleep(1)
+    try:
+        os.close(os.open(hang_fifo, os.O_WRONLY | os.O_NONBLOCK))
+    except OSError as error:
+        if error.errno == errno.ENXIO:
+            return False
+        raise
+    return True
+
+
+def lock_free(repo):
+    try:
+        os.close(handler.hold({"lockDir": locks, "lockTimeout": 0.2}, session(repo)))
+        return True
+    except handler.Busy:
+        return False
+
+
+def ended_without_target(case, reply, repo, verb, status, reason, own_output=False):
+    """The reply and the exit log line of a failed request, neither naming its target.
+
+    A failed command's reply carries the command's own output, which may name the
+    target the caller gave; only the log is checked then.
+    """
+    line = rf"^{stamp} verb={re.escape(verb)} repo={re.escape(repo)} exit status={status} duration=\d+\.\d{{3}}s reason: {reason}$"
+    if reply["exit"] in (None, 0) or not re.search(line, reply["log"], re.M):
+        failures.append(f"{case}: the caller must get a failure reply and the log an exit line matching {line!r}: {reply}")
+    for text in ("secret", "https://", "file://", "Traceback"):
+        if text in reply["log"] or (text in reply["stderr"] and not own_output):
+            failures.append(f"{case}: {text!r} must not reach the log or the reply's message: {reply}")
+    if not lock_free(repo):
+        failures.append(f"{case}: the repository's lock must be free afterwards")
+
+
+# A get whose clone outlasts the command timeout: ghq and the git it started are
+# stopped, and git removes its partial clone.
+reply = finish(*start({"action": "get", "target": "https://u:secret@github.com/o/hang.git"}, hang_cfg, through_rewrite),
+               within=30)
+ended_without_target("a timed-out get", reply, "github.com/o/hang", "get", 124, "timed out after 1 s running ghq get")
+if left_running():
+    failures.append("a timed-out get must stop every process it started")
+if os.path.exists(os.path.join(root, "github.com", "o", "hang")):
+    failures.append("a timed-out get must leave no partial clone")
+
+# A git step that outlasts the command timeout: an update's first step lists the remote.
+reply = finish(*start({"action": "get", "target": "https://u:secret@github.com/o/hang-step.git", "update": True}, hang_cfg),
+               within=30)
+ended_without_target("a timed-out git step", reply, "github.com/o/hang-step", "get+update", 124,
+                     "timed out after 1 s running git ls-remote")
+if left_running():
+    failures.append("a timed-out git step must stop every process it started")
+
+# A command that fails: the update of a clone whose remote is gone fails at its
+# first fetch.
+_, gone_bare = upstream("gone")
+git("clone", "-q", f"file://{gone_bare}", os.path.join(root, "github.com", "o", "gone"))
+shutil.rmtree(gone_bare)
+reply = ask({"action": "get", "target": "https://u:secret@github.com/o/gone.git", "update": True},
+            config(protocols=("https", "file")))
+ended_without_target("a failed command", reply, "github.com/o/gone", "get+update", r"(\d+)", r"git fetch exited \1",
+                     own_output=True)
+
+# An unexpected error whose message holds the target: the handler exits non-zero
+# after replying and logging the error's type and its message with the target
+# replaced.
+boom = ("def boom(request, *rest):\n"
+        "    raise RuntimeError(f\"cannot reach {request['target']}\")\n"
+        "handler.run_get = boom\n")
+proc, ours = start({"action": "get", "target": "https://u:secret@github.com/o/hang.git"}, hang_cfg, boom)
+reply = finish(proc, ours)
+ended_without_target("an unexpected error", reply, "github.com/o/hang", "get", 70,
+                     r"unexpected RuntimeError: cannot reach <target>")
+if proc.returncode == 0:
+    failures.append(f"an unexpected error must end the handler with a non-zero status: {reply}")
 
 if failures:
     sys.exit("\n".join(failures))

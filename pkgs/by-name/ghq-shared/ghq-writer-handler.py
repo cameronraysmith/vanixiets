@@ -19,9 +19,15 @@ configuration applies the same policy to the shared root.
 Every request leaves one log line on standard error at start, while it waits
 and at exit, carrying the time, the handler's pid, the caller's uid and pid, the
 verb and the repository, never the target as given, which may hold credentials.
+The exit line of a failed request ends with its reason, naming any command by
+its program and subcommand only.
+
+Each command runs in a process group of its own; one that outlasts
+commandTimeout seconds is stopped with every process it started, and its
+request ends with a reply and an exit line like any other failure.
 
 Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group",
-"allowedProtocols", "lockDir" and optionally "lockTimeout".
+"allowedProtocols", "lockDir" and optionally "lockTimeout" and "commandTimeout".
 """
 
 import datetime
@@ -43,11 +49,22 @@ GHQ = "@ghq@"
 GHQ_SYNC = "@ghqSync@"
 TOOL_PATH = "@toolPath@"
 
-# Longer than any single git command the handler runs may take (their timeout
-# below), so a waiter outlasts every step of a slow fetch it queues behind.
+# The longest any one command the handler runs may take, unless CONFIG's
+# commandTimeout says otherwise.
+COMMAND_TIMEOUT = 3600
+command_timeout = COMMAND_TIMEOUT
+# As long as any single command may take, so a waiter outlasts every step of a
+# slow fetch it queues behind.
 LOCK_TIMEOUT = 3600
 # EX_TEMPFAIL from sysexits.h: the repository is busy or its lock unavailable.
 BUSY = 75
+# The status timeout(1) exits with when its command outlasts its limit.
+TIMED_OUT = 124
+# EX_SOFTWARE from sysexits.h: the handler failed in a way it does not expect.
+INTERNAL = 70
+# Seconds a timed-out command has after SIGTERM, for git to remove a partial
+# clone, before SIGKILL.
+STOP_GRACE = 10
 
 MAX_REQUEST = 4096
 READ_TIMEOUT = 30
@@ -56,6 +73,7 @@ TARGET = re.compile(r"[A-Za-z0-9][A-Za-z0-9._~:/@+%-]*\Z")
 # range, reflog, search or option syntax.
 REVISION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/+-]*(?:[~^][0-9]*)*\Z")
 SCHEME = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*)://")
+USERINFO = re.compile(r"://[^/\s]*@")
 FIELDS = {
     "get": {"action", "target", "lazy", "update", "tags"},
     "deepen": {"action", "depth", "path"},
@@ -277,8 +295,65 @@ def hold(config, session):
     return fd
 
 
+class TimedOut(Exception):
+    pass
+
+
+def label(argv):
+    """A command as its program and subcommand only: its other arguments may hold the target."""
+    words = argv.split() if isinstance(argv, str) else [os.fsdecode(word) for word in argv]
+    if not words:
+        return "-"
+    program, rest = os.path.basename(words[0]), words[1:]
+    while program == "git" and rest[:1] in (["-C"], ["-c"]):
+        rest = rest[2:]
+    return " ".join([program, *rest[:1]])
+
+
+def signal_group(pgid, signum):
+    """Send signum to a process group; False when no process is left in it."""
+    try:
+        os.killpg(pgid, signum)
+    except (ProcessLookupError, PermissionError):
+        # darwin answers EPERM, not ESRCH, for a group whose members have all exited.
+        return False
+    return True
+
+
+def stop(child):
+    """Stop a command and every process it started, which share its process group.
+
+    subprocess's own timeout kills only the command, so a git that ghq started
+    would go on writing the repository after its request ended. SIGTERM lets git
+    remove a partial clone; whatever is still running STOP_GRACE seconds later is
+    killed.
+    """
+    deadline = time.monotonic() + STOP_GRACE
+    signal_group(child.pid, signal.SIGTERM)
+    try:
+        child.wait(STOP_GRACE)
+    except subprocess.TimeoutExpired:
+        pass
+    while time.monotonic() < deadline and signal_group(child.pid, 0):
+        time.sleep(0.1)
+    signal_group(child.pid, signal.SIGKILL)
+    child.wait()
+
+
+def run(argv, env, stdin=None):
+    """Run a command in a process group of its own, its output captured, stopping it past command_timeout."""
+    with subprocess.Popen(argv, env=env, stdin=subprocess.DEVNULL if stdin is None else subprocess.PIPE,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, process_group=0) as child:
+        try:
+            out, err = child.communicate(stdin, timeout=command_timeout)
+        except subprocess.TimeoutExpired:
+            stop(child)
+            raise TimedOut(f"timed out after {command_timeout} s running {label(argv)}") from None
+    return subprocess.CompletedProcess(argv, child.returncode, out, err)
+
+
 def git(path, env, *args, stdin=None):
-    return subprocess.run(["git", "-C", path, *args], env=env, input=stdin, capture_output=True, timeout=3600)
+    return run(["git", "-C", path, *args], env, stdin)
 
 
 def shallow_tags(path, env):
@@ -399,7 +474,7 @@ def run_get(request, argv, config, env):
     full = path and git(path, env, "rev-parse", "--is-shallow-repository").stdout.strip() == b"false"
     if path and full and request.get("update") is True:
         results.append(git(path, env, "fetch", "--tags", "origin"))
-    results.append(subprocess.run(argv, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=3600))
+    results.append(run(argv, env))
     if request.get("tags") is True:
         path = repo_dir(request["target"], config["root"])
         if path and git(path, env, "rev-parse", "--is-shallow-repository").stdout.strip() == b"true":
@@ -421,6 +496,7 @@ class Session:
         self.started = time.monotonic()
         self.uid, self.caller_pid = peer(conn)
         self.verb = self.repo = "-"
+        self.target = self.reason = None
         self.gone = self.notes = False
 
     def log(self, event):
@@ -442,6 +518,23 @@ class Session:
             self.gone = True
             self.log("caller disconnected")
 
+    def fail(self, status, reason, message):
+        """A failure's reply; the reason, which must not hold the target, goes on the exit log line."""
+        self.reason = reason
+        return {"stdout": "", "stderr": message, "exit": status}
+
+
+def describe(error, target):
+    """An exception's type and message, naming neither the target nor a command's arguments."""
+    if isinstance(error, subprocess.TimeoutExpired):
+        return f"TimeoutExpired: {label(error.cmd)} after {error.timeout} s"
+    if isinstance(error, subprocess.CalledProcessError):
+        return f"CalledProcessError: {label(error.cmd)} exited {error.returncode}"
+    message = " ".join(str(error).split())
+    if target:
+        message = message.replace(target, "<target>")
+    return f"{type(error).__name__}: {USERINFO.sub('://<credentials>@', message)}"
+
 
 def serve(session, config):
     conn = session.conn
@@ -462,37 +555,46 @@ def serve(session, config):
         options = {}
     session.notes = isinstance(options, dict) and isinstance(options.get("accept"), list) and "note" in options["accept"]
     if not authorized(session.uid, config["group"]):
-        return {"stdout": "", "stderr": f"ghq-writer: uid {session.uid} is not a member of {config['group']}\n", "exit": 13}
+        return session.fail(13, f"not a member of {config['group']}",
+                            f"ghq-writer: uid {session.uid} is not a member of {config['group']}\n")
     try:
         if raw is None:
             raise Refused(f"no complete request within {READ_TIMEOUT} s")
         if len(raw) > MAX_REQUEST:
             raise Refused("request exceeds 4 KiB")
         request = json.loads(raw)
+        if isinstance(request, dict) and isinstance(request.get("target"), str):
+            session.target = request["target"]
         argv = command(request, config)
         repo = repository(request, config["root"])
     except (Refused, ValueError) as refusal:
-        return {"stdout": "", "stderr": f"ghq-writer: refused: {refusal}\n", "exit": 2}
+        return session.fail(2, "refused", f"ghq-writer: refused: {refusal}\n")
     session.verb, session.repo = verb(request), repo
     session.log("start")
     try:
         held = hold(config, session)
     except Busy as busy:
-        return {"stdout": "", "stderr": f"{busy}\n", "exit": BUSY}
+        return session.fail(BUSY, "gave up waiting for the lock", f"{busy}\n")
     except OSError as error:
-        return {"stdout": "", "stderr": f"ghq-writer: cannot open the lock for {repo} in {config['lockDir']}: {error.strerror}\n", "exit": BUSY}
+        return session.fail(BUSY, f"cannot open the lock: {error.strerror}",
+                            f"ghq-writer: cannot open the lock for {repo} in {config['lockDir']}: {error.strerror}\n")
     try:
         env = environment(config)
         if request["action"] == "get":
             results = run_get(request, argv, config, env)
         else:
-            results = [subprocess.run(argv, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=3600)]
+            results = [run(argv, env)]
+    except TimedOut as timeout:
+        return session.fail(TIMED_OUT, str(timeout), f"ghq-writer: {timeout}\n")
     finally:
         os.close(held)
+    failed = next((r for r in results if r.returncode), None)
+    if failed:
+        session.reason = f"{label(failed.args)} exited {failed.returncode}"
     return {
         "stdout": "".join(r.stdout.decode(errors="replace") for r in results),
         "stderr": "".join(r.stderr.decode(errors="replace") for r in results),
-        "exit": next((r.returncode for r in results if r.returncode), 0),
+        "exit": failed.returncode if failed else 0,
     }
 
 
@@ -503,11 +605,21 @@ def main():
     os.umask(0o027)
     with open(sys.argv[1]) as handle:
         config = json.load(handle)
+    global command_timeout
+    command_timeout = config.get("commandTimeout", COMMAND_TIMEOUT)
     session = Session(socket.socket(fileno=0))
-    reply = serve(session, config)
+    status = 0
+    try:
+        reply = serve(session, config)
+    except Exception as error:
+        reply = session.fail(INTERNAL, f"unexpected {describe(error, session.target)}",
+                             "ghq-writer: the writer failed unexpectedly; its log names the error\n")
+        status = INTERNAL
     session.send(reply)
     session.conn.close()
-    session.log(f"exit status={reply['exit']} duration={time.monotonic() - session.started:.3f}s")
+    reason = f" reason: {session.reason}" if session.reason else ""
+    session.log(f"exit status={reply['exit']} duration={time.monotonic() - session.started:.3f}s{reason}")
+    sys.exit(status)
 
 
 if __name__ == "__main__":
