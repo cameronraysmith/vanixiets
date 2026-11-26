@@ -126,6 +126,21 @@
         lifecycle.prevent_destroy = true;
       };
 
+      # R2 bucket for nightly backups of local omnigraph roots (openspec
+      # change serve-omnigraph-from-local-disk, design D5): one restic
+      # repository per host under the host's name, written by
+      # restic-backups-omnigraph (modules/nixos/omnigraph-backup.nix,
+      # flake.lib.omnigraphBackup.bucket) with a token scoped to this bucket
+      # alone, minted by hand. restic owns every deletion in it through its
+      # prune, so no lifecycle rule that deletes objects by age may be added
+      # here.
+      resource.cloudflare_r2_bucket.sciexp-omnigraph-backup = {
+        account_id = config.data.cloudflare_zone.scientistexperience "account.id";
+        name = "sciexp-omnigraph-backup";
+        location = "enam";
+        lifecycle.prevent_destroy = true;
+      };
+
       # DNS CNAME record for niks3 cache endpoint (resolves to magnetite)
       resource.cloudflare_dns_record.niks3 = {
         zone_id = config.data.cloudflare_zone.scientistexperience "id";

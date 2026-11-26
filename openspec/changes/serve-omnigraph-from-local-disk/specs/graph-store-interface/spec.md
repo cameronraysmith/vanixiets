@@ -18,21 +18,21 @@ Outside them lie: OmniGraph's lock record and `force-unlock` (A232), ZFS snapsho
 ### Requirement: The root store setting yields the root's location
 
 `flake.lib.omnigraphClusterRoots` SHALL provide `localDirectory = "/var/lib/omnigraph/clusters"` and `uriIn`, mapping `"local"` and a root name to `"<localDirectory>/<root>"`, `"r2"` and a root name to `uri <root>`, and rejecting any other store.
-magnetite's `services.omnigraph.storageUri` SHALL be `uriIn` of the `let` value `omnigraphRootStore` in `modules/machines/nixos/magnetite/default.nix` and the root `name { family = "cookbooks"; createdAtFormat = 17; }`.
+magnetite's module SHALL declare the internal option `vanixiets.omnigraphRootStore` (`"local"` or `"r2"`) and derive `services.omnigraph.storageUri` from it with `uriIn`.
 
 #### Scenario: magnetite on its disk
 
-- **WHEN** magnetite's configuration is evaluated with `omnigraphRootStore = "local"`
+- **WHEN** magnetite's configuration is evaluated with `vanixiets.omnigraphRootStore = "local"`, as `checks.x86_64-linux.omnigraph-retired-roots` does through `extendModules`
 - **THEN** `services.omnigraph.storageUri` is `/var/lib/omnigraph/clusters/cookbooks-f17`
 
 #### Scenario: magnetite on R2
 
-- **WHEN** magnetite's configuration is evaluated with `omnigraphRootStore = "r2"`
+- **WHEN** magnetite's configuration is evaluated with `vanixiets.omnigraphRootStore = "r2"`
 - **THEN** `services.omnigraph.storageUri` is `s3://sciexp/omnigraph/clusters/cookbooks-f17`, as before this change
 
 ### Requirement: R2 settings apply only to an R2 root
 
-On magnetite, `services.omnigraph.s3.endpointUrl`, `s3.region`, `environmentFile` and `extraEnvironment.OMNIGRAPH_CLUSTER_LEASE_SECONDS` SHALL be set only when `omnigraphRootStore = "r2"`, and the `omnigraph-r2` generator, `retired`, `rollback`, the lifecycle rules on `sciexp` and `checks.x86_64-linux.omnigraph-retired-roots` SHALL be unchanged by either value.
+On magnetite, `services.omnigraph.s3.endpointUrl`, `s3.region`, `environmentFile` and `extraEnvironment.OMNIGRAPH_CLUSTER_LEASE_SECONDS` SHALL be set only when `vanixiets.omnigraphRootStore = "r2"`, and the `omnigraph-r2` generator, `retired`, `rollback`, the lifecycle rules on `sciexp` and `checks.x86_64-linux.omnigraph-retired-roots` SHALL be unchanged by either value.
 
 #### Scenario: a local root's environment
 
@@ -41,12 +41,12 @@ On magnetite, `services.omnigraph.s3.endpointUrl`, `s3.region`, `environmentFile
 
 ### Requirement: The graph data has a dataset of its own
 
-With `omnigraphRootStore = "local"`, magnetite's `disko.devices.zpool.zroot.datasets."root/omnigraph"` SHALL have `mountpoint = "/var/lib/private/omnigraph/clusters"` and `quota = "20G"` and SHALL NOT set `com.sun:auto-snapshot` to `false`; a oneshot `zfs-set-root-omnigraph-quota` SHALL assert the quota at boot; it and `restic-backups-omnigraph` SHALL be in magnetite's `notifiedUnits`; and every omnigraph unit SHALL carry `RequiresMountsFor` on the mountpoint.
+With `vanixiets.omnigraphRootStore = "local"`, magnetite's `disko.devices.zpool.zroot.datasets."root/omnigraph"` SHALL have `mountpoint = "/var/lib/omnigraph"` and `quota = "20G"` and SHALL NOT set `com.sun:auto-snapshot` to `false`; a oneshot `zfs-set-root-omnigraph-quota` SHALL assert the quota at boot; it, `restic-backups-omnigraph` and `omnigraph-backup-metric` SHALL be in magnetite's `notifiedUnits`; and every omnigraph unit SHALL carry `RequiresMountsFor` on the root's parent.
 
 #### Scenario: the dataset is evaluated
 
 - **WHEN** magnetite's configuration is evaluated with `"local"`
-- **THEN** the dataset has the mountpoint and quota above, `zfs-set-root-omnigraph-quota` is a oneshot, and `omnigraph-server`'s `unitConfig.RequiresMountsFor` contains `/var/lib/private/omnigraph/clusters`
+- **THEN** the dataset has the mountpoint and quota above, `zfs-set-root-omnigraph-quota` is a oneshot, and `omnigraph-server`'s `unitConfig.RequiresMountsFor` contains `/var/lib/omnigraph/clusters`
 
 #### Scenario: on R2
 
@@ -62,10 +62,63 @@ On an empty local root with no marker, `omnigraph-cluster-bootstrap` SHALL creat
 - **WHEN** magnetite starts with the empty dataset mounted and no marker
 - **THEN** `cookbooks-f17.initialized` exists in the marker directory, no `.seed-pending` marker remains once the seed units finish, and `/readyz` reports 10 served and 10 ready graphs
 
+### Requirement: Every omnigraph unit runs as the static user omnigraph
+
+`modules/nixos/omnigraph.nix` SHALL declare the system user and group `omnigraph` and run every omnigraph unit with `User` and `Group` `omnigraph`, `StateDirectory = "omnigraph"` and `DynamicUser` unset, whatever the store.
+For a local `storageUri` the `omnigraph-cluster` wrapper SHALL run `omnigraph` through `runuser -u omnigraph`.
+
+#### Scenario: either store is evaluated
+
+- **WHEN** magnetite's configuration is evaluated with `"local"` or with `"r2"`
+- **THEN** `omnigraph-server`, `omnigraph-cluster-bootstrap`, `omnigraph-cluster-apply` and each `omnigraph-seed-<graph>` have `User = "omnigraph"` and no `DynamicUser` setting, and `users.users.omnigraph.isSystemUser` is true
+
+#### Scenario: the wrapper on each store
+
+- **WHEN** the `omnigraph-cluster` wrapper is built for a local root and for an `s3://` root
+- **THEN** only the local root's wrapper runs `omnigraph` through `runuser -u omnigraph`
+
+#### Scenario: one owner on the dataset
+
+- **WHEN** a dataset at `/var/lib/omnigraph` is created owned by root, the units start, and the root is then written by the bootstrap, the seeds, `omnigraph-cluster apply` run as root, the server, the recovery and a restore ending in `chown -R omnigraph:omnigraph /var/lib/omnigraph`
+- **THEN** after each step the dataset's root and every file on it belong to `omnigraph`
+
+### Requirement: The state directory survives the moves between stores and generations
+
+`vmTests.x86_64-linux.omnigraph-state-directory-transitions`, with RustFS on the node standing in for R2, SHALL show that the first static-user start migrates a `DynamicUser` generation's private state directory with no step before it, that a switch from the local root to the bucket with the dataset mounted starts and serves, and that only a rollback to a `DynamicUser` generation with the dataset mounted fails.
+
+#### Scenario: the first start under the static user
+
+- **WHEN** a host whose `/var/lib/omnigraph` is a `DynamicUser` symlink to `/var/lib/private/omnigraph` starts the units under `omnigraph` on the bucket
+- **THEN** systemd logs `Found pre-existing private StateDirectory= directory /var/lib/private/omnigraph, migrating to /var/lib/omnigraph.` and the server serves
+
+#### Scenario: local to the bucket with the dataset mounted
+
+- **WHEN** the host switches from the local root to the bucket with the dataset still mounted at `/var/lib/omnigraph`
+- **THEN** every unit starts and the server serves from the bucket
+
+#### Scenario: a rollback to a DynamicUser generation
+
+- **WHEN** the host switches to a generation whose units run as a `DynamicUser`, first with the dataset mounted at `/var/lib/omnigraph` and then after `zfs unmount zroot/root/omnigraph`
+- **THEN** the units first fail with `Device or resource busy` and status 238/STATE_DIRECTORY, then start and serve
+
+### Requirement: Optimize is not enabled on a local root
+
+For a local `storageUri`, evaluation SHALL fail when `services.omnigraph.optimize.enable` is set, with a message that `omnigraph optimize` leaves its admission lock behind on a local root, that the server's stale-lock recovery refuses that lock, and that the server stays down until `omnigraph-cluster force-unlock <LOCK_ID>`.
+
+#### Scenario: the optimize timer on a local root
+
+- **WHEN** a configuration sets `services.omnigraph.optimize.enable = true` with a local `storageUri`
+- **THEN** evaluation fails with that message
+
+#### Scenario: the optimize timer on an R2 root
+
+- **WHEN** a configuration sets `services.omnigraph.optimize.enable = true` with an `s3://` `storageUri`
+- **THEN** the assertion does not fail evaluation
+
 ### Requirement: The server's start clears a stale serve lock
 
-For a local `storageUri`, `omnigraph-server`'s first `ExecStartPre` SHALL be `+` and the program `flake.lib.omnigraphLockRecovery` builds for the root, run by no other unit, and absent for an `s3://` root.
-The program SHALL run `omnigraph --target <root> cluster force-unlock <lock_id> --json` only in the clearing scenarios below; otherwise it SHALL leave `<root>/__cluster/lock.json` unchanged, print the reason and the manual command, and exit non-zero.
+For a local `storageUri`, `omnigraph-server`'s first `ExecStartPre` SHALL be `+` and the program `flake.lib.omnigraphLockRecovery` builds for the root, in no other unit and absent for an `s3://` root; its `omnigraph` calls SHALL run as `omnigraph`.
+It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios below; otherwise it SHALL leave `<root>/__cluster/lock.json` unchanged, print the reason and the manual command, and exit non-zero.
 
 #### Scenario: no lock
 
@@ -99,7 +152,7 @@ The program SHALL run `omnigraph --target <root> cluster force-unlock <lock_id> 
 
 #### Scenario: the process scan
 
-- **WHEN** any process whose executable is the packaged `omnigraph` or `omnigraph-server` has an argv naming the root as `/var/lib/omnigraph/…` or `/var/lib/private/omnigraph/…`
+- **WHEN** any process whose executable is named `omnigraph` or `omnigraph-server`, from any package, has an argument naming the root as `/var/lib/omnigraph/…`
 - **THEN** the program refuses, whatever the record says
 
 #### Scenario: a lock from before the boot
@@ -128,7 +181,7 @@ It SHALL hold one record written by the packaged `omnigraph-server`, so a change
 
 ### Requirement: The backup job copies a ZFS snapshot to its R2 repository
 
-With `vanixiets.omnigraphBackup.enable`, `services.restic.backups.omnigraph` SHALL back up only `/var/lib/private/omnigraph/clusters/.zfs/snapshot/restic`, a snapshot its prepare step takes fresh and its cleanup step destroys, to repository `sciexp-omnigraph-backup/<hostName>` at the account's R2 endpoint, and the module SHALL assert that `services.omnigraph.storageUri` is a local path.
+With `vanixiets.omnigraphBackup.enable`, `services.restic.backups.omnigraph` SHALL back up only `/var/lib/omnigraph/.zfs/snapshot/restic`, a snapshot its prepare step takes fresh and its cleanup step destroys, to repository `sciexp-omnigraph-backup/<hostName>` at the account's R2 endpoint, and the module SHALL assert that `services.omnigraph.storageUri` is a local path.
 
 #### Scenario: the repository and snapshot steps
 
@@ -191,6 +244,20 @@ With the `monitor` token, the probe SHALL publish `vanixiets_omnigraph_graph_ent
 - **WHEN** the probe runs on magnetite serving its local root
 - **THEN** `omnigraph.prom` has one `vanixiets_omnigraph_graph_entities` line per served graph and the four storage series
 
+### Requirement: The probe reports a failed per-graph read
+
+With the `monitor` token, the probe SHALL publish `vanixiets_omnigraph_graph_reads_ok`, 1 when `GET /graphs` and the snapshot read of every ready graph succeeded and 0 otherwise, SHALL log `omnigraph-probe: GET <path> answered HTTP <status>` for each failed request, with status `000` for no HTTP answer, and SHALL still exit 0; the series SHALL be in `nodeExporterKeep`.
+
+#### Scenario: the monitor actor is refused
+
+- **WHEN** the probe runs while the server answers `GET /graphs` with 403
+- **THEN** `omnigraph.prom` holds `vanixiets_omnigraph_graph_reads_ok 0` and no per-graph series, the journal holds `omnigraph-probe: GET /graphs answered HTTP 403`, and the unit succeeds
+
+#### Scenario: every read succeeds
+
+- **WHEN** the probe runs on a served root the `monitor` actor may read
+- **THEN** `omnigraph.prom` holds `vanixiets_omnigraph_graph_reads_ok 1`
+
 ### Requirement: The monitor actor reads and nothing else
 
 `services.omnigraph.extraBearerTokenFiles` SHALL add each named actor's token to the server's assembled tokens file, refusing an actor the tokens file already names; magnetite SHALL set `monitor` from generator `omnigraph-monitor-token`; `server.policy.yaml` SHALL grant `monitor` only `graph_list` and `examples.policy.yaml` only `read`.
@@ -229,7 +296,7 @@ With the `monitor` token, the probe SHALL publish `vanixiets_omnigraph_graph_ent
 
 ### Requirement: A runtime test proves recovery, refusal and restore
 
-`vmTests.x86_64-linux.omnigraph-local-root`, declared `medium` in `testSizes.vmTests`, SHALL boot a VM with ZFS, the dataset at `/var/lib/private/omnigraph/clusters`, and the real omnigraph, probe and backup modules, and SHALL assert the scenarios below.
+`vmTests.x86_64-linux.omnigraph-local-root`, declared `medium` in `testSizes.vmTests`, SHALL boot a VM with ZFS, a dataset created owned by root and mounted at `/var/lib/omnigraph`, and the real omnigraph, probe and backup modules, and SHALL assert the scenarios below and the scenario `one owner on the dataset`.
 
 #### Scenario: crash and recovery
 
@@ -243,8 +310,13 @@ With the `monitor` token, the probe SHALL publish `vanixiets_omnigraph_graph_ent
 
 #### Scenario: backup and restore
 
-- **WHEN** a backup to a local restic repository is taken, the dataset emptied, the backup restored and its lock unlocked
+- **WHEN** a backup to a local restic repository is taken, the dataset emptied, the backup restored with `restic-omnigraph restore`, its files given to `omnigraph` with `chown -R`, and its lock removed with `omnigraph-cluster force-unlock`
 - **THEN** the server serves the same entity counts and stored-query answer, and every probe series is present
+
+#### Scenario: a reboot
+
+- **WHEN** the VM reboots
+- **THEN** the dataset is mounted before the units, whose `RequiresMountsFor` names it, and the server serves the same answers
 
 #### Scenario: the test runs on pyrite
 

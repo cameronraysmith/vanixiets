@@ -29,17 +29,20 @@ Decisions tagged `D<n>` are developed in `design.md`; the operator settled the s
 
 **Graph data on the host's disk**
 - From: `s3://sciexp/omnigraph/clusters/cookbooks-f17`, 4 min 50 s per start.
-- To: `/var/lib/omnigraph/clusters/cookbooks-f17` on dataset `zroot/root/omnigraph` (quota 20 GiB, auto-snapshots on), created and seeded fresh by the existing bootstrap (D1, D2).
-- One host setting selects local disk or R2 for the same root name; everything R2-specific stays, and switching back serves the R2 root as it was left (D3).
+- To: `/var/lib/omnigraph/clusters/cookbooks-f17` on dataset `zroot/root/omnigraph` (quota 20 GiB, auto-snapshots on) mounted at `/var/lib/omnigraph`, the omnigraph units' state directory, created and seeded fresh by the existing bootstrap (D1, D2).
+- Every omnigraph unit runs as the static user `omnigraph` instead of a `DynamicUser`, on either store, so it owns every file on the dataset; on a local root the `omnigraph-cluster` wrapper and the lock recovery run `omnigraph` as that user too (D13).
+- One host option, `vanixiets.omnigraphRootStore`, selects local disk or R2 for the same root name; everything R2-specific stays, and switching back serves the R2 root as it was left (D3).
 
 **Stale-lock recovery on a local root**
 - The server's own start clears a crashed server's lock only when no omnigraph process has the root open, the lock is a `serve` lock and its pid is dead or it predates the boot, by its exact id; each recovery is counted and posts an info notice; every other case refuses and the start fails visibly (D4).
+- `omnigraph optimize`, which leaves its lock behind on a local root, cannot be enabled there (D14).
 
 **Nightly off-host backup**
 - An atomic ZFS snapshot, then restic to a new R2 bucket `sciexp-omnigraph-backup`, following the PostgreSQL backup; rule `OmnigraphBackupStale` at 36 h; a runbook for restore, the unlock a restored root needs, and switching back to R2 (D5, D8).
 
 **Proven before the switch**
-- `vmTests.x86_64-linux.omnigraph-local-root` (medium, ZFS in the VM, run on pyrite): crash and recovery, refusal while a direct writer holds the root, backup and restore to identical counts and answers, probe series present (D10).
+- `vmTests.x86_64-linux.omnigraph-local-root` (medium, ZFS in the VM, run on pyrite): ownership by the static user, crash and recovery, refusal while a direct writer holds the root, backup and restore to identical counts and answers, a reboot, probe series present (D10).
+- The probe reports a refused or failed per-graph read with a journal line and the gauge `vanixiets_omnigraph_graph_reads_ok` (D6).
 
 **Not now, recorded**
 - No trace export, no JSON log receiver, no scheduled `omnigraph cleanup` (D11).
@@ -53,7 +56,7 @@ Decisions tagged `D<n>` are developed in `design.md`; the operator settled the s
   Trust boundary: this machine declares the units, programs, rules and resources and judges them in evaluation, in a build-sandbox rehearsal and inside a test VM. It does not guarantee that OmniGraph's lock record means what A232 says, that ZFS snapshots are instant images, that R2 keeps what restic wrote, that the operator keeps the identity that decrypts the vars, or that a restored root opens under a later OmniGraph release. The readiness and staleness alerts are the runtime evidence on the real host.
 
 ### Modified Capabilities
-- `world-assumptions` (stratum: `world`): A231 to A241 record OmniGraph's single writer, its local lock record and force-unlock, atomic commits across a kill, the unsafety of copying a live root, ZFS snapshots as instant images on the same disk, the sciexp bucket's fixed location, Hetzner Object Storage's undocumented conditional writes, OmniGraph's telemetry surface, its exporter's trust roots, `cleanup` needing the server stopped, and systemd's state-directory symlink. `Grounded vocabulary for behavioral requirements` gains `graph store`, `graph`, `example graph`, `seed`, `graph data`, `graph data name`, `storage format`, `entity count`, `stored query`, a third sense of `writer`, `direct writer`, `writer claim`, `stale writer claim`, `crash`, `boot`, `serving`, `blocked graph`, `storage location`, `bucket`, a second sense of `disk` (the existing row becomes its `cloud session` sense), `local snapshot`, `graph backup`, `runbook` and `recovery notice`.
+- `world-assumptions` (stratum: `world`): A231 to A242 record OmniGraph's single writer, its local lock record and force-unlock, atomic commits across a kill, the unsafety of copying a live root, ZFS snapshots as instant images on the same disk, the sciexp bucket's fixed location, Hetzner Object Storage's undocumented conditional writes, OmniGraph's telemetry surface, its exporter's trust roots, `cleanup` needing the server stopped, systemd's handling of a state directory, and `optimize` leaving its lock on a local root. `Grounded vocabulary for behavioral requirements` gains `graph store`, `graph`, `example graph`, `seed`, `graph data`, `graph data name`, `storage format`, `entity count`, `stored query`, a third sense of `writer`, `direct writer`, `writer claim`, `stale writer claim`, `crash`, `boot`, `serving`, `blocked graph`, `storage location`, `bucket`, a second sense of `disk` (the existing row becomes its `cloud session` sense), `local snapshot`, `graph backup`, `runbook` and `recovery notice`.
 
 ## Impact
 
@@ -68,6 +71,6 @@ Decisions tagged `D<n>` are developed in `design.md`; the operator settled the s
   - new `modules/checks/omnigraph-lock-recovery-rehearsal.nix`, new `modules/vm-tests/omnigraph-local-root.nix`; `modules/checks/omnigraph-cluster-actor-policy.nix`;
   - docs under `packages/docs/src/content/docs/development/operations/`.
 - Hosts: magnetite only. pyrite and the Macs reach OmniGraph at the same URL and are unaffected.
-- Operator by hand: create the dataset, apply the bucket with terranix after an explicit yes, mint the bucket's R2 token, generate the vars.
+- Operator by hand: apply the bucket with terranix after an explicit yes, mint the bucket's R2 token, generate the vars; directly before the switch's deploy, remove the empty state directory and its symlink and create the dataset at `/var/lib/omnigraph`.
 - Spending: a few hundred MB of R2 storage for backups; R2 requests for the graph data stop while the host serves locally.
 - No new flake input.

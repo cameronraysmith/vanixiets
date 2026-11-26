@@ -10,9 +10,12 @@
 #   on the drifted one only, and must fail on the mutant driftAnyValue;
 #   over 2026-11-18's node_exporter loop for SystemdUnitRestartLoop (F77),
 #   which must hold while the unit stays failed, and must fail on the
-#   mutant windowOnly; and over omnigraph-probe's series for
+#   mutant windowOnly; over omnigraph-probe's series for
 #   OmnigraphNotServing, which must fire after 5 min not ready or with a
-#   blocked graph, and must fail on the mutant notServingFor.
+#   blocked graph, and must fail on the mutant notServingFor; and over the
+#   omnigraph backup stamp for OmnigraphBackupStale, which must fire 36 h
+#   10 min after the last success, and must fail on the mutant
+#   omnigraphStaleThreshold.
 # - r2PromtoolRehearsal (track-r2-usage): `promtool test rules` cases for
 #   R2MultipartUploadPending, R2CostProjected, R2BucketGrowthAnomalous,
 #   R2BucketUndeclared (rendered with a fixture external bucket) and
@@ -80,10 +83,11 @@
 # sets in fleet-alert/fixtures/series.json are those measured on magnetite's
 # `fleet` database on 2026-10-18 (logs/s3/series-labels.md), except the
 # file-system rules', which no host stored when those rules were added:
-# theirs are the file-system expressions' `by` labels; and OmnigraphNotServing's,
+# theirs are the file-system expressions' `by` labels; OmnigraphNotServing's,
 # which no host stored when that rule was added: its labels are those
 # PostgresqlBackupStale's textfile series carries, under its first arm's
-# metric name, which a comparison keeps. The NVMe rules' names
+# metric name, which a comparison keeps; and OmnigraphBackupStale's, which
+# no host stored either: PostgresqlBackupStale's. The NVMe rules' names
 # and label sets are pyrite's as stored on 2026-11-01
 # (logs/s4-evidence/5.3-smart-20261101T063202Z.log), where the exporter's
 # counter-typed fields carry `_total`. The darwin rules' label sets and the
@@ -138,30 +142,31 @@
 
       rulesYaml = pkgs.writeText "fleet-alert-rules.yaml" rules.yaml;
 
-      # back-up-postgresql-off-host D11: PromQL's own semantics for
-      # PostgresqlBackupStale over 41 h of minute samples. magnetite's last
-      # success stops advancing at hour 2, so the value is exactly 36 h old
-      # at 38 h, not yet stale; the condition holds from 38 h 1 min, is
-      # pending at 38 h 5 min and fires at 38 h 11 min. pyrite's succeeds
-      # every 24 h and never fires. The mutant staleThreshold, ten times
-      # the threshold, must fail it.
-      backupStaleTest =
-        rulesFile:
+      # back-up-postgresql-off-host D11: PromQL's own semantics for a backup
+      # stamp rule, PostgresqlBackupStale or OmnigraphBackupStale, over 41 h
+      # of minute samples. magnetite's last success stops advancing at hour
+      # 2, so the value is exactly 36 h old at 38 h, not yet stale; the
+      # condition holds from 38 h 1 min, is pending at 38 h 5 min and fires
+      # at 38 h 11 min. pyrite's succeeds every 24 h and never fires. The
+      # mutants staleThreshold and omnigraphStaleThreshold, ten times the
+      # threshold, must fail theirs.
+      stampStaleTest =
+        alert: metric: rulesFile:
         let
-          series = host: ''vanixiets_postgresql_backup_last_success_timestamp_seconds{host_name="${host}"}'';
+          series = host: ''${metric}{host_name="${host}"}'';
           at = minutes: alerts: {
             eval_time = "${toString minutes}m";
-            alertname = "PostgresqlBackupStale";
+            alertname = alert;
             exp_alerts = map (host: {
               exp_labels = {
                 host_name = host;
                 severity = "warning";
               };
-              exp_annotations = (ruleNamed "PostgresqlBackupStale").annotations;
+              exp_annotations = (ruleNamed alert).annotations;
             }) alerts;
           };
         in
-        pkgs.writeText "fleet-alert-backup-stale-test.yaml" (
+        pkgs.writeText "fleet-alert-${alert}-test.yaml" (
           builtins.toJSON {
             rule_files = [ "${rulesFile}" ];
             evaluation_interval = "1m";
@@ -188,9 +193,17 @@
             ];
           }
         );
+      backupStaleTest = stampStaleTest "PostgresqlBackupStale" "vanixiets_postgresql_backup_last_success_timestamp_seconds";
+      omnigraphBackupStaleTest = stampStaleTest "OmnigraphBackupStale" "vanixiets_omnigraph_backup_last_success_timestamp_seconds";
       staleThresholdYaml = pkgs.writeText "fleet-alert-rules-stale-threshold.yaml" (
         mutateText "staleThreshold" "vanixiets_postgresql_backup_last_success_timestamp_seconds > 129600"
           "vanixiets_postgresql_backup_last_success_timestamp_seconds > 1296000"
+          rules.yaml
+      );
+      omnigraphStaleThresholdYaml = pkgs.writeText "fleet-alert-rules-omnigraph-stale-threshold.yaml" (
+        mutateText "omnigraphStaleThreshold"
+          "vanixiets_omnigraph_backup_last_success_timestamp_seconds > 129600"
+          "vanixiets_omnigraph_backup_last_success_timestamp_seconds > 1296000"
           rules.yaml
       );
 
@@ -779,7 +792,7 @@
         pkgs.runCommand "fleet-alert-promtool"
           {
             nativeBuildInputs = [ pkgs.prometheus.cli ];
-            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only; F77: SystemdUnitRestartLoop holds while a looped unit stays failed; OmnigraphNotServing fires after 5 min not serving";
+            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only; F77: SystemdUnitRestartLoop holds while a looped unit stays failed; OmnigraphNotServing fires after 5 min not serving; OmnigraphBackupStale fires 36 h 10 min after the last backup";
           }
           ''
             set -euo pipefail
@@ -800,6 +813,14 @@
             fi
             cat not-serving-for.log
             echo "mutant notServingFor rejected"
+            promtool test rules ${omnigraphBackupStaleTest rulesYaml}
+            if promtool test rules ${omnigraphBackupStaleTest omnigraphStaleThresholdYaml} > omnigraph-stale-threshold.log 2>&1; then
+              cat omnigraph-stale-threshold.log
+              echo "FAIL: the omnigraph backup stale test accepted the omnigraphStaleThreshold mutant" >&2
+              exit 1
+            fi
+            cat omnigraph-stale-threshold.log
+            echo "mutant omnigraphStaleThreshold rejected"
             if promtool check rules ${malformedYaml} > malformed.log 2>&1; then
               cat malformed.log
               echo "FAIL: promtool accepted the malformed-expression mutant" >&2
@@ -1855,12 +1876,123 @@
         messages = [ "development/operations/postgresql-backup.md" ];
       };
 
+      # A rule's condition holds from minute 0 to its `for` plus one, as in
+      # fireAndResolve, run only at the minutes that decide it, within the
+      # fixture budget: at the start, a minute before its `for` (pending),
+      # at its `for` (one FIRING), the next two (no repeat, then cleared),
+      # 5 min after it was last seen (one RESOLVED), and after.
+      fireAndResolveAt =
+        alert:
+        let
+          f = (ruleNamed alert).for / 60;
+          priority = priorityOf (ruleNamed alert).severity;
+        in
+        {
+          name = "${alert} fires once after its for of ${toString f} min and resolves once 5 min after it clears, run at the deciding minutes";
+          steps =
+            map
+              (n: {
+                at = minute n;
+                series = lib.optionalAttrs (n <= f + 1) { ${alert} = [ (seriesOn "magnetite" alert) ]; };
+              })
+              [
+                0
+                (f - 1)
+                f
+                (f + 1)
+                (f + 2)
+                (f + 6)
+                (f + 7)
+              ];
+          expect = [
+            "2 [FIRING] ${alert} magnetite ${priority}"
+            "5 [RESOLVED] ${alert} magnetite ${priority}"
+          ];
+        };
+
       # magnetite's omnigraph-server not ready, as the rule's expression
       # answers it, posts one warning whose title names magnetite and whose
       # message names the runbook; promtoolRehearsal's not-serving test shows
       # when PromQL answers it.
-      notServingLeg = fireAndResolve "OmnigraphNotServing" // {
+      notServingLeg = fireAndResolveAt "OmnigraphNotServing" // {
         messages = [ "development/operations/omnigraph.md" ];
+      };
+
+      # magnetite's stale omnigraph backup stamp, as the rule's expression
+      # answers it, posts one warning whose title names magnetite and whose
+      # message names the runbook; promtoolRehearsal's omnigraph backup
+      # stale test shows when PromQL answers it.
+      omnigraphBackupStaleLeg = fireAndResolveAt "OmnigraphBackupStale" // {
+        messages = [ "development/operations/omnigraph.md" ];
+      };
+
+      # The omnigraph rules expect their series on the hosts whose row
+      # notifies omnigraph-server and restic-backups-omnigraph. The table is
+      # rendered with magnetite's row notifying both, and neither, so the
+      # legs hold whatever magnetite's row says.
+      omnigraphTableNotifying =
+        units:
+        builtins.fromJSON
+          (self.lib.fleetAlertRules {
+            inherit lib;
+            hosts = hosts // {
+              magnetite = hosts.magnetite // {
+                notifiedUnits =
+                  lib.subtractLists [
+                    "omnigraph-server"
+                    "restic-backups-omnigraph"
+                  ] hosts.magnetite.notifiedUnits
+                  ++ units;
+              };
+            };
+          }).json;
+      omnigraphSelectors = [
+        "vanixiets_omnigraph_ready"
+        "vanixiets_omnigraph_backup_last_success_timestamp_seconds"
+      ];
+      # Run at the start, before the 30 min of RuleSignalMissing, at them
+      # and after.
+      omnigraphSignalMissingLeg = {
+        name = "no omnigraph readiness or backup stamp for 30 min while magnetite reports and notifies omnigraph-server and restic-backups-omnigraph raises one RuleSignalMissing for each omnigraph rule";
+        rules = omnigraphTableNotifying [
+          "omnigraph-server"
+          "restic-backups-omnigraph"
+        ];
+        steps =
+          map
+            (n: {
+              at = gap n;
+              missing = omnigraphSelectors;
+            })
+            [
+              0
+              5
+              6
+              7
+            ];
+        expect = [
+          "2 [FIRING] RuleSignalMissing default"
+          "2 [FIRING] RuleSignalMissing default"
+        ];
+        messages = [
+          "rule=OmnigraphNotServing"
+          "rule=OmnigraphBackupStale"
+        ];
+      };
+      omnigraphNotExpectedLeg = {
+        name = "no omnigraph readiness or backup stamp for 30 min posts nothing while no host notifies omnigraph-server or restic-backups-omnigraph";
+        rules = omnigraphTableNotifying [ ];
+        steps =
+          map
+            (n: {
+              at = gap n;
+              missing = omnigraphSelectors;
+            })
+            [
+              0
+              6
+            ];
+        expect = [ ];
       };
 
       # darwin-agent-session-telemetry design D9: pyrite's Langfuse failures
@@ -2961,6 +3093,7 @@
           collationDriftLeg
           backupStaleLeg
           notServingLeg
+          omnigraphBackupStaleLeg
           langfuseBlocked
           langfuseHealthy
           exclusionLeg
@@ -3433,6 +3566,8 @@
           (legCheck notCollectingConfig notCollectingLeg)
           (legCheck (checkConfig linuxSelectorDarwinOnly.rules) linuxSelectorDarwinOnly)
           (legCheck (checkConfig stibniteNotCollecting.rules) stibniteNotCollecting)
+          (legCheck (checkConfig omnigraphSignalMissingLeg.rules) omnigraphSignalMissingLeg)
+          (legCheck (checkConfig omnigraphNotExpectedLeg.rules) omnigraphNotExpectedLeg)
         ];
       # The work budget, in evaluator runs, checked at evaluation: no
       # derivation may run more than maxFixtureRuns, nor all of them more

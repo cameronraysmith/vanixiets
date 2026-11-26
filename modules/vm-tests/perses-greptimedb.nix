@@ -481,6 +481,7 @@
                           + series(lambda i: 0, {"state": "blocked"}),
                       ),
                       metric("vanixiets_omnigraph_start_to_ready_seconds", series(lambda i: 3.5)),
+                      metric("vanixiets_omnigraph_graph_reads_ok", series(lambda i: 1)),
                       metric("vanixiets_omnigraph_graph_entities", series(lambda i: 120, {"graph": "cookbook-a"})),
                       metric("vanixiets_omnigraph_graph_manifest_version", series(lambda i: 4, {"graph": "cookbook-a"})),
                       metric("vanixiets_omnigraph_graph_storage_format", series(lambda i: 17, {"graph": "cookbook-a"})),

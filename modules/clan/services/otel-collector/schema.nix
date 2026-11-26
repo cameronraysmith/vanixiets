@@ -103,6 +103,7 @@
       "vanixiets_omnigraph_ready"
       "vanixiets_omnigraph_graphs"
       "vanixiets_omnigraph_start_to_ready_seconds"
+      "vanixiets_omnigraph_graph_reads_ok"
       "vanixiets_omnigraph_graph_entities"
       "vanixiets_omnigraph_graph_manifest_version"
       "vanixiets_omnigraph_graph_storage_format"
@@ -110,6 +111,10 @@
       "vanixiets_omnigraph_dataset_quota_bytes"
       "vanixiets_omnigraph_dataset_snapshots"
       "vanixiets_omnigraph_lock_recoveries_total"
+      # The last successful omnigraph backup: written to the textfile
+      # collector by flake.modules.nixos.omnigraph-backup where the backup
+      # is on.
+      "vanixiets_omnigraph_backup_last_success_timestamp_seconds"
     ];
 
     # The units magnetite's memory budget reports (CAM-111 design D11), as

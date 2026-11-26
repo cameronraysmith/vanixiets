@@ -192,6 +192,11 @@ in
           OMNIGRAPH_HOME=$(mktemp -d)
           export OMNIGRAPH_HOME
           trap 'rm -rf -- "$OMNIGRAPH_HOME"' EXIT
+          ${lib.optionalString storageIsLocal ''
+            # A local root's files belong to the units' static user, so
+            # every write runs as that user, never as the invoking root.
+            chown ${lib.escapeShellArg "${cfg.user}:${cfg.group}"} "$OMNIGRAPH_HOME"
+          ''}
           cd ${lib.escapeShellArg clusterEtcPath}
           # Every verb but validate addresses the storage root through
           # --target. Only plan, apply and upgrade-ledger take --as; the
@@ -205,7 +210,12 @@ in
               targetArgs+=(--as ${lib.escapeShellArg cfg.cluster.actor})
               ;;
           esac
-          omnigraph "''${targetArgs[@]}" cluster "$@"
+          ${
+            if storageIsLocal then
+              "${pkgs.util-linux}/bin/runuser -u ${lib.escapeShellArg cfg.user} -- omnigraph \"\${targetArgs[@]}\" cluster \"$@\""
+            else
+              "omnigraph \"\${targetArgs[@]}\" cluster \"$@\""
+          }
         '';
       };
 
@@ -237,13 +247,35 @@ in
       storageIsS3 = storageScheme == "s3";
       storageIsLocal = localRootOf cfg.storageUri != null;
 
-      # Every unit runs with ProtectSystem=strict and DynamicUser, and none
+      # Every unit runs with ProtectSystem=strict, and none
       # carries ReadWritePaths, so the only writable local storage is the
       # StateDirectory. A local root works only beneath it, which also puts
       # the marker directory `<parent>/_omnigraph-markers` inside it.
       stateDirectoryPath = "/var/lib/omnigraph";
       localStorageRoot = lib.removeSuffix "/" (lib.removePrefix "file://" cfg.storageUri);
       localRootUnderStateDirectory = lib.hasPrefix "${stateDirectoryPath}/" localStorageRoot;
+
+      # A local root's parent: RequiresMountsFor on it requires every mount
+      # on its path, a dataset mounted at the state directory included.
+      localRootParent = builtins.dirOf localStorageRoot;
+      mountRequirement = lib.optionalAttrs storageIsLocal { RequiresMountsFor = [ localRootParent ]; };
+
+      # Clears the lock a killed server leaves on a local root, only when it
+      # is provably stale (modules/lib/omnigraph-lock-recovery.nix). Run with
+      # `+`, as root outside the sandbox: ProtectProc=invisible and
+      # PrivateUsers would hide other users' processes, a direct writer run
+      # as root among them.
+      lockRecovery = flakeLib.omnigraphLockRecovery pkgs (
+        {
+          omnigraph = cfg.package;
+          root = localStorageRoot;
+          hostName = config.networking.hostName;
+          ntfySend = lib.getExe pkgs.ntfy-send;
+          tokenFile = config.services.observability-notify.tokenFile or null;
+          runAs = cfg.user;
+        }
+        // lib.optionalAttrs cfg.cluster.enable { manualCli = "omnigraph-cluster"; }
+      );
 
       seededGraphs = lib.filterAttrs (_: graph: graph.seed != null) cfg.cluster.graphs;
 
@@ -352,6 +384,8 @@ in
           // storageEnvironment
           // cfg.extraEnvironment;
 
+          unitConfig = mountRequirement;
+
           serviceConfig = hardening // {
             Type = "oneshot";
             RemainAfterExit = true;
@@ -370,7 +404,6 @@ in
             EnvironmentFile = environmentFiles;
             LoadCredential = [ "${seedTokenCredential}:${graph.seed.tokenFile}" ];
             StateDirectory = "omnigraph";
-            DynamicUser = true;
             User = cfg.user;
             Group = cfg.group;
           };
@@ -1012,7 +1045,9 @@ in
               cluster's admission lock: it is refused while `omnigraph-server`
               holds that lock, and a run while the server is stopped retains
               its own lock, which then blocks the server's next start until
-              `omnigraph-cluster force-unlock <LOCK_ID>` releases it.
+              `omnigraph-cluster force-unlock <LOCK_ID>` releases it. On a
+              local root that next start's stale-lock recovery refuses such a
+              lock, so an assertion refuses this option there.
 
               The unit runs as {option}`services.omnigraph.cluster.actor`
               (`--as`), which the policy applied to each graph in
@@ -1122,11 +1157,24 @@ in
               services.omnigraph.cluster.bootstrap.enable is set for the local
               storage root ${cfg.storageUri}, which is not beneath
               ${stateDirectoryPath}/. The omnigraph units run with
-              ProtectSystem=strict and DynamicUser and are granted no
+              ProtectSystem=strict and are granted no
               ReadWritePaths, so their StateDirectory is the only local storage
               they can write, and the bootstrap marker directory
               (<parent>/_omnigraph-markers) must lie inside it. Place the root
               beneath ${stateDirectoryPath}/, or disable the bootstrap.
+            '';
+          }
+          {
+            assertion = !(storageIsLocal && cfg.optimize.enable);
+            message = ''
+              services.omnigraph.optimize.enable is set for the local storage
+              root ${cfg.storageUri}. `omnigraph optimize` runs directly
+              against storage and, on a local root, leaves its cluster
+              admission lock behind when it exits; omnigraph-server's next
+              start then meets a direct writer's lock, which its stale-lock
+              recovery refuses to clear, and the server stays down until an
+              operator runs `omnigraph-cluster force-unlock <LOCK_ID>`.
+              Disable the optimize timer for a local root.
             '';
           }
         ]
@@ -1240,6 +1288,26 @@ in
           clusterCli
         ];
 
+        # Every unit runs as this static user, on either store, never as a
+        # DynamicUser. It owns a local root's files on disk, so a direct
+        # writer, a backup restore and every unit agree on their owner (a
+        # DynamicUser state directory is an id-mapped mount in systemd 262,
+        # which fails with a dataset mounted beneath it and leaves files owned
+        # by `nobody`). And it keeps the state directory a plain directory
+        # under both stores: a DynamicUser unit moves a plain
+        # /var/lib/omnigraph into /var/lib/private by rename(2), which a
+        # dataset mounted there refuses, so switching a host that served
+        # locally back to an object store would fail every unit
+        # (setup_exec_directory, src/core/exec-invoke.c). A unit started
+        # under DynamicUser before leaves the symlink to
+        # /var/lib/private/omnigraph, which systemd moves back at the static
+        # unit's first start.
+        users.users.${cfg.user} = {
+          isSystemUser = true;
+          inherit (cfg) group;
+        };
+        users.groups.${cfg.group} = { };
+
         environment.etc = lib.mkIf cfg.cluster.enable {
           ${clusterEtcName}.source = clusterConfigDir;
         };
@@ -1286,7 +1354,9 @@ in
               ++ lib.optional cfg.requireAllGraphs "--require-all-graphs"
               ++ cfg.extraFlags
             );
-            ExecStartPre = lib.getExe assembleBearerTokens;
+            ExecStartPre = lib.optional storageIsLocal "+${lib.getExe lockRecovery}" ++ [
+              (lib.getExe assembleBearerTokens)
+            ];
             ExecStartPost = lib.getExe readinessProbe;
             EnvironmentFile = environmentFiles;
             LoadCredential =
@@ -1296,7 +1366,6 @@ in
               ) bearerTokenFiles;
             RuntimeDirectory = "omnigraph-server";
             StateDirectory = "omnigraph";
-            DynamicUser = true;
             User = cfg.user;
             Group = cfg.group;
             Restart = "on-failure";
@@ -1318,13 +1387,16 @@ in
           # Sizing the window at (burst + 1) cycles leaves a full cycle of
           # margin even when every attempt burns its entire budget.
           unitConfig =
-            if cfg.requireAllGraphs then
-              {
-                StartLimitIntervalSec = (serverStartLimitBurst + 1) * serverStartCycleSec;
-                StartLimitBurst = serverStartLimitBurst;
-              }
-            else
-              { StartLimitIntervalSec = 0; };
+            mountRequirement
+            // (
+              if cfg.requireAllGraphs then
+                {
+                  StartLimitIntervalSec = (serverStartLimitBurst + 1) * serverStartCycleSec;
+                  StartLimitBurst = serverStartLimitBurst;
+                }
+              else
+                { StartLimitIntervalSec = 0; }
+            );
         };
 
         systemd.services.omnigraph-cluster-apply = lib.mkIf cfg.cluster.enable {
@@ -1345,13 +1417,14 @@ in
           // storageEnvironment
           // cfg.extraEnvironment;
 
+          unitConfig = mountRequirement;
+
           serviceConfig = hardening // {
             Type = "oneshot";
             RemainAfterExit = true;
             ExecStart = lib.getExe applyScript;
             EnvironmentFile = environmentFiles;
             StateDirectory = "omnigraph";
-            DynamicUser = true;
             User = cfg.user;
             Group = cfg.group;
           };
@@ -1373,13 +1446,14 @@ in
           // storageEnvironment
           // cfg.extraEnvironment;
 
+          unitConfig = mountRequirement;
+
           serviceConfig = hardening // {
             Type = "oneshot";
             RemainAfterExit = true;
             ExecStart = lib.getExe bootstrapScript;
             EnvironmentFile = environmentFiles;
             StateDirectory = "omnigraph";
-            DynamicUser = true;
             User = cfg.user;
             Group = cfg.group;
           };
@@ -1393,6 +1467,8 @@ in
           }
           // storageEnvironment
           // cfg.extraEnvironment;
+
+          unitConfig = mountRequirement;
 
           serviceConfig = hardening // {
             Type = "oneshot";
@@ -1412,7 +1488,6 @@ in
             ) cfg.optimize.graphs;
             EnvironmentFile = environmentFiles;
             StateDirectory = "omnigraph";
-            DynamicUser = true;
             User = cfg.user;
             Group = cfg.group;
           };

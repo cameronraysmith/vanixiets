@@ -5,7 +5,7 @@
 When a host's storage location is its own disk, the graph store on that host SHALL keep all of its graph data on that host's disk, within a bound of 20 GiB that leaves the rest of the disk to the host's other services, and SHALL keep none of it in a bucket.
 A new storage location on a disk SHALL start empty and be filled by seeding each example graph from its published seed, never by copying graph data from a bucket.
 
-**Discharged by**: `graph-store-interface` requirements `The root store setting yields the root's location`, `The graph data has a dataset of its own`, and `The bootstrap creates and seeds the local root`; relies on A231.
+**Discharged by**: `graph-store-interface` requirements `The root store setting yields the root's location`, `The graph data has a dataset of its own`, `Every omnigraph unit runs as the static user omnigraph` and `The bootstrap creates and seeds the local root`; relies on A231 and A241.
 
 #### Scenario: magnetite serves from its disk
 
@@ -22,7 +22,7 @@ A new storage location on a disk SHALL start empty and be filled by seeding each
 Each host SHALL have exactly one storage location for its graph data, either its own disk or a bucket, chosen by one setting of that host, and both locations SHALL be reachable under the same graph data name.
 Switching a host back to the bucket SHALL serve the graph data the bucket held when the host left it; changes made while serving from the disk SHALL NOT follow.
 
-**Discharged by**: `graph-store-interface` requirements `The root store setting yields the root's location` and `R2 settings apply only to an R2 root`; relies on A236.
+**Discharged by**: `graph-store-interface` requirements `The root store setting yields the root's location`, `R2 settings apply only to an R2 root`, `Every omnigraph unit runs as the static user omnigraph` and `The state directory survives the moves between stores and generations`; relies on A236 and A241.
 
 #### Scenario: switching back to the bucket
 
@@ -103,7 +103,7 @@ A graph backup SHALL be made only from a local snapshot, never by copying the gr
 
 The operator SHALL be able to restore graph data from a graph backup, clear the writer claim the backup carries, and start the graph store on the restored graph data, which then answers with the entity counts and stored query results it had when the backup was taken.
 
-**Discharged by**: `graph-store-interface` requirement `A runtime test proves recovery, refusal and restore`; the runbook; relies on A232 and A235.
+**Discharged by**: `graph-store-interface` requirements `A runtime test proves recovery, refusal and restore` and `Every omnigraph unit runs as the static user omnigraph`; the runbook; relies on A232 and A235.
 
 #### Scenario: a restore after the graph data is lost
 
@@ -150,9 +150,9 @@ The operator SHALL receive an alert when no graph backup has succeeded on a host
 
 ### Requirement: The graph store's state is visible on a dashboard
 
-A dashboard SHALL show, for the graph store, whether it is serving, how many graphs are in each state, how long its last start took to serve, each graph's entity count, version and storage format, the graph data's use of its disk bound, the number of local snapshots, the age of the last graph backup and the number of recoveries.
+A dashboard SHALL show, for the graph store, whether it is serving, how many graphs are in each state, how long its last start took to serve, each graph's entity count, version and storage format, whether those per-graph readings succeeded, the graph data's use of its disk bound, the number of local snapshots, the age of the last graph backup and the number of recoveries.
 
-**Discharged by**: `graph-store-interface` requirements `The probe publishes readiness each minute`, `The probe publishes per-graph and storage series` and `The omnigraph view is provisioned and query-checked`.
+**Discharged by**: `graph-store-interface` requirements `The probe publishes readiness each minute`, `The probe publishes per-graph and storage series`, `The probe reports a failed per-graph read` and `The omnigraph view is provisioned and query-checked`.
 
 #### Scenario: the operator opens the dashboard
 

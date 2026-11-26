@@ -32,6 +32,12 @@
 # the root each host serves, and checks.x86_64-linux.omnigraph-retired-roots
 # asserts it for the rollback roots and shows that each kind of conflict is
 # reported.
+#
+# A root of the same name may also live on the serving host's disk, under
+# `localDirectory`: `uriIn` maps a host's root store, "local" or "r2", and a
+# root name to the root's location, and `rootOf` names the root of either
+# location. A host serving a local root keeps the bucket's root of that name
+# as its way back to R2, so the retired list must leave it alone as well.
 { lib, ... }:
 let
   bucket = "sciexp";
@@ -84,14 +90,35 @@ in
     # The `s3://` URI of a root in the bucket.
     uri = root: "s3://${bucket}/${clustersPrefix}/${root}";
 
-    # The root name of a storage URI in this bucket's clusters prefix, or
-    # null for any other URI.
+    # The directory holding local roots: beneath the omnigraph units'
+    # StateDirectory, the only local path their sandbox lets them write.
+    localDirectory = "/var/lib/omnigraph/clusters";
+
+    # The location of `root` in `store`: "local" for the serving host's
+    # disk, "r2" for the bucket.
+    uriIn =
+      store: root:
+      if store == "local" then
+        "${localDirectory}/${root}"
+      else if store == "r2" then
+        uri root
+      else
+        throw "omnigraphClusterRoots.uriIn: the root store must be \"local\" or \"r2\", got ${builtins.toJSON store}";
+
+    # The root name of a storage URI in this bucket's clusters prefix or in
+    # localDirectory, or null for any other URI.
     rootOf =
       storageUri:
       let
-        m = builtins.match "s3://${bucket}/${clustersPrefix}/([^/]+)/*" storageUri;
+        inBucket = builtins.match "s3://${bucket}/${clustersPrefix}/([^/]+)/*" storageUri;
+        local = builtins.match "(file://)?${localDirectory}/([^/]+)/*" storageUri;
       in
-      if m == null then null else builtins.head m;
+      if inBucket != null then
+        builtins.head inBucket
+      else if local != null then
+        builtins.elemAt local 1
+      else
+        null;
 
     # The lifecycle rules that delete one retired root, as
     # cloudflare_r2_bucket_lifecycle rules.

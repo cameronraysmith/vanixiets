@@ -49,6 +49,8 @@
 # collecting hosts marked always-on, whose own silence it reports: one absent from
 # system_memory_usage_bytes for 10 min while the store answers raises it
 # with that host_name and no `for` (ADR-009 item 16, charter v20).
+# OmnigraphNotServing and OmnigraphBackupStale expect the collecting hosts
+# whose row notifies omnigraph-server and restic-backups-omnigraph.
 #
 # Every rule but StoreQueryFailing carries `database` (default "fleet") and
 # `language` ("promql", the default, or "sql"); the evaluator sends a promql
@@ -108,6 +110,10 @@
       textfileHosts = builtins.attrNames (
         lib.filterAttrs (_: h: h.platform == "darwin" || h.textfile) collecting
       );
+      # The collecting hosts whose row notifies `unit`: a row lists only
+      # units its host runs, which then post their own failure notices.
+      notifying =
+        unit: builtins.attrNames (lib.filterAttrs (_: h: lib.elem unit h.notifiedUnits) collecting);
       presence = expectedHosts: selector: { inherit selector expectedHosts; };
       fsRatio = ''sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes)'';
       # Each dot written [.], as notifiedRegex below.
@@ -409,9 +415,11 @@
         # it answers. Graphs open only at a server start, so a blocked graph
         # stays blocked until a restart. 5 min lets a start that serves
         # within it pass unreported; a failed start is also reported by
-        # omnigraph-server's own failure notice. No presence selector: the
-        # host table does not say which hosts serve omnigraph, and a probe
-        # that stops writing is HostProbeStale's.
+        # omnigraph-server's own failure notice. A probe that stops writing
+        # is HostProbeStale's. The expression selects nothing where no
+        # readiness series is stored, so the presence selector expects it on
+        # the hosts whose row notifies omnigraph-server, the hosts serving
+        # omnigraph.
         #
         # Runbook: packages/docs/src/content/docs/development/operations/omnigraph.md.
         {
@@ -420,6 +428,29 @@
           for = "5m";
           severity = "warning";
           annotations.summary = "omnigraph-server has not been ready, or has served a blocked graph, for 5 min; check omnigraph-server's status and journal (runbook in packages/docs/src/content/docs/development/operations/omnigraph.md)";
+          presence = [ (presence (notifying "omnigraph-server") "vanixiets_omnigraph_ready") ];
+        }
+        # restic-backups-omnigraph (flake.modules.nixos.omnigraph-backup)
+        # records the time of each run whose backup, prune and check all
+        # succeeded, and omnigraph-backup-metric publishes it every minute,
+        # seeding it with its first run's time when no record exists, so a
+        # host that never completes a backup ages too. 36 h is one missed
+        # night plus margin, as PostgresqlBackupStale's. A failed run is
+        # reported by its unit's notice; this rule reports runs that do not
+        # happen. The presence selector expects the stamp on the hosts whose
+        # row notifies restic-backups-omnigraph, which the backup module
+        # requires of every host it backs up.
+        #
+        # Runbook: packages/docs/src/content/docs/development/operations/omnigraph.md.
+        {
+          alert = "OmnigraphBackupStale";
+          expr = "time() - vanixiets_omnigraph_backup_last_success_timestamp_seconds > 129600";
+          for = "10m";
+          severity = "warning";
+          annotations.summary = "No omnigraph backup has succeeded on this host for over 36 h; check restic-backups-omnigraph's journal and timer (runbook in packages/docs/src/content/docs/development/operations/omnigraph.md)";
+          presence = [
+            (presence (notifying "restic-backups-omnigraph") "vanixiets_omnigraph_backup_last_success_timestamp_seconds")
+          ];
         }
         # track-r2-usage (F74, design D7): R2 keeps a multipart upload that is
         # never completed or aborted, and bills its parts as storage, until

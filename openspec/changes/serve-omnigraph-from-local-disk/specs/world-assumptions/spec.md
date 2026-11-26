@@ -474,13 +474,24 @@ Any requirement relying on this SHALL name it and SHALL lose its discharge once 
 - **WHEN** a release runs cleanup through the server
 - **THEN** this assumption is void, and the reason this fleet schedules no cleanup is void and is reviewed
 
-### Requirement: A241 — systemd keeps a DynamicUser unit's state directory under /var/lib/private behind a symlink
+### Requirement: A241 — systemd 262 id-maps a DynamicUser state directory and hands a static user's root-owned one to that user
 
-It is true of systemd, independent of what this fleet builds, that a unit with `DynamicUser=yes` and `StateDirectory=<name>` keeps its state in `/var/lib/private/<name>` and exposes it as the symlink `/var/lib/<name>`.
+It is true of systemd 262, independent of what this fleet builds, that a `DynamicUser` unit's state directory is moved into `/var/lib/private` behind a symlink and, owned by root or `nobody`, id-mapped, which fails with a mount below it, and that a static-user unit moves it back out and chowns a root-owned one to that user at start.
 Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
 
-**Evidence**: systemd.exec(5), `StateDirectory=`; observed on magnetite 2026-11-26: `/var/lib/omnigraph -> private/omnigraph`.
+**Evidence**: systemd.exec(5), `StateDirectory=`; systemd v262 `src/core/exec-invoke.c` `setup_exec_directory` (the private migration, the `nobody` and root-owned id-mapping branch, `path_chown_recursive`) and `src/core/namespace.c`; observed on magnetite 2026-11-26: `/var/lib/omnigraph -> private/omnigraph`; runtime test 2026-11-26: every omnigraph unit failed with `Failed to create an id-mapped mount: Device or resource busy` while a dataset was mounted at `/var/lib/private/omnigraph/clusters`; `vmTests.x86_64-linux.omnigraph-state-directory-transitions` (2026-11-26): the private directory moved back out at the first static-user start and stayed `65534:65534` behind an id-mapped mount, a root-owned dataset at `/var/lib/omnigraph` was chowned to the static user, and a `DynamicUser` start with that dataset mounted failed with status 238/STATE_DIRECTORY.
 
 #### Scenario: the assumption drifts
-- **WHEN** `/var/lib/omnigraph` on magnetite is a directory rather than a symlink
-- **THEN** this assumption is void, and `graph-store-interface` requirement `The graph data has a dataset of its own` loses its discharge
+- **WHEN** a systemd release leaves the state directory of a static-user unit behind the `/var/lib/private` symlink, leaves a root-owned one owned by root, or id-maps it
+- **THEN** this assumption is void, and `graph-store` requirements `Graph data lives on the disk of the host that serves it` and `The storage location is chosen per host, and switching back serves what the bucket held` lose their discharge
+
+### Requirement: A242 — omnigraph optimize run directly against a local root leaves its admission lock behind
+
+It is true of OmniGraph 0.16.0, independent of what this fleet builds, that `omnigraph optimize` run directly against a local root exits with its cluster admission lock still in `__cluster/lock.json`, so that every later writer and server start meets `state_lock_held` until `cluster force-unlock` of that id.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: runtime test of 2026-11-26 against the packaged 0.16.0 binary: `omnigraph optimize --graph <first>` logged `cluster admission retained … use exact-ID cluster force-unlock; command completion alone does not release this lock`, and the next `omnigraph` command on the root failed with `[state_lock_held]`.
+
+#### Scenario: the assumption drifts
+- **WHEN** a release releases the admission lock when a direct `optimize` completes
+- **THEN** this assumption is void, and the reason `graph-store-interface` requirement `Optimize is not enabled on a local root` forbids the optimize timer is void and is reviewed

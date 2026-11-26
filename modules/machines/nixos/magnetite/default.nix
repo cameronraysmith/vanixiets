@@ -52,6 +52,14 @@ in
         "vc-os"
       ];
       cookbookGraph = cookbook: "cookbook-${cookbook}";
+
+      # Where magnetite's omnigraph root lives (vanixiets.omnigraphRootStore,
+      # declared below): "local" or "r2".
+      omnigraphRootStore = config.vanixiets.omnigraphRootStore;
+      omnigraphOnR2 = omnigraphRootStore == "r2";
+      # The account's R2 endpoint, shared by omnigraph's R2 root and the
+      # telemetry store's object storage.
+      r2Endpoint = "https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com";
     in
     {
       imports = [
@@ -93,7 +101,32 @@ in
         effects-vanixiets-secrets
         effects-ironstar-secrets
         shared-reference-tree
-      ]);
+      ])
+      ++ [
+        # An option rather than a `let` value, so that an extendModules
+        # override can evaluate magnetite on the other store
+        # (checks.x86_64-linux.omnigraph-retired-roots).
+        {
+          options.vanixiets.omnigraphRootStore = lib.mkOption {
+            type = lib.types.enum [
+              "local"
+              "r2"
+            ];
+            internal = true;
+            description = ''
+              Where magnetite's omnigraph root lives, under the same root
+              name either way (flake.lib.omnigraphClusterRoots.uriIn):
+              "local" serves it from /var/lib/omnigraph/clusters on this
+              host's disk, "r2" from the `sciexp` bucket with the R2
+              endpoint, region, credentials and cluster lease set. The
+              `omnigraph-r2` generator, the retired and rollback roots and
+              their lifecycle rules stay defined under both values, so
+              switching back to "r2" serves the bucket's root as it was left.
+            '';
+          };
+          config.vanixiets.omnigraphRootStore = "r2";
+        }
+      ];
 
       services.shared-reference-tree = {
         enable = true;
@@ -524,8 +557,9 @@ in
         # takes a revision (`revision = 2;` names cookbooks-f17-r2). The
         # previous root, dev-graph-v10, created by 0.15 at format 16 with one
         # empty graph `dev`, stays intact as the way back
-        # (flake.lib.omnigraphClusterRoots.rollback).
-        storageUri = omnigraphRoots.uri (
+        # (flake.lib.omnigraphClusterRoots.rollback). The root lives where
+        # vanixiets.omnigraphRootStore says, under the same name.
+        storageUri = omnigraphRoots.uriIn omnigraphRootStore (
           omnigraphRoots.name {
             family = "cookbooks";
             inherit (config.services.omnigraph.cluster) createdAtFormat;
@@ -538,8 +572,8 @@ in
         cluster.createdAtFormat = 17;
         cluster.servesFloor = 14;
 
-        s3 = {
-          endpointUrl = "https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com";
+        s3 = lib.mkIf omnigraphOnR2 {
+          endpointUrl = r2Endpoint;
           region = "auto";
         };
 
@@ -567,9 +601,11 @@ in
         # successor then waits 180 s instead of 45 s to take over a crashed
         # server's lock (OMNIGRAPH_CLUSTER_LEASE_SECONDS, omnigraph
         # docs/user/operations/storage-failures.md).
-        extraEnvironment.OMNIGRAPH_CLUSTER_LEASE_SECONDS = "120";
+        extraEnvironment.OMNIGRAPH_CLUSTER_LEASE_SECONDS = lib.mkIf omnigraphOnR2 "120";
 
-        environmentFile = config.clan.core.vars.generators.omnigraph-r2.files."env".path;
+        environmentFile =
+          lib.mkIf omnigraphOnR2
+            config.clan.core.vars.generators.omnigraph-r2.files."env".path;
         bearerTokensFile =
           config.clan.core.vars.generators.omnigraph-bearer-tokens.files."tokens.json".path;
         extraBearerTokenFiles.monitor =
@@ -752,7 +788,7 @@ in
           type = "S3";
           bucket = "sciexp";
           root = "projects/vanixiets/observability/store/";
-          endpoint = config.services.omnigraph.s3.endpointUrl;
+          endpoint = r2Endpoint;
           region = "auto";
           enable_virtual_host_style = false;
           disable_ec2_metadata = true;

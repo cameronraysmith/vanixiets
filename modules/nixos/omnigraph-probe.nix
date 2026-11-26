@@ -18,10 +18,15 @@
 #   process start to the end of its start job, whose ExecStartPost waits for
 #   readiness, while the unit is active;
 # - with the `monitor` actor's token (services.omnigraph.extraBearerTokenFiles):
-#   vanixiets_omnigraph_graph_entities, _graph_manifest_version and
+#   vanixiets_omnigraph_graph_reads_ok, 1 when `GET /graphs` and every ready
+#   graph's snapshot were read and 0 otherwise (a server down included), each
+#   failed request also one journal line `omnigraph-probe: GET <path>
+#   answered HTTP <status>` (000 for no answer), while the unit still exits
+#   0; and vanixiets_omnigraph_graph_entities, _graph_manifest_version and
 #   _graph_storage_format per ready graph, a graph whose read fails left out;
 # - on a local root: vanixiets_omnigraph_dataset_used_bytes, _quota_bytes and
-#   _snapshots of the ZFS dataset mounted at the root's parent, and
+#   _snapshots of the ZFS dataset holding the root (the deepest mounted at
+#   the root's parent or one of its ancestors), and
 #   vanixiets_omnigraph_lock_recoveries_total from
 #   flake.lib.omnigraphProbe.lockRecoveriesFile, 0 while that file is absent.
 # The series names are in nodeExporterKeep; the assertion keeps the
@@ -44,6 +49,7 @@ let
     "vanixiets_omnigraph_ready"
     "vanixiets_omnigraph_graphs"
     "vanixiets_omnigraph_start_to_ready_seconds"
+    "vanixiets_omnigraph_graph_reads_ok"
     "vanixiets_omnigraph_graph_entities"
     "vanixiets_omnigraph_graph_manifest_version"
     "vanixiets_omnigraph_graph_storage_format"
@@ -63,15 +69,21 @@ let
     }:
     let
       parent = builtins.dirOf localRoot;
-      # A root under the DynamicUser state directory /var/lib/omnigraph is
-      # reached through systemd's symlink to /var/lib/private/omnigraph, so
-      # its dataset may be mounted at either path.
-      mountpoints = [
-        parent
-      ]
-      ++ lib.optional (lib.hasPrefix "/var/lib/omnigraph/" parent) (
-        "/var/lib/private/omnigraph/" + lib.removePrefix "/var/lib/omnigraph/" parent
-      );
+      # The dataset holding the root is the one mounted at the deepest of
+      # the root's parent and its ancestors up to /var/lib.
+      ancestors =
+        path:
+        if
+          lib.elem path [
+            "/var/lib"
+            "/"
+            "."
+          ]
+        then
+          [ ]
+        else
+          [ path ] ++ ancestors (builtins.dirOf path);
+      mountpoints = ancestors parent;
     in
     pkgs.writeShellApplication {
       name = "omnigraph-probe";
@@ -135,37 +147,66 @@ let
         fi
 
         token_file="''${CREDENTIALS_DIRECTORY:-}/${credential}"
-        if [ -n "$contract" ] && [ -n "''${CREDENTIALS_DIRECTORY:-}" ] && [ -r "$token_file" ]; then
+        if [ -n "''${CREDENTIALS_DIRECTORY:-}" ] && [ -r "$token_file" ]; then
           token=$(cat -- "$token_file")
           token=''${token//\\/\\\\}
           token=''${token//\"/\\\"}
-          api() { # <path>; the token reaches curl in a config on stdin, never its argv
-            printf 'header = "Authorization: Bearer %s"\n' "$token" \
-              | curl --config - --silent --fail --max-time 10 \
-                --header "Omnigraph-Http-Api: $contract" "$url$1"
+          # GET <path> into <file>. Any answer but HTTP 200 is one line in
+          # the journal, 000 for no HTTP answer at all. The token reaches
+          # curl in a config on stdin, never its argv.
+          fetch() { # <path> <file>
+            local status
+            status=$(printf 'header = "Authorization: Bearer %s"\n' "$token" \
+              | curl --config - --silent --max-time 10 --output "$2" --write-out '%{http_code}' \
+                --header "Omnigraph-Http-Api: $contract" "$url$1") || true
+            if [ "$status" != 200 ]; then
+              printf 'omnigraph-probe: GET %s answered HTTP %s\n' "$1" "''${status:-000}" >&2
+              return 1
+            fi
+          }
+          unreadable() { # <path>
+            printf 'omnigraph-probe: GET %s answered HTTP 200 with an unreadable body\n' "$1" >&2
           }
           : >"$scratch/entities"
           : >"$scratch/versions"
           : >"$scratch/formats"
-          if list=$(api /graphs) \
-            && graphs=$(jq -er '.graphs | map(select(.state == "ready") | .graph_id) | .[]' <<<"$list"); then
-            while read -r graph; do
-              [ -n "$graph" ] || continue
-              if snapshot=$(api "/graphs/$graph/snapshot") \
-                && lines=$(jq -er --arg graph "$graph" '
+          # 1 once the list and every ready graph's snapshot were read; a
+          # server that does not answer /readyz is not asked, and reads 0.
+          reads_ok=0
+          if [ -n "$contract" ] && fetch /graphs "$scratch/list"; then
+            if graphs=$(jq -r '.graphs
+              | if type == "array" then map(select(.state == "ready") | .graph_id) | .[]
+                else error("not a graph list") end' "$scratch/list" 2>/dev/null); then
+              reads_ok=1
+              while read -r graph; do
+                [ -n "$graph" ] || continue
+                path="/graphs/$graph/snapshot"
+                if ! fetch "$path" "$scratch/snapshot"; then
+                  reads_ok=0
+                elif lines=$(jq -er --arg graph "$graph" '
                   [(.datasets | map(.entity_count) | add // 0), .graph_manifest_version, .internal_schema_version] as $v
                   | if ($v | all(type == "number")) then
                       ($graph | tojson) as $g
                       | "vanixiets_omnigraph_graph_entities{graph=\($g)} \($v[0])",
                         "vanixiets_omnigraph_graph_manifest_version{graph=\($g)} \($v[1])",
                         "vanixiets_omnigraph_graph_storage_format{graph=\($g)} \($v[2])"
-                    else error("not a snapshot") end' <<<"$snapshot" 2>/dev/null); then
-                sed -n 1p <<<"$lines" >>"$scratch/entities"
-                sed -n 2p <<<"$lines" >>"$scratch/versions"
-                sed -n 3p <<<"$lines" >>"$scratch/formats"
-              fi
-            done <<<"$graphs"
+                    else error("not a snapshot") end' "$scratch/snapshot" 2>/dev/null); then
+                  sed -n 1p <<<"$lines" >>"$scratch/entities"
+                  sed -n 2p <<<"$lines" >>"$scratch/versions"
+                  sed -n 3p <<<"$lines" >>"$scratch/formats"
+                else
+                  unreadable "$path"
+                  reads_ok=0
+                fi
+              done <<<"$graphs"
+            else
+              unreadable /graphs
+            fi
           fi
+          {
+            series vanixiets_omnigraph_graph_reads_ok gauge "1 when the probe listed the graphs with GET /graphs and read every ready graph's snapshot, else 0."
+            echo "vanixiets_omnigraph_graph_reads_ok $reads_ok"
+          } >&3
           if [ -s "$scratch/entities" ]; then
             {
               series vanixiets_omnigraph_graph_entities gauge "Entities in a graph's main branch, summed over its datasets."
@@ -179,12 +220,12 @@ let
         fi
         ${lib.optionalString (localRoot != null) ''
           if datasets=$(zfs list -H -p -t filesystem -o name,mountpoint,used,quota 2>/dev/null) \
-            && dataset=$(awk -F'\t' ${
-              lib.escapeShellArg (
-                lib.concatMapStringsSep " || " (m: "$2 == \"${m}\"") mountpoints
-                + " { print $1 \"\\t\" $3 \"\\t\" $4; exit }"
-              )
-            } <<<"$datasets") \
+            && dataset=$(awk -F'\t' -v candidates=${lib.escapeShellArg (lib.concatStringsSep ":" mountpoints)} '
+              { line[$2] = $1 "\t" $3 "\t" $4 }
+              END {
+                n = split(candidates, c, ":")
+                for (i = 1; i <= n; i++) if (c[i] in line) { print line[c[i]]; exit }
+              }' <<<"$datasets") \
             && [ -n "$dataset" ]; then
             IFS=$'\t' read -r name used quota <<<"$dataset"
             if snapshots=$(zfs list -H -t snapshot -d 1 -o name "$name" 2>/dev/null | wc -l); then
