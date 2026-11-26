@@ -7,7 +7,7 @@
   "spec": {
     "display": {
       "name": "OmniGraph",
-      "description": "omnigraph-server as omnigraph-probe sees it every minute: readiness, whether its graphs could be read, graphs by state, start time, each graph's entities, version and storage format, the local root's dataset and snapshots, the graph backup's age, lock recoveries, and the server's memory."
+      "description": "omnigraph-server as omnigraph-probe sees it every minute: readiness, whether its graphs could be read, graphs by state, start time, each graph's entities, version and storage format, the local root's dataset against its quota and its snapshots, the graph backup's age, lock recoveries, and the server's memory."
     },
     "duration": "1d",
     "refreshInterval": "1m",
@@ -44,20 +44,38 @@
         "spec": {
           "display": {
             "name": "Ready",
-            "description": "1 while omnigraph-server's /readyz answers ready, 0 while it answers not ready or nothing answers; OmnigraphNotServing fires after 5 min at 0."
+            "description": "Whether omnigraph-server's /readyz answered ready at the probe's last reading: serving at 1, not serving at 0 while it answers not ready or nothing answers; OmnigraphNotServing fires after 5 min at 0. The line under the value is the series over the view's range."
           },
           "plugin": {
-            "kind": "TimeSeriesChart",
+            "kind": "StatChart",
             "spec": {
-              "yAxis": {
-                "format": {
-                  "unit": "decimal"
-                }
+              "calculation": "last",
+              "format": {
+                "unit": "decimal"
               },
-              "legend": {
-                "position": "bottom",
-                "mode": "list"
-              }
+              "sparkline": {},
+              "mappings": [
+                {
+                  "kind": "Value",
+                  "spec": {
+                    "value": "1",
+                    "result": {
+                      "value": "serving",
+                      "color": "#2e7d32"
+                    }
+                  }
+                },
+                {
+                  "kind": "Value",
+                  "spec": {
+                    "value": "0",
+                    "result": {
+                      "value": "not serving",
+                      "color": "#c62828"
+                    }
+                  }
+                }
+              ]
             }
           },
           "queries": [
@@ -85,20 +103,38 @@
         "spec": {
           "display": {
             "name": "Graph reads",
-            "description": "1 while the probe lists the graphs with GET /graphs and reads every ready graph's snapshot with the monitor token, 0 when a request is refused or fails (each one a journal line of omnigraph-probe.service with its HTTP status) or the server does not answer /readyz."
+            "description": "Whether the probe's last reading listed the graphs with GET /graphs and read every ready graph's snapshot with the monitor token: reading at 1, failing at 0 when a request is refused or fails (each one a journal line of omnigraph-probe.service with its HTTP status) or the server does not answer /readyz. The line under the value is the series over the view's range."
           },
           "plugin": {
-            "kind": "TimeSeriesChart",
+            "kind": "StatChart",
             "spec": {
-              "yAxis": {
-                "format": {
-                  "unit": "decimal"
-                }
+              "calculation": "last",
+              "format": {
+                "unit": "decimal"
               },
-              "legend": {
-                "position": "bottom",
-                "mode": "list"
-              }
+              "sparkline": {},
+              "mappings": [
+                {
+                  "kind": "Value",
+                  "spec": {
+                    "value": "1",
+                    "result": {
+                      "value": "reading",
+                      "color": "#2e7d32"
+                    }
+                  }
+                },
+                {
+                  "kind": "Value",
+                  "spec": {
+                    "value": "0",
+                    "result": {
+                      "value": "failing",
+                      "color": "#c62828"
+                    }
+                  }
+                }
+              ]
             }
           },
           "queries": [
@@ -208,7 +244,7 @@
         "spec": {
           "display": {
             "name": "Entities per graph",
-            "description": "Entities in each ready graph's main branch, summed over its datasets, read as the monitor actor; a graph whose read failed has no point."
+            "description": "Entities in each ready graph's main branch, summed over its datasets, read as the monitor actor; a graph whose read failed has no point. The legend names each graph without its cookbook- prefix, after the host serving it, with its last value."
           },
           "plugin": {
             "kind": "TimeSeriesChart",
@@ -219,8 +255,12 @@
                 }
               },
               "legend": {
-                "position": "bottom",
-                "mode": "list"
+                "position": "right",
+                "mode": "table",
+                "size": "small",
+                "values": [
+                  "last"
+                ]
               }
             }
           },
@@ -235,8 +275,8 @@
                       "kind": "PrometheusDatasource",
                       "name": "greptimedb-promql"
                     },
-                    "query": "sum by (host_name, graph) (vanixiets_omnigraph_graph_entities{host_name=~\"$host_name\"})",
-                    "seriesNameFormat": "{{host_name}} {{graph}}"
+                    "query": "label_replace(sum by (host_name, graph) (vanixiets_omnigraph_graph_entities{host_name=~\"$host_name\"}), \"graph_name\", \"$1\", \"graph\", \"(?:cookbook-)?(.*)\")",
+                    "seriesNameFormat": "{{host_name}} {{graph_name}}"
                   }
                 }
               }
@@ -244,25 +284,71 @@
           ]
         }
       },
-      "graph-manifest-version": {
+      "graph-versions": {
         "kind": "Panel",
         "spec": {
           "display": {
-            "name": "Manifest version per graph",
-            "description": "The graph manifest version of each ready graph's main branch; it rises with every commit."
+            "name": "Manifest version and storage format per graph",
+            "description": "At the end of the view's range, each ready graph's main branch: its graph manifest version, which rises with every commit, and the storage format (internal schema version) it is stamped at."
           },
           "plugin": {
-            "kind": "TimeSeriesChart",
+            "kind": "Table",
             "spec": {
-              "yAxis": {
-                "format": {
-                  "unit": "decimal"
+              "density": "compact",
+              "defaultColumnHidden": true,
+              "enableSorting": true,
+              "columnSettings": [
+                {
+                  "name": "graph",
+                  "header": "Graph",
+                  "sort": "asc"
+                },
+                {
+                  "name": "host_name",
+                  "header": "Host"
+                },
+                {
+                  "name": "value #1",
+                  "header": "Manifest version",
+                  "format": {
+                    "unit": "decimal",
+                    "decimalPlaces": 0,
+                    "shortValues": false
+                  }
+                },
+                {
+                  "name": "value #2",
+                  "header": "Storage format",
+                  "format": {
+                    "unit": "decimal",
+                    "decimalPlaces": 0,
+                    "shortValues": false
+                  }
                 }
-              },
-              "legend": {
-                "position": "bottom",
-                "mode": "list"
-              }
+              ],
+              "transforms": [
+                {
+                  "kind": "MergeIndexedColumns",
+                  "spec": {
+                    "column": "host_name"
+                  }
+                },
+                {
+                  "kind": "MergeIndexedColumns",
+                  "spec": {
+                    "column": "graph"
+                  }
+                },
+                {
+                  "kind": "JoinByColumnValue",
+                  "spec": {
+                    "columns": [
+                      "host_name",
+                      "graph"
+                    ]
+                  }
+                }
+              ]
             }
           },
           "queries": [
@@ -276,8 +362,22 @@
                       "kind": "PrometheusDatasource",
                       "name": "greptimedb-promql"
                     },
-                    "query": "max by (host_name, graph) (vanixiets_omnigraph_graph_manifest_version{host_name=~\"$host_name\"})",
-                    "seriesNameFormat": "{{host_name}} {{graph}}"
+                    "query": "max by (host_name, graph) (vanixiets_omnigraph_graph_manifest_version{host_name=~\"$host_name\"})"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, graph) (vanixiets_omnigraph_graph_storage_format{host_name=~\"$host_name\"})"
                   }
                 }
               }
@@ -285,19 +385,19 @@
           ]
         }
       },
-      "graph-storage-format": {
+      "dataset-quota-used": {
         "kind": "Panel",
         "spec": {
           "display": {
-            "name": "Storage format per graph",
-            "description": "The storage format (internal schema version) each ready graph's main branch is stamped at."
+            "name": "Dataset quota used",
+            "description": "Bytes used by the ZFS dataset holding a local root, snapshots included, over its quota; a dataset without a quota has no point. Written only while the host serves a local root."
           },
           "plugin": {
             "kind": "TimeSeriesChart",
             "spec": {
               "yAxis": {
                 "format": {
-                  "unit": "decimal"
+                  "unit": "percent-decimal"
                 }
               },
               "legend": {
@@ -317,8 +417,8 @@
                       "kind": "PrometheusDatasource",
                       "name": "greptimedb-promql"
                     },
-                    "query": "max by (host_name, graph) (vanixiets_omnigraph_graph_storage_format{host_name=~\"$host_name\"})",
-                    "seriesNameFormat": "{{host_name}} {{graph}}"
+                    "query": "max by (host_name) (vanixiets_omnigraph_dataset_used_bytes{host_name=~\"$host_name\"}) / (max by (host_name) (vanixiets_omnigraph_dataset_quota_bytes{host_name=~\"$host_name\"}) > 0)",
+                    "seriesNameFormat": "{{host_name}}"
                   }
                 }
               }
@@ -331,20 +431,16 @@
         "spec": {
           "display": {
             "name": "Dataset used and quota",
-            "description": "Bytes used by the ZFS dataset holding a local root, snapshots included, and its quota; written only while the host serves a local root."
+            "description": "Bytes used by the ZFS dataset holding a local root, snapshots included, and its quota (0 for none) at the probe's last reading, each with its series over the view's range; written only while the host serves a local root."
           },
           "plugin": {
-            "kind": "TimeSeriesChart",
+            "kind": "StatChart",
             "spec": {
-              "yAxis": {
-                "format": {
-                  "unit": "bytes"
-                }
+              "calculation": "last",
+              "format": {
+                "unit": "bytes"
               },
-              "legend": {
-                "position": "bottom",
-                "mode": "list"
-              }
+              "sparkline": {}
             }
           },
           "queries": [
@@ -470,19 +566,25 @@
         "spec": {
           "display": {
             "name": "Lock recoveries",
-            "description": "Stale serve locks omnigraph-server's start has cleared on this host; written only while the host serves a local root."
+            "description": "Stale serve locks omnigraph-server's start has cleared on this host, shown in orange once any has been; each recovery is an omnigraph-lock-recovery line in omnigraph-server's journal. Written only while the host serves a local root."
           },
           "plugin": {
-            "kind": "TimeSeriesChart",
+            "kind": "StatChart",
             "spec": {
-              "yAxis": {
-                "format": {
-                  "unit": "decimal"
-                }
+              "calculation": "last",
+              "format": {
+                "unit": "decimal"
               },
-              "legend": {
-                "position": "bottom",
-                "mode": "list"
+              "sparkline": {},
+              "thresholds": {
+                "mode": "absolute",
+                "defaultColor": "#2e7d32",
+                "steps": [
+                  {
+                    "value": 1,
+                    "color": "#ef6c00"
+                  }
+                ]
               }
             }
           },
@@ -578,34 +680,34 @@
             {
               "x": 0,
               "y": 0,
-              "width": 6,
+              "width": 4,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/ready"
               }
             },
             {
-              "x": 6,
+              "x": 4,
               "y": 0,
-              "width": 6,
+              "width": 4,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/graph-reads"
               }
             },
             {
-              "x": 12,
+              "x": 8,
               "y": 0,
-              "width": 6,
+              "width": 8,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/graph-states"
               }
             },
             {
-              "x": 18,
+              "x": 16,
               "y": 0,
-              "width": 6,
+              "width": 8,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/start-to-ready"
@@ -627,28 +729,19 @@
             {
               "x": 0,
               "y": 0,
-              "width": 8,
-              "height": 8,
+              "width": 14,
+              "height": 12,
               "content": {
                 "$ref": "#/spec/panels/graph-entities"
               }
             },
             {
-              "x": 8,
+              "x": 14,
               "y": 0,
-              "width": 8,
-              "height": 8,
+              "width": 10,
+              "height": 12,
               "content": {
-                "$ref": "#/spec/panels/graph-manifest-version"
-              }
-            },
-            {
-              "x": 16,
-              "y": 0,
-              "width": 8,
-              "height": 8,
-              "content": {
-                "$ref": "#/spec/panels/graph-storage-format"
+                "$ref": "#/spec/panels/graph-versions"
               }
             }
           ]
@@ -670,31 +763,40 @@
               "width": 6,
               "height": 8,
               "content": {
-                "$ref": "#/spec/panels/dataset-usage"
+                "$ref": "#/spec/panels/dataset-quota-used"
               }
             },
             {
               "x": 6,
               "y": 0,
-              "width": 6,
+              "width": 5,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/dataset-usage"
+              }
+            },
+            {
+              "x": 11,
+              "y": 0,
+              "width": 5,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/dataset-snapshots"
               }
             },
             {
-              "x": 12,
+              "x": 16,
               "y": 0,
-              "width": 6,
+              "width": 4,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/backup-age"
               }
             },
             {
-              "x": 18,
+              "x": 20,
               "y": 0,
-              "width": 6,
+              "width": 4,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/lock-recoveries"
