@@ -1,0 +1,22 @@
+# Allow-list for `just drv-diff <parent> <tip> openspec/changes/stop-reading-other-hosts-configs/drv-delta.txt`.
+# Every attribute not listed here must keep its drvPath: all nixos and darwin
+# toplevels, all home activation packages, and every other check and vmTests
+# attribute. Checks that embed the whole flake source change on every commit;
+# establish-refactor-oracle's committed base allow-list covers them on every
+# run, so they are not repeated here.
+
+checks.x86_64-linux.host-key-obligations added  # design D2: the own-host obligation's judge, new in this change
+checks.x86_64-linux.fleet-alert changed  # its sizeRuleClause renders every testSizes.checks entry and echoes their count; host-key-obligations adds one entry
+
+# The five edited vm-test files define these seven tests (design D6). Each now
+# takes `databases` from flake.lib.otelCollectorSchema and asserts magnetite
+# declares the same map, so the value reaching the nodes is the same attrset and
+# no drvPath is predicted to move. Listed because the files are edited; task 6.1
+# separately requires each test's driver drvPath to equal its parent value.
+vmTests.x86_64-linux.greptimedb-pipeline may-change  # edited by D6; predicted identical
+vmTests.x86_64-linux.fleet-ingress may-change  # edited by D6; predicted identical
+vmTests.x86_64-linux.fleet-ingress-outage may-change  # same file as fleet-ingress; predicted identical
+vmTests.x86_64-linux.devloop-ingest may-change  # edited by D6; predicted identical
+vmTests.x86_64-linux.devloop-ingest-reconcile may-change  # same file as devloop-ingest; predicted identical
+vmTests.x86_64-linux.greptimedb-oom-order may-change  # edited by D6; predicted identical
+vmTests.x86_64-linux.perses-greptimedb may-change  # edited by D6; predicted identical

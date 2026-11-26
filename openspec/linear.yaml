@@ -139,3 +139,9 @@ projects:
         id: "2155a8eb-2d71-46bc-867c-3f5c8f0cd5ae"
       "world-assumptions":
         id: "eca2b2d5-7c43-45ed-afd9-7a5c31e4dc7e"
+  "den-ready-fleet":
+    # slugId, for the reason recorded on the sibling entries.
+    id: "06049a4f18a4"
+    name: "Den-ready fleet architecture"
+    teams: ["CAM"]
+    archive_documents: {}
