@@ -11,6 +11,9 @@ groups:
   # The bearer-token actor of the omnigraph-seed-<graph> units, which load
   # each cookbook's seed into a newly created root through the server.
   seeders: [seeder]
+  # The bearer-token actor omnigraph-probe reads each graph's snapshot as
+  # (GET /graphs/<graph>/snapshot, which checks `read` on `main`).
+  monitors: [monitor]
 # Names `main` for the seeder rule's branch scope; protection has no other
 # effect in a policy bundle.
 protected_branches: [main]
@@ -49,3 +52,7 @@ rules:
       actors: { group: seeders }
       actions: [change]
       branch_scope: protected
+  - id: monitor-read
+    allow:
+      actors: { group: monitors }
+      actions: [read]

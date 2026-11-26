@@ -84,6 +84,7 @@
             queryChecked = [
               "devloop"
               "fleet-hosts"
+              "omnigraph"
             ];
             # The views case 14 does not run, each with its reason. A
             # provisioned view in neither list fails evaluation, so a new view
@@ -407,7 +408,7 @@
 
 
               def emit_fleet(host):
-                  """OTLP gauges for every series the fleet-hosts view reads, written as collector."""
+                  """OTLP gauges for every series the fleet-hosts and omnigraph views read, written as collector."""
                   now = int(machine.succeed("date +%s").strip())
                   times = [now - 840 + 30 * i for i in range(29)]
 
@@ -463,32 +464,64 @@
                       metric("vanixiets_zram_compr_data_bytes", series(lambda i: 5e8)),
                       metric("vanixiets_zram_mem_used_bytes", series(lambda i: 6e8)),
                   ]
-                  payload = {
-                      "resourceMetrics": [
-                          resource({}, host_metrics),
-                          resource({"process.executable.name": "greptime"}, [metric("process_memory_usage_bytes", series(lambda i: 2e8))]),
-                          resource({"process.executable.name": "perses"}, [metric("process_memory_usage_bytes", series(lambda i: 7e7))]),
-                          resource(
-                              {"systemd.unit.name": "demo-failed.service"},
-                              [
-                                  metric(
-                                      "systemd_unit_state",
-                                      series(lambda i: 1, {"systemd_unit_active_state": "failed"})
-                                      + series(lambda i: 0, {"systemd_unit_active_state": "active"}),
-                                  )
-                              ],
-                          ),
-                          resource({"systemd.unit.name": "demo.service"}, [metric("systemd_service_restarts_total", series(lambda i: i))]),
-                      ]
-                  }
-                  machine.succeed(f"cat > /tmp/fleet.json <<'EOF'\n{json.dumps(payload)}\nEOF")
-                  machine.succeed(
-                      "otlp-json-to-pb < /tmp/fleet.json > /tmp/fleet.pb && "
-                      f"curl -sS --fail-with-body --netrc-file {VARS}/collector.netrc "
-                      "-H 'Content-Type: application/x-protobuf' -H 'x-greptime-db-name: fleet' "
-                      f"-H {shlex.quote('x-greptime-otlp-metric-promote-resource-attrs: ' + PROMOTE)} "
-                      "--data-binary @/tmp/fleet.pb http://127.0.0.1:4000/v1/otlp/v1/metrics"
+                  # omnigraph-probe's series, omnigraph-server's memory and the
+                  # graph backup's stamp, which the omnigraph view reads, go in
+                  # a request of their own: the driver passes each command as
+                  # one argument, which Linux caps at 128 KiB, and one payload
+                  # of every series exceeds it.
+                  omnigraph_metrics = [
+                      metric("vanixiets_unit_memory_current_bytes", series(lambda i: 2e8, {"unit": "omnigraph-server.service"})),
+                      metric("vanixiets_unit_memory_peak_bytes", series(lambda i: 3e8, {"unit": "omnigraph-server.service"})),
+                      metric("vanixiets_omnigraph_ready", series(lambda i: 1)),
+                      metric(
+                          "vanixiets_omnigraph_graphs",
+                          series(lambda i: 2, {"state": "served"})
+                          + series(lambda i: 2, {"state": "ready"})
+                          + series(lambda i: 0, {"state": "loading"})
+                          + series(lambda i: 0, {"state": "blocked"}),
+                      ),
+                      metric("vanixiets_omnigraph_start_to_ready_seconds", series(lambda i: 3.5)),
+                      metric("vanixiets_omnigraph_graph_entities", series(lambda i: 120, {"graph": "cookbook-a"})),
+                      metric("vanixiets_omnigraph_graph_manifest_version", series(lambda i: 4, {"graph": "cookbook-a"})),
+                      metric("vanixiets_omnigraph_graph_storage_format", series(lambda i: 17, {"graph": "cookbook-a"})),
+                      metric("vanixiets_omnigraph_dataset_used_bytes", series(lambda i: 5e6)),
+                      metric("vanixiets_omnigraph_dataset_quota_bytes", series(lambda i: 2e10)),
+                      metric("vanixiets_omnigraph_dataset_snapshots", series(lambda i: 8)),
+                      metric("vanixiets_omnigraph_lock_recoveries_total", series(lambda i: 0)),
+                      metric("vanixiets_omnigraph_backup_last_success_timestamp_seconds", series(lambda i: now - 7200)),
+                  ]
+
+                  def post(payload):
+                      machine.succeed(f"cat > /tmp/fleet.json <<'EOF'\n{json.dumps(payload)}\nEOF")
+                      machine.succeed(
+                          "otlp-json-to-pb < /tmp/fleet.json > /tmp/fleet.pb && "
+                          f"curl -sS --fail-with-body --netrc-file {VARS}/collector.netrc "
+                          "-H 'Content-Type: application/x-protobuf' -H 'x-greptime-db-name: fleet' "
+                          f"-H {shlex.quote('x-greptime-otlp-metric-promote-resource-attrs: ' + PROMOTE)} "
+                          "--data-binary @/tmp/fleet.pb http://127.0.0.1:4000/v1/otlp/v1/metrics"
+                      )
+
+                  post(
+                      {
+                          "resourceMetrics": [
+                              resource({}, host_metrics),
+                              resource({"process.executable.name": "greptime"}, [metric("process_memory_usage_bytes", series(lambda i: 2e8))]),
+                              resource({"process.executable.name": "perses"}, [metric("process_memory_usage_bytes", series(lambda i: 7e7))]),
+                              resource(
+                                  {"systemd.unit.name": "demo-failed.service"},
+                                  [
+                                      metric(
+                                          "systemd_unit_state",
+                                          series(lambda i: 1, {"systemd_unit_active_state": "failed"})
+                                          + series(lambda i: 0, {"systemd_unit_active_state": "active"}),
+                                      )
+                                  ],
+                              ),
+                              resource({"systemd.unit.name": "demo.service"}, [metric("systemd_service_restarts_total", series(lambda i: i))]),
+                          ]
+                      }
                   )
+                  post({"resourceMetrics": [resource({}, omnigraph_metrics)]})
 
 
               def emit_devloop(host):

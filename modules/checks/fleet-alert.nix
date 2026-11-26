@@ -7,10 +7,12 @@
 #   modules/nixos/fleet-alert/rules.nix, and a malformed-expression mutant
 #   that promtool must reject; `promtool test rules` over a drifted and a
 #   matching database for PostgresqlCollationDrift (F61), which must fire
-#   on the drifted one only, and must fail on the mutant driftAnyValue; and
+#   on the drifted one only, and must fail on the mutant driftAnyValue;
 #   over 2026-11-18's node_exporter loop for SystemdUnitRestartLoop (F77),
 #   which must hold while the unit stays failed, and must fail on the
-#   mutant windowOnly.
+#   mutant windowOnly; and over omnigraph-probe's series for
+#   OmnigraphNotServing, which must fire after 5 min not ready or with a
+#   blocked graph, and must fail on the mutant notServingFor.
 # - r2PromtoolRehearsal (track-r2-usage): `promtool test rules` cases for
 #   R2MultipartUploadPending, R2CostProjected, R2BucketGrowthAnomalous,
 #   R2BucketUndeclared (rendered with a fixture external bucket) and
@@ -78,7 +80,10 @@
 # sets in fleet-alert/fixtures/series.json are those measured on magnetite's
 # `fleet` database on 2026-10-18 (logs/s3/series-labels.md), except the
 # file-system rules', which no host stored when those rules were added:
-# theirs are the file-system expressions' `by` labels. The NVMe rules' names
+# theirs are the file-system expressions' `by` labels; and OmnigraphNotServing's,
+# which no host stored when that rule was added: its labels are those
+# PostgresqlBackupStale's textfile series carries, under its first arm's
+# metric name, which a comparison keeps. The NVMe rules' names
 # and label sets are pyrite's as stored on 2026-11-01
 # (logs/s4-evidence/5.3-smart-20261101T063202Z.log), where the exporter's
 # counter-typed fields carry `_total`. The darwin rules' label sets and the
@@ -186,6 +191,97 @@
       staleThresholdYaml = pkgs.writeText "fleet-alert-rules-stale-threshold.yaml" (
         mutateText "staleThreshold" "vanixiets_postgresql_backup_last_success_timestamp_seconds > 129600"
           "vanixiets_postgresql_backup_last_success_timestamp_seconds > 1296000"
+          rules.yaml
+      );
+
+      # PromQL's own semantics for OmnigraphNotServing over minute samples
+      # of omnigraph-probe's series. magnetite is not ready from minute 0 to
+      # 6, pending until the rule fires at 5 min and still firing at 6;
+      # pyrite is not ready from minute 0 to 4 and ready from 5, so it never
+      # fires. In the second case magnetite is ready and serves one blocked
+      # graph from minute 0 to 6, which fires under the blocked series'
+      # labels. The mutant notServingFor, a `for` of 50 min, must fail it.
+      notServingTest =
+        rulesFile:
+        let
+          series =
+            name: labels:
+            "${name}{${lib.concatStringsSep "," (lib.mapAttrsToList (k: v: ''${k}="${v}"'') labels)}}";
+          ready = host: series "vanixiets_omnigraph_ready" { host_name = host; };
+          graphs =
+            host: state:
+            series "vanixiets_omnigraph_graphs" {
+              host_name = host;
+              inherit state;
+            };
+          at = minutes: labelSets: {
+            eval_time = "${toString minutes}m";
+            alertname = "OmnigraphNotServing";
+            exp_alerts = map (labels: {
+              exp_labels = labels // {
+                severity = "warning";
+              };
+              exp_annotations = (ruleNamed "OmnigraphNotServing").annotations;
+            }) labelSets;
+          };
+        in
+        pkgs.writeText "fleet-alert-omnigraph-not-serving-test.yaml" (
+          builtins.toJSON {
+            rule_files = [ "${rulesFile}" ];
+            evaluation_interval = "1m";
+            tests = [
+              {
+                interval = "1m";
+                input_series = [
+                  {
+                    series = ready "magnetite";
+                    values = "0x6 1x10";
+                  }
+                  {
+                    series = ready "pyrite";
+                    values = "0x4 1x12";
+                  }
+                ];
+                alert_rule_test = [
+                  (at 4 [ ])
+                  (at 5 [ { host_name = "magnetite"; } ])
+                  (at 6 [ { host_name = "magnetite"; } ])
+                  (at 8 [ ])
+                ];
+              }
+              {
+                interval = "1m";
+                input_series = [
+                  {
+                    series = ready "magnetite";
+                    values = "1x16";
+                  }
+                  {
+                    series = graphs "magnetite" "blocked";
+                    values = "1x6 0x10";
+                  }
+                  {
+                    series = graphs "magnetite" "ready";
+                    values = "9x16";
+                  }
+                ];
+                alert_rule_test = [
+                  (at 4 [ ])
+                  (at 6 [
+                    {
+                      host_name = "magnetite";
+                      state = "blocked";
+                    }
+                  ])
+                  (at 8 [ ])
+                ];
+              }
+            ];
+          }
+        );
+      notServingForYaml = pkgs.writeText "fleet-alert-rules-not-serving-for.yaml" (
+        mutateText "notServingFor" ''${builtins.toJSON (ruleNamed "OmnigraphNotServing").expr},"for":"5m"''
+          ''${builtins.toJSON (ruleNamed "OmnigraphNotServing").expr},"for":"50m"''
           rules.yaml
       );
 
@@ -683,7 +779,7 @@
         pkgs.runCommand "fleet-alert-promtool"
           {
             nativeBuildInputs = [ pkgs.prometheus.cli ];
-            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only; F77: SystemdUnitRestartLoop holds while a looped unit stays failed";
+            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only; F77: SystemdUnitRestartLoop holds while a looped unit stays failed; OmnigraphNotServing fires after 5 min not serving";
           }
           ''
             set -euo pipefail
@@ -696,6 +792,14 @@
             fi
             cat stale-threshold.log
             echo "mutant staleThreshold rejected"
+            promtool test rules ${notServingTest rulesYaml}
+            if promtool test rules ${notServingTest notServingForYaml} > not-serving-for.log 2>&1; then
+              cat not-serving-for.log
+              echo "FAIL: the omnigraph not-serving test accepted the notServingFor mutant" >&2
+              exit 1
+            fi
+            cat not-serving-for.log
+            echo "mutant notServingFor rejected"
             if promtool check rules ${malformedYaml} > malformed.log 2>&1; then
               cat malformed.log
               echo "FAIL: promtool accepted the malformed-expression mutant" >&2
@@ -1749,6 +1853,14 @@
       # backup stale test shows when PromQL answers it.
       backupStaleLeg = fireAndResolve "PostgresqlBackupStale" // {
         messages = [ "development/operations/postgresql-backup.md" ];
+      };
+
+      # magnetite's omnigraph-server not ready, as the rule's expression
+      # answers it, posts one warning whose title names magnetite and whose
+      # message names the runbook; promtoolRehearsal's not-serving test shows
+      # when PromQL answers it.
+      notServingLeg = fireAndResolve "OmnigraphNotServing" // {
+        messages = [ "development/operations/omnigraph.md" ];
       };
 
       # darwin-agent-session-telemetry design D9: pyrite's Langfuse failures
@@ -2848,6 +2960,7 @@
         ++ [
           collationDriftLeg
           backupStaleLeg
+          notServingLeg
           langfuseBlocked
           langfuseHealthy
           exclusionLeg

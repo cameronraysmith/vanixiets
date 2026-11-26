@@ -97,6 +97,19 @@
       "vanixiets_r2_billing_period_start_timestamp_seconds"
       "vanixiets_r2_billing_period_end_timestamp_seconds"
       "vanixiets_r2_last_success_timestamp_seconds"
+      # omnigraph-server's readiness, graphs and storage: written to the
+      # textfile collector by flake.modules.nixos.omnigraph-probe on the
+      # hosts serving omnigraph (flake.lib.omnigraphProbe.seriesNames).
+      "vanixiets_omnigraph_ready"
+      "vanixiets_omnigraph_graphs"
+      "vanixiets_omnigraph_start_to_ready_seconds"
+      "vanixiets_omnigraph_graph_entities"
+      "vanixiets_omnigraph_graph_manifest_version"
+      "vanixiets_omnigraph_graph_storage_format"
+      "vanixiets_omnigraph_dataset_used_bytes"
+      "vanixiets_omnigraph_dataset_quota_bytes"
+      "vanixiets_omnigraph_dataset_snapshots"
+      "vanixiets_omnigraph_lock_recoveries_total"
     ];
 
     # The units magnetite's memory budget reports (CAM-111 design D11), as

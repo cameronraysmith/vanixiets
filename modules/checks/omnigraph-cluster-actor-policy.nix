@@ -1,8 +1,9 @@
 # Behavioural check: the policy magnetite applies to its omnigraph graphs lets
 # the host's cluster actor run the operations its units and its
 # omnigraph-cluster wrapper perform, and nothing more; lets the seed actor
-# load into `main`, and nothing more; and keeps the bearer-token actor
-# `admin`'s access.
+# load into `main`, and nothing more; lets the monitor actor list the graphs
+# and read them, and nothing more; and keeps the bearer-token actor `admin`'s
+# access.
 #
 # omnigraph judges a direct write to a cluster graph by the policy the cluster
 # applied to that graph and denies an actor the policy does not name
@@ -21,9 +22,12 @@
 # cluster that does not yet grant that actor anything.
 #
 # Each allow case names the operation that needs it; the deny cases hold the
-# cluster actor and the seed actor to those operations, and the `admin` cases
-# hold the bearer-token actor to its access. The cases run on two of the
-# graphs, the first and the last by id, which one bundle binds like the rest.
+# cluster actor, the seed actor and the monitor actor to those operations,
+# and the `admin` cases hold the bearer-token actor to its access. `policy
+# test` asks the bundle bound to `cluster` for `graph_list` and
+# `config_manage`, and the graph's bundle for every other action. The cases
+# run on two of the graphs, the first and the last by id, which one bundle
+# binds like the rest.
 # Every graph magnetite declares must then let `admin` read it: the server
 # denies every read on a graph no applied policy binds, so a graph left out of
 # the bundle's `applies_to` fails here.
@@ -114,6 +118,15 @@
           (case "seeder-no-branch-merge" seeder "branch_merge" mainToMain "deny")
           (case "seeder-no-maintain" seeder "maintain" onMain "deny")
           (case "seeder-no-reclaim" seeder "reclaim" { } "deny")
+          # omnigraph-probe: `GET /graphs` checks `graph_list`, and
+          # `GET /graphs/<graph>/snapshot` checks `read` on `main`.
+          (case "monitor-graph-list-for-probe" "monitor" "graph_list" { } "allow")
+          (case "monitor-read-main-for-probe" "monitor" "read" onMain "allow")
+          (case "monitor-no-change" "monitor" "change" onMain "deny")
+          (case "monitor-no-export" "monitor" "export" onMain "deny")
+          (case "monitor-no-schema-apply" "monitor" "schema_apply" intoMain "deny")
+          (case "monitor-no-maintain" "monitor" "maintain" onMain "deny")
+          (case "monitor-no-config-manage" "monitor" "config_manage" { } "deny")
         ];
 
       readableTests = testsFile "admin-read" [ (case "admin-read" "admin" "read" onMain "allow") ];

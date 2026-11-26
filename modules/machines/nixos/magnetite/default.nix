@@ -499,6 +499,20 @@ in
         '';
       };
 
+      # The read-only `monitor` actor's token, in a generator of its own like
+      # the seeder's. omnigraph-probe reads each graph's snapshot as this
+      # actor, which the policies let list the graphs and read them, nothing
+      # more (services.omnigraph.extraBearerTokenFiles).
+      clan.core.vars.generators.omnigraph-monitor-token = {
+        files."token" = {
+          restartUnits = [ "omnigraph-server.service" ];
+        };
+        runtimeInputs = [ pkgs.openssl ];
+        script = ''
+          printf '%s' "$(openssl rand -hex 32)" > "$out/token"
+        '';
+      };
+
       services.omnigraph = {
         enable = true;
 
@@ -558,6 +572,8 @@ in
         environmentFile = config.clan.core.vars.generators.omnigraph-r2.files."env".path;
         bearerTokensFile =
           config.clan.core.vars.generators.omnigraph-bearer-tokens.files."tokens.json".path;
+        extraBearerTokenFiles.monitor =
+          config.clan.core.vars.generators.omnigraph-monitor-token.files."token".path;
 
         cluster = {
           # One example graph per cookbook, seeded once when the bootstrap

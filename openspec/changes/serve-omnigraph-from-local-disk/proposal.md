@@ -3,14 +3,15 @@ linear_story_id: CAM-127
 linear_story_identifier: CAM-127
 linear_story_title: "Serve OmniGraph from local disk on magnetite"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-127/serve-omnigraph-from-local-disk-on-magnetite
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
-last_synced_state: Todo
-last_synced_at: "2026-11-26T04:04:41Z"
+last_synced_state: In Progress
+last_synced_at: "2026-11-26T04:59:43Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T04:04:41Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-127 created in Todo on team CAM with no project, description seeded from proposal.md; state confirmed by read-only view" }
+  - { at: "2026-11-26T04:59:43Z", transition: "Todo->In Progress", outcome: "posted", note: "First tasks.md checkbox ticked; state set to In Progress with a comment and confirmed by read-only view" }
 ---
 
 ## Why

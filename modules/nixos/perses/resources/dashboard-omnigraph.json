@@ -1,0 +1,680 @@
+{
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "omnigraph",
+    "project": "fleet"
+  },
+  "spec": {
+    "display": {
+      "name": "OmniGraph",
+      "description": "omnigraph-server as omnigraph-probe sees it every minute: readiness, graphs by state, start time, each graph's entities, version and storage format, the local root's dataset and snapshots, the graph backup's age, lock recoveries, and the server's memory."
+    },
+    "duration": "1d",
+    "refreshInterval": "1m",
+    "variables": [
+      {
+        "kind": "ListVariable",
+        "spec": {
+          "name": "host_name",
+          "display": {
+            "name": "Host"
+          },
+          "allowMultiple": true,
+          "allowAllValue": true,
+          "defaultValue": "$__all",
+          "plugin": {
+            "kind": "PrometheusLabelValuesVariable",
+            "spec": {
+              "datasource": {
+                "kind": "PrometheusDatasource",
+                "name": "greptimedb-promql"
+              },
+              "labelName": "host_name",
+              "matchers": [
+                "vanixiets_omnigraph_ready"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "panels": {
+      "ready": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Ready",
+            "description": "1 while omnigraph-server's /readyz answers ready, 0 while it answers not ready or nothing answers; OmnigraphNotServing fires after 5 min at 0."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name) (vanixiets_omnigraph_ready{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "graph-states": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Graphs by state",
+            "description": "Graphs omnigraph-server serves, and how many of them are ready, loading or blocked, from /readyz; OmnigraphNotServing fires after 5 min with any blocked."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name, state) (vanixiets_omnigraph_graphs{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{state}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "start-to-ready": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Start to ready",
+            "description": "Seconds from omnigraph-server's main process start to the end of its start job, which waits for readiness, for the current run."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "seconds"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name) (vanixiets_omnigraph_start_to_ready_seconds{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "graph-entities": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Entities per graph",
+            "description": "Entities in each ready graph's main branch, summed over its datasets, read as the monitor actor; a graph whose read failed has no point."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "sum by (host_name, graph) (vanixiets_omnigraph_graph_entities{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{graph}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "graph-manifest-version": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Manifest version per graph",
+            "description": "The graph manifest version of each ready graph's main branch; it rises with every commit."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, graph) (vanixiets_omnigraph_graph_manifest_version{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{graph}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "graph-storage-format": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Storage format per graph",
+            "description": "The storage format (internal schema version) each ready graph's main branch is stamped at."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, graph) (vanixiets_omnigraph_graph_storage_format{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{graph}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "dataset-usage": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Dataset used and quota",
+            "description": "Bytes used by the ZFS dataset holding a local root, snapshots included, and its quota; written only while the host serves a local root."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "bytes"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name) (vanixiets_omnigraph_dataset_used_bytes{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} used"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name) (vanixiets_omnigraph_dataset_quota_bytes{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} quota"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "dataset-snapshots": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Local snapshots",
+            "description": "Snapshots of the dataset holding a local root; written only while the host serves a local root."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name) (vanixiets_omnigraph_dataset_snapshots{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "backup-age": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Graph backup age",
+            "description": "Seconds since the last nightly graph backup whose backup, prune and check all succeeded; written only where the graph backup is on."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "seconds"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "time() - max by (host_name) (vanixiets_omnigraph_backup_last_success_timestamp_seconds{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "lock-recoveries": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Lock recoveries",
+            "description": "Stale serve locks omnigraph-server's start has cleared on this host; written only while the host serves a local root."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name) (vanixiets_omnigraph_lock_recoveries_total{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "server-memory": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "omnigraph-server memory",
+            "description": "omnigraph-server.service's current and peak memory, from the host's memory budget probe."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "bytes"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name) (vanixiets_unit_memory_current_bytes{unit=\"omnigraph-server.service\", host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} current"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name) (vanixiets_unit_memory_peak_bytes{unit=\"omnigraph-server.service\", host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} peak"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Serving",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/ready"
+              }
+            },
+            {
+              "x": 8,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/graph-states"
+              }
+            },
+            {
+              "x": 16,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/start-to-ready"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Graphs",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/graph-entities"
+              }
+            },
+            {
+              "x": 8,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/graph-manifest-version"
+              }
+            },
+            {
+              "x": 16,
+              "y": 0,
+              "width": 8,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/graph-storage-format"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Storage and recovery",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 6,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/dataset-usage"
+              }
+            },
+            {
+              "x": 6,
+              "y": 0,
+              "width": 6,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/dataset-snapshots"
+              }
+            },
+            {
+              "x": 12,
+              "y": 0,
+              "width": 6,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/backup-age"
+              }
+            },
+            {
+              "x": 18,
+              "y": 0,
+              "width": 6,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/lock-recoveries"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Grid",
+        "spec": {
+          "display": {
+            "title": "Memory",
+            "collapse": {
+              "open": true
+            }
+          },
+          "items": [
+            {
+              "x": 0,
+              "y": 0,
+              "width": 24,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/server-memory"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

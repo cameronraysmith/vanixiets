@@ -91,6 +91,14 @@
       "job": "node",
       "service_instance_id": "127.0.0.1:9100",
       "service_name": "node"
+    },
+    "OmnigraphNotServing": {
+      "__name__": "vanixiets_omnigraph_ready",
+      "host_name": "magnetite",
+      "instance": "127.0.0.1:9100",
+      "job": "node",
+      "service_instance_id": "127.0.0.1:9100",
+      "service_name": "node"
     }
   },
   "selectors": {

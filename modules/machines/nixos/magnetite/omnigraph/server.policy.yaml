@@ -1,8 +1,15 @@
 version: 1
 groups:
   operators: [admin]
+  # The bearer-token actor omnigraph-probe lists the graphs as, before it
+  # reads each one's snapshot.
+  monitors: [monitor]
 rules:
   - id: operator-graph-list
     allow:
       actors: { group: operators }
+      actions: [graph_list]
+  - id: monitor-graph-list
+    allow:
+      actors: { group: monitors }
       actions: [graph_list]

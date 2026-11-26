@@ -19,11 +19,43 @@
 #      flake.lib.omnigraphClusterRoots.retired in a later change, and apply
 #      the terraform configuration, whose lifecycle rules then delete its
 #      data and its markers from the bucket.
-{ config, ... }:
+{ config, lib, ... }:
 let
   flakeLib = config.flake.lib;
+
+  # The server's listen address as `host:port`, an IPv6 host in brackets.
+  bindTargetOf =
+    bindAddress: port:
+    if lib.hasInfix ":" bindAddress then
+      "[${bindAddress}]:${toString port}"
+    else
+      "${bindAddress}:${toString port}";
+
+  # A storage URI's scheme, lowercased, or null for a plain path.
+  storageSchemeOf =
+    uri:
+    let
+      m = builtins.match "([A-Za-z][A-Za-z0-9+.-]*)://.*" uri;
+    in
+    if m == null then null else lib.toLower (builtins.head m);
+
+  # The directory of a local storage root, a plain path or a file:// URI,
+  # or null for a root in an object store.
+  localRootOf =
+    uri:
+    let
+      scheme = storageSchemeOf uri;
+    in
+    if scheme == null || scheme == "file" then
+      lib.removeSuffix "/" (lib.removePrefix "file://" uri)
+    else
+      null;
 in
 {
+  flake.lib.omnigraphServer = {
+    inherit bindTargetOf localRootOf;
+  };
+
   flake.modules.nixos.omnigraph =
     {
       config,
@@ -36,11 +68,7 @@ in
 
       yaml = pkgs.formats.yaml { };
 
-      bindTarget =
-        if lib.hasInfix ":" cfg.bindAddress then
-          "[${cfg.bindAddress}]:${toString cfg.port}"
-        else
-          "${cfg.bindAddress}:${toString cfg.port}";
+      bindTarget = bindTargetOf cfg.bindAddress cfg.port;
 
       storageEnvironment =
         lib.optionalAttrs (cfg.s3.region != null) { AWS_REGION = cfg.s3.region; }
@@ -205,13 +233,9 @@ in
       # The bootstrap library derives the create-once marker location from
       # the storage URI itself; this only classifies the scheme for the
       # eval-time assertions.
-      storageScheme =
-        let
-          m = builtins.match "([A-Za-z][A-Za-z0-9+.-]*)://.*" cfg.storageUri;
-        in
-        if m == null then null else lib.toLower (builtins.head m);
+      storageScheme = storageSchemeOf cfg.storageUri;
       storageIsS3 = storageScheme == "s3";
-      storageIsLocal = storageScheme == null || storageScheme == "file";
+      storageIsLocal = localRootOf cfg.storageUri != null;
 
       # Every unit runs with ProtectSystem=strict and DynamicUser, and none
       # carries ReadWritePaths, so the only writable local storage is the
@@ -238,13 +262,18 @@ in
       seedTokenFiles = lib.mapAttrs' (
         _: graph: lib.nameValuePair graph.seed.actor graph.seed.tokenFile
       ) seededGraphs;
+      # The extra actors' tokens are kept the same way
+      # (services.omnigraph.extraBearerTokenFiles); an extra actor that is
+      # also a seed actor is refused by an assertion below.
+      bearerTokenFiles = seedTokenFiles // cfg.extraBearerTokenFiles;
       tokenCredentialName = actor: "bearer-token-${actor}";
 
       # omnigraph-server reads one tokens file, so the server's ExecStartPre
-      # assembles it from the tokens file and the seed actors' tokens into
-      # its RuntimeDirectory, readable by the service user alone. An actor
-      # already in the tokens file is refused rather than overwritten. Tokens
-      # stay out of every argv: jq reads them from the credential files.
+      # assembles it from the tokens file, the seed actors' tokens and the
+      # extra actors' tokens into its RuntimeDirectory, readable by the
+      # service user alone. An actor already in the tokens file is refused
+      # rather than overwritten. Tokens stay out of every argv: jq reads them
+      # from the credential files.
       assembleBearerTokens = pkgs.writeShellApplication {
         name = "omnigraph-server-bearer-tokens";
         runtimeInputs = [
@@ -258,9 +287,9 @@ in
               lib.concatMapStringsSep " " (
                 actor:
                 "--rawfile ${lib.escapeShellArg actor} \"$CREDENTIALS_DIRECTORY/\"${lib.escapeShellArg (tokenCredentialName actor)}"
-              ) (lib.attrNames seedTokenFiles)
+              ) (lib.attrNames bearerTokenFiles)
             } \
-            --argjson actors ${lib.escapeShellArg (builtins.toJSON (lib.attrNames seedTokenFiles))} '
+            --argjson actors ${lib.escapeShellArg (builtins.toJSON (lib.attrNames bearerTokenFiles))} '
             if type != "object" then error("the bearer tokens file is not a JSON object")
             else reduce $actors[] as $actor (.;
               if has($actor) then error("the bearer tokens file already names the actor \($actor)")
@@ -516,12 +545,32 @@ in
 
             At each start the server's `ExecStartPre` adds the token of every
             seed actor ({option}`services.omnigraph.cluster.graphs.<graph>.seed`)
-            to it, refusing an actor the file already names, and writes the
-            result to the server's RuntimeDirectory, readable by the service
-            user alone, which the server then reads.
+            and of every actor in
+            {option}`services.omnigraph.extraBearerTokenFiles` to it, refusing
+            an actor the file already names, and writes the result to the
+            server's RuntimeDirectory, readable by the service user alone,
+            which the server then reads.
 
             The server refuses to start without at least one bearer token, so
             this is required.
+          '';
+        };
+
+        extraBearerTokenFiles = lib.mkOption {
+          type = lib.types.attrsOf lib.types.path;
+          default = { };
+          example = lib.literalExpression ''{ monitor = "/run/secrets/omnigraph-monitor-token"; }'';
+          description = ''
+            Bearer-token actors beyond {option}`services.omnigraph.bearerTokensFile`
+            and the seed actors, each mapped to a file holding its token
+            alone. The server's `ExecStartPre` adds each to the tokens file
+            as it adds a seed actor's, refusing an actor the tokens file
+            already names, so adding one never regenerates the tokens file.
+            What an actor may do is set by the applied policy, not here.
+
+            The actor `monitor`, when present, is the one
+            `omnigraph-probe.service` reads per-graph state as; it receives
+            the same file through systemd credentials.
           '';
         };
 
@@ -1133,6 +1182,26 @@ in
             }
           ]) cfg.cluster.graphs
         )
+        ++ lib.concatLists (
+          lib.mapAttrsToList (actor: _: [
+            {
+              assertion = builtins.match "[A-Za-z_][A-Za-z0-9_]*" actor != null;
+              message = ''
+                services.omnigraph.extraBearerTokenFiles names the actor
+                "${actor}", which must match [A-Za-z_][A-Za-z0-9_]*.
+              '';
+            }
+            {
+              assertion = !(seedTokenFiles ? ${actor});
+              message = ''
+                services.omnigraph.extraBearerTokenFiles names the actor
+                ${actor}, which is also a seed actor
+                (services.omnigraph.cluster.graphs.<graph>.seed.actor); one
+                actor has one bearer token.
+              '';
+            }
+          ]) cfg.extraBearerTokenFiles
+        )
         ++ [
           {
             assertion = (createdAtFormat == null) == (servesFloor == null);
@@ -1224,7 +1293,7 @@ in
               lib.optional (cfg.bearerTokensFile != null) "bearer-tokens:${cfg.bearerTokensFile}"
               ++ lib.mapAttrsToList (
                 actor: tokenFile: "${tokenCredentialName actor}:${tokenFile}"
-              ) seedTokenFiles;
+              ) bearerTokenFiles;
             RuntimeDirectory = "omnigraph-server";
             StateDirectory = "omnigraph";
             DynamicUser = true;

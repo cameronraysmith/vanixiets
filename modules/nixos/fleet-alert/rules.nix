@@ -403,6 +403,24 @@
           severity = "warning";
           annotations.summary = "No PostgreSQL backup has succeeded on this host for over 36 h; check restic-backups-postgresql's journal and timer (runbook in packages/docs/src/content/docs/development/operations/postgresql-backup.md)";
         }
+        # omnigraph-probe (flake.modules.nixos.omnigraph-probe) writes
+        # omnigraph-server's readiness every minute: 0 while /readyz answers
+        # not ready or nothing answers, and the count of blocked graphs while
+        # it answers. Graphs open only at a server start, so a blocked graph
+        # stays blocked until a restart. 5 min lets a start that serves
+        # within it pass unreported; a failed start is also reported by
+        # omnigraph-server's own failure notice. No presence selector: the
+        # host table does not say which hosts serve omnigraph, and a probe
+        # that stops writing is HostProbeStale's.
+        #
+        # Runbook: packages/docs/src/content/docs/development/operations/omnigraph.md.
+        {
+          alert = "OmnigraphNotServing";
+          expr = ''vanixiets_omnigraph_ready == 0 or vanixiets_omnigraph_graphs{state="blocked"} > 0'';
+          for = "5m";
+          severity = "warning";
+          annotations.summary = "omnigraph-server has not been ready, or has served a blocked graph, for 5 min; check omnigraph-server's status and journal (runbook in packages/docs/src/content/docs/development/operations/omnigraph.md)";
+        }
         # track-r2-usage (F74, design D7): R2 keeps a multipart upload that is
         # never completed or aborted, and bills its parts as storage, until
         # a lifecycle rule aborts it; sciexp's aborts at 7 days. A day of
