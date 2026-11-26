@@ -145,6 +145,26 @@ It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios bel
 - **WHEN** the program runs with a `serve` lock whose pid exists and whose `created_at` is after `btime`
 - **THEN** it exits non-zero and `lock.json` is unchanged
 
+#### Scenario: an omnigraph server at the lock's pid after a clock step
+
+- **WHEN** the program runs with a `serve` lock whose `created_at` is earlier than `btime` and whose pid runs an executable named `omnigraph-server` with arguments that do not name the root
+- **THEN** it exits non-zero naming that pid and executable, and `lock.json` is unchanged
+
+#### Scenario: an unreadable boot time
+
+- **WHEN** `/proc/stat` cannot be read, or holds no integer `btime`, whether or not the lock's pid runs
+- **THEN** it exits non-zero saying the boot time cannot be read, and `lock.json` is unchanged
+
+#### Scenario: an unreadable process table
+
+- **WHEN** `/proc` cannot be listed, or a process with a non-empty command line has an `exe` link that cannot be read, or a process named `omnigraph` outside the Nix store has a `status` that cannot be read
+- **THEN** it exits non-zero naming what it could not read, and `lock.json` is unchanged
+
+#### Scenario: a kernel thread
+
+- **WHEN** a process has an empty command line and no readable `exe` link
+- **THEN** the program skips it
+
 #### Scenario: an id mismatch or an unreadable record
 
 - **WHEN** `omnigraph --target <root> cluster status --json` reports a `lock_id` other than the record's, or the record lacks string `lock_id`, `operation`, `created_at` or integer `pid`
@@ -152,8 +172,13 @@ It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios bel
 
 #### Scenario: the process scan
 
-- **WHEN** any process whose executable is named `omnigraph` or `omnigraph-server`, from any package, has an argument naming the root as `/var/lib/omnigraph/…`
+- **WHEN** a process whose executable is named `omnigraph` or `omnigraph-server`, and lies under `/nix/store/*-omnigraph-*/bin/` from any version or runs as root or `omnigraph`, has an argument naming the root as `/var/lib/omnigraph/…`
 - **THEN** the program refuses, whatever the record says
+
+#### Scenario: another user's executable named omnigraph
+
+- **WHEN** a process run by a user other than root and `omnigraph`, whose executable is named `omnigraph` and lies outside the Nix store, has an argument naming the root
+- **THEN** the program does not count it, and clears a dead server's lock
 
 #### Scenario: a lock from before the boot
 
@@ -177,7 +202,7 @@ It SHALL hold one record written by the packaged `omnigraph-server`, so a change
 #### Scenario: the check runs
 
 - **WHEN** `nix build .#checks.x86_64-linux.omnigraph-lock-recovery-rehearsal` runs
-- **THEN** every row passes, and a mutant that skips the process scan fails the running-writer row
+- **THEN** every row passes; a mutant that skips the process scan fails the running-writer row, one that accepts any boot time fails the unreadable-boot-time rows, and one that lets the boot time excuse an omnigraph server at the lock's pid fails the clock-step row
 
 ### Requirement: The backup job copies a ZFS snapshot to its R2 repository
 

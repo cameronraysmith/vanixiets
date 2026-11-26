@@ -10,24 +10,30 @@
 # answers `cluster status --json` with the lock file's lock_id (or the row's)
 # and removes the lock on `cluster force-unlock`; with a stub ntfy-send,
 # which logs its arguments and NTFY_TOKEN_FILE; and with a scripted process
-# table, a directory of `<pid>/exe` links, `<pid>/cmdline` files and a
-# `stat` holding btime. A row asserts the exit status, the stub's argument
-# log, the lock file (unchanged, byte for byte, or removed), the counter,
-# the notices posted and, for a refusal, the reason printed.
+# table, a directory of `<pid>/exe` links, `<pid>/cmdline` files and
+# `<pid>/status` files holding the owner's uids, and a `stat` holding
+# btime; an /etc/passwd names root, `omnigraph` and one other user. A row
+# asserts the exit status, the stub's argument log, the lock file
+# (unchanged, byte for byte, or removed), the counter, the notices posted
+# and, for a refusal, the reason printed.
 #
 # There is one row per scenario of the requirement `The server's start
 # clears a stale serve lock` (openspec change serve-omnigraph-from-local-disk,
-# graph-store-interface), and rows for an unconfirmed unlock, a failed notice
-# and a counter that already holds a count. The row `packaged-record` runs
-# the packaged omnigraph instead: it applies a one-graph cluster to the root,
+# graph-store-interface), and rows for an unconfirmed unlock, a failed notice,
+# a counter that already holds a count, and the processes the scan counts as
+# writers. The row `packaged-record` runs the packaged omnigraph instead: it
+# applies a one-graph cluster to the root,
 # starts omnigraph-server, kills it with SIGKILL, and requires the record it
 # left to have exactly the fields the program reads, the program built with
 # the packaged omnigraph and the real /proc to clear it, and the server to
 # serve again; so a release that changes the record's shape fails here.
 #
-# The mutant scanSkipped is the program with its process scan replaced by
-# `false`; the rows running-writer and running-server must fail
-# under it.
+# Each mutant is the program with one line replaced: scanSkipped skips the
+# process scan, and the rows running-writer and running-server must fail
+# under it; btimeUnchecked accepts any boot time, and the rows btime-missing
+# and stat-unreadable must fail; omnigraphAtPidExcused lets the boot time
+# excuse an omnigraph server at the lock's pid, and the row
+# stepped-clock-server must fail.
 { self, lib, ... }:
 {
   perSystem =
@@ -91,18 +97,32 @@
           hostName = "rehearsal";
           ntfySend = stubNtfySend;
           manualCli = "omnigraph-cluster";
+          writerUser = "omnigraph";
         };
       program = recovery stubOmnigraph procDir;
       packagedProgram = recovery packages.omnigraph "/proc";
 
       mutants = {
         scanSkipped = {
-          from = "if holder=$(scan_processes); then";
+          from = "if scan_processes; then";
           to = "if false; then";
           rows = [
             "running-writer"
             "running-server"
           ];
+        };
+        btimeUnchecked = {
+          from = "[[ $btime =~ ^[0-9]+$ ]] ||";
+          to = "true ||";
+          rows = [
+            "btime-missing"
+            "stat-unreadable"
+          ];
+        };
+        omnigraphAtPidExcused = {
+          from = ''if [ "$pid_program" = omnigraph ] || [ "$pid_program" = omnigraph-server ]; then'';
+          to = "if false; then";
+          rows = [ "stepped-clock-server" ];
         };
       };
       mutantProgram =
@@ -152,6 +172,17 @@
       bootBefore = 1795660874;
       bootAfter = 1795668074;
       omnigraphExe = "${packages.omnigraph}/bin/omnigraph";
+      serverExe = "${packages.omnigraph}/bin/omnigraph-server";
+      # The users of the scripted process table: `omnigraph` stands for the
+      # static user of modules/nixos/omnigraph.nix, whose uid differs per
+      # host, and 1000 for any other user.
+      omnigraphUid = 400;
+      otherUid = 1000;
+      passwd = pkgs.writeText "passwd" ''
+        root:x:0:0::/root:/bin/sh
+        omnigraph:x:${toString omnigraphUid}:${toString omnigraphUid}::/var/empty:/bin/sh
+        mallory:x:${toString otherUid}:${toString otherUid}::/home/mallory:/bin/sh
+      '';
 
       rehearsal =
         pkgs.runCommand "omnigraph-lock-recovery-rehearsal"
@@ -196,12 +227,18 @@
               write_lock "$(jq -n --arg op "''${1:-serve}" --argjson pid "''${2:-4242}" --arg at "''${3:-${createdAt}}" \
                 '{version: 1, lock_id: "${lockId}", operation: $op, created_at: $at, pid: $pid}')"
             }
-            process() { # <pid> <exe> <argv...>
-              local pid=$1 exe=$2
-              shift 2
+            process() { # <pid> <uid> <exe, or - for none> <argv...>
+              local pid=$1 uid=$2 exe=$3
+              shift 3
               mkdir -p "$dir/proc/$pid"
-              ln -s "$exe" "$dir/proc/$pid/exe"
+              [ "$exe" = - ] || ln -s "$exe" "$dir/proc/$pid/exe"
               printf '%s\0' "$@" >"$dir/proc/$pid/cmdline"
+              printf 'Name:\t%s\nUid:\t%s\t%s\t%s\t%s\n' "''${exe##*/}" "$uid" "$uid" "$uid" "$uid" >"$dir/proc/$pid/status"
+            }
+            kernel_thread() { # <pid>: an empty command line and no executable
+              mkdir -p "$dir/proc/$1"
+              : >"$dir/proc/$1/cmdline"
+              printf 'Name:\tkworker/0:1\nUid:\t0\t0\t0\t0\n' >"$dir/proc/$1/status"
             }
             run_program() {
               set +e
@@ -209,6 +246,7 @@
                 bwrap --unshare-all --die-with-parent \
                   --proc /proc --dev /dev --tmpfs /tmp --setenv TMPDIR /tmp \
                   --ro-bind /nix/store /nix/store \
+                  --ro-bind ${passwd} /etc/passwd \
                   --bind "$dir/var-lib" /var/lib \
                   --bind "$dir/proc" ${procDir} \
                   --bind "$dir/log" /run/log \
@@ -287,7 +325,7 @@
             row_running_writer() {
               start_row running-writer
               serve_lock
-              process 77 ${omnigraphExe} omnigraph --target ${root} load --data /tmp/seed.jsonl --graph cookbook-beads
+              process 77 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target ${root} load --data /tmp/seed.jsonl --graph cookbook-beads
               run_program
               refused_untouched
               expect_calls
@@ -296,7 +334,7 @@
             row_running_server() {
               start_row running-server
               serve_lock
-              process 91 "${packages.omnigraph}/bin/omnigraph-server (deleted)" omnigraph-server --cluster ${root} --bind 127.0.0.1:8090
+              process 91 ${toString omnigraphUid} "${serverExe} (deleted)" omnigraph-server --cluster ${root} --bind 127.0.0.1:8090
               run_program
               refused_untouched
               expect_calls
@@ -305,9 +343,10 @@
             row_unrelated_processes() {
               start_row unrelated-processes
               serve_lock
-              process 12 ${omnigraphExe} omnigraph --target ${root}-r2 cluster status
-              process 13 /run/current-system/sw/bin/ls ls ${root}
-              process 14 ${omnigraphExe} omnigraph version
+              process 12 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target ${root}-r2 cluster status
+              process 13 ${toString otherUid} /run/current-system/sw/bin/ls ls ${root}
+              process 14 ${toString omnigraphUid} ${omnigraphExe} omnigraph version
+              kernel_thread 2
               run_program
               expect_code 0
               expect_calls "$status_call" "$unlock_call"
@@ -325,7 +364,7 @@
             row_live_pid_this_boot() {
               start_row live-pid-this-boot
               serve_lock serve 4242
-              process 4242 /run/current-system/sw/bin/sleep sleep 600
+              process 4242 ${toString otherUid} /run/current-system/sw/bin/sleep sleep 600
               run_program
               refused_untouched
               expect_calls "$status_call"
@@ -335,7 +374,7 @@
               start_row lock-before-boot
               serve_lock serve 4242
               boot_at ${toString bootAfter}
-              process 4242 /run/current-system/sw/bin/sleep sleep 600
+              process 4242 ${toString otherUid} /run/current-system/sw/bin/sleep sleep 600
               run_program
               expect_code 0
               expect_calls "$status_call" "$unlock_call"
@@ -406,6 +445,99 @@
               expect_notices 1
             }
 
+            # Process state the program cannot read makes it refuse rather
+            # than count as no process.
+            row_listing_unreadable() {
+              start_row listing-unreadable
+              serve_lock
+              process 77 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target ${root} load --data /tmp/seed.jsonl --graph cookbook-beads
+              chmod 0311 "$dir/proc"
+              run_program
+              chmod 0755 "$dir/proc"
+              refused_untouched
+              expect_calls
+              expect_reason "the process table ${procDir} cannot be listed"
+            }
+            row_exe_unreadable() {
+              start_row exe-unreadable
+              serve_lock
+              process 78 ${toString omnigraphUid} - omnigraph --target ${root} load --data /tmp/seed.jsonl --graph cookbook-beads
+              run_program
+              refused_untouched
+              expect_calls
+              expect_reason "the executable of pid 78 (omnigraph --target ${root} load"
+            }
+            row_owner_unreadable() {
+              start_row owner-unreadable
+              serve_lock
+              process 79 ${toString otherUid} /home/mallory/omnigraph omnigraph --target ${root} status
+              rm "$dir/proc/79/status"
+              run_program
+              refused_untouched
+              expect_calls
+              expect_reason "the owner of pid 79 (omnigraph --target ${root} status) cannot be read"
+            }
+            row_btime_missing() {
+              start_row btime-missing
+              serve_lock serve 4242
+              printf 'cpu  1 2 3 4\nprocesses 9\n' >"$dir/proc/stat"
+              process 4242 ${toString otherUid} /run/current-system/sw/bin/sleep sleep 600
+              run_program
+              refused_untouched
+              expect_calls "$status_call"
+              expect_reason "the boot time in ${procDir}/stat cannot be read"
+            }
+            row_stat_unreadable() {
+              start_row stat-unreadable
+              serve_lock
+              chmod 0 "$dir/proc/stat"
+              run_program
+              refused_untouched
+              expect_calls "$status_call"
+              expect_reason "the boot time in ${procDir}/stat cannot be read"
+            }
+
+            # An omnigraph server at the lock's pid is refused whatever the
+            # boot time says: here the clock stepped forward after the lock
+            # was taken, and the server addresses the root by a form the scan
+            # does not match.
+            row_stepped_clock_server() {
+              start_row stepped-clock-server
+              serve_lock serve 4242
+              boot_at ${toString bootAfter}
+              process 4242 ${toString omnigraphUid} ${serverExe} omnigraph-server --target cookbooks --bind 127.0.0.1:8090
+              run_program
+              refused_untouched
+              expect_calls "$status_call"
+              expect_reason "pid 4242, which lock ${lockId} names, is running ${serverExe} (omnigraph-server --target cookbooks"
+            }
+
+            # Which processes the scan counts as writers of the root.
+            row_imposter_ignored() {
+              start_row imposter-ignored
+              serve_lock
+              process 55 ${toString otherUid} /home/mallory/omnigraph omnigraph 1d ${root}
+              run_program
+              expect_code 0
+              expect_calls "$status_call" "$unlock_call"
+              expect_lock_cleared
+              expect_counter 1
+            }
+            counted_writer() { # <name> <uid> <exe>
+              start_row "$1"
+              serve_lock
+              process 56 "$2" "$3" omnigraph --target ${root} load --data /tmp/seed.jsonl
+              run_program
+              refused_untouched
+              expect_calls
+              expect_reason "pid 56: omnigraph --target ${root} load"
+            }
+            row_counted_writers() {
+              counted_writer store-binary-other-user ${toString otherUid} ${omnigraphExe}
+              counted_writer other-binary-as-omnigraph ${toString omnigraphUid} /home/mallory/omnigraph
+              counted_writer other-binary-as-root 0 /usr/local/bin/omnigraph
+            }
+
             # The packaged omnigraph's own record: apply, serve, SIGKILL, then
             # the program built with the packaged omnigraph and the real /proc.
             row_packaged_record() {
@@ -440,6 +572,7 @@
               NTFY_LOG=/run/log/ntfy bwrap --unshare-all --share-net --die-with-parent \
                 --proc /proc --dev /dev --tmpfs /tmp --setenv TMPDIR /tmp \
                 --ro-bind /nix/store /nix/store \
+                --ro-bind ${passwd} /etc/passwd \
                 --bind "$dir/var-lib" /var/lib \
                 --bind "$dir/log" /run/log \
                 bash /run/log/crash.sh >"$dir/out" 2>"$dir/err"
@@ -459,6 +592,8 @@
               no_lock dead_server running_writer running_server unrelated_processes
               direct_writer_lock live_pid_this_boot lock_before_boot id_mismatch status_failed
               unreadable unlock_unconfirmed counter_counts_on notice_fails
+              listing_unreadable exe_unreadable owner_unreadable btime_missing stat_unreadable
+              stepped_clock_server imposter_ignored counted_writers
             )
             program=${lib.getExe program}
             for r in "''${rows[@]}"; do

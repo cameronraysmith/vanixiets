@@ -12,25 +12,41 @@
 # the lock stale before it unlocks, and clears it only when all of these
 # hold, in this order:
 #   1. no lock file: exit 0, nothing run;
-#   2. no process whose executable is named `omnigraph` or `omnigraph-server`
-#      has an argument naming the root (a direct writer run as root
-#      included, which the server's sandbox would hide from it); the
-#      executable is matched by name, so a writer started from an older or
-#      newer omnigraph package counts too;
-#   3. the record is OmniGraph's held-lock shape (version 1, string lock_id,
+#   2. the process table can be read: it lists, and every process with a
+#      command line has a readable executable and, where the next step needs
+#      it, a readable owner; a process with an empty command line (a kernel
+#      thread or a zombie) has no executable and holds no file, and is
+#      skipped;
+#   3. no process that may write the root has an argument naming it: one
+#      whose executable is named `omnigraph` or `omnigraph-server` and is
+#      either an omnigraph package's in the Nix store, from any version, or
+#      run by root or `writerUser` (a direct writer run as root included,
+#      which the server's sandbox would hide from it); an executable of that
+#      name elsewhere, run by another user, is not omnigraph's, and counting
+#      it would let any user hold the server down;
+#   4. the record is OmniGraph's held-lock shape (version 1, string lock_id,
 #      operation and created_at, positive integer pid), its created_at is a
 #      date, and `omnigraph cluster status --json` reports the same lock_id;
-#   4. its operation is `serve`: any other lock is a direct writer's, whose
+#   5. its operation is `serve`: any other lock is a direct writer's, whose
 #      recovery is the reconciliation of its deployment, not a bare unlock;
-#   5. its pid is not running, or the lock was taken before this boot
-#      (`btime` in <proc>/stat): the record has no boot id, so a running pid
-#      is only another process when the boot changed;
+#   6. the boot time (`btime` in <proc>/stat) is an integer;
+#   7. its pid is not running an executable named `omnigraph` or
+#      `omnigraph-server`, whatever the boot time says: a server the scan
+#      missed (another argument form) after a forward clock step would
+#      otherwise look like one from an earlier boot;
+#   8. its pid is not running, or the lock was taken before this boot: the
+#      record has no boot id, so a running pid is only another program when
+#      the boot changed;
 # then it runs `omnigraph --target <root> cluster force-unlock <lock_id>
 # --json`, requires `"unlocked": true`, adds one to the integer in
 # `counterFile` (0 when absent), which omnigraph-probe publishes, and posts a
 # low-priority notice to fleet-alerts through ntfy-send, whose failure does
 # not fail the start. Any other case leaves lock.json as it is, prints the
 # reason and the manual step, and exits 1, so the start fails visibly.
+#
+# A server in another pid namespace (a container) passes steps 7 and 8:
+# its record's pid is the namespace's, which on the host is absent or
+# another process.
 #
 # `proc` is the process table and boot time to read, /proc on a host;
 # checks.x86_64-linux.omnigraph-lock-recovery-rehearsal builds the program
@@ -53,6 +69,10 @@
       # The user owning the root's files, whom omnigraph runs as, so that the
       # unlock leaves no file owned by root; null runs it as the caller.
       runAs ? null,
+      # The user besides root whose processes named omnigraph count as
+      # writers of the root wherever their executable lies; null counts
+      # root's alone.
+      writerUser ? runAs,
       counterFile ? config.flake.lib.omnigraphProbe.lockRecoveriesFile,
     }:
     let
@@ -87,23 +107,65 @@
           exit 1
         }
 
-        # The first omnigraph process with an argument naming the root, as
-        # `pid <pid>: <argv>`.
+        # Reads the process directory $1 into `args` (its command line) and
+        # `exe` (its executable, without " (deleted)"). Fails for a process
+        # that has exited and for one with an empty command line; refuses
+        # when a live process's command line or executable cannot be read.
+        read_process() {
+          local pid=''${1##*/}
+          local check="Confirm with ps -o pid,user,args -p $pid that it is not an omnigraph process using the root, then run: systemctl restart omnigraph-server"
+          if ! mapfile -d "" -t args 2>/dev/null <"$1/cmdline"; then
+            [ -e "$1" ] || return 1
+            refuse "the command line of pid $pid cannot be read" "$check"
+          fi
+          [ "''${#args[@]}" -gt 0 ] || return 1
+          if ! exe=$(readlink -- "$1/exe" 2>/dev/null); then
+            [ -e "$1" ] || return 1
+            refuse "the executable of pid $pid (''${args[*]}) cannot be read" "$check"
+          fi
+          exe=''${exe% (deleted)}
+        }
+
+        # Whether the process directory $1 runs as root or the writer user,
+        # by any of its real, effective, saved and file-system uids.
+        writer_owned() {
+          local uids uid writer
+          if ! uids=$(awk '$1 == "Uid:" { print $2, $3, $4, $5; found = 1 } END { exit !found }' "$1/status" 2>/dev/null); then
+            [ -e "$1" ] || return 1
+            refuse "the owner of pid ''${1##*/} (''${args[*]}) cannot be read" \
+              "Confirm with ps -o pid,user,args -p ''${1##*/} that it is not an omnigraph process using the root, then run: systemctl restart omnigraph-server"
+          fi
+          for uid in $uids; do
+            for writer in "''${writer_uids[@]}"; do
+              [ "$uid" != "$writer" ] || return 0
+            done
+          done
+          return 1
+        }
+
+        # Sets `holder` to `pid <pid>: <argv>` of the first process that may
+        # write the root and has an argument naming it.
         scan_processes() {
-          local dir exe arg
-          local -a args
-          for dir in "$proc"/[0-9]*; do
-            exe=$(readlink -- "$dir/exe" 2>/dev/null) || continue
-            exe=''${exe% (deleted)}
+          local entries entry arg
+          if ! entries=$(ls -- "$proc" 2>/dev/null); then
+            refuse "the process table $proc cannot be listed" \
+              "Check that $proc is mounted and readable by root (ls $proc), then run: systemctl restart omnigraph-server"
+          fi
+          for entry in $entries; do
+            [[ $entry =~ ^[0-9]+$ ]] || continue
+            read_process "$proc/$entry" || continue
             case ''${exe##*/} in
               omnigraph | omnigraph-server) ;;
               *) continue ;;
             esac
-            mapfile -d "" -t args < <(cat -- "$dir/cmdline" 2>/dev/null || true)
+            case $exe in
+              /nix/store/*-omnigraph-*/bin/omnigraph | /nix/store/*-omnigraph-*/bin/omnigraph-server) ;;
+              *) writer_owned "$proc/$entry" || continue ;;
+            esac
             for arg in "''${args[@]}"; do
               case $arg in
                 *"$root" | *"$root"/*)
-                  printf 'pid %s: %s\n' "''${dir##*/}" "''${args[*]}"
+                  holder="pid $entry: ''${args[*]}"
                   return 0
                   ;;
               esac
@@ -114,8 +176,17 @@
 
         [ -e "$lock" ] || exit 0
 
+        writer_uids=(0)
+        ${lib.optionalString (writerUser != null) ''
+          if ! writer_uid=$(id -u -- ${lib.escapeShellArg writerUser} 2>/dev/null); then
+            refuse ${lib.escapeShellArg "the user ${writerUser} does not exist, so the processes that may write the root cannot be told apart"} \
+              "Once no omnigraph process runs against the root (ps -eo pid,user,args), run: $manual force-unlock <lock_id>"
+          fi
+          writer_uids+=("$writer_uid")
+        ''}
+
         # mutant: scanSkipped
-        if holder=$(scan_processes); then
+        if scan_processes; then
           refuse "an omnigraph process has the root open ($holder)" \
             "Wait for that process to finish or stop it, then run: systemctl restart omnigraph-server"
         fi
@@ -157,10 +228,23 @@
             "With no omnigraph process running against the root, find its deployment with $manual status --json, then run $manual force-unlock $lock_id and $manual apply --deployment-id <deployment_id> --writers-stopped --json; for a writer other than an apply, confirm it stopped and run $manual force-unlock $lock_id"
         fi
 
-        btime=$(awk '$1 == "btime" { print $2 }' "$proc/stat")
-        if [ -d "$proc/$pid" ] && [ "$created" -ge "$btime" ]; then
-          refuse "lock $lock_id was taken in this boot ($created_at) by pid $pid, which is running" \
-            "Confirm pid $pid is not an omnigraph-server holding the root (ps -o pid,args -p $pid), then run $manual force-unlock $lock_id and systemctl restart omnigraph-server"
+        pid_check="Confirm pid $pid is not an omnigraph-server holding the root (ps -o pid,args -p $pid), then run $manual force-unlock $lock_id and systemctl restart omnigraph-server"
+        btime=$(awk '$1 == "btime" { print $2 }' "$proc/stat" 2>/dev/null) || btime=
+        # mutant: btimeUnchecked
+        [[ $btime =~ ^[0-9]+$ ]] || refuse "the boot time in $proc/stat cannot be read, so whether lock $lock_id was taken in this boot cannot be told" "$pid_check"
+
+        if [ -d "$proc/$pid" ]; then
+          if read_process "$proc/$pid"; then
+            pid_program=''${exe##*/}
+            # mutant: omnigraphAtPidExcused
+            if [ "$pid_program" = omnigraph ] || [ "$pid_program" = omnigraph-server ]; then
+              refuse "pid $pid, which lock $lock_id names, is running $exe (''${args[*]}), so the lock may be that server's whatever the boot time says" \
+                "Confirm pid $pid does not serve the root (ps -o pid,args -p $pid); if it does not, run $manual force-unlock $lock_id and systemctl restart omnigraph-server; if it does, stop it, then run systemctl restart omnigraph-server"
+            fi
+          fi
+          if [ "$created" -ge "$btime" ]; then
+            refuse "lock $lock_id was taken in this boot ($created_at) by pid $pid, which is running" "$pid_check"
+          fi
         fi
 
         if ! unlocked=$(og --target "$root" cluster force-unlock "$lock_id" --json) \

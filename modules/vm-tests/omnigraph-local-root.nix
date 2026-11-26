@@ -31,13 +31,19 @@
 #      writer, and leaves lock.json byte for byte; once the writer is gone
 #      the start recovers;
 #   4. the backup job takes the snapshot zroot/root/omnigraph@restic, backs up
-#      its directory, destroys it and stamps its success; after the dataset
-#      is emptied, the runbook's restore (stop, `restic-omnigraph restore`
-#      of the snapshot directory, `chown -R omnigraph:omnigraph`,
-#      `omnigraph-cluster force-unlock` of the restored lock, start) serves
-#      the same counts and answers;
+#      its directory, destroys it and stamps its success, recording every
+#      file of the dataset with omnigraph's uid and gid; after the dataset is
+#      emptied, the runbook's
+#      restore (stop the backup timer and the server, take
+#      zroot/root/omnigraph@pre-restore, `restic-omnigraph restore` of the
+#      chosen backup's snapshot directory, `chown -R omnigraph:omnigraph`,
+#      `omnigraph-cluster force-unlock` of the restored lock, start, destroy
+#      the pre-restore snapshot, start the timer) serves the same counts and
+#      answers;
 #   5. after a reboot the dataset is mounted before the units, which start
-#      and serve the same answers;
+#      and serve the same answers, and the server, bootstrap, apply and seed
+#      units each require the mounts of /var/lib/omnigraph/clusters
+#      (`RequiresMountsFor`);
 #   6. every series of the probe is in its textfile, per-graph ones
 #      included, and the backup stamp in the backup's; with a wrong monitor
 #      token the probe logs `GET /graphs` answered with its HTTP 4xx status,
@@ -394,13 +400,24 @@
                   machine.succeed("[ -z \"$(zfs list -H -t snapshot -o name ${backup.snapshot} 2>/dev/null)\" ]")
                   snapshots = json.loads(machine.succeed("restic-omnigraph snapshots --json"))
                   assert len(snapshots) == 1 and snapshots[0]["paths"] == ["${backup.snapshotPath}"], snapshots
-                  owners = machine.succeed("restic-omnigraph ls latest --json | jq -r 'select(.path != null) | \"\\(.uid):\\(.gid)\"' | sort -u")
-                  print(f"owners recorded in the backup: {owners}")
+                  chosen = snapshots[0]["short_id"]
+                  nodes = [json.loads(line) for line in machine.succeed(f"restic-omnigraph ls {chosen} --json").splitlines()]
+                  snap = "${backup.snapshotPath}"
+                  within = lambda path: path == snap or path.startswith(snap + "/")
+                  owners = {f"{n['uid']}:{n['gid']}" for n in nodes if within(n.get("path", ""))}
+                  omnigraph_ids = machine.succeed("echo $(id -u omnigraph):$(id -g omnigraph)").strip()
+                  assert owners == {omnigraph_ids}, f"owners recorded below the snapshot directory: {owners}"
+                  print(f"recorded above it: {sorted((n['path'], n['uid'], n['gid']) for n in nodes if 'path' in n and not within(n['path']))}")
                   machine.succeed(f"grep -q '^${backup.seriesName} [0-9]' {TEXTFILE}/omnigraph-backup.prom")
-                  machine.succeed("systemctl stop omnigraph-server.service")
+                  machine.succeed("systemctl stop restic-backups-omnigraph.timer omnigraph-server.service")
+                  machine.fail("systemctl is-active restic-backups-omnigraph.timer")
+                  machine.succeed("zfs snapshot ${backup.dataset}@pre-restore")
                   machine.succeed(f"find {DATASET} -mindepth 1 -xdev -delete")
                   machine.succeed(f"[ -z \"$(ls -A {DATASET})\" ]")
-                  machine.succeed(f"restic-omnigraph restore latest:${backup.snapshotPath} --target {DATASET}")
+                  machine.succeed(f"restic-omnigraph restore {chosen}:${backup.snapshotPath} --target {DATASET}")
+                  # restic restores the recorded owners; the chown matters on a
+                  # host where omnigraph has another uid.
+                  owned_by_omnigraph()
                   machine.succeed(f"chown -R omnigraph:omnigraph {DATASET}")
                   owned_by_omnigraph()
                   restored = machine.succeed(f"jq -r .lock_id {LOCK}").strip()
@@ -412,6 +429,8 @@
                   assert after_restore == before
                   assert counter() == "2", counter()
                   owned_by_omnigraph()
+                  machine.succeed("zfs destroy ${backup.dataset}@pre-restore")
+                  machine.succeed("systemctl start restic-backups-omnigraph.timer")
 
               with subtest("after a reboot the dataset is mounted before the units, which serve"):
                   machine.shutdown()
@@ -419,7 +438,10 @@
                   machine.wait_for_unit("omnigraph-server.service")
                   seeds_done()
                   machine.succeed(f"findmnt -n -o SOURCE {DATASET} | grep -qx ${backup.dataset}")
-                  assert "var-lib-omnigraph.mount" in machine.succeed("systemctl show -P RequiresMountsFor -P Requires omnigraph-server.service")
+                  for unit in ["omnigraph-cluster-bootstrap", "omnigraph-cluster-apply", "omnigraph-server"] + [f"omnigraph-seed-{g}" for g in SEEDED]:
+                      mounts = machine.succeed(f"systemctl show -P RequiresMountsFor {unit}.service").split()
+                      assert "${roots.localDirectory}" in mounts, (unit, mounts)
+                      print(f"{unit} RequiresMountsFor: {mounts}")
                   after_reboot = answers()
                   print(f"answers after reboot: {json.dumps(after_reboot, sort_keys=True)}")
                   assert after_reboot == before

@@ -62,14 +62,20 @@ It decides by the first matching row:
 | Row | It finds | It does |
 |---|---|---|
 | 1 | no `lock.json` | nothing; the start goes on |
-| 2 | a process whose executable is named `omnigraph` or `omnigraph-server` with an argument naming the root | refuses |
-| 3 | a record not of the shape OmniGraph writes for a held lock (version 1, string `lock_id` and `operation`, RFC 3339 `created_at`, positive integer `pid`) | refuses |
-| 4 | a `created_at` that is not a date | refuses |
-| 5 | `omnigraph cluster status` failing | refuses |
-| 6 | `omnigraph cluster status` reporting a lock other than the record's | refuses |
-| 7 | an `operation` other than `serve`: a direct writer's lock | refuses |
-| 8 | a record `pid` that is running, in a lock taken during the current boot | refuses |
-| 9 | anything else: a server's lock whose process is gone, or taken before this boot | removes it by its exact id with `force-unlock`, counts it, posts a notice, and the start goes on |
+| 2 | a process table it cannot read: `/proc` does not list, a process with a command line has an executable it cannot read, or a process it must judge by owner has an owner it cannot read; or the user `omnigraph` does not exist | refuses |
+| 3 | a process that may write the root with an argument naming it: its executable is named `omnigraph` or `omnigraph-server`, and lies in an omnigraph package in the Nix store or runs as root or `omnigraph` | refuses |
+| 4 | a record not of the shape OmniGraph writes for a held lock (version 1, string `lock_id` and `operation`, RFC 3339 `created_at`, positive integer `pid`) | refuses |
+| 5 | a `created_at` that is not a date | refuses |
+| 6 | `omnigraph cluster status` failing | refuses |
+| 7 | `omnigraph cluster status` reporting a lock other than the record's | refuses |
+| 8 | an `operation` other than `serve`: a direct writer's lock | refuses |
+| 9 | a boot time (`btime` in `/proc/stat`) it cannot read as an integer | refuses |
+| 10 | a record `pid` running an executable named `omnigraph` or `omnigraph-server`, whatever the boot time says | refuses |
+| 11 | a record `pid` that is running, in a lock taken during the current boot | refuses |
+| 12 | anything else: a server's lock whose process is gone, or taken before this boot by a pid that now runs another program | removes it by its exact id with `force-unlock`, counts it, posts a notice, and the start goes on |
+
+A process with an empty command line, a kernel thread or a zombie, has no executable and holds no file, so row 2 skips it.
+An executable named `omnigraph` outside the Nix store and run by another user is not omnigraph's, and row 3 ignores it, so no user can hold the server down by running one.
 
 A recovery adds one to `/var/lib/omnigraph-metrics/lock-recoveries`, which the probe publishes as `vanixiets_omnigraph_lock_recoveries_total`, logs `omnigraph-lock-recovery: omnigraph-server on magnetite cleared the stale serve lock <id> of <root> (pid <pid>, taken <created_at>) and starts; lock recoveries on magnetite: <n>`, and posts that message at low priority to `fleet-alerts` with the title `omnigraph lock recovered on magnetite`.
 A recovery is an expected event after a crash, not an alert; a failed post does not fail the start.
@@ -85,17 +91,25 @@ Each refusal prints two lines, `omnigraph-lock-recovery: left <root>/__cluster/l
 
 | Row | Reason | Manual step |
 |---|---|---|
-| 2 | `an omnigraph process has the root open (pid <pid>: <argv>)` | `Wait for that process to finish or stop it, then run: systemctl restart omnigraph-server` |
-| 3 | `the record is not the shape omnigraph writes for a held lock (…)` | `Read <lock> and omnigraph-cluster status --json, and once no omnigraph process runs against the root, run: omnigraph-cluster force-unlock <lock_id>` |
-| 4 | `the record's created_at (<value>) is not a date` | the same, with the record's id |
-| 5 | `omnigraph cluster status failed, so the record's lock <id> cannot be confirmed as the cluster's` | `Read omnigraph-cluster status --json, and once no omnigraph process runs against the root, run: omnigraph-cluster force-unlock <id>` |
-| 6 | `the record names lock <id> but omnigraph cluster status reports <other>, so the lock changed while it was read` | `Run systemctl restart omnigraph-server to read it again; if it persists, compare <lock> with omnigraph-cluster status --json` |
-| 7 | `lock <id> was taken by a direct <operation> writer (pid <pid>, <created_at>), whose interrupted work needs its own recovery` | `With no omnigraph process running against the root, find its deployment with omnigraph-cluster status --json, then run omnigraph-cluster force-unlock <id> and omnigraph-cluster apply --deployment-id <deployment_id> --writers-stopped --json; for a writer other than an apply, confirm it stopped and run omnigraph-cluster force-unlock <id>` |
-| 8 | `lock <id> was taken in this boot (<created_at>) by pid <pid>, which is running` | `Confirm pid <pid> is not an omnigraph-server holding the root (ps -o pid,args -p <pid>), then run omnigraph-cluster force-unlock <id> and systemctl restart omnigraph-server` |
+| 2 | `the process table /proc cannot be listed` | `Check that /proc is mounted and readable by root (ls /proc), then run: systemctl restart omnigraph-server` |
+| 2 | `the command line of pid <pid> cannot be read`, `the executable of pid <pid> (<argv>) cannot be read` or `the owner of pid <pid> (<argv>) cannot be read` | `Confirm with ps -o pid,user,args -p <pid> that it is not an omnigraph process using the root, then run: systemctl restart omnigraph-server` |
+| 2 | `the user omnigraph does not exist, so the processes that may write the root cannot be told apart` | `Once no omnigraph process runs against the root (ps -eo pid,user,args), run: omnigraph-cluster force-unlock <lock_id>` |
+| 3 | `an omnigraph process has the root open (pid <pid>: <argv>)` | `Wait for that process to finish or stop it, then run: systemctl restart omnigraph-server` |
+| 4 | `the record is not the shape omnigraph writes for a held lock (…)` | `Read <lock> and omnigraph-cluster status --json, and once no omnigraph process runs against the root, run: omnigraph-cluster force-unlock <lock_id>` |
+| 5 | `the record's created_at (<value>) is not a date` | the same, with the record's id |
+| 6 | `omnigraph cluster status failed, so the record's lock <id> cannot be confirmed as the cluster's` | `Read omnigraph-cluster status --json, and once no omnigraph process runs against the root, run: omnigraph-cluster force-unlock <id>` |
+| 7 | `the record names lock <id> but omnigraph cluster status reports <other>, so the lock changed while it was read` | `Run systemctl restart omnigraph-server to read it again; if it persists, compare <lock> with omnigraph-cluster status --json` |
+| 8 | `lock <id> was taken by a direct <operation> writer (pid <pid>, <created_at>), whose interrupted work needs its own recovery` | `With no omnigraph process running against the root, find its deployment with omnigraph-cluster status --json, then run omnigraph-cluster force-unlock <id> and omnigraph-cluster apply --deployment-id <deployment_id> --writers-stopped --json; for a writer other than an apply, confirm it stopped and run omnigraph-cluster force-unlock <id>` |
+| 9 | `the boot time in /proc/stat cannot be read, so whether lock <id> was taken in this boot cannot be told` | `Confirm pid <pid> is not an omnigraph-server holding the root (ps -o pid,args -p <pid>), then run omnigraph-cluster force-unlock <id> and systemctl restart omnigraph-server` |
+| 10 | `pid <pid>, which lock <id> names, is running <executable> (<argv>), so the lock may be that server's whatever the boot time says` | `Confirm pid <pid> does not serve the root (ps -o pid,args -p <pid>); if it does not, run omnigraph-cluster force-unlock <id> and systemctl restart omnigraph-server; if it does, stop it, then run systemctl restart omnigraph-server` |
+| 11 | `lock <id> was taken in this boot (<created_at>) by pid <pid>, which is running` | `Confirm pid <pid> is not an omnigraph-server holding the root (ps -o pid,args -p <pid>), then run omnigraph-cluster force-unlock <id> and systemctl restart omnigraph-server` |
 
 Run the manual commands as root (`sudo omnigraph-cluster …`, `sudo systemctl …`).
 A `force-unlock` that does not report the lock removed fails the start with `omnigraph cluster force-unlock <id> did not report the lock removed`; read the command's output in the same journal.
 Once the start limit is spent, systemd refuses further starts until `sudo systemctl reset-failed omnigraph-server.service`.
+
+The recovery cannot tell a server in another pid namespace, such as a container, from a dead one: that server's record holds its pid inside the namespace, which on the host is absent or another program, so row 10 never sees it, row 11 stops the unlock only while some host process happens to hold that pid, and otherwise only row 3 does, when the scan finds the server by its arguments.
+Serve or write this root only from the host.
 
 On an R2 root none of this runs: a lock in the bucket carries a lease, and a successor takes over a crashed server's lock once the lease expires.
 
@@ -103,7 +117,7 @@ On an R2 root none of this runs: a lock in the bucket carries a lease, and a suc
 
 `omnigraph optimize` runs directly against storage, not through the server.
 On a local root it exits with its admission lock still in `lock.json`, logging `cluster admission retained … use exact-ID cluster force-unlock`.
-The server's next start then meets a direct writer's lock, which the recovery refuses (row 7), and the server stays down until someone runs `sudo omnigraph-cluster force-unlock <LOCK_ID>`.
+The server's next start then meets a direct writer's lock, which the recovery refuses (row 8), and the server stays down until someone runs `sudo omnigraph-cluster force-unlock <LOCK_ID>`.
 An assertion in `modules/nixos/omnigraph.nix` therefore fails evaluation when `services.omnigraph.optimize.enable` is set for a local root.
 Optimize on a local root is not provided; on an R2 root the option is unchanged and off on magnetite.
 
@@ -137,39 +151,51 @@ A run whose backup, prune and check all succeeded writes `vanixiets_omnigraph_ba
 ## Restoring the graph data
 
 Restore from the backup when the dataset's contents are lost or damaged.
-The steps are the ones `vmTests.x86_64-linux.omnigraph-local-root` runs and checks to identical entity counts and stored-query answers.
+The steps are the ones `vmTests.x86_64-linux.omnigraph-local-root` runs and checks to identical entity counts and stored-query answers, all but the rollback in step 3.
 On a host that no longer has the dataset, create it first as the switch to local disk does: `sudo zfs create -o mountpoint=/var/lib/omnigraph -o quota=20G zroot/root/omnigraph`.
 
-1. Stop the server:
+1. Stop the nightly backup's timer and the server, so that no backup runs over a half-restored dataset; the prune after such a backup keeps one backup a day and would drop that day's good one:
    ```bash
-   sudo systemctl stop omnigraph-server.service
+   sudo systemctl stop restic-backups-omnigraph.timer omnigraph-server.service
    ```
-2. Pick the backup, `latest` or a snapshot id from `sudo restic-omnigraph snapshots`.
-3. Empty the dataset; its ZFS snapshots are untouched:
+   If `systemctl is-active restic-backups-omnigraph.service` answers `activating`, a backup is running; wait until it answers `inactive`.
+2. Pick the backup from `sudo restic-omnigraph snapshots`: its id, or `latest`, is `<SNAPSHOT>` below.
+3. Keep the dataset's current contents, so that a failed restore can go back to them:
+   ```bash
+   sudo zfs snapshot zroot/root/omnigraph@pre-restore
+   ```
+   To go back, with the server stopped, run `sudo zfs rollback -r zroot/root/omnigraph@pre-restore`; `-r` also destroys the snapshots taken after it, automatic ones included.
+4. Empty the dataset; its ZFS snapshots are untouched:
    ```bash
    sudo find /var/lib/omnigraph -mindepth 1 -xdev -delete
    ```
-4. Restore the snapshot directory's contents into the dataset:
+5. Restore the chosen backup's snapshot directory into the dataset:
    ```bash
-   sudo restic-omnigraph restore latest:/var/lib/omnigraph/.zfs/snapshot/restic --target /var/lib/omnigraph
+   sudo restic-omnigraph restore <SNAPSHOT>:/var/lib/omnigraph/.zfs/snapshot/restic --target /var/lib/omnigraph
    ```
-5. Give every file to `omnigraph`. The backup records every file as owned by `0:0` (`sudo restic-omnigraph ls latest --json` shows it), so the restored files belong to root and the server, running as `omnigraph`, cannot write them; the `chown` also covers a host where `omnigraph` has another uid.
+6. Give every file to `omnigraph`. The backup records each file's numeric owner on the host it was taken on, the uid and gid of `omnigraph` there (`sudo restic-omnigraph ls <SNAPSHOT> --json` shows them), and restores those numbers; on a host where `omnigraph` has another uid, as after a reinstall, the restored files belong to a uid the server, running as `omnigraph`, cannot write as. The `chown` gives every file to `omnigraph` whatever the backup recorded.
    ```bash
    sudo chown -R omnigraph:omnigraph /var/lib/omnigraph
    ```
-6. Remove the lock the backup carries: the server was running when the snapshot was taken, so every backup holds its serve lock.
+7. Remove the lock the backup carries: the server was running when the snapshot was taken, so every backup holds its serve lock.
    ```bash
    sudo jq -r .lock_id /var/lib/omnigraph/clusters/cookbooks-f17/__cluster/lock.json
    sudo omnigraph-cluster force-unlock <LOCK_ID>
    ```
    Without this step the server's start treats the restored lock like a crashed server's and clears it when the recovery's checks pass, counting it as a recovery and posting a notice.
-7. Start the server and compare:
+8. Start the server and compare:
    ```bash
    sudo systemctl start omnigraph-server.service
    sudo systemctl start omnigraph-probe.service
    grep vanixiets_omnigraph_graph_entities /run/node-exporter-textfile/omnigraph.prom
    ```
    The entity counts should equal those stored on the night of the backup, for example from `nix run .#obs-query -- --table promql 'vanixiets_omnigraph_graph_entities{host_name="magnetite"}'`.
+9. Once they do, drop the snapshot of step 3, which otherwise keeps the replaced files' space within the dataset's quota, and start the timer again:
+   ```bash
+   sudo zfs destroy zroot/root/omnigraph@pre-restore
+   sudo systemctl start restic-backups-omnigraph.timer
+   ```
+   If they do not, roll back as step 3 says before starting the timer.
 
 To return to a recent state without R2, the dataset's hourly, daily and weekly ZFS snapshots are listed by `zfs list -t snapshot zroot/root/omnigraph`.
 Any copy of a root carries the lock of the server it was taken from, so a copy from one of them needs the same `chown` and unlock; this path is not exercised by a test.
