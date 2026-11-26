@@ -380,6 +380,7 @@ nix run .#omnigent-worker-login -- stibnite cameron codex
 `omnigent` renews the worker's own Omnigent login: it runs `omnigent login` against the server role's domain and prints a `/auth/login` URL to open within five minutes, signing in through Kanidm as the worker's owner.
 The login's refresh grant expires `OMNIGENT_GRANT_MAX_LIFETIME_DAYS` after that login, 90 days once the server role deploys it (omnigent's default is 30), after which the host fails with "stored login session … has EXPIRED", exits 78, and needs this renewal again; renew ahead of that date, or when the unit's failure notice arrives.
 `atomic`, `omp` and `pi` open their interactive interfaces, where `/login` selects the intended provider.
+`agy` (or `antigravity`) opens the Antigravity CLI for the `antigravity-native` harness, which starts Google sign-in; `agy models` lists models once the worker is signed in.
 Each login receives its own refresh state even when the underlying subscription is shared.
 `verify` runs the GitHub, Linear, signing-key and Omnigent identity verifier; it does not attest model login or a model turn.
 Remote access uses SSH without agent forwarding; local Stibnite access uses sudo.

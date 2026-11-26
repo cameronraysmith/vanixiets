@@ -16,6 +16,7 @@
       inputs.llm-agents.packages.${system}.codex
       inputs.llm-agents.packages.${system}.pi
       inputs.llm-agents.packages.${system}.omp
+      inputs.llm-agents.packages.${system}.antigravity-cli
       pkgs.bun
       pkgs.nodejs_22
       pkgs.python3
