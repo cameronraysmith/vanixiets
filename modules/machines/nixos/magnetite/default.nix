@@ -270,10 +270,10 @@ in
 
       # Pool-starvation guardrails (2026-06-10 incident: /nix consumed the
       # entire 304G pool and wedged every dataset). The quota caps /nix below
-      # pool capacity; the reservations guarantee / and /home writable
-      # headroom even when /nix hits its quota. Mirrored create-time in
-      # disko.nix; these oneshots enforce the values on the already-
-      # provisioned host because disko options apply at dataset creation only.
+      # pool capacity; the reservation guarantees / writable headroom even
+      # when /nix hits its quota. Mirrored create-time in disko.nix; these
+      # oneshots enforce the values on the already-provisioned host because
+      # disko options apply at dataset creation only.
       systemd.services.zfs-set-root-nix-quota = {
         description = "Assert quota=250G on zroot/root/nix";
         wantedBy = [ "multi-user.target" ];
@@ -301,14 +301,18 @@ in
         };
       };
 
-      systemd.services.zfs-set-root-home-reservation = {
-        description = "Assert reservation=4G on zroot/root/home";
+      # /home has no reservation: a reservation guarantees a total that
+      # counts the dataset's own use, /home's use exceeded its former 4G, and
+      # nothing on the host stops when /home cannot grow. A property set on
+      # the installed pool stays until cleared, so this clears it.
+      systemd.services.zfs-set-root-home-noreservation = {
+        description = "Assert reservation=none on zroot/root/home";
         wantedBy = [ "multi-user.target" ];
         after = [ "zfs-import.target" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=4G zroot/root/home";
+          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=none zroot/root/home";
         };
       };
 
@@ -494,13 +498,28 @@ in
 
       # A warm store (bound-fleet-garbage-collection D8): harmonia-gc stops
       # once 40 % of the store's filesystem is free instead of deleting every
-      # unrooted output daily, so yesterday's builds stay cached. `40%` is of
-      # the size statfs reports for the quota-bounded /nix dataset (A152).
+      # unrooted output, so recent builds stay cached. `40%` is of the size
+      # statfs reports for the quota-bounded /nix dataset (A152). It was sized
+      # for one run a day, which let the store grow unchecked for up to 24
+      # hours (197 GiB against the 250G quota on 2026-11-25); reconsider it
+      # against a week of vanixiets_zfs_dataset_used_bytes for zroot/root/nix
+      # under the hourly schedule.
+      # Hourly: a run with enough free space exits without taking gc.lock, so
+      # an idle run costs milliseconds and growth between runs is bounded by
+      # an hour's builds. The 2 h bound stays; systemd does not start a run
+      # while the previous one is still active.
+      # Three days of generations: at magnetite's deploy rate 10 days kept
+      # about 60 system generations across several nixpkgs versions, whose
+      # closures the free-space target then had to make room for by deleting
+      # recent build outputs. harmonia-gc keeps the current generation and
+      # the newest one older than the cutoff.
       # noVacuum, as upstream recommends for busy builders: concurrent daemon
       # readers stop the post-GC VACUUM's WAL from being cleaned up.
       services.harmonia-dev.gc = {
         ensureFree = "40%";
         noVacuum = true;
+        dates = "hourly UTC";
+        deleteOlderThan = "3d";
       };
 
       # Nix >= 2.30 keeps build sandboxes in /nix/var/nix/builds; the only

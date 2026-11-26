@@ -345,7 +345,9 @@
         # bound-fleet-garbage-collection D7: harmonia-gc still running an
         # hour after it started, which a wait on gc.lock causes; its 2 h
         # bound then ends it and LaunchdJobFailed or SystemdUnitFailed reports
-        # that. A oneshot unit is `activating` while it runs.
+        # that. A oneshot unit is `activating` while it runs. A run on an
+        # hourly timer, as magnetite's, that fires this has also caused the
+        # next run to be skipped, since systemd does not start an active unit.
         {
           alert = "GarbageCollectionOverrun";
           expr = ''launchd_job_state{launchd_label="org.nixos.harmonia-gc", launchd_state="running"} == 1 or systemd_unit_state{systemd_unit_name="harmonia-gc.service", systemd_unit_active_state="activating"} == 1'';

@@ -87,7 +87,7 @@
           "zfs-set-root-docker-quota"
           "zfs-set-root-greptimedb-quota"
           "zfs-set-root-greptimedb-reservation"
-          "zfs-set-root-home-reservation"
+          "zfs-set-root-home-noreservation"
           "zfs-set-root-nix-quota"
           "zfs-set-root-nixos-reservation"
           "zfs-set-root-omnigraph-quota"

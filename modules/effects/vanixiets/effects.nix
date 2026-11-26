@@ -47,10 +47,11 @@
 # matches `when` against the UTC clock and knows no time zone
 # (nixbot/schedules.py), so the run starts at 05:00 New York time in winter
 # and 06:00 in summer, on the same Tuesday and Friday: its burst of builds
-# lands hours before the working day, and it starts at least an hour after
-# magnetite's store collection (harmonia-gc, at 04:00 New York time, so
-# 09:00 UTC in winter), not during it. nixbot runs the effect from the
-# default branch's tip in a checkout of it; run it by hand with
+# lands hours before the working day. magnetite's store collection
+# (harmonia-gc) runs hourly; while one that deletes holds gc.lock, builds and
+# substitutions register their temporary roots over its gc-socket and go on.
+# nixbot runs the effect from the default branch's tip in a checkout of it;
+# run it by hand with
 # `nbo schedule run flake-update flake-update -f`. It writes as the GitHub
 # App vanixiets-flake-updater: the program signs a JWT with the App's key,
 # looks up the App's installation on this repository and mints a one-hour

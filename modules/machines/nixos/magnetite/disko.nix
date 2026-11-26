@@ -55,12 +55,10 @@
               };
               mountpoint = "/";
             };
+            # No reservation; see zfs-set-root-home-noreservation in default.nix.
             "root/home" = {
               type = "zfs_fs";
-              options = {
-                mountpoint = "/home";
-                reservation = "4G";
-              };
+              options.mountpoint = "/home";
               mountpoint = "/home";
             };
             "root/nix" = {

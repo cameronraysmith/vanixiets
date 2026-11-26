@@ -2,8 +2,8 @@
 # The nixpkgs/nix-darwin automatic gc must stay disabled: the upstream module warns when it and harmonia-gc both run.
 #
 # harmonia-gc, like Nix's own auto-GC, waits for /nix/var/nix/gc.lock with no
-# time limit (harmonia-store-gc/src/gc.rs:125-147 at 8d717e07), and a run that
-# waits keeps its unit or job busy, so the next day's run does not start
+# time limit (acquire_gc_lock in harmonia-store-gc/src/gc.rs), and a run that
+# waits keeps its unit or job busy, so the next scheduled run does not start
 # either. Every run is therefore bounded (bound-fleet-garbage-collection D1):
 # NixOS by the oneshot unit's TimeoutStartSec, darwin, where launchd has no
 # run time limit, by running upstream's argv under coreutils' `timeout`.
@@ -100,7 +100,7 @@ in
       imports = [ inputs.harmonia.darwinModules.harmonia ];
 
       # launchd runs a missed calendar interval on the next wake, so a sleeping laptop still collects once per day.
-      # Laptops keep 7 days of generations, servers 10 (D4).
+      # Laptops keep 7 days of generations, servers 10 (D4), magnetite 3.
       services.harmonia-dev.gc = gcSettings // {
         deleteOlderThan = "7d";
         startCalendarInterval = [
@@ -127,14 +127,22 @@ in
   flake.modules.nixos.base = {
     imports = [ inputs.harmonia.nixosModules.harmonia ];
 
-    # Jitter keeps fleet hosts from collecting in lockstep.
+    # Jitter keeps fleet hosts from collecting in lockstep. A host may set
+    # its own schedule and retention; magnetite does.
     services.harmonia-dev.gc = gcSettings // {
-      deleteOlderThan = "10d";
-      dates = "*-*-* 04:00:00 America/New_York";
+      deleteOlderThan = lib.mkDefault "10d";
+      dates = lib.mkDefault "*-*-* 04:00:00 America/New_York";
       randomizedDelaySec = "5min";
     };
 
     # The unit is Type=oneshot, so the start timeout bounds the whole run.
-    systemd.services.harmonia-gc.serviceConfig.TimeoutStartSec = bound;
+    # Batch CPU and idle I/O scheduling, as srvos gives nix-gc.service, so a
+    # collection yields to builds and services.
+    systemd.services.harmonia-gc.serviceConfig = {
+      TimeoutStartSec = bound;
+      CPUSchedulingPolicy = "batch";
+      IOSchedulingClass = "idle";
+      IOSchedulingPriority = 7;
+    };
   };
 }
