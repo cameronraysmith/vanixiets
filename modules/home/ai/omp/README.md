@@ -2,10 +2,18 @@
 
 `default.nix` configures omp (oh-my-pi); its header comment explains which files it owns and why.
 
-## Browser relay extension
+## Browser relay
 
 omp's browser relay lets the Eval `browser` API drive the user's own browser, with its profiles and extensions, through a Chrome extension.
-`pkgs/by-name/omp-browser-relay-extension` builds that extension by running `omp browser-relay install` with the omp that `programs.omp.package` installs.
+In omp 19.2.1 nothing listens on a fixed port and no omp session starts the relay.
+The extension's service worker calls `chrome.runtime.connectNative("sh.omp.browser")` (`packages/browser-relay/extension/worker/relay.ts`), and the browser starts the program named in that native messaging host's manifest, which runs `omp browser-relay native-host`.
+The host serves the relay on a port the OS assigns and publishes it as `~/.omp/browser-relay/endpoints/<pid>-<port>` (`src/tools/browser/relay/native-relay.ts`, `discovery.ts`), and an omp session's `browser` calls with `app: "relay"` use the newest endpoint whose process is alive.
+The relay therefore runs exactly while the browser runs with the extension loaded, and the extension's badge shows `on` while it is linked.
+If the browser refuses the host, the extension retries after 1 s, doubling to at most 10 s, and its 30 s keep-alive alarm reconnects after the browser stops its service worker.
+
+### Extension
+
+`pkgs/by-name/omp-browser-relay-extension` builds the extension by running `omp browser-relay install` with the omp that `programs.omp.package` installs.
 The build fails unless the extension's version stamp equals that omp's version.
 On darwin, `programs.omp.browserRelay.extension` copies the extension to `~/.omp/browser-relay/extension` on every activation.
 That is the directory omp's relay updates by default.
@@ -16,16 +24,31 @@ Helium records the resolved path of an unpacked extension and derives the extens
 A store symlink would give the extension a new ID on every omp bump, and the browser would treat it as a different extension.
 Activation fails if the directory is a symlink.
 
-Each Helium profile needs one manual step: open `chrome://extensions`, turn on Developer mode, choose Load unpacked, and select `~/.omp/browser-relay/extension`.
-The extension's badge shows `on` while a relay is running.
-If omp's default directory moves (for example when `$XDG_DATA_HOME/omp` exists, or under an omp profile), the loaded path and omp's updater no longer agree.
-
-The relay is enabled per call with `app.relay: true`.
-`browser.relay` is not set in `config.yml`, because it would make every session in every project drive the real browser.
-
 After an omp bump, activation writes the new extension files first.
 Going by omp's relay source, the new relay's own update then finds identical files, writes nothing, and asks the extension to reload, so the browser picks up the new version without another manual step.
 This has not yet been observed on a real bump.
+
+### Native messaging host
+
+`omp browser-relay install` registers the host only in the browsers omp knows (`chromiumUserDataDirs` in `src/tools/browser/relay/chromium-profiles.ts`), and omp 19.2.1 does not know Helium.
+The extension package is built with `HOME` pointing into the build directory, so that command registers nothing in the real home either.
+`programs.omp.browserRelay.nativeHost`, on wherever the extension option is on, therefore links `sh.omp.browser.json` into `~/Library/Application Support/net.imput.helium/NativeMessagingHosts/`, the directory Helium reads for the current user.
+Its fields are those omp writes (`src/tools/browser/relay/native-host-manifest.ts`): `type` is `stdio`, and `allowed_origins` holds `chrome-extension://<id>/` for the ID that `programs.omp.browserRelay.nativeHost.extensionId` computes from the extension directory, `oijoeegnoohbebikmcjkffchcokmdndn` for `/Users/crs58/.omp/browser-relay/extension`.
+Its `path` is a store script that runs the installed, wrapped `omp browser-relay native-host`, so the wrapper's settings such as `PI_AGY_PATH` reach the relay and the panel sessions it starts.
+
+The module does not write omp's own launcher, `~/.omp/browser-relay/native-host`.
+While that file exists, omp's start-up sync rewrites it to run the unwrapped binary and rewrites the manifests of the browsers it knows; without it, the sync leaves every manifest alone (`refreshRelayNativeHost`), so omp and home-manager never write the same file.
+Running `omp browser-relay install` by hand creates that launcher again, but omp still does not touch Helium's manifest.
+An open upstream change, [can1357/oh-my-pi#20226](https://github.com/can1357/oh-my-pi/pull/20226), adds Helium to omp's browser list; once a release with it is installed, omp writes the same file itself, and this option should be revisited.
+
+### Manual steps per Helium profile
+
+Each Helium profile needs one manual step: open `chrome://extensions`, turn on Developer mode, choose Load unpacked, and select `~/.omp/browser-relay/extension`.
+The extension keeps retrying the host, so after the manifest first appears the relay comes up within seconds, without reloading the extension or restarting Helium.
+If the loaded path and omp's default directory ever differ (for example when `$XDG_DATA_HOME/omp` exists, or under an omp profile), the extension ID and omp's updater no longer agree with this module.
+
+The relay is used per call with `app: "relay"`, for example `browser.open({ app: "relay", ... })` or `browser.targets({ app: "relay" })` in Eval.
+`browser.relay` is not set in `config.yml`, because it would make every top-level session in every project drive the real browser.
 
 Bitwarden is installed by hand in each Helium profile.
 Force-installing it would need a macOS configuration profile that has to be approved manually.

@@ -36,7 +36,10 @@
 #
 # Outside the configuration directory, programs.omp.browserRelay.extension
 # copies omp's browser relay Chrome extension to a fixed real directory for
-# Helium to load unpacked; README.md beside this file covers the manual step.
+# Helium to load unpacked, and programs.omp.browserRelay.nativeHost links the
+# native messaging host manifest that extension connects to into Helium's
+# NativeMessagingHosts directory; README.md beside this file covers the manual
+# step.
 { config, ... }:
 let
   managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
@@ -51,6 +54,14 @@ let
     let
       cfg = config.programs.omp;
       relayExtension = cfg.browserRelay.extension;
+      relayNativeHost = cfg.browserRelay.nativeHost;
+      # Chromium's crx_file::id_util::GenerateIdForPath, as omp computes it
+      # (src/tools/browser/relay/extension-files.ts extensionIdForPath).
+      chromiumExtensionIdForPath =
+        path:
+        builtins.replaceStrings (lib.stringToCharacters "0123456789abcdef")
+          (lib.stringToCharacters "abcdefghijklmnop")
+          (builtins.substring 0 32 (builtins.hashString "sha256" path));
       yamlFormat = pkgs.formats.yaml { };
       # omp's agyCredentialEnv sets only SSH_TTY to keep agy off the OS keychain,
       # which agy 1.5.13 and later ignore on macOS: /login then fails with "did
@@ -89,6 +100,24 @@ let
         '';
         inherit (cfg.package) meta;
       };
+      # A store script rather than omp's own ~/.omp/browser-relay/native-host:
+      # while that file exists, omp's start-up sync rewrites it to exec the
+      # unwrapped binary and rewrites the manifests of the browsers omp knows
+      # (src/tools/browser/relay/native-host-manifest.ts refreshRelayNativeHost).
+      # The browser passes the caller's origin as arguments, which omp's own
+      # launcher drops as well.
+      nativeHostLauncher = pkgs.writeShellScript "omp-browser-relay-native-host" ''
+        exec ${ompWithAgyFileTokenStorage}/bin/omp browser-relay native-host
+      '';
+      nativeHostManifest = pkgs.writeText "sh.omp.browser.json" (
+        builtins.toJSON {
+          name = "sh.omp.browser";
+          description = "omp browser native messaging host";
+          path = "${nativeHostLauncher}";
+          type = "stdio";
+          allowed_origins = [ "chrome-extension://${relayNativeHost.extensionId}/" ];
+        }
+      );
     in
     {
       imports = [ managedConfigsModule ];
@@ -164,6 +193,49 @@ let
             description = ''
               Real directory the extension is mirrored into. The default is the
               directory omp's own relay updates, so both write the same files.
+            '';
+          };
+        };
+
+        browserRelay.nativeHost = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = relayExtension.enable;
+            defaultText = lib.literalExpression "config.programs.omp.browserRelay.extension.enable";
+            description = ''
+              Whether to register omp's native messaging host, `sh.omp.browser`,
+              in each of {option}`programs.omp.browserRelay.nativeHost.browserDirectories`.
+              The extension starts the relay by connecting to this host, which
+              runs {command}`omp browser-relay native-host` from the wrapped
+              {option}`programs.omp.package`; without the registration the
+              browser refuses the connection and no relay comes up.
+            '';
+          };
+
+          extensionId = lib.mkOption {
+            type = lib.types.strMatching "[a-p]{32}";
+            default = chromiumExtensionIdForPath relayExtension.directory;
+            defaultText = lib.literalMD "derived from {option}`programs.omp.browserRelay.extension.directory`";
+            description = ''
+              ID of the extension the host admits, written into the manifest's
+              `allowed_origins`. Chromium derives the ID of an unpacked
+              extension from the resolved path of its directory (the first 128
+              bits of the path's SHA-256, written as the letters a to p), so the
+              default is computed from
+              {option}`programs.omp.browserRelay.extension.directory`, which
+              must therefore contain no symlinks.
+            '';
+          };
+
+          browserDirectories = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [ "Library/Application Support/net.imput.helium" ];
+            description = ''
+              Browser user data directories, relative to the home directory,
+              that receive {file}`NativeMessagingHosts/sh.omp.browser.json`.
+              {command}`omp browser-relay install` registers the host itself in
+              the Chromium browsers omp knows; Helium is not among them in omp
+              19.2.1.
             '';
           };
         };
@@ -418,6 +490,15 @@ let
             run ${lib.getExe pkgs.rsync} --recursive --checksum --delete --perms --chmod=D0755,F0644 \
               ${relayExtension.package}/ "$ompRelayExtensionDir/"
           ''
+        );
+
+        home.file = lib.mkIf (cfg.enable && relayNativeHost.enable) (
+          lib.listToAttrs (
+            map (
+              dir:
+              lib.nameValuePair "${dir}/NativeMessagingHosts/sh.omp.browser.json" { source = nativeHostManifest; }
+            ) relayNativeHost.browserDirectories
+          )
         );
 
         managedConfigs = lib.mkIf cfg.enable {
