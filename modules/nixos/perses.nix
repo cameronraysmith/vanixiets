@@ -28,7 +28,12 @@ let
     "User-Agent"
     "x-greptime-db-name"
   ];
-  wipe = "rm -rf /var/lib/perses/db /var/lib/perses/plugins";
+  # Everything Perses stores except users/, the records its sign-in writes:
+  # /api/v1/user/whoami answers 401 for a session whose record is missing, so
+  # wiping them signs every browser out at each start. A record holds a name
+  # and provider identities only; permissions come from guest_permissions and
+  # from role bindings, which are wiped with the rest.
+  wipe = "rm -rf /var/lib/perses/plugins && if [ -d /var/lib/perses/db ]; then find /var/lib/perses/db -mindepth 1 -maxdepth 1 ! -name users -exec rm -rf {} +; fi";
   strip = ''proxy_set_header x-greptime-auth "";'';
 
   persesServingFailures =
@@ -147,9 +152,12 @@ let
       (fail 2 (sec.cookie.secure or false) "security.cookie.secure must be true")
       (fail 2 ((providers.enable_native or true) == false) "native login must be disabled")
       (fail 2 (authn.disable_sign_up or false) "sign-up must be disabled")
+      # A session outlives its sign-in by at most the sum, since Perses never
+      # asks Kanidm again once it has issued its refresh token: the sum bounds
+      # how long a member removed from perses_users can still read the views.
       (fail 2 (
-        refresh != null && access != null && refresh + access <= 3600
-      ) "refresh_token_ttl plus access_token_ttl must be set as <n>s, <n>m or <n>h and total at most 1h")
+        refresh != null && access != null && refresh + access <= 8 * 3600
+      ) "refresh_token_ttl plus access_token_ttl must be set as <n>s, <n>m or <n>h and total at most 8h")
       (fail 3 (lib.length oidc == 1) "exactly one OIDC provider must be configured")
       # Only once there is exactly one provider, so an empty list is reported
       # once rather than also forcing its head.
@@ -273,9 +281,10 @@ in
               authentication = {
                 disable_sign_up = true;
                 # A refresh issues an access token valid from the refresh and
-                # keeps the refresh token, so a removed member keeps access for
-                # at most the sum, 1 h.
-                refresh_token_ttl = "45m";
+                # keeps the refresh token, so a session lasts at most the sum,
+                # 8 h from sign-in, however active, and so does the access of
+                # a member removed from perses_users.
+                refresh_token_ttl = "465m";
                 access_token_ttl = "15m";
                 providers = {
                   enable_native = false;
@@ -350,8 +359,9 @@ in
           ];
           restartTriggers = [ resources ];
           # Provisioning creates and updates but never deletes, and Perses
-          # loads every plugin directory it finds, so each start begins from an
-          # empty database and extracts only the curated archives.
+          # loads every plugin directory it finds, so each start begins from a
+          # database holding only the sign-in records and extracts only the
+          # curated archives.
           preStart = lib.mkBefore "${wipe}\n";
           unitConfig.StartLimitIntervalSec = 0;
           serviceConfig = {

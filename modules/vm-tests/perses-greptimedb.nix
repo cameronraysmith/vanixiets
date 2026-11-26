@@ -13,7 +13,9 @@
 #
 # What it establishes: an unauthenticated request is refused; the
 # provisioned user logs in; the provisioned set is exactly the committed
-# dashboards after a planted view and a restart; dashboard writes are
+# dashboards after a planted view and a restart, and a session opened
+# before that restart, whose user record no provisioning folder holds,
+# still answers whoami after it; dashboard writes are
 # refused; PromQL and SQL reads through the two datasources return data and
 # a caller's database header is overwritten; every query-checked view's
 # query succeeds and each PromQL query returns series, while a view with one
@@ -270,6 +272,8 @@
               USER = json.loads(${builtins.toJSON (builtins.toJSON (readJSON ./perses-greptimedb "user-tester.json"))})
               LOGIN = USER["metadata"]["name"]
               PASSWORD = USER["spec"]["nativeProvider"]["password"]
+              # A user record outside every provisioning folder, as Perses' sign-in writes one.
+              SIGNED_IN = "signed-in"
               NGINX = "http://127.0.0.1"
               DIRECT = "http://127.0.0.1:8095"
               REFUSED = "you are not allowed to use this endpoint"
@@ -301,9 +305,9 @@
                   return status, machine.succeed("cat /tmp/response")
 
 
-              def login():
-                  global cookie
-                  body = json.dumps({"login": LOGIN, "password": PASSWORD})
+              def session(name):
+                  """Log in natively as name; return the session's Cookie header value."""
+                  body = json.dumps({"login": name, "password": PASSWORD})
                   status = machine.succeed(
                       "curl -sS -o /dev/null -w '%{http_code}' -c /tmp/jar -H 'Content-Type: application/json' "
                       f"--data {shlex.quote(body)} {DIRECT}/api/auth/providers/native/login"
@@ -315,7 +319,12 @@
                       if len(fields) == 7 and (not line.startswith("#") or line.startswith("#HttpOnly_")):
                           pairs.append(f"{fields[5]}={fields[6]}")
                   assert pairs, "no session cookie"
-                  cookie = "; ".join(pairs)
+                  return "; ".join(pairs)
+
+
+              def login():
+                  global cookie
+                  cookie = session(LOGIN)
 
 
               def dashboards():
@@ -595,7 +604,7 @@
               with subtest("3: the provisioned set is exactly the committed views"):
                   ok(f"fleet lists {assert_provisioned('before the restart')}")
 
-              with subtest("4: a view planted in the database is gone after a restart"):
+              with subtest("4: after a restart a planted view is gone and a sign-in record is kept"):
                   planted = copy.deepcopy(DASHBOARDS["devloop"])
                   planted["metadata"]["name"] = "planted"
                   machine.succeed(
@@ -605,12 +614,23 @@
                   machine.succeed("chown -R --reference=/var/lib/perses/db /var/lib/perses/db/dashboards")
                   assert "planted" in dashboards(), dashboards()
                   ok("the planted view is listed before the restart")
+                  # A user record that no provisioning folder holds, written to
+                  # users/ as sign-in writes one, with the tester's stored hash.
+                  machine.succeed(
+                      "cd /var/lib/perses/db/users && "
+                      f"jq '.metadata.name = \"{SIGNED_IN}\"' {LOGIN}.json > {SIGNED_IN}.json && "
+                      f"chown --reference={LOGIN}.json {SIGNED_IN}.json"
+                  )
+                  signed_in = session(SIGNED_IN)
                   machine.succeed("systemctl restart perses.service")
                   machine.wait_for_unit("perses.service")
                   machine.wait_until_succeeds(
                       f"[ \"$(curl -s -o /dev/null -w '%{{http_code}}' {DIRECT}/api/v1/projects)\" = 401 ]",
                       timeout=dt.timedelta(minutes=3),
                   )
+                  status, body = curl("/api/v1/user/whoami", "-H", f"Cookie: {signed_in}", auth=False)
+                  assert status == 200 and json.loads(body)["metadata"]["name"] == SIGNED_IN, (status, body)
+                  ok(f"the session {SIGNED_IN} opened before the restart answers whoami 200 after it")
                   login()
                   ok(f"after the restart fleet lists {assert_provisioned('after the restart')}")
 

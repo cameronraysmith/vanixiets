@@ -790,14 +790,14 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: Membership becomes declarative
 
 - **WHEN** the repository declares members of `perses_users`, or provisioning overwrites them
-- **THEN** this assumption is void, and the `fleet-dashboard` requirements `A person outside the dashboard group is refused` and `A person removed from the dashboard group loses access within an hour` must be restated over the declared list
+- **THEN** this assumption is void, and the `fleet-dashboard` requirements `A person outside the dashboard group is refused` and `A person removed from the dashboard group loses access within 8 hours` must be restated over the declared list
 
 ### Requirement: A58 — Perses 0.55.1 removes its write routes in read-only mode, proxies with the stored credential and fixed headers, and refreshes a session without depending on the identity provider's answer
 
 It is true of Perses 0.55.1, independent of what this fleet builds, that read-only mode removes writes and sign-up, its proxy authenticates from a secret file, fixes configured headers, drops unlisted ones, refuses unmatched paths, provisioning never deletes, and a refresh ignores the identity provider's answer.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
 
-**Evidence**: read at v0.55.0 (`bfaf3ce2`): `perses/perses@v0.55.0:internal/api/core/server.go:63-93`, `internal/api/impl/v1/user/endpoint.go`, `internal/api/impl/proxy/http/http.go:157-306`, `internal/api/provisioning/service.go:43-120`, `internal/api/crypto/jwt.go:102-110` and `internal/api/impl/auth/auth.go:167-207`, where a refresh issues an access token valid for `access_token_ttl` from the refresh and returns the same refresh token, and calls Kanidm's token endpoint when an OIDC refresh cookie exists but ignores the answer, on failure only clearing the OIDC cookies; `perses/spec@v0.3.0-rc.1:go/datasource/proxy/http/http.go:89-93` for `allowHeaders`; the plan review's stub-upstream probe at 0.55.0 (`logs/cam73-evidence/1.1-runtime-probe-20261104T234415Z.log`), showing a caller's `x-greptime-auth` passed through a datasource without `allowHeaders` and dropped by one with it; 0.55.1 is a patch release, so Task 2's first step re-runs that probe at 0.55.1 before any code lands, and `vmTests.x86_64-linux.perses-greptimedb` is the monitor at 0.55.1 and at every upgrade.
+**Evidence**: read at v0.55.0 (`bfaf3ce2`): `perses/perses@v0.55.0:internal/api/core/server.go:63-93`, `internal/api/impl/v1/user/endpoint.go`, `internal/api/impl/proxy/http/http.go:157-306`, `internal/api/provisioning/service.go:43-120`, `internal/api/crypto/jwt.go:102-110` and `internal/api/impl/auth/auth.go:167-207`, where a refresh issues an access token valid for `access_token_ttl` from the refresh and returns the same refresh token, and calls Kanidm's token endpoint when an OIDC refresh cookie exists but ignores the answer, on failure only clearing the OIDC cookies; `perses/spec@v0.3.0-rc.1:go/datasource/proxy/http/http.go:89-93` for `allowHeaders`; the plan review's stub-upstream probe at 0.55.0 (`logs/cam73-evidence/1.1-runtime-probe-20261104T234415Z.log`), showing a caller's `x-greptime-auth` passed through a datasource without `allowHeaders` and dropped by one with it; 0.55.1 is a patch release, so Task 2's first step re-runs that probe at 0.55.1 before any code lands, and `vmTests.x86_64-linux.perses-greptimedb` is the monitor at 0.55.1 and at every upgrade; at 0.55.1 on magnetite on 2026-11-26, Kanidm refused all but the first of a burst of OIDC token refreshes as reuse of one refresh token, while Perses answered each of its own refreshes with 200 (`internal/api/impl/auth/oidc.go:545-562`).
 
 #### Scenario: A Perses upgrade changes one of these behaviours
 
@@ -1583,3 +1583,15 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** a skills release pinned by `llm-agents` lists fewer skills than the first-party directories in the `skills-cli-discovery` check, or `npx skills add cameronraysmith/vanixiets --list` from GitHub does
 - **THEN** this assumption is void, and the `skill-marketplace-publication` requirement `A skills CLI user installs each first-party skill` loses its discharge
+
+### Requirement: A243 — Perses 0.55.1 answers whoami only from a stored user record that carries no permission
+
+It is true of Perses 0.55.1, independent of what this fleet builds, that a sign-in writes a user record under `users/`, that `whoami` answers 401 without it, and that a record holds no permission: only guest permissions, role bindings, global role bindings and claim mappings grant one.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL be treated as losing its discharge once this assumption's violation condition below is observed.
+
+**Evidence**: read at v0.55.1: `internal/api/impl/auth/service.go:94-129` writes the record at sign-in; `internal/api/impl/v1/user/endpoint.go:96-104` and `internal/api/authorization/native/native.go:184-196` answer `whoami` from it; `pkg/model/api/v1/user.go:43-48` holds names, a native password hash and provider identities; `internal/api/authorization/native/permissions.go:106-144` grants permissions through role bindings and global role bindings only; the container runtime test's subtest "4: after a restart a planted view is gone and a sign-in record is kept" is its monitor.
+
+#### Scenario: A Perses upgrade changes where a session's user comes from
+
+- **WHEN** the container runtime test finds a session whose user record was kept answered 401 by `whoami` after a restart, or a Perses release adds a permission to the user record
+- **THEN** this assumption is void for that version, and the `fleet-dashboard-interface` requirement `Committed files are the only source of views and datasources` loses its discharge until the wipe or the assumption is restated

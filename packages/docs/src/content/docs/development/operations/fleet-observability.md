@@ -76,8 +76,10 @@ nix develop -c kanidm group remove-members perses_users <account> --name idm_adm
 nix develop -c kanidm group list-members perses_users --name idm_admin
 ```
 
-Kanidm refuses the person's next login at once, but a session already open keeps working for up to an hour.
-Perses renews a session without asking Kanidm: its refresh token lives 45 min and the last access token issued from it 15 min more, so a removed member loses access within 1 h of the removal.
+Kanidm refuses the person's next login at once, but a session already open keeps working for up to 8 hours.
+Perses renews a session without asking Kanidm: its refresh token lives 7 h 45 min from sign-in and the last access token issued from it 15 min more, so a removed member loses access within 8 h of the removal.
+The same bound is every session's length, however active: 8 hours after signing in, Perses sends the browser through Kanidm again, which signs it back in at once while the person's Kanidm session lasts.
+Restarting `perses.service` signs no one out, since its start keeps the records of who has signed in (see "Changing the views").
 
 ### The operator's fallback: the embedded dashboard
 
@@ -109,7 +111,8 @@ Two queries confirm data is arriving:
 ### Changing the views
 
 The committed files under `modules/nixos/perses/resources/` are the only source of the views, the two datasources, the store credential's reference and the project.
-Each start of `perses.service` removes `/var/lib/perses/db` and provisions exactly those files, and a deploy that changes a file restarts the service, so a view created by any other route is gone at the next start, and deleting a file deletes its view.
+Each start of `perses.service` removes everything under `/var/lib/perses/db` except `users/` and provisions exactly those files, and a deploy that changes a file restarts the service, so a view created by any other route is gone at the next start, and deleting a file deletes its view.
+`users/` holds one record per person who has signed in, written by Perses at sign-in with the name and Kanidm identity only; a session whose record is missing is answered as signed out, and a record grants nothing beyond the read-only guest permissions, since the role bindings that could grant more are removed with the rest.
 To change a view, edit its `dashboard-*.json` in a pull request.
 A view reads the store only through the datasources `greptimedb-promql` and `greptimedb-sql`, both on the database `fleet`; an SQL query names each table with its database, as `"devloop"."ci_build"`, uses no `SELECT *` and no `WITH`, and a PromQL query for another database adds `{__database__="<db>"}`.
 Before merging, build the lint check, which runs `percli lint` at the shipped plugins with these rules:

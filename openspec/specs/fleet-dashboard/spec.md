@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This capability (stratum: `behavioral`) states what the fleet requires of its dashboard service: that an admitted person views the fleet's signals and the dev-loop history by host; that a person outside the dashboard group is refused, and one removed from it loses access within an hour; that nobody changes the views except by a committed change; that no store credential reaches a person and the dashboard service only reads; and that the dashboard service stays inside its memory envelope and its failures reach a person.
+This capability (stratum: `behavioral`) states what the fleet requires of its dashboard service: that an admitted person views the fleet's signals and the dev-loop history by host; that a person outside the dashboard group is refused, and one removed from it loses access within 8 hours; that nobody changes the views except by a committed change; that no store credential reaches a person and the dashboard service only reads; and that the dashboard service stays inside its memory envelope and its failures reach a person.
 
 ## Requirements
 
@@ -43,15 +43,15 @@ The identity provider SHALL refuse to admit to the dashboard service any person 
 - **WHEN** the container runtime test asks the dashboard service for its projects without having logged in
 - **THEN** the dashboard service refuses with HTTP 401
 
-### Requirement: A person removed from the dashboard group loses access within an hour
+### Requirement: A person removed from the dashboard group loses access within 8 hours
 
-A person removed from the dashboard group SHALL lose access to the dashboard service within one hour of the removal.
+A person removed from the dashboard group SHALL lose access to the dashboard service within 8 hours of the removal.
 
 **Discharged by**: `fleet-dashboard-interface` requirement `The identity provider admits only the dashboard group`, resting on world assumptions `A57 — Dashboard-group membership is kept in the running identity provider` and `A58 — Perses 0.55.1 removes its write routes in read-only mode, proxies with the stored credential and fixed headers, and refreshes a session without depending on the identity provider's answer`; the serving predicate's session clause and its mutant discharge it.
 
 #### Scenario: The session lifetime is lengthened
 
-- **WHEN** the dashboard service's configuration lets the refresh token's lifetime plus the access token's lifetime exceed one hour
+- **WHEN** the dashboard service's configuration lets the refresh token's lifetime plus the access token's lifetime exceed 8 hours
 - **THEN** magnetite's evaluation fails on the serving predicate, which its mutants show
 
 ### Requirement: Nobody changes the views except by a committed change

@@ -31,7 +31,7 @@ let
         secret_file_allowed_directories = [ credsDir ];
         authentication = {
           disable_sign_up = true;
-          refresh_token_ttl = "45m";
+          refresh_token_ttl = "465m";
           access_token_ttl = "15m";
           providers = {
             enable_native = false;
@@ -81,7 +81,7 @@ let
         MemoryHigh = "192M";
         MemoryMax = "256M";
       };
-      preStart = "rm -rf /var/lib/perses/db /var/lib/perses/plugins\n";
+      preStart = "rm -rf /var/lib/perses/plugins && if [ -d /var/lib/perses/db ]; then find /var/lib/perses/db -mindepth 1 -maxdepth 1 ! -name users -exec rm -rf {} +; fi\n";
     };
     vhost = {
       forceSSL = true;
@@ -158,7 +158,7 @@ let
     "2-nativeLogin" = set [ "settings" "security" "authentication" "providers" "enable_native" ] true;
     "2-signUp" = set [ "settings" "security" "authentication" "disable_sign_up" ] false;
     "2-longRefresh" = set [ "settings" "security" "authentication" "refresh_token_ttl" ] "24h";
-    "2-longAccess" = set [ "settings" "security" "authentication" "access_token_ttl" ] "30m";
+    "2-longAccess" = set [ "settings" "security" "authentication" "access_token_ttl" ] "16m";
     "2-unparsedTtl" = set [ "settings" "security" "authentication" "access_token_ttl" ] "15 minutes";
     "3-noProvider" = set [ "settings" "security" "authentication" "providers" "oidc" ] [ ];
     "3-pkceOff" = mapProvider (p: p // { disable_pkce = true; });
@@ -284,7 +284,11 @@ let
     "10-secondGroup" = set [ "client" "scopeMaps" "cognee_access" ] [ "openid" ];
     "11-pluginsOnTmpfs" = set [ "settings" "plugin" "path" ] "/run/perses/plugins";
     "11-noWipe" = set [ "unit" "preStart" ] "";
-    "11-noPluginWipe" = set [ "unit" "preStart" ] "rm -rf /var/lib/perses/db\n";
+    "11-noPluginWipe" = set [
+      "unit"
+      "preStart"
+    ] "find /var/lib/perses/db -mindepth 1 -maxdepth 1 ! -name users -exec rm -rf {} +\n";
+    "11-usersWiped" = set [ "unit" "preStart" ] "rm -rf /var/lib/perses/db /var/lib/perses/plugins\n";
     "11-bigMemory" = set [ "unit" "serviceConfig" "MemoryMax" ] "1G";
     "11-highAtMax" = set [ "unit" "serviceConfig" "MemoryHigh" ] "256M";
   };

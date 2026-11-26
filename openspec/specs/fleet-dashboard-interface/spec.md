@@ -3,7 +3,7 @@
 ## Purpose
 
 This capability (stratum: `interface`) states the properties at the machine's interface that discharge the `fleet-dashboard` requirements: the `perses-bin` package and its pinned plugins; the loopback listener and the `obs.scientistexperience.net` vhost; the Kanidm client `perses` and its group `perses_users`; Perses' read-only and permission settings; the two global datasources and their secret; provisioning from committed files and the wipe at each start; the credentials; the unit's memory envelope and failure wiring; `perses-lint`, `perses-config` and the container runtime test; and the DNS record.
-Trust boundary: Kanidm authenticates people and refuses those outside `perses_users`, whose membership is set in the running Kanidm outside the repository; Perses enforces read-only mode, guest permissions, endpoint patterns and header allow-lists; the telemetry store refuses writes from `perses:ro`; a removed person keeps access for at most 1 h after login; any root process on magnetite can read the credentials; nothing here guarantees that a chart shows correct values, only that the configuration, the gating checks, the container runtime test and the recorded logins behave as stated.
+Trust boundary: Kanidm authenticates people and refuses those outside `perses_users`, whose membership is set in the running Kanidm outside the repository; Perses enforces read-only mode, guest permissions, endpoint patterns and header allow-lists; the telemetry store refuses writes from `perses:ro`; a removed person keeps access for at most 8 h after login; any root process on magnetite can read the credentials; nothing here guarantees that a chart shows correct values, only that the configuration, the gating checks, the container runtime test and the recorded logins behave as stated.
 
 ## Requirements
 
@@ -51,7 +51,7 @@ The machine SHALL bind Perses to `127.0.0.1:8095` and SHALL serve it only throug
 
 ### Requirement: The identity provider admits only the dashboard group
 
-The machine SHALL declare the Kanidm group stub `perses_users` and an OAuth2 client `perses` whose only scope map is `perses_users`, and SHALL configure Perses with exactly one OIDC provider for that client, PKCE enabled, native login and sign-up disabled, `refresh_token_ttl = "45m"` and `access_token_ttl = "15m"`, so that no session outlasts one hour after its login.
+The machine SHALL declare the Kanidm group stub `perses_users` and an OAuth2 client `perses` whose only scope map is `perses_users`, and SHALL configure Perses with exactly one OIDC provider for that client, PKCE enabled, native login and sign-up disabled, `refresh_token_ttl = "465m"` and `access_token_ttl = "15m"`, so that no session outlasts 8 hours after its login.
 
 **Discharged by**: the serving predicate's authentication and client clauses with their mutants, resting on world assumptions `A56 — Kanidm refuses an authorization whose scopes no group of the person maps` and `A57 — Dashboard-group membership is kept in the running identity provider`; the operator's recorded refusal and admission at deployment.
 
@@ -69,6 +69,11 @@ The machine SHALL declare the Kanidm group stub `perses_users` and an OAuth2 cli
 
 - **WHEN** `providers.enable_native` is true or `disable_sign_up` is false in magnetite's configuration
 - **THEN** the serving predicate fails, which its mutants show
+
+#### Scenario: A session may outlast 8 hours
+
+- **WHEN** `refresh_token_ttl` plus `access_token_ttl` exceeds 8 hours in magnetite's configuration
+- **THEN** clause 2 of the serving predicate fails, which the mutants `2-longRefresh` and `2-longAccess` of `checks.x86_64-linux.perses-config` show
 
 ### Requirement: Readers hold only read permission on a read-only server
 
@@ -124,19 +129,34 @@ The machine SHALL provision exactly two GlobalDatasources on `http://127.0.0.1:4
 
 ### Requirement: Committed files are the only source of views and datasources
 
-The machine SHALL provision Perses only from `modules/nixos/perses/resources/`, SHALL remove `/var/lib/perses/db` and `/var/lib/perses/plugins` before each start of `perses.service`, and SHALL restart `perses.service` when a file in that directory changes.
+The machine SHALL provision Perses only from `modules/nixos/perses/resources/`, SHALL remove `/var/lib/perses/plugins` and every entry of `/var/lib/perses/db` except `users/` before each start of `perses.service`, and SHALL restart `perses.service` when a file in that directory changes.
 
-**Discharged by**: the serving predicate's provisioning clause with its mutant and the container runtime test's planted-view case, resting on world assumption `A58 — Perses 0.55.1 removes its write routes in read-only mode, proxies with the stored credential and fixed headers, and refreshes a session without depending on the identity provider's answer`.
+**Discharged by**: the serving predicate's provisioning clause with its mutants and the container runtime test's planted-view and kept-session case, resting on world assumptions `A58 — Perses 0.55.1 removes its write routes in read-only mode, proxies with the stored credential and fixed headers, and refreshes a session without depending on the identity provider's answer` and `A243 — Perses 0.55.1 answers whoami only from a stored user record that carries no permission`.
 
 #### Scenario: The wipe is dropped
 
-- **WHEN** `perses.service`'s `preStart` no longer removes `/var/lib/perses/db` or `/var/lib/perses/plugins`
-- **THEN** the serving predicate fails, which its mutant shows
+- **WHEN** `perses.service`'s `preStart` no longer removes `/var/lib/perses/plugins` or the entries of `/var/lib/perses/db` other than `users/`
+- **THEN** clause 11 of the serving predicate fails, which the mutants `11-noWipe` and `11-noPluginWipe` show
+
+#### Scenario: The sign-in records are wiped
+
+- **WHEN** `perses.service`'s `preStart` removes `/var/lib/perses/db` whole
+- **THEN** clause 11 fails, which the mutant `11-usersWiped` shows
 
 #### Scenario: A planted view is present at start
 
 - **WHEN** the container runtime test writes a dashboard file into `/var/lib/perses/db` and restarts `perses.service`
-- **THEN** the project lists only `fleet-hosts` and `devloop`
+- **THEN** its subtest "4: after a restart a planted view is gone and a sign-in record is kept" finds the project listing exactly the committed views
+
+#### Scenario: A session is open across a restart
+
+- **WHEN** the container runtime test writes a user record that no provisioning folder holds into `/var/lib/perses/db/users/`, signs in as it and restarts `perses.service`
+- **THEN** the same subtest finds `GET /api/v1/user/whoami` with the cookie from before the restart answered 200 with that user's name
+
+#### Scenario: A kept record is asked to widen access
+
+- **WHEN** someone asks whether a record kept in `users/` can grant more than `guest_permissions`
+- **THEN** the answer is no: a record holds names, provider identities and a native password hash only, and the role bindings and global role bindings that could grant more are removed with the rest of the database at each start, while read-only mode refuses creating them
 
 ### Requirement: The dashboard service's secrets arrive only as credentials
 
@@ -216,7 +236,7 @@ The machine SHALL provision Perses only from `modules/nixos/perses/resources/`, 
 #### Scenario: The test is run before deployment
 
 - **WHEN** the test runs on magnetite before the deploy
-- **THEN** an unauthenticated request is answered 401; the provisioned user logs in; the provisioned set is exact after a planted view and a restart; dashboard writes are refused; PromQL and SQL reads through the two datasources return data; every committed view's query succeeds and each PromQL query returns series, and a mutant view query fails the case; an `INSERT` through `greptimedb-sql` is refused by the telemetry store; the four out-of-pattern routes, sent as written, are answered 403; `x-greptime-auth` carrying the administrative credential reaches the telemetry store as `perses`, through nginx and sent directly to Perses; `/metrics` through nginx is answered 404; and the result is recorded
+- **THEN** an unauthenticated request is answered 401; the provisioned user logs in; the provisioned set is exact after a planted view and a restart, and a session opened before that restart for a user record outside provisioning still answers `whoami`; dashboard writes are refused; PromQL and SQL reads through the two datasources return data; every committed view's query succeeds and each PromQL query returns series, and a mutant view query fails the case; an `INSERT` through `greptimedb-sql` is refused by the telemetry store; the four out-of-pattern routes, sent as written, are answered 403; `x-greptime-auth` carrying the administrative credential reaches the telemetry store as `perses`, through nginx and sent directly to Perses; `/metrics` through nginx is answered 404; `/api/config` serves the rendered `frontend.information`; and the result is recorded
 
 #### Scenario: The allow-list is bypassed
 
@@ -243,7 +263,7 @@ This capability SHALL state what its properties guarantee and what they do not, 
 #### Scenario: A guarantee about who is admitted is sought
 
 - **WHEN** someone asks whether these properties guarantee that only members of `perses_users` read the dashboard service
-- **THEN** the answer is no: Kanidm authenticates people and refuses non-members, membership is set in the running Kanidm outside the repository, and a removed member keeps access until the last access token issued from the refresh token expires, at most 1 h after login: 45 min of refresh token and 15 min of access token
+- **THEN** the answer is no: Kanidm authenticates people and refuses non-members, membership is set in the running Kanidm outside the repository, and a removed member keeps access until the last access token issued from the refresh token expires, at most 8 h after login: 7 h 45 min of refresh token and 15 min of access token, since Perses does not consult Kanidm after sign-in
 
 #### Scenario: A guarantee about the server's enforcement is sought
 
