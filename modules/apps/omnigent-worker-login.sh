@@ -57,9 +57,11 @@ if [[ "$host" == stibnite && "$(/bin/hostname -s)" == stibnite ]]; then
   exec "${command[@]}"
 fi
 printf -v remote '%q ' "${command[@]}"
+# tincr names, not *.zt: macOS Local Network privacy refuses ZeroTier's feth
+# interface to a Nix-built ssh whose terminal holds no Local Network grant.
 if [[ "$host" == stibnite ]]; then
-  endpoint=crs58@stibnite.zt
+  endpoint=crs58@stibnite.vanixiets.internal
 else
-  endpoint="root@$host.zt"
+  endpoint="root@$host.vanixiets.internal"
 fi
 exec ssh -t -o ForwardAgent=no -o StrictHostKeyChecking=yes "$endpoint" "cd / && $remote"
