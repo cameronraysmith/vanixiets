@@ -244,7 +244,7 @@
         "spec": {
           "display": {
             "name": "Entities per graph",
-            "description": "Entities in each ready graph's main branch, summed over its datasets, read as the monitor actor; a graph whose read failed has no point. The legend names each graph without its cookbook- prefix, after the host serving it, with its last value."
+            "description": "Entities in each ready graph's main branch, summed over its datasets, read as the monitor actor; a graph whose read failed has no point. The legend names each graph without its cookbook- prefix, then the host serving it, with its last value."
           },
           "plugin": {
             "kind": "TimeSeriesChart",
@@ -257,7 +257,7 @@
               "legend": {
                 "position": "right",
                 "mode": "table",
-                "size": "small",
+                "size": "medium",
                 "values": [
                   "last"
                 ]
@@ -276,7 +276,7 @@
                       "name": "greptimedb-promql"
                     },
                     "query": "label_replace(sum by (host_name, graph) (vanixiets_omnigraph_graph_entities{host_name=~\"$host_name\"}), \"graph_name\", \"$1\", \"graph\", \"(?:cookbook-)?(.*)\")",
-                    "seriesNameFormat": "{{host_name}} {{graph_name}}"
+                    "seriesNameFormat": "{{graph_name}} {{host_name}}"
                   }
                 }
               }
@@ -289,7 +289,7 @@
         "spec": {
           "display": {
             "name": "Manifest version and storage format per graph",
-            "description": "At the end of the view's range, each ready graph's main branch: its graph manifest version, which rises with every commit, and the storage format (internal schema version) it is stamped at."
+            "description": "At the end of the view's range, each ready graph's main branch, named without its cookbook- prefix: its graph manifest version, which rises with every commit, and the storage format (internal schema version) it is stamped at."
           },
           "plugin": {
             "kind": "Table",
@@ -299,17 +299,23 @@
               "enableSorting": true,
               "columnSettings": [
                 {
-                  "name": "graph",
+                  "name": "graph_name",
                   "header": "Graph",
+                  "headerDescription": "The graph's name without its cookbook- prefix.",
+                  "width": "auto",
                   "sort": "asc"
                 },
                 {
                   "name": "host_name",
-                  "header": "Host"
+                  "header": "Host",
+                  "width": 100
                 },
                 {
                   "name": "value #1",
-                  "header": "Manifest version",
+                  "header": "Manifest",
+                  "headerDescription": "The graph manifest version of the main branch; it rises with every commit.",
+                  "width": 80,
+                  "align": "right",
                   "format": {
                     "unit": "decimal",
                     "decimalPlaces": 0,
@@ -318,7 +324,10 @@
                 },
                 {
                   "name": "value #2",
-                  "header": "Storage format",
+                  "header": "Format",
+                  "headerDescription": "The storage format (internal schema version) the main branch is stamped at.",
+                  "width": 80,
+                  "align": "right",
                   "format": {
                     "unit": "decimal",
                     "decimalPlaces": 0,
@@ -337,6 +346,12 @@
                   "kind": "MergeIndexedColumns",
                   "spec": {
                     "column": "graph"
+                  }
+                },
+                {
+                  "kind": "MergeIndexedColumns",
+                  "spec": {
+                    "column": "graph_name"
                   }
                 },
                 {
@@ -362,7 +377,7 @@
                       "kind": "PrometheusDatasource",
                       "name": "greptimedb-promql"
                     },
-                    "query": "max by (host_name, graph) (vanixiets_omnigraph_graph_manifest_version{host_name=~\"$host_name\"})"
+                    "query": "label_replace(max by (host_name, graph) (vanixiets_omnigraph_graph_manifest_version{host_name=~\"$host_name\"}), \"graph_name\", \"$1\", \"graph\", \"(?:cookbook-)?(.*)\")"
                   }
                 }
               }
@@ -377,7 +392,7 @@
                       "kind": "PrometheusDatasource",
                       "name": "greptimedb-promql"
                     },
-                    "query": "max by (host_name, graph) (vanixiets_omnigraph_graph_storage_format{host_name=~\"$host_name\"})"
+                    "query": "label_replace(max by (host_name, graph) (vanixiets_omnigraph_graph_storage_format{host_name=~\"$host_name\"}), \"graph_name\", \"$1\", \"graph\", \"(?:cookbook-)?(.*)\")"
                   }
                 }
               }
@@ -455,7 +470,7 @@
                       "name": "greptimedb-promql"
                     },
                     "query": "max by (host_name) (vanixiets_omnigraph_dataset_used_bytes{host_name=~\"$host_name\"})",
-                    "seriesNameFormat": "{{host_name}} used"
+                    "seriesNameFormat": "used {{host_name}}"
                   }
                 }
               }
@@ -471,7 +486,7 @@
                       "name": "greptimedb-promql"
                     },
                     "query": "max by (host_name) (vanixiets_omnigraph_dataset_quota_bytes{host_name=~\"$host_name\"})",
-                    "seriesNameFormat": "{{host_name}} quota"
+                    "seriesNameFormat": "quota {{host_name}}"
                   }
                 }
               }
@@ -680,34 +695,34 @@
             {
               "x": 0,
               "y": 0,
-              "width": 4,
-              "height": 8,
+              "width": 6,
+              "height": 4,
               "content": {
                 "$ref": "#/spec/panels/ready"
               }
             },
             {
-              "x": 4,
-              "y": 0,
-              "width": 4,
-              "height": 8,
+              "x": 0,
+              "y": 4,
+              "width": 6,
+              "height": 4,
               "content": {
                 "$ref": "#/spec/panels/graph-reads"
               }
             },
             {
-              "x": 8,
+              "x": 6,
               "y": 0,
-              "width": 8,
+              "width": 9,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/graph-states"
               }
             },
             {
-              "x": 16,
+              "x": 15,
               "y": 0,
-              "width": 8,
+              "width": 9,
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/start-to-ready"
