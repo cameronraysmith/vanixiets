@@ -3,15 +3,16 @@ linear_story_id: CAM-128
 linear_story_identifier: CAM-128
 linear_story_title: "Serialise shared reference tree writes in the spec and split its runtime test"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-128/serialise-shared-reference-tree-writes-in-the-spec-and-split-its
-linear_story_state: In Progress
+linear_story_state: In Review
 linear_team: CAM
-last_synced_state: In Progress
-last_synced_at: "2026-11-26T22:43:20Z"
+last_synced_state: In Review
+last_synced_at: "2026-11-27T01:25:37Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T22:35:53Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-128 created in Todo on team CAM with no project, description seeded from proposal.md; state, project and labels confirmed by read-only view" }
   - { at: "2026-11-26T22:43:20Z", transition: "Todo->In Progress", outcome: "posted", note: "First tasks.md checkbox checked; state confirmed In Progress by read-only view" }
+  - { at: "2026-11-27T01:25:37Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md written with PASS WITH WARNINGS after two earlier FAIL runs closed by the writer fixes; state confirmed In Review by read-only view" }
 ---
 
 ## Why
