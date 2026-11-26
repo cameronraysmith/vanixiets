@@ -4,7 +4,10 @@ Every refused request class must be refused without touching the shared root,
 an unauthorized caller must be refused, and one accepted request (deepen over a
 file:// fixture) must change the repository it names. An update that changes an
 LFS path fast-forwards to its pointer file, and hydrate fetches the blobs a
-revision needs.
+revision needs. Requests for one repository run one after another, the later one
+telling its caller it waits and giving up after the lock timeout; requests for
+different repositories overlap; a caller that disconnects leaves its update to
+finish, with no traceback, and its lock released.
 """
 
 import grp
@@ -12,10 +15,12 @@ import hashlib
 import importlib.machinery
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
 import tempfile
+import time
 import types
 
 HANDLER = sys.argv[1]
@@ -36,24 +41,45 @@ def git(*args, cwd=None):
     ).stdout.strip()
 
 
-def config(group=own_group, protocols=("https",)):
-    path = os.path.join(work, f"config-{group}-{'-'.join(protocols)}.json")
+locks = os.path.join(work, "locks")
+os.makedirs(locks)
+
+
+def config(group=own_group, protocols=("https",), lock_timeout=None):
+    path = os.path.join(work, f"config-{group}-{'-'.join(protocols)}-{lock_timeout}.json")
+    settings = {"root": root, "group": group, "allowedProtocols": list(protocols), "lockDir": locks}
+    if lock_timeout is not None:
+        settings["lockTimeout"] = lock_timeout
     with open(path, "w") as handle:
-        json.dump({"root": root, "group": group, "allowedProtocols": list(protocols)}, handle)
+        json.dump(settings, handle)
     return path
 
 
-def ask(request, cfg):
+def start(request, cfg):
     ours, theirs = socket.socketpair()
     # launchd starts each inetd-style handler with umask 022 whatever the job's Umask
     # key says; the handler must set the writer's umask itself.
-    proc = subprocess.Popen([HANDLER, cfg], stdin=theirs, stdout=theirs, preexec_fn=lambda: os.umask(0o022))
+    proc = subprocess.Popen([HANDLER, cfg], stdin=theirs, stdout=theirs, stderr=subprocess.PIPE,
+                            preexec_fn=lambda: os.umask(0o022))
     theirs.close()
     ours.sendall((request if isinstance(request, bytes) else json.dumps(request).encode()) + b"\n")
     ours.shutdown(socket.SHUT_WR)
-    data = b"".join(iter(lambda: ours.recv(65536), b""))
-    proc.wait()
-    return json.loads(data)
+    return proc, ours
+
+
+def finish(proc, ours):
+    """The handler's reply, with the notes sent before it and its log lines."""
+    with ours, ours.makefile("rb") as lines:
+        messages = [json.loads(line) for line in lines]
+    _, log = proc.communicate()
+    reply = messages[-1]
+    reply["notes"] = [message["note"] for message in messages[:-1]]
+    reply["log"] = log.decode()
+    return reply
+
+
+def ask(request, cfg):
+    return finish(*start(request, cfg))
 
 
 def snapshot():
@@ -388,6 +414,162 @@ except subprocess.TimeoutExpired:
     proc.kill()
     failures.append("an idle connection held its handler past the read timeout")
 
+# Serialisation. Each fixture clone fetches through an upload-pack that sleeps
+# before serving and records the window it slept in, so the windows show whether
+# two requests' fetches from one remote, or from two, overlapped.
+windows = os.path.join(work, "windows")
+slow_pack = os.path.join(work, "slow-upload-pack")
+put(slow_pack, f"#!{sys.executable}\n" + """import os, sys, time
+def mark(event):
+    with open(WINDOWS, "a") as handle:
+        handle.write(f"{event} {os.getpid()} {sys.argv[-1]} {time.time()}\\n")
+mark("begin")
+time.sleep(1)
+mark("end")
+os.execvp("git", ["git", "upload-pack", *sys.argv[1:]])
+""".replace("WINDOWS", repr(windows)))
+os.chmod(slow_pack, 0o755)
+serial = {}
+for name in ("serial-a", "serial-b"):
+    work_tree, bare = upstream(name)
+    clone_dir = os.path.join(root, "github.com", "o", name)
+    git("clone", "-q", f"file://{bare}", clone_dir)
+    git("config", "remote.origin.uploadpack", slow_pack, cwd=clone_dir)
+    serial[name] = (work_tree, bare, clone_dir)
+
+
+def advance(name):
+    work_tree, _, _ = serial[name]
+    git("commit", "-q", "--allow-empty", "-m", "advance", cwd=work_tree)
+    git("push", "-q", "up", "master", cwd=work_tree)
+
+
+def slept(name):
+    """Each sleep window of name's upload-pack, as (begin, end)."""
+    begun, spans = {}, []
+    with open(windows) as handle:
+        for line in handle:
+            event, pid, path, stamp = line.split()
+            if path.rstrip("/").endswith(f"/{name}.git"):
+                if event == "begin":
+                    begun[pid] = float(stamp)
+                else:
+                    spans.append((begun.pop(pid), float(stamp)))
+    return spans
+
+
+def overlap(first, second):
+    return any(a < d and c < b for a, b in first for c, d in second)
+
+
+def wait_for_fetch():
+    """Return once a fetch has started, so the next request finds its lock held."""
+    for _ in range(300):
+        if os.path.exists(windows) and os.path.getsize(windows):
+            return
+        time.sleep(0.1)
+    sys.exit("no fixture fetch began within 30 s")
+
+
+def up_to_date(name):
+    _, bare, clone_dir = serial[name]
+    return git("rev-parse", "HEAD", cwd=clone_dir) == git("rev-parse", "master", cwd=bare)
+
+
+def update(spelling, cfg=None):
+    return {"action": "get", "target": spelling, "update": True}, cfg or config(protocols=("file",))
+
+
+def run_client(target):
+    """ghq-writer-client get --update target, against a listener handing each connection to the handler."""
+    code = ("import importlib.machinery, sys, types\n"
+            "loader = importlib.machinery.SourceFileLoader('client', sys.argv[1])\n"
+            "client = types.ModuleType('client')\n"
+            "loader.exec_module(client)\n"
+            "client.SOCKET = sys.argv[2]\n"
+            "sys.argv = ['ghq-writer-client', 'get', '--update', sys.argv[3]]\n"
+            "client.main()\n")
+    path = os.path.join(work, "w.sock")
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
+        listener.bind(path)
+        listener.listen()
+        caller = subprocess.Popen([sys.executable, "-c", code, os.path.join(os.path.dirname(HANDLER), "ghq-writer-client"), path, target],
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        conn, _ = listener.accept()
+        with conn:
+            served = subprocess.Popen([HANDLER, config(protocols=("file",))], stdin=conn, stdout=conn, stderr=subprocess.PIPE)
+    os.unlink(path)
+    out, err = caller.communicate()
+    served.communicate()
+    return caller.returncode, out.decode(), err.decode()
+
+
+# Two updates of one repository, the second spelled owner/repo and sent through
+# the client: the second waits, says so, and fetches only after the first is done.
+advance("serial-a")
+first = start(*update("github.com/o/serial-a"))
+wait_for_fetch()
+status, out, err = run_client("o/serial-a")
+first = finish(*first)
+if first["exit"] != 0 or status != 0 or not up_to_date("serial-a"):
+    failures.append(f"concurrent updates of one repository must both succeed: {first} / {status} {out!r} {err!r}")
+if not err.startswith("ghq-writer: waiting up to 3600 s for github.com/o/serial-a,"):
+    failures.append(f"a request waiting for its repository must tell its caller first: {err!r}")
+spans = sorted(slept("serial-a"))
+if len(spans) < 4 or any(overlap([x], [y]) for i, x in enumerate(spans) for y in spans[i + 1:]):
+    failures.append(f"two updates of one repository fetched at the same time: {spans}")
+
+# Updates of two repositories run side by side.
+os.unlink(windows)
+advance("serial-a")
+advance("serial-b")
+pair = [start(*update(f"github.com/o/{name}")) for name in ("serial-a", "serial-b")]
+replies = [finish(*request) for request in pair]
+if any(reply["exit"] != 0 or " waiting " in reply["log"] for reply in replies) or not overlap(slept("serial-a"), slept("serial-b")):
+    failures.append(f"updates of two repositories must overlap without waiting: {replies} {slept('serial-a')} {slept('serial-b')}")
+
+# A request still waiting when the lock timeout passes gives up, saying why. Its
+# caller sends no {"accept": ["note"]} line, as clients predating notes do not,
+# so it receives its reply alone.
+os.unlink(windows)
+advance("serial-a")
+first = start(*update("github.com/o/serial-a"))
+wait_for_fetch()
+impatient = ask(*update("github.com/o/serial-a", config(protocols=("file",), lock_timeout=1)))
+first = finish(*first)
+if (impatient["exit"] != 75 or first["exit"] != 0
+        or "gave up after 1 s waiting for github.com/o/serial-a" not in impatient["stderr"]):
+    failures.append(f"a request must give up after the lock timeout: {impatient}")
+if impatient["notes"]:
+    failures.append(f"a caller that does not accept notes must receive none: {impatient['notes']}")
+
+# A caller that disconnects: the update finishes, the handler logs the
+# disconnection rather than a traceback, and the lock is free once it exits.
+os.unlink(windows)
+advance("serial-a")
+proc, ours = start(*update("github.com/o/serial-a"))
+ours.close()
+_, log = proc.communicate(timeout=300)
+log = log.decode()
+after = ask(*update("github.com/o/serial-a"))
+if (proc.returncode != 0 or "Traceback" in log or "caller disconnected" not in log
+        or "exit status=0" not in log or not up_to_date("serial-a")):
+    failures.append(f"a disconnected caller's update must finish quietly: {proc.returncode} {log!r}")
+if after["exit"] != 0 or after["notes"]:
+    failures.append(f"a disconnected caller's handler must release its lock at exit: {after}")
+
+# Log lines: a UTC timestamp, the handler's pid, the caller, verb and repository,
+# at start and exit; a waiting request logs its wait too.
+stamp = r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z ghq-writer pid=\d+ uid=\d+ user=\S+ caller-pid=\S+"
+line = rf"{stamp} verb=get\+update repo=github\.com/o/serial-a"
+for pattern in (rf"^{line} start$", rf"^{line} caller disconnected$", rf"^{line} exit status=0 duration=\d+\.\d{{3}}s$"):
+    if not re.search(pattern, log, re.M):
+        failures.append(f"log line {pattern!r} missing: {log!r}")
+if not re.search(rf"^{line} waiting held-by: pid=\d+ verb=get\+update since=\S+Z$", impatient["log"], re.M):
+    failures.append(f"a waiting request must log its wait: {impatient['log']!r}")
+if "file://" in log + impatient["log"]:
+    failures.append("log lines must name the repository, not the target or its remote URL")
+
 # ls-remote output that is not "<sha>\t<ref>" is a failed tag fetch, not a crash.
 loader = importlib.machinery.SourceFileLoader("handler", HANDLER)
 handler = types.ModuleType("handler")
@@ -399,6 +581,46 @@ try:
         failures.append(f"malformed ls-remote output must fail the tag fetch: {results}")
 except ValueError as error:
     failures.append(f"malformed ls-remote output raised: {error!r}")
+
+# Every spelling of a repository, and a repository not cloned yet, names one
+# lock; two names differing only in case share it.
+_, _, serial_a = serial["serial-a"]
+os.makedirs(os.path.join(serial_a, "sub"))
+root_link = os.path.join(work, "root-link")
+os.symlink(root, root_link)
+spellings = [
+    ({"action": "get", "target": target}, base)
+    for target in ("github.com/o/serial-a", "o/serial-a", "https://u:secret@github.com/o/serial-a.git",
+                   "git@github.com:o/serial-a.git", "github.com/o/serial-a/")
+    for base in (root, root_link)
+] + [
+    ({"action": "deepen", "depth": 1, "path": os.path.join(base, "github.com", "o", "serial-a", "sub")}, root)
+    for base in (root, root_link)
+]
+names = {handler.repository(request, base) for request, base in spellings}
+if names != {"github.com/o/serial-a"}:
+    failures.append(f"spellings of one repository must name one lock: {names}")
+if handler.repository({"action": "get", "target": "github.com/o/not-yet"}, root) != "github.com/o/not-yet":
+    failures.append("a repository not cloned yet must have a lock name")
+try:
+    handler.repository({"action": "get", "target": "bare"}, root)
+    failures.append("a bare target, which names no directory under the root, must be refused")
+except handler.Refused:
+    pass
+
+
+def session(repo):
+    return types.SimpleNamespace(repo=repo, verb="get", notes=False, log=lambda event: None, send=lambda message: None)
+
+
+held = handler.hold({"lockDir": locks}, session("github.com/o/serial-a"))
+try:
+    handler.hold({"lockDir": locks, "lockTimeout": 0.2}, session("github.com/O/Serial-A"))
+    failures.append("two names differing only in case must share one lock")
+except handler.Busy:
+    pass
+finally:
+    os.close(held)
 
 if failures:
     sys.exit("\n".join(failures))

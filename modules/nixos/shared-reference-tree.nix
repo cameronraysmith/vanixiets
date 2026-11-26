@@ -12,9 +12,13 @@ in
     }:
     let
       cfg = config.services.shared-reference-tree;
+      # The handler's per-repository lock files; the writer creates them and never
+      # removes them.
+      lockDir = "/var/lib/ghq-writer";
       handlerConfig = pkgs.writeText "ghq-writer.json" (
         builtins.toJSON {
           inherit (cfg) root allowedProtocols;
+          inherit lockDir;
           group = cfg.writer;
         }
       );
@@ -109,7 +113,10 @@ in
         };
         users.groups.${cfg.writer}.members = cfg.participants;
 
-        systemd.tmpfiles.rules = [ "d ${cfg.root} 0750 ${cfg.writer} ${cfg.writer} -" ];
+        systemd.tmpfiles.rules = [
+          "d ${cfg.root} 0750 ${cfg.writer} ${cfg.writer} -"
+          "d ${lockDir} 0700 ${cfg.writer} ${cfg.writer} -"
+        ];
 
         home-manager.users = lib.genAttrs cfg.participants (_: {
           programs.ghq-shared.root = cfg.root;
@@ -141,7 +148,10 @@ in
             PrivateTmp = true;
             ProtectHome = true;
             ProtectSystem = "strict";
-            ReadWritePaths = [ cfg.root ];
+            ReadWritePaths = [
+              cfg.root
+              lockDir
+            ];
           };
         };
       };

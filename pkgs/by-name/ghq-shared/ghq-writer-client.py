@@ -37,19 +37,29 @@ def request(argv):
 
 
 def main():
-    payload = json.dumps(request(sys.argv[1:])).encode() + b"\n"
+    # The second line asks for notes; a writer predating them reads only the first.
+    payload = json.dumps(request(sys.argv[1:])).encode() + b'\n{"accept": ["note"]}\n'
+    reply = None
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as conn:
             conn.connect(SOCKET)
             conn.sendall(payload)
             conn.shutdown(socket.SHUT_WR)
-            data = b"".join(iter(lambda: conn.recv(65536), b""))
+            # The writer may send {"note": ...} lines, such as a wait for the
+            # repository, before its one reply.
+            for line in conn.makefile("rb"):
+                message = json.loads(line)
+                if "note" in message:
+                    sys.stderr.write(message["note"])
+                    sys.stderr.flush()
+                else:
+                    reply = message
     except OSError as error:
         print(f"ghq-writer: cannot reach the shared-tree writer at {SOCKET}: {error}", file=sys.stderr)
         sys.exit(69)
-    try:
-        reply = json.loads(data)
     except ValueError:
+        reply = None
+    if reply is None:
         print("ghq-writer: the writer closed the connection without a reply", file=sys.stderr)
         sys.exit(70)
     sys.stdout.write(reply["stdout"])

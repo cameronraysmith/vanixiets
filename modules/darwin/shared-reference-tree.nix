@@ -22,9 +22,13 @@ in
       # launchd opens StandardErrorPath as UserName before spawning the handler,
       # so the writer must own the directory it lands in; /var/log is root's.
       logDir = "/var/log/ghq-writer";
+      # The handler's per-repository lock files; the writer creates them and never
+      # removes them.
+      lockDir = "/var/lib/ghq-writer";
       handlerConfig = pkgs.writeText "ghq-writer.json" (
         builtins.toJSON {
           inherit (cfg) root allowedProtocols;
+          inherit lockDir;
           group = cfg.writer;
         }
       );
@@ -193,6 +197,7 @@ in
         # trusting entries another account controls.
         system.activationScripts.launchd.text = lib.mkBefore ''
           /usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} ${logDir}
+          /usr/bin/install -d -m 0700 -o ${cfg.writer} -g ${cfg.writer} ${lockDir}
           ghqRoot=${lib.escapeShellArg cfg.root}
           if [ -L "$ghqRoot" ] || { [ -e "$ghqRoot" ] && [ ! -d "$ghqRoot" ]; }; then
             echo "shared-reference-tree: $ghqRoot exists and is not a directory; refusing to provision it" >&2

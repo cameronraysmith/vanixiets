@@ -103,6 +103,7 @@
             ];
           };
           testScript = ''
+            import hashlib
             import json
             import re
             import shlex
@@ -156,6 +157,22 @@
                 assert machine.succeed(as_writer(f"git -C {P} rev-parse --is-shallow-repository")).strip() == "true"
                 machine.succeed(as_user("cameron", "ghq-sync --seed-zoxide hello"))
                 assert machine.succeed(as_user("cameron", "zoxide query hello")).strip() == P
+
+            with subtest("a request takes its repository's lock in the writer's lock directory, and a second one waits"):
+                assert machine.succeed("stat -c '%U %G %a' /var/lib/ghq-writer").strip() == "ghq ghq 700"
+                lock = "/var/lib/ghq-writer/" + hashlib.sha256(b"localhost/fixture/hello").hexdigest() + ".lock"
+                assert machine.succeed(f"stat -c '%U %a' {lock}").strip() == "ghq 600"
+                # Root holds the lock in place of a first, slow request: taken before the
+                # request starts, released once its handler has logged that it waits (or
+                # after 10 s, failing the assertion), so the wait is certain and no longer
+                # than it takes.
+                out = machine.succeed(
+                    f"(flock -x {lock} -c 'touch /tmp/lock-held; for i in $(seq 100); do"
+                    " journalctl -b -o cat | grep -q \"waiting held-by\" && break; sleep 0.1; done'"
+                    " >/dev/null 2>&1 &) && until [ -e /tmp/lock-held ]; do sleep 0.05; done && "
+                    + as_user("cameron", f"ghq get -u {URL} 2>&1")
+                )
+                assert "ghq-writer: waiting up to 3600 s for localhost/fixture/hello," in out, out
 
             with subtest("every reader reads it with git"):
                 for user in readers:

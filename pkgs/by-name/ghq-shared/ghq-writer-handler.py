@@ -3,29 +3,51 @@
 Started once per connection by a socket-activated service (systemd Accept=yes,
 launchd inetdCompatibility), with the connection on file descriptor 0. Reads one
 JSON request, refuses anything outside a fixed action set, runs ghq or ghq-sync
-without a shell, and writes one JSON reply {"stdout", "stderr", "exit"}.
+without a shell, and writes one JSON reply {"stdout", "stderr", "exit"}. To a
+client that sends {"accept": ["note"]} on a second line, lines {"note": TEXT}
+may precede the reply while the request waits for its repository.
+
+Requests for one repository run one at a time: each holds an exclusive flock on
+a lock file in CONFIG's lockDir, named by the repository's path under the root,
+for the whole operation. A request waits at most lockTimeout seconds for it.
+A caller that disconnects does not stop the operation; its reply is dropped.
 
 Git runs with no LFS filter, whatever a repository's own configuration says, so
 every working tree holds LFS pointer files exactly as committed; readers' git
 configuration applies the same policy to the shared root.
 
-Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group" and
-"allowedProtocols".
+Every request leaves one log line on standard error at start, while it waits
+and at exit, carrying the time, the handler's pid, the caller's uid and pid, the
+verb and the repository, never the target as given, which may hold credentials.
+
+Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group",
+"allowedProtocols", "lockDir" and optionally "lockTimeout".
 """
 
+import datetime
+import fcntl
 import grp
+import hashlib
 import json
 import os
 import pwd
 import re
+import signal
 import socket
 import struct
 import subprocess
 import sys
+import time
 
 GHQ = "@ghq@"
 GHQ_SYNC = "@ghqSync@"
 TOOL_PATH = "@toolPath@"
+
+# Longer than any single git command the handler runs may take (their timeout
+# below), so a waiter outlasts every step of a slow fetch it queues behind.
+LOCK_TIMEOUT = 3600
+# EX_TEMPFAIL from sysexits.h: the repository is busy or its lock unavailable.
+BUSY = 75
 
 MAX_REQUEST = 4096
 READ_TIMEOUT = 30
@@ -56,14 +78,20 @@ class Refused(Exception):
     pass
 
 
-def peer_uid(conn):
+def peer(conn):
+    """The caller's uid, and its pid when the platform reports one."""
     if sys.platform.startswith("linux"):
         size = struct.calcsize("3i")
-        _pid, uid, _gid = struct.unpack("3i", conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, size))
-        return uid
+        pid, uid, _gid = struct.unpack("3i", conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, size))
+        return uid, pid
     # darwin: getsockopt(SOL_LOCAL=0, LOCAL_PEERCRED=1) returns struct xucred,
-    # whose first two fields are cr_version and cr_uid.
-    return struct.unpack_from("=II", conn.getsockopt(0, 1, 76))[1]
+    # whose first two fields are cr_version and cr_uid; LOCAL_PEERPID=2 the pid.
+    uid = struct.unpack_from("=II", conn.getsockopt(0, 1, 76))[1]
+    try:
+        pid = struct.unpack("=i", conn.getsockopt(0, 2, 4))[0]
+    except OSError:
+        pid = None
+    return uid, pid
 
 
 def authorized(uid, group):
@@ -154,8 +182,8 @@ def environment(config):
     return env
 
 
-def repo_dir(target, root):
-    """The clone directory ghq uses for target, or None when it is not cloned."""
+def clone_path(target, root):
+    """The directory ghq clones target into, cloned or not, or None when it is not inside root."""
     name = re.sub(r"^[A-Za-z][A-Za-z0-9+.-]*://", "", target)
     if "://" not in target and re.match(r"^[^/]+@[^/:]+:", name):
         name = name.split("@", 1)[1].replace(":", "/", 1)
@@ -169,7 +197,84 @@ def repo_dir(target, root):
     path = os.path.realpath(os.path.join(root, name))
     if not path.startswith(os.path.realpath(root) + os.sep):
         return None
-    return path if os.path.isdir(os.path.join(path, ".git")) else None
+    return path
+
+
+def repo_dir(target, root):
+    """The clone directory ghq uses for target, or None when it is not cloned."""
+    path = clone_path(target, root)
+    return path if path and os.path.isdir(os.path.join(path, ".git")) else None
+
+
+def repository(request, root):
+    """The repository a valid request writes, as its path relative to root.
+
+    A get names the directory ghq clones into, which need not exist yet; any
+    other action names the repository enclosing its path, as ghq-sync acts on.
+    Symbolic links are resolved, so every spelling of a path yields one name.
+    """
+    real_root = os.path.realpath(root)
+    if request["action"] == "get":
+        path = clone_path(request["target"], root)
+        if path is None:
+            raise Refused("target must name a repository inside the shared root, as owner/repo, host/owner/repo or a URL")
+    else:
+        path = top = os.path.realpath(request["path"])
+        while top != real_root and not os.path.isdir(os.path.join(top, ".git")):
+            top = os.path.dirname(top)
+        if top != real_root:
+            path = top
+    return os.path.relpath(path, real_root)
+
+
+def verb(request):
+    return "+".join([request["action"], *(flag for flag in BOOLEANS if request.get(flag) is True)])
+
+
+class Busy(Exception):
+    pass
+
+
+def wait_for(fd, timeout):
+    def expire(_signum, _frame):
+        raise TimeoutError
+
+    previous = signal.signal(signal.SIGALRM, expire)
+    signal.setitimer(signal.ITIMER_REAL, timeout)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def hold(config, session):
+    """Take the session's repository lock, waiting for it; closing the result releases it.
+
+    The lock file is named by the repository's path case-folded, since darwin's
+    file system is case-insensitive: two spellings of one clone must share a lock,
+    and on a case-sensitive host two clones differing only in case merely queue.
+    Lock files are never removed, so a waiter never holds a lock on an unlinked
+    file while another request creates a fresh one.
+    """
+    name = hashlib.sha256(session.repo.casefold().encode()).hexdigest()
+    fd = os.open(os.path.join(config["lockDir"], f"{name}.lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        timeout = config.get("lockTimeout", LOCK_TIMEOUT)
+        holder = os.pread(fd, 512, 0).decode(errors="replace").strip() or "pid=-"
+        session.log(f"waiting held-by: {holder}")
+        if session.notes:
+            session.send({"note": f"ghq-writer: waiting up to {timeout} s for {session.repo}, in use by another request ({holder})\n"})
+        try:
+            wait_for(fd, timeout)
+        except TimeoutError:
+            os.close(fd)
+            raise Busy(f"ghq-writer: gave up after {timeout} s waiting for {session.repo}, still in use by another request ({holder}); try again later") from None
+    os.ftruncate(fd, 0)
+    os.pwrite(fd, f"pid={os.getpid()} verb={session.verb} since={utc_now()}\n".encode(), 0)
+    return fd
 
 
 def git(path, env, *args, stdin=None):
@@ -304,17 +409,60 @@ def run_get(request, argv, config, env):
     return results
 
 
-def serve(conn, config):
-    uid = peer_uid(conn)
+def utc_now():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+class Session:
+    """One connection: its caller, its log lines and the messages sent back."""
+
+    def __init__(self, conn):
+        self.conn = conn
+        self.started = time.monotonic()
+        self.uid, self.caller_pid = peer(conn)
+        self.verb = self.repo = "-"
+        self.gone = self.notes = False
+
+    def log(self, event):
+        try:
+            user = pwd.getpwuid(self.uid).pw_name
+        except KeyError:
+            user = "-"
+        print(f"{utc_now()} ghq-writer pid={os.getpid()} uid={self.uid} user={user}"
+              f" caller-pid={self.caller_pid or '-'} verb={self.verb} repo={self.repo} {event}",
+              file=sys.stderr, flush=True)
+
+    def send(self, message):
+        """Send one line to the caller, unless it has gone: the operation outlives it."""
+        if self.gone:
+            return
+        try:
+            self.conn.sendall(json.dumps(message).encode() + b"\n")
+        except OSError:
+            self.gone = True
+            self.log("caller disconnected")
+
+
+def serve(session, config):
+    conn = session.conn
     # Under per-connection activation an idle connection holds a handler process.
     conn.settimeout(READ_TIMEOUT)
+    reader = conn.makefile("rb")
     # Read before refusing, so an unauthorized caller gets a reply rather than a reset.
     try:
-        raw = conn.makefile("rb").readline(MAX_REQUEST + 1)
+        raw = reader.readline(MAX_REQUEST + 1)
     except TimeoutError:
         raw = None
-    if not authorized(uid, config["group"]):
-        return {"stdout": "", "stderr": f"ghq-writer: uid {uid} is not a member of {config['group']}\n", "exit": 13}, uid, None
+    # A client that relays notes says so on a second line, {"accept": ["note"]}:
+    # a handler predating notes reads only the first line, and a client predating
+    # them, which parses everything it receives as one reply, sends none.
+    try:
+        options = json.loads(reader.readline(MAX_REQUEST + 1)) if raw and raw.endswith(b"\n") else {}
+    except (TimeoutError, ValueError):
+        options = {}
+    session.notes = isinstance(options, dict) and isinstance(options.get("accept"), list) and "note" in options["accept"]
+    if not authorized(session.uid, config["group"]):
+        return {"stdout": "", "stderr": f"ghq-writer: uid {session.uid} is not a member of {config['group']}\n", "exit": 13}
     try:
         if raw is None:
             raise Refused(f"no complete request within {READ_TIMEOUT} s")
@@ -322,19 +470,30 @@ def serve(conn, config):
             raise Refused("request exceeds 4 KiB")
         request = json.loads(raw)
         argv = command(request, config)
+        repo = repository(request, config["root"])
     except (Refused, ValueError) as refusal:
-        return {"stdout": "", "stderr": f"ghq-writer: refused: {refusal}\n", "exit": 2}, uid, None
-    env = environment(config)
-    if request["action"] == "get":
-        results = run_get(request, argv, config, env)
-    else:
-        results = [subprocess.run(argv, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=3600)]
-    reply = {
+        return {"stdout": "", "stderr": f"ghq-writer: refused: {refusal}\n", "exit": 2}
+    session.verb, session.repo = verb(request), repo
+    session.log("start")
+    try:
+        held = hold(config, session)
+    except Busy as busy:
+        return {"stdout": "", "stderr": f"{busy}\n", "exit": BUSY}
+    except OSError as error:
+        return {"stdout": "", "stderr": f"ghq-writer: cannot open the lock for {repo} in {config['lockDir']}: {error.strerror}\n", "exit": BUSY}
+    try:
+        env = environment(config)
+        if request["action"] == "get":
+            results = run_get(request, argv, config, env)
+        else:
+            results = [subprocess.run(argv, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=3600)]
+    finally:
+        os.close(held)
+    return {
         "stdout": "".join(r.stdout.decode(errors="replace") for r in results),
         "stderr": "".join(r.stderr.decode(errors="replace") for r in results),
         "exit": next((r.returncode for r in results if r.returncode), 0),
     }
-    return reply, uid, argv
 
 
 def main():
@@ -344,11 +503,11 @@ def main():
     os.umask(0o027)
     with open(sys.argv[1]) as handle:
         config = json.load(handle)
-    conn = socket.socket(fileno=0)
-    reply, uid, argv = serve(conn, config)
-    print(f"ghq-writer: uid={uid} argv={argv} exit={reply['exit']}", file=sys.stderr)
-    conn.sendall(json.dumps(reply).encode() + b"\n")
-    conn.close()
+    session = Session(socket.socket(fileno=0))
+    reply = serve(session, config)
+    session.send(reply)
+    session.conn.close()
+    session.log(f"exit status={reply['exit']} duration={time.monotonic() - session.started:.3f}s")
 
 
 if __name__ == "__main__":
