@@ -464,6 +464,16 @@
                       metric("vanixiets_zram_compr_data_bytes", series(lambda i: 5e8)),
                       metric("vanixiets_zram_mem_used_bytes", series(lambda i: 6e8)),
                   ]
+                  # zpool-probe's series, which the view's pool and dataset
+                  # quota panels read, go in a request of their own, as
+                  # omnigraph-probe's below, under the driver's 128 KiB cap.
+                  zfs_metrics = [
+                      metric("vanixiets_zpool_capacity_ratio", series(lambda i: 0.54, {"zpool": "zroot"})),
+                      metric("vanixiets_zpool_fragmentation_ratio", series(lambda i: 0.7, {"zpool": "zroot"})),
+                      metric("vanixiets_zfs_dataset_used_bytes", series(lambda i: 1.5e11, {"dataset": "zroot/root/nix"})),
+                      metric("vanixiets_zfs_dataset_quota_bytes", series(lambda i: 2.5e11, {"dataset": "zroot/root/nix"})),
+                      metric("vanixiets_zfs_dataset_snapshots_used_bytes", series(lambda i: 3e9, {"dataset": "zroot/root/nix"})),
+                  ]
                   # omnigraph-probe's series, omnigraph-server's memory and the
                   # graph backup's stamp, which the omnigraph view reads, go in
                   # a request of their own: the driver passes each command as
@@ -523,6 +533,7 @@
                       }
                   )
                   post({"resourceMetrics": [resource({}, omnigraph_metrics)]})
+                  post({"resourceMetrics": [resource({}, zfs_metrics)]})
 
 
               def emit_devloop(host):

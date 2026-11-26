@@ -115,6 +115,16 @@
       # collector by flake.modules.nixos.omnigraph-backup where the backup
       # is on.
       "vanixiets_omnigraph_backup_last_success_timestamp_seconds"
+      # Each ZFS pool's capacity and fragmentation, and each dataset's USED,
+      # quota and USEDSNAP where its quota is set locally, which
+      # node_exporter's zfs collector does not report: written to the
+      # textfile collector by flake.modules.nixos.zpool-probe on every host
+      # with ZFS (flake.lib.zpoolProbe.seriesNames).
+      "vanixiets_zpool_capacity_ratio"
+      "vanixiets_zpool_fragmentation_ratio"
+      "vanixiets_zfs_dataset_used_bytes"
+      "vanixiets_zfs_dataset_quota_bytes"
+      "vanixiets_zfs_dataset_snapshots_used_bytes"
     ];
 
     # The units magnetite's memory budget reports (CAM-111 design D11), as

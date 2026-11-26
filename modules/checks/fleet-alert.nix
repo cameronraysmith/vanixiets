@@ -12,10 +12,16 @@
 #   which must hold while the unit stays failed, and must fail on the
 #   mutant windowOnly; over omnigraph-probe's series for
 #   OmnigraphNotServing, which must fire after 5 min not ready or with a
-#   blocked graph, and must fail on the mutant notServingFor; and over the
+#   blocked graph, and must fail on the mutant notServingFor; over the
 #   omnigraph backup stamp for OmnigraphBackupStale, which must fire 36 h
 #   10 min after the last success, and must fail on the mutant
-#   omnigraphStaleThreshold.
+#   omnigraphStaleThreshold; over zpool-probe's capacity series for
+#   ZfsPoolCapacityWarn and ZfsPoolCapacityCritical, which must fire after
+#   their `for` above 0.75 and 0.85, and must fail on the mutants
+#   zpoolWarnThreshold and zpoolCriticalThreshold; and over its dataset
+#   series for ZfsDatasetQuotaFilling, which must fire 15 min after USED
+#   passes 0.85 of the quota, and must fail on the mutant
+#   datasetQuotaThreshold.
 # - r2PromtoolRehearsal (track-r2-usage): `promtool test rules` cases for
 #   R2MultipartUploadPending, R2CostProjected, R2BucketGrowthAnomalous,
 #   R2BucketUndeclared (rendered with a fixture external bucket) and
@@ -82,8 +88,9 @@
 # Consequences); RuleSignalMissing watches those after deploy. The label
 # sets in fleet-alert/fixtures/series.json are those measured on magnetite's
 # `fleet` database on 2026-10-18 (logs/s3/series-labels.md), except the
-# file-system rules', which no host stored when those rules were added:
-# theirs are the file-system expressions' `by` labels; OmnigraphNotServing's,
+# file-system rules', which no host stored when those rules were added, and
+# the pool capacity and dataset quota rules', which no host stored either:
+# theirs are their expressions' `by` labels; OmnigraphNotServing's,
 # which no host stored when that rule was added: its labels are those
 # PostgresqlBackupStale's textfile series carries, under its first arm's
 # metric name, which a comparison keeps; and OmnigraphBackupStale's, which
@@ -455,6 +462,139 @@
           .expr) (builtins.toJSON "increase(systemd_service_restarts_total[15m]) > 5") rules.yaml
       );
 
+      # PromQL's own semantics for the pool capacity rules over minute
+      # samples of zpool-probe's series, which carry the scrape's job label
+      # the rules' `max by` drops. magnetite's zroot is 0.70 allocated to
+      # minute 9, 0.80 to minute 60 and 0.90 after: ZfsPoolCapacityWarn is
+      # pending at 39 min and fires at 40, ZfsPoolCapacityCritical is
+      # pending at 70 min and fires at 71. pyrite's zroot stays at exactly
+      # 0.75 and never fires. The mutants zpoolWarnThreshold and
+      # zpoolCriticalThreshold, each its rule's threshold raised by 0.10,
+      # must fail their rule's case.
+      zpoolCapacityTest =
+        alert: rulesFile:
+        let
+          pool = host: ''vanixiets_zpool_capacity_ratio{host_name="${host}",zpool="zroot",job="node"}'';
+          at = minutes: hosts: {
+            eval_time = "${toString minutes}m";
+            alertname = alert;
+            exp_alerts = map (host: {
+              exp_labels = {
+                host_name = host;
+                zpool = "zroot";
+                severity = (ruleNamed alert).severity;
+              };
+              exp_annotations = (ruleNamed alert).annotations;
+            }) hosts;
+          };
+          checkpoints = {
+            ZfsPoolCapacityWarn = [
+              (at 39 [ ])
+              (at 40 [ "magnetite" ])
+            ];
+            ZfsPoolCapacityCritical = [
+              (at 70 [ ])
+              (at 71 [ "magnetite" ])
+            ];
+          };
+        in
+        pkgs.writeText "fleet-alert-${alert}-test.yaml" (
+          builtins.toJSON {
+            rule_files = [ "${rulesFile}" ];
+            evaluation_interval = "1m";
+            tests = [
+              {
+                interval = "1m";
+                input_series = [
+                  {
+                    series = pool "magnetite";
+                    values = "0.7x9 0.8x50 0.9x30";
+                  }
+                  {
+                    series = pool "pyrite";
+                    values = "0.75x90";
+                  }
+                ];
+                alert_rule_test = checkpoints.${alert};
+              }
+            ];
+          }
+        );
+      zpoolThresholdYaml =
+        name: alert: threshold:
+        pkgs.writeText "fleet-alert-rules-${name}.yaml" (
+          mutateText name (builtins.toJSON (ruleNamed alert).expr)
+            (builtins.toJSON "max by (host_name, zpool) (vanixiets_zpool_capacity_ratio) > ${threshold}")
+            rules.yaml
+        );
+      zpoolWarnThresholdYaml = zpoolThresholdYaml "zpoolWarnThreshold" "ZfsPoolCapacityWarn" "0.85";
+      zpoolCriticalThresholdYaml =
+        zpoolThresholdYaml "zpoolCriticalThreshold" "ZfsPoolCapacityCritical"
+          "0.95";
+
+      # PromQL's own semantics for ZfsDatasetQuotaFilling over minute
+      # samples of zpool-probe's dataset series, which carry the scrape's
+      # job label the rule's `max by` drops. On magnetite zroot/root/docker,
+      # quota 20 GB, holds 16 GB to minute 9 and 18 GB after: the rule is
+      # pending at 24 min and fires at 25. zroot/root/nix stays at exactly
+      # 0.85 of its quota and never fires. The mutant datasetQuotaThreshold,
+      # the threshold raised to 0.95, must fail it.
+      datasetQuotaTest =
+        rulesFile:
+        let
+          series = name: dataset: ''${name}{host_name="magnetite",dataset="${dataset}",job="node"}'';
+          at = minutes: datasets: {
+            eval_time = "${toString minutes}m";
+            alertname = "ZfsDatasetQuotaFilling";
+            exp_alerts = map (dataset: {
+              exp_labels = {
+                host_name = "magnetite";
+                inherit dataset;
+                severity = "warning";
+              };
+              exp_annotations = (ruleNamed "ZfsDatasetQuotaFilling").annotations;
+            }) datasets;
+          };
+        in
+        pkgs.writeText "fleet-alert-dataset-quota-test.yaml" (
+          builtins.toJSON {
+            rule_files = [ "${rulesFile}" ];
+            evaluation_interval = "1m";
+            tests = [
+              {
+                interval = "1m";
+                input_series = [
+                  {
+                    series = series "vanixiets_zfs_dataset_used_bytes" "zroot/root/docker";
+                    values = "16000000000x9 18000000000x30";
+                  }
+                  {
+                    series = series "vanixiets_zfs_dataset_quota_bytes" "zroot/root/docker";
+                    values = "20000000000x40";
+                  }
+                  {
+                    series = series "vanixiets_zfs_dataset_used_bytes" "zroot/root/nix";
+                    values = "85000000000x40";
+                  }
+                  {
+                    series = series "vanixiets_zfs_dataset_quota_bytes" "zroot/root/nix";
+                    values = "100000000000x40";
+                  }
+                ];
+                alert_rule_test = [
+                  (at 24 [ ])
+                  (at 25 [ "zroot/root/docker" ])
+                ];
+              }
+            ];
+          }
+        );
+      datasetQuotaThresholdYaml = pkgs.writeText "fleet-alert-rules-dataset-quota-threshold.yaml" (
+        mutateText "datasetQuotaThreshold" "(vanixiets_zfs_dataset_quota_bytes) > 0.85"
+          "(vanixiets_zfs_dataset_quota_bytes) > 0.95"
+          rules.yaml
+      );
+
       # --- R2 usage (track-r2-usage design D7, D8) ------------------------------
 
       r2Series =
@@ -792,7 +932,7 @@
         pkgs.runCommand "fleet-alert-promtool"
           {
             nativeBuildInputs = [ pkgs.prometheus.cli ];
-            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only; F77: SystemdUnitRestartLoop holds while a looped unit stays failed; OmnigraphNotServing fires after 5 min not serving; OmnigraphBackupStale fires 36 h 10 min after the last backup";
+            meta.description = "R9.2: every rendered rule parses as PromQL, and a malformed expression is rejected; F61: PostgresqlCollationDrift fires on a drifted database only; F77: SystemdUnitRestartLoop holds while a looped unit stays failed; OmnigraphNotServing fires after 5 min not serving; OmnigraphBackupStale fires 36 h 10 min after the last backup; ZfsPoolCapacityWarn, ZfsPoolCapacityCritical and ZfsDatasetQuotaFilling fire after their `for` above their thresholds";
           }
           ''
             set -euo pipefail
@@ -844,6 +984,38 @@
             fi
             cat window-only.log
             echo "mutant windowOnly rejected"
+            ${lib.concatMapStrings
+              (c: ''
+                promtool test rules ${c.test rulesYaml}
+                if promtool test rules ${c.test c.mutant} > ${c.name}.log 2>&1; then
+                  cat ${c.name}.log
+                  echo "FAIL: the ${c.alert} test accepted the ${c.name} mutant" >&2
+                  exit 1
+                fi
+                cat ${c.name}.log
+                echo "mutant ${c.name} rejected"
+              '')
+              [
+                {
+                  alert = "ZfsPoolCapacityWarn";
+                  test = zpoolCapacityTest "ZfsPoolCapacityWarn";
+                  name = "zpoolWarnThreshold";
+                  mutant = zpoolWarnThresholdYaml;
+                }
+                {
+                  alert = "ZfsPoolCapacityCritical";
+                  test = zpoolCapacityTest "ZfsPoolCapacityCritical";
+                  name = "zpoolCriticalThreshold";
+                  mutant = zpoolCriticalThresholdYaml;
+                }
+                {
+                  alert = "ZfsDatasetQuotaFilling";
+                  test = datasetQuotaTest;
+                  name = "datasetQuotaThreshold";
+                  mutant = datasetQuotaThresholdYaml;
+                }
+              ]
+            }
             touch "$out"
           '';
 
@@ -1910,6 +2082,17 @@
           ];
         };
 
+      # magnetite's zroot/root/docker above 85 % of its quota, as the
+      # rule's expression answers it, posts one warning whose message names
+      # the dataset and where to look; promtoolRehearsal's dataset quota
+      # test shows when PromQL answers it.
+      datasetQuotaLeg = fireAndResolveAt "ZfsDatasetQuotaFilling" // {
+        messages = [
+          "dataset=zroot/root/docker"
+          "zfs list -o space -r"
+        ];
+      };
+
       # magnetite's omnigraph-server not ready, as the rule's expression
       # answers it, posts one warning whose title names magnetite and whose
       # message names the runbook; promtoolRehearsal's not-serving test shows
@@ -2408,22 +2591,66 @@
         expect = [ ];
       };
 
+      # A warning rule's condition holds from minute 0 and its critical
+      # rule's from the warning's `for`, run only at the minutes that decide
+      # them, within the fixture budget: the start, a minute before the
+      # warning's `for` (pending), at it (one FIRING), the next minute (no
+      # repeat), a minute before the critical rule's `for` from there
+      # (pending), and at it (one FIRING at its own priority).
+      escalationLeg =
+        name: host: warn: critical:
+        let
+          w = (ruleNamed warn).for / 60;
+          c = (ruleNamed critical).for / 60;
+        in
+        {
+          inherit name;
+          steps =
+            map
+              (n: {
+                at = minute n;
+                series = {
+                  ${warn} = [ (seriesOn host warn) ];
+                }
+                // lib.optionalAttrs (n >= w) { ${critical} = [ (seriesOn host critical) ]; };
+              })
+              [
+                0
+                (w - 1)
+                w
+                (w + 1)
+                (w + c - 1)
+                (w + c)
+              ];
+          expect = [
+            "2 [FIRING] ${warn} ${host} ${priorityOf (ruleNamed warn).severity}"
+            "5 [FIRING] ${critical} ${host} ${priorityOf (ruleNamed critical).severity}"
+          ];
+        };
+
       # cinnabar's / is above 85 % from minute 0 and above 95 % from minute
       # 15: each rule fires after its own `for`, at its own priority.
-      filesystemLeg = {
-        name = "cinnabar's / above 85 % for 15 min fires FilesystemFillingWarn at default, then above 95 % for 5 min fires FilesystemFull at high";
-        steps = map (n: {
-          at = minute n;
-          series = {
-            FilesystemFillingWarn = [ (seriesOn "cinnabar" "FilesystemFillingWarn") ];
-          }
-          // lib.optionalAttrs (n >= 15) { FilesystemFull = [ (seriesOn "cinnabar" "FilesystemFull") ]; };
-        }) (lib.range 0 20);
-        expect = [
-          "15 [FIRING] FilesystemFillingWarn cinnabar default"
-          "20 [FIRING] FilesystemFull cinnabar high"
-        ];
-      };
+      filesystemLeg =
+        escalationLeg
+          "cinnabar's / above 85 % for 15 min fires FilesystemFillingWarn at default, then above 95 % for 5 min fires FilesystemFull at high"
+          "cinnabar"
+          "FilesystemFillingWarn"
+          "FilesystemFull";
+
+      # magnetite's zroot is above 75 % allocated from minute 0 and above
+      # 85 % from minute 30; the messages name the pool and where to look.
+      zpoolCapacityLeg =
+        escalationLeg
+          "magnetite's zroot above 75 % for 30 min fires ZfsPoolCapacityWarn at default, then above 85 % for 10 min fires ZfsPoolCapacityCritical at high"
+          "magnetite"
+          "ZfsPoolCapacityWarn"
+          "ZfsPoolCapacityCritical"
+        // {
+          messages = [
+            "zpool=zroot"
+            "zfs list -o space"
+          ];
+        };
 
       nvmeLeg = {
         name = "pyrite's NVMe critical warning on one run fires NvmeCriticalWarning pyrite at once at high";
@@ -2642,6 +2869,7 @@
         "system_paging_usage_bytes"
         "node_zfs_arc_size"
         "node_zfs_zpool_state"
+        "vanixiets_zpool_capacity_ratio"
         "node_vmstat_oom_kill"
         "systemd_unit_state"
         "systemd_service_restarts_total"
@@ -3105,6 +3333,8 @@
           alwaysOnSilentLeg
           cinnabarSilentLeg
           filesystemLeg
+          zpoolCapacityLeg
+          datasetQuotaLeg
           windowLeg
           budgetFleetLeg
           budgetLaptopLeg

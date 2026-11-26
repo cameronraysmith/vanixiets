@@ -21,6 +21,12 @@
     "WeeklyPipelineTest": {},
     "FilesystemFillingWarn": { "host_name": "magnetite", "mountpoint": "/" },
     "FilesystemFull": { "host_name": "magnetite", "mountpoint": "/" },
+    "ZfsPoolCapacityWarn": { "host_name": "magnetite", "zpool": "zroot" },
+    "ZfsPoolCapacityCritical": { "host_name": "magnetite", "zpool": "zroot" },
+    "ZfsDatasetQuotaFilling": {
+      "host_name": "magnetite",
+      "dataset": "zroot/root/docker"
+    },
     "NvmeCriticalWarning": {
       "__name__": "smartctl_device_critical_warning_total",
       "device": "nvme0",

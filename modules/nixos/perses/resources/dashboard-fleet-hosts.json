@@ -7,7 +7,7 @@
   "spec": {
     "display": {
       "name": "Fleet hosts",
-      "description": "Each collecting host's memory, swap, processes, OOM kills, file systems, ZFS, units, exporters and NVMe health, selectable by host."
+      "description": "Each collecting host's memory, swap, processes, OOM kills, file systems, ZFS pools and ARC, units, exporters and NVMe health, selectable by host."
     },
     "duration": "6h",
     "refreshInterval": "1m",
@@ -324,6 +324,145 @@
                       "name": "greptimedb-promql"
                     },
                     "query": "node_zfs_zpool_state{host_name=~\"$host_name\"} == 1"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "pool-capacity": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "ZFS pool capacity",
+            "description": "Allocated over size per pool, the CAP of zpool list; ZfsPoolCapacityWarn fires above 0.75 for 30 min and ZfsPoolCapacityCritical above 0.85 for 10 min. zfs list -o space on the host shows which datasets hold it."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent-decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, zpool) (vanixiets_zpool_capacity_ratio{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{zpool}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "pool-fragmentation": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "ZFS pool fragmentation",
+            "description": "The fragmentation of each pool's free space, the FRAG of zpool list over 100; no alert reads it."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent-decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, zpool) (vanixiets_zpool_fragmentation_ratio{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{zpool}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "dataset-quota": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "ZFS dataset quota used",
+            "description": "Per dataset with a local quota, USED (children and snapshots included) over the quota, and USEDSNAP over the quota; ZfsDatasetQuotaFilling fires above 0.85 for 15 min. The file-system panel counts neither children nor snapshots."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "percent-decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, dataset) (vanixiets_zfs_dataset_used_bytes{host_name=~\"$host_name\"}) / max by (host_name, dataset) (vanixiets_zfs_dataset_quota_bytes{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{dataset}} used"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, dataset) (vanixiets_zfs_dataset_snapshots_used_bytes{host_name=~\"$host_name\"}) / max by (host_name, dataset) (vanixiets_zfs_dataset_quota_bytes{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{dataset}} snapshots"
                   }
                 }
               }
@@ -743,6 +882,33 @@
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/arc-hits"
+              }
+            },
+            {
+              "x": 0,
+              "y": 16,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/pool-capacity"
+              }
+            },
+            {
+              "x": 12,
+              "y": 16,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/pool-fragmentation"
+              }
+            },
+            {
+              "x": 0,
+              "y": 24,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/dataset-quota"
               }
             }
           ]

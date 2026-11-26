@@ -24,10 +24,12 @@
 # Every rule's expected hosts and RuleSignalMissing's `alwaysOn` come from
 # `hosts`, flake.lib.observabilityHosts by default (S4 design D9), among the
 # hosts that collect, by each host's `platform`: HostMemoryPressure,
-# HostOOMKill, ZfsPoolUnhealthy, SystemdUnitRestartLoop and
-# SystemdUnitFailed expect the NixOS hosts, whose selectors darwin never
-# writes; the file-system rules, LocalExporterDown and WeeklyPipelineTest
-# expect every collecting host; the NVMe rules expect the hosts with SMART
+# HostOOMKill, ZfsPoolUnhealthy, ZfsPoolCapacityWarn,
+# ZfsPoolCapacityCritical, SystemdUnitRestartLoop and SystemdUnitFailed
+# expect the NixOS hosts, whose selectors darwin never writes, and each of
+# which has a ZFS pool (modules/nixos/zpool-probe.nix asserts it); the
+# file-system rules, LocalExporterDown and WeeklyPipelineTest expect every
+# collecting host; the NVMe rules expect the hosts with SMART
 # devices; the three launchd rules expect the darwin hosts (S5 design D9),
 # and HostProbeStale the hosts with a textfile writer, every collecting
 # darwin host and each NixOS host whose row's `textfile` is set (F76);
@@ -116,6 +118,8 @@
         unit: builtins.attrNames (lib.filterAttrs (_: h: lib.elem unit h.notifiedUnits) collecting);
       presence = expectedHosts: selector: { inherit selector expectedHosts; };
       fsRatio = ''sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used"}) / sum by (host_name, mountpoint) (system_filesystem_usage_bytes)'';
+      poolRatio = "max by (host_name, zpool) (vanixiets_zpool_capacity_ratio)";
+      poolAdvice = "zfs list -o space on the host shows which datasets hold the pool, with their snapshots, reservations and children, and the Fleet hosts view's pool capacity panel shows its history";
       # Each dot written [.], as notifiedRegex below.
       launchdRegex =
         labels: lib.concatMapStringsSep "|" (builtins.replaceStrings [ "." ] [ "[.]" ]) labels;
@@ -243,6 +247,42 @@
           severity = "critical";
           annotations.summary = "A ZFS pool is not online";
           presence = [ (presence nixosHosts "node_zfs_zpool_state") ];
+        }
+        # zpool-probe (flake.modules.nixos.zpool-probe) writes each pool's
+        # allocated bytes over its size every minute, the CAP of `zpool
+        # list`. The file-system rules judge each ZFS mount against its own
+        # size, which for a dataset without a quota is its use plus the
+        # pool's free space, so they say little about the pool all datasets
+        # share; these judge the pool.
+        {
+          alert = "ZfsPoolCapacityWarn";
+          expr = poolRatio + " > 0.75";
+          for = "30m";
+          severity = "warning";
+          annotations.summary = "A ZFS pool is more than 75 % allocated, the message's zpool naming it; ${poolAdvice}";
+          presence = [ (presence nixosHosts "vanixiets_zpool_capacity_ratio") ];
+        }
+        {
+          alert = "ZfsPoolCapacityCritical";
+          expr = poolRatio + " > 0.85";
+          for = "10m";
+          severity = "critical";
+          annotations.summary = "A ZFS pool is more than 85 % allocated, the message's zpool naming it, and every dataset without a reservation on it fails writes once it is full; ${poolAdvice}";
+          presence = [ (presence nixosHosts "vanixiets_zpool_capacity_ratio") ];
+        }
+        # zpool-probe writes each dataset's USED and quota where the quota
+        # is set locally. USED counts the dataset's children and snapshots,
+        # as its quota does; statfs on its mount counts neither, so a
+        # container engine's layers in child datasets, or snapshots, fill
+        # the quota while FilesystemFillingWarn reads the mount as nearly
+        # empty. No presence selector: the host table does not say which
+        # hosts set a quota, and a host without one writes no sample.
+        {
+          alert = "ZfsDatasetQuotaFilling";
+          expr = "max by (host_name, dataset) (vanixiets_zfs_dataset_used_bytes) / max by (host_name, dataset) (vanixiets_zfs_dataset_quota_bytes) > 0.85";
+          for = "15m";
+          severity = "warning";
+          annotations.summary = "A ZFS dataset's USED, its children and snapshots included, is above 85 % of its quota, the message's dataset naming it; statfs on its mount counts neither, so the file-system rules see it late. zfs list -o space -r <dataset> on the host shows what holds it, and the Fleet hosts view's dataset quota panel shows its history";
         }
         {
           alert = "FilesystemFillingWarn";

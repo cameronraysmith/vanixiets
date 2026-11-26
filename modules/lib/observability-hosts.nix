@@ -9,7 +9,9 @@
 # writer (vanixiets.nodeExporter.textfileWriters), so HostProbeStale expects
 # its textfile series; modules/nixos/node-exporter-textfile.nix asserts it
 # against the host's own configuration, which its machine check evaluates
-# anyway (F76). Every collecting darwin host's probe writes a textfile.
+# anyway (F76). It defaults to set: every collecting NixOS host runs
+# zpool-probe, which modules/nixos/zpool-probe.nix asserts. Every
+# collecting darwin host's probe writes a textfile.
 # A host's `agentTelemetry` turns on the agent-session collector, with its
 # loopback receiver on 127.0.0.1:4318, for its agent sessions: on NixOS
 # otel-agent-session.service and, through the agent-telemetry home module,
@@ -41,7 +43,7 @@
         platform = "nixos";
         alwaysOn = false;
         smartDevices = [ ];
-        textfile = false;
+        textfile = true;
         agentTelemetry = false;
         langfuse = false;
         agentSpanQueueMiB = 44;
@@ -94,7 +96,6 @@
         ]
         // {
           alwaysOn = true;
-          textfile = true;
           agentTelemetry = true;
           langfuse = true;
         };
