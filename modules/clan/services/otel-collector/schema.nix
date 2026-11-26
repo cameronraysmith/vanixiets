@@ -27,7 +27,7 @@
       "opentelemetry-collector.service"
       "zerotierone.service"
       "omnigent-host-*.service"
-      "omnigraph.service"
+      "omnigraph-server.service"
       "otel-envelope.service"
       "devloop-reconcile.service"
       "greptimedb-envelope.service"

@@ -365,7 +365,7 @@ The email does not watch the phone's `fleet-alerts` subscription, so a Monday wi
 
 Unit failures go to the same topic as plain messages without a title.
 The notified units of each host are its `notifiedUnits` in `modules/lib/observability-hosts.nix`.
-On every collecting NixOS host they are `opentelemetry-collector` and `otel-envelope`; magnetite adds `greptimedb`, `greptimedb-schema`, `greptimedb-envelope`, `fleet-alert`, `devloop-pg-grants`, `devloop-reconcile`, `perses` and its `zfs-set-*` and `zfs-assert-*` oneshots, and cinnabar adds `fleet-deadman`.
+On every collecting NixOS host they are `opentelemetry-collector` and `otel-envelope`; magnetite adds `greptimedb`, `greptimedb-schema`, `greptimedb-envelope`, `fleet-alert`, `devloop-pg-grants`, `devloop-reconcile`, `perses`, `omnigraph-server` and its `zfs-set-*` and `zfs-assert-*` oneshots, and cinnabar adds `fleet-deadman`.
 On stibnite only `otel-envelope` posts its own notices, as `FAILED otel-envelope on stibnite` without `.service` (see "Reading FAILED otel-envelope on stibnite"); its other jobs report through the launchd alerts.
 Print the current list for a host:
 

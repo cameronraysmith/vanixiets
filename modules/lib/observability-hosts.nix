@@ -64,6 +64,7 @@
           "greptimedb-schema"
           "otel-agent-session"
           "otel-agent-session-envelope"
+          "omnigraph-server"
           "perses"
           "postgresql-dump-globals"
           "postgresqlBackup-gitea"
