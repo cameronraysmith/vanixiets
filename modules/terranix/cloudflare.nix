@@ -103,6 +103,11 @@
                   max_age = 31536000;
                 }
               ]
+          # Retired OmniGraph cluster roots, deleted a day after the rules
+          # reach the bucket: their cluster state and graphs, and their
+          # bootstrap markers (modules/lib/omnigraph-cluster-roots.nix).
+          ++ ((import ../lib/omnigraph-cluster-roots.nix { inherit lib; }).flake.lib.omnigraphClusterRoots)
+            .lifecycleRules
         );
       };
 

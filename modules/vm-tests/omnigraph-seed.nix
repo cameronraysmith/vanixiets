@@ -1,21 +1,29 @@
-# The omnigraph seed unit end to end, in one QEMU VM with forced KVM (pyrite).
+# The omnigraph seed units end to end, in one QEMU VM with forced KVM (pyrite).
 #
 # The node runs services.omnigraph with magnetite's cluster configuration
-# (graphs, policies, the cookbooks' schema and queries, the cluster actor) and
-# magnetite's seed declaration for graph `dev`, on a fresh local root under
-# the StateDirectory instead of R2, with test bearer tokens.
+# (all its graphs, its policies, the cookbooks' schemas and queries, the
+# cluster actor) and magnetite's seed declarations for two of its graphs,
+# cookbook-beads and cookbook-company-brain, on a fresh local root under the
+# StateDirectory instead of R2, with test bearer tokens.
 #
 # What this establishes:
-#   1. on a fresh root the bootstrap marks the seed of `dev` pending, and
-#      omnigraph-seed-dev loads the cookbooks' seed through the running server
-#      as the seed actor, under magnetite's graph policy, and deletes the
-#      pending marker; the graph then answers the cookbook's `ready` question;
-#   2. run again with no pending marker, the unit sends nothing and the graph
+#   1. on a fresh root the bootstrap marks the seed of each seeded graph
+#      pending, and omnigraph-seed-<graph> loads each cookbook's seed through
+#      the running server as the seed actor, under magnetite's graph policy,
+#      and deletes its pending marker; the second load starts only once the
+#      first has finished; each graph then answers a featured question of its
+#      cookbook as its seed.md documents;
+#   2. run again with no pending marker, a unit sends nothing and its graph
 #      does not change, also when a server restart starts it;
-#   3. with the marker put back over a seeded graph, the load is refused with
-#      key_conflict, the unit counts that as success, deletes the marker and
-#      the graph does not change;
-#   4. the seed actor's token reads nothing.
+#   3. with the marker of cookbook-beads put back over its seeded graph, the
+#      load is refused with key_conflict, the unit counts that as success,
+#      deletes the marker and the graph does not change;
+#   4. with the marker of cookbook-company-brain put back over its seeded
+#      graph, whose seed writes edges under a `@card` maximum, the load is
+#      refused with effects `unknown`; the unit fails, keeps the marker and
+#      prints the command that clears it, the graph does not change, and that
+#      command deletes the marker;
+#   5. the seed actor's token reads nothing.
 #
 # What it does not establish: anything about R2 (the S3 marker requests are
 # covered by checks.omnigraph-bootstrap-rehearsal), nor activation's handling
@@ -30,9 +38,8 @@
       ...
     }:
     {
-      # Size class: the script measured 33.37 s, 47 s for the whole build with
-      # the driver already built, on pyrite on 2026-11-25
-      # (logs/omnigraph-seed-vmtest-20261125T2356Z.log).
+      # Size class: the script measured 39.83 s, 54 s for the whole build with
+      # the driver already built, on pyrite on 2026-11-25.
       testSizes.vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         omnigraph-seed.class = "small";
       };
@@ -44,15 +51,25 @@
               overlays = [ self.overlays.default ];
             };
             reference = self.nixosConfigurations.magnetite.config.services.omnigraph;
-            graph = "dev";
-            seed = reference.cluster.graphs.${graph}.seed;
+            # Two of the smallest seeds, in the order the seed units run
+            # (graph id order). Each with a featured question of its cookbook
+            # and the number of rows its seed.md documents for it on the seed.
+            seeded = {
+              cookbook-beads = {
+                question = "blocked";
+                rows = 3;
+              };
+              cookbook-company-brain = {
+                question = "current_decisions";
+                rows = 4;
+              };
+            };
+            first = "cookbook-beads";
+            second = "cookbook-company-brain";
             stateDirectory = "/var/lib/omnigraph";
             markers = "${stateDirectory}/clusters/_omnigraph-markers";
             adminToken = "admin-test-token";
             seederToken = "seeder-test-token";
-            # The cookbook's documented answer for `ready` on the seed
-            # (dev-graph/README.md), as checks.omnigraph-dev-graph-seed holds it.
-            readyRows = 5;
           in
           pkgs.testers.runNixOSTest {
             name = "omnigraph-seed";
@@ -84,78 +101,116 @@
                     inherit (reference.cluster.settings) metadata graphs policies;
                   };
                   inherit (reference.cluster) extraFiles actor;
-                  graphs.${graph} = {
+                  graphs = lib.mapAttrs (graph: _: {
                     exampleDataOnly = true;
                     seed = {
-                      inherit (seed) file actor;
+                      inherit (reference.cluster.graphs.${graph}.seed) file actor;
                       tokenFile = "/etc/omnigraph-test/seeder-token";
                     };
-                  };
+                  }) seeded;
                 };
               };
             };
             testScript = ''
               import json
 
-              GRAPH = "${graph}"
-              BASE = "http://127.0.0.1:${toString reference.port}/graphs/" + GRAPH
-              PENDING = "${markers}/test.${graph}.seed-pending"
-              INITIALIZED = "${markers}/test.initialized"
+              SEEDED = json.loads(r"""${
+                builtins.toJSON (
+                  lib.mapAttrs (graph: s: s // { inherit (reference.cluster.graphs.${graph}.seed) file; }) seeded
+                )
+              }""")
+              FIRST, SECOND = "${first}", "${second}"
+              BASE = "http://127.0.0.1:${toString reference.port}/graphs/"
 
-              def api(token, method, path, body=None):
+              def pending(graph):
+                  return f"${markers}/test.{graph}.seed-pending"
+
+              def api(token, method, graph, path, body=None):
                   data = "" if body is None else f" -H 'content-type: application/json' -d '{json.dumps(body)}'"
                   return machine.succeed(
                       f"curl -sS -o /tmp/body -w '%{{http_code}}' -X {method}"
-                      f" -H 'Omnigraph-Http-Api: 0.14' -H 'authorization: Bearer {token}'{data} '{BASE}{path}'"
+                      f" -H 'Omnigraph-Http-Api: 0.14' -H 'authorization: Bearer {token}'{data} '{BASE}{graph}{path}'"
                       " && echo && cat /tmp/body"
                   )
 
-              def admin_json(method, path, body=None):
-                  status, _, body = api("${adminToken}", method, path, body).partition("\n")
-                  assert status == "200", f"{method} {path}: {status} {body}"
+              def admin_json(method, graph, path, body=None):
+                  status, _, body = api("${adminToken}", method, graph, path, body).partition("\n")
+                  assert status == "200", f"{method} {graph}{path}: {status} {body}"
                   return json.loads(body)
 
-              def manifest_version():
-                  return admin_json("GET", "/snapshot")["graph_manifest_version"]
+              def manifest_version(graph):
+                  return admin_json("GET", graph, "/snapshot")["graph_manifest_version"]
 
-              def seed_journal():
-                  return machine.succeed("journalctl -u omnigraph-seed-dev.service -o cat --no-pager")
+              def seed_journal(graph):
+                  return machine.succeed(f"journalctl -u omnigraph-seed-{graph}.service -o cat --no-pager")
+
+              def unit_time(graph, prop):
+                  return int(machine.succeed(f"systemctl show -P {prop} omnigraph-seed-{graph}.service").strip())
 
               start_all()
               machine.wait_for_unit("omnigraph-server.service")
 
-              with subtest("a fresh root is seeded once through the server"):
-                  machine.wait_until_succeeds("systemctl is-active omnigraph-seed-dev.service", timeout=300)
+              with subtest("a fresh root is seeded once per graph through the server, one load at a time"):
+                  for graph in SEEDED:
+                      machine.wait_until_succeeds(f"systemctl is-active omnigraph-seed-{graph}.service", timeout=300)
                   bootstrap = machine.succeed("journalctl -u omnigraph-cluster-bootstrap.service -o cat --no-pager")
-                  assert "marked the seed of graph dev pending" in bootstrap, bootstrap
-                  machine.succeed(f"test -e {INITIALIZED}")
-                  machine.succeed(f"test ! -e {PENDING}")
-                  assert "loaded 341 entities into graph dev" in seed_journal(), seed_journal()
-                  rows = admin_json("POST", "/queries/ready", {"params": {}})["rows"]
-                  assert len(rows) == ${toString readyRows}, rows
-                  seeded = manifest_version()
+                  machine.succeed("test -e ${markers}/test.initialized")
+                  seeded = {}
+                  for graph, expected in SEEDED.items():
+                      assert f"marked the seed of graph {graph} pending" in bootstrap, bootstrap
+                      machine.succeed(f"test ! -e {pending(graph)}")
+                      entities = machine.succeed(f"grep -c . {expected['file']}").strip()
+                      assert f"loaded {entities} entities into graph {graph}" in seed_journal(graph), seed_journal(graph)
+                      rows = admin_json("POST", graph, f"/queries/{expected['question']}", {"params": {}})["rows"]
+                      assert len(rows) == expected["rows"], rows
+                      seeded[graph] = manifest_version(graph)
+                  first_done = unit_time(FIRST, "ExecMainExitTimestampMonotonic")
+                  second_started = unit_time(SECOND, "ExecMainStartTimestampMonotonic")
+                  assert 0 < first_done <= second_started, (first_done, second_started)
 
-              with subtest("with nothing pending the unit sends nothing"):
-                  machine.succeed("systemctl restart omnigraph-seed-dev.service")
+              with subtest("with nothing pending the units send nothing"):
+                  machine.succeed(f"systemctl restart omnigraph-seed-{FIRST}.service")
                   machine.succeed("systemctl restart omnigraph-server.service")
                   machine.wait_until_succeeds(
-                      "[ \"$(journalctl -u omnigraph-seed-dev.service -o cat --no-pager | grep -c 'nothing to do')\" = 2 ]",
+                      f"[ \"$(journalctl -u omnigraph-seed-{FIRST}.service -o cat --no-pager | grep -c 'nothing to do')\" = 2 ]",
                       timeout=300,
                   )
-                  assert manifest_version() == seeded
+                  machine.wait_until_succeeds(
+                      f"[ \"$(journalctl -u omnigraph-seed-{SECOND}.service -o cat --no-pager | grep -c 'nothing to do')\" = 1 ]",
+                      timeout=300,
+                  )
+                  for graph in SEEDED:
+                      assert manifest_version(graph) == seeded[graph]
 
               with subtest("a key conflict counts as an earlier, committed seed"):
-                  machine.succeed(f"echo '{{}}' > {PENDING}")
-                  machine.succeed("systemctl restart omnigraph-seed-dev.service")
-                  assert "already holds the seed" in seed_journal(), seed_journal()
-                  machine.succeed(f"test ! -e {PENDING}")
-                  assert manifest_version() == seeded
+                  machine.succeed(f"echo '{{}}' > {pending(FIRST)}")
+                  machine.succeed(f"systemctl restart omnigraph-seed-{FIRST}.service")
+                  assert "already holds the seed" in seed_journal(FIRST), seed_journal(FIRST)
+                  machine.succeed(f"test ! -e {pending(FIRST)}")
+                  assert manifest_version(FIRST) == seeded[FIRST]
+
+              with subtest("a @card refusal keeps the marker and names the command that clears it"):
+                  machine.succeed(f"echo '{{}}' > {pending(SECOND)}")
+                  machine.fail(f"systemctl restart omnigraph-seed-{SECOND}.service")
+                  machine.succeed(f"test -e {pending(SECOND)}")
+                  assert manifest_version(SECOND) == seeded[SECOND]
+                  journal = seed_journal(SECOND)
+                  assert "@card violation" in journal, journal
+                  assert pending(SECOND) in journal, journal
+                  marker = "clear the marker as root with:"
+                  assert marker in journal, journal
+                  command = journal.split(marker, 1)[1].strip().splitlines()[0].strip()
+                  assert command.startswith("systemd-run ") and command.endswith(" --clear-pending"), command
+                  machine.succeed(command)
+                  machine.succeed(f"test ! -e {pending(SECOND)}")
+                  assert manifest_version(SECOND) == seeded[SECOND]
 
               with subtest("the seed actor reads nothing"):
-                  status = api("${seederToken}", "POST", "/queries/ready", {"params": {}}).partition("\n")[0]
-                  assert status in ("403", "404"), status
-                  status = api("${seederToken}", "GET", "/snapshot").partition("\n")[0]
-                  assert status in ("403", "404"), status
+                  for graph, expected in SEEDED.items():
+                      status = api("${seederToken}", "POST", graph, f"/queries/{expected['question']}", {"params": {}}).partition("\n")[0]
+                      assert status in ("403", "404"), status
+                      status = api("${seederToken}", "GET", graph, "/snapshot").partition("\n")[0]
+                      assert status in ("403", "404"), status
             '';
           };
       };

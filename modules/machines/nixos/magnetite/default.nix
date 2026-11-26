@@ -10,6 +10,7 @@ let
   inherit (config.flake.lib) fleet;
   inherit (config.flake.lib) meshInterfaces;
   collectorSchema = config.flake.lib.otelCollectorSchema;
+  omnigraphRoots = config.flake.lib.omnigraphClusterRoots;
 in
 {
   flake.modules.nixos."machines/nixos/magnetite" =
@@ -30,6 +31,27 @@ in
         quota = "16G";
         reservation = "12G";
       };
+
+      # The cookbooks of the pinned omnigraph-cookbooks (the top-level
+      # directories holding a schema.pg and a seed.jsonl), each served as the
+      # example graph `cookbook-<directory>`. Listed here rather than read
+      # from the package, which evaluation could only do by building the
+      # fetch first; checks.x86_64-linux.omnigraph-cookbook-seeds fails when
+      # the pinned package holds a cookbook this list lacks, or lacks one it
+      # names.
+      cookbooks = [
+        "agent-ops"
+        "beads"
+        "company-brain"
+        "dev-graph"
+        "hardware-program"
+        "health-record"
+        "industry-intel"
+        "pharma-intel"
+        "second-brain"
+        "vc-os"
+      ];
+      cookbookGraph = cookbook: "cookbook-${cookbook}";
     in
     {
       imports = [
@@ -480,16 +502,26 @@ in
       services.omnigraph = {
         enable = true;
 
-        # A fresh root for omnigraph 0.15, initialized by the bootstrap unit.
-        # The previous root, s3://sciexp/omnigraph/clusters/dev-graph-v9, held
-        # only disposable stub data written by 0.11, so nothing was exported
-        # into this one.
-        storageUri = "s3://sciexp/omnigraph/clusters/dev-graph-v10";
-        # omnigraph 0.15.0 created this root's graphs at storage format 16;
-        # change it only together with the root's suffix above. servesFloor
-        # is the lowest format the packaged omnigraph reads, and
-        # checks.omnigraph-format-window holds it to the binary.
-        cluster.createdAtFormat = 16;
+        # Every cookbook of the pinned omnigraph-cookbooks as an example
+        # graph, on a root created by omnigraph 0.16 and initialized by the
+        # bootstrap unit. Its name records the storage format its graphs are
+        # created at (flake.lib.omnigraphClusterRoots.name), so it follows
+        # createdAtFormat; a fresh copy at the same format to replay the seeds
+        # takes a revision (`revision = 2;` names cookbooks-f17-r2). The
+        # previous root, dev-graph-v10, created by 0.15 at format 16 with one
+        # empty graph `dev`, stays intact as the way back
+        # (flake.lib.omnigraphClusterRoots.rollback).
+        storageUri = omnigraphRoots.uri (
+          omnigraphRoots.name {
+            family = "cookbooks";
+            inherit (config.services.omnigraph.cluster) createdAtFormat;
+          }
+        );
+        # omnigraph 0.16.0 writes storage format 17 (`omnigraph version
+        # --json`, internal_schema.writes). servesFloor is the lowest format
+        # the packaged omnigraph reads, and checks.omnigraph-format-window
+        # holds it to the binary.
+        cluster.createdAtFormat = 17;
         cluster.servesFloor = 14;
 
         s3 = {
@@ -528,27 +560,37 @@ in
           config.clan.core.vars.generators.omnigraph-bearer-tokens.files."tokens.json".path;
 
         cluster = {
-          # The cookbooks' example graph: seeded once when the bootstrap
+          # One example graph per cookbook, seeded once when the bootstrap
           # creates a new root, never on an existing one.
-          graphs.dev = {
-            exampleDataOnly = true;
-            seed = {
-              file = "${pkgs.omnigraph-cookbooks}/dev-graph/seed.jsonl";
-              actor = "seeder";
-              tokenFile = config.clan.core.vars.generators.omnigraph-seeder-token.files."token".path;
-            };
-          };
+          graphs = lib.listToAttrs (
+            map (
+              cookbook:
+              lib.nameValuePair (cookbookGraph cookbook) {
+                exampleDataOnly = true;
+                seed = {
+                  file = "${pkgs.omnigraph-cookbooks}/${cookbook}/seed.jsonl";
+                  actor = "seeder";
+                  tokenFile = config.clan.core.vars.generators.omnigraph-seeder-token.files."token".path;
+                };
+              }
+            ) cookbooks
+          );
 
           settings = {
-            metadata.name = "dev-graph";
-            graphs.dev = {
-              schema = "schema.pg";
-              queries = "queries/";
-            };
+            metadata.name = "cookbooks";
+            graphs = lib.listToAttrs (
+              map (
+                cookbook:
+                lib.nameValuePair (cookbookGraph cookbook) {
+                  schema = "cookbooks/${cookbook}/schema.pg";
+                  queries = "cookbooks/${cookbook}/queries/";
+                }
+              ) cookbooks
+            );
             policies = {
-              dev = {
-                file = "policies/dev.policy.yaml";
-                applies_to = [ "dev" ];
+              examples = {
+                file = "policies/examples.policy.yaml";
+                applies_to = map cookbookGraph cookbooks;
               };
               server = {
                 file = "policies/server.policy.yaml";
@@ -557,16 +599,21 @@ in
             };
           };
 
-          # The dev graph's schema and stored queries come from the cookbooks
+          # Each graph's schema and stored queries come from the cookbooks
           # commit pinned in pkgs/by-name/omnigraph-cookbooks/pin.json. A new
           # commit changes the rendered configuration only; the cluster takes
           # it when omnigraph-cluster-apply is run by hand.
-          extraFiles = {
-            "schema.pg" = "${pkgs.omnigraph-cookbooks}/dev-graph/schema.pg";
-            "queries" = "${pkgs.omnigraph-cookbooks}/dev-graph/queries";
-            "policies/dev.policy.yaml" = ./omnigraph/dev.policy.yaml;
-            "policies/server.policy.yaml" = ./omnigraph/server.policy.yaml;
-          };
+          extraFiles =
+            lib.listToAttrs (
+              lib.concatMap (cookbook: [
+                (lib.nameValuePair "cookbooks/${cookbook}/schema.pg" "${pkgs.omnigraph-cookbooks}/${cookbook}/schema.pg")
+                (lib.nameValuePair "cookbooks/${cookbook}/queries" "${pkgs.omnigraph-cookbooks}/${cookbook}/queries")
+              ]) cookbooks
+            )
+            // {
+              "policies/examples.policy.yaml" = ./omnigraph/examples.policy.yaml;
+              "policies/server.policy.yaml" = ./omnigraph/server.policy.yaml;
+            };
 
           actor = "magnetite";
         };

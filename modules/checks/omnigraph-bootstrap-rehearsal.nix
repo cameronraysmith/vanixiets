@@ -36,12 +36,13 @@
 # directory (mode 0700) before the apply, leaves an existing one unchanged,
 # and an s3:// root gets no local directory.
 #
-# Seed-pending markers, for a bootstrap with seeded graphs `dev` and `ops`, on
-# both backends: the first-initialization branch writes
-# `_omnigraph-markers/<root>.<graph>.seed-pending` for each before the apply
-# runs (so before `.initialized`), and they stay when the apply fails; the
-# adopt, no-op and refusal branches write none; a bootstrap without seeded
-# graphs writes none in any branch (the rows above).
+# Seed-pending markers, for a bootstrap with the seeded graphs magnetite
+# declares (one per cookbook, ten at the pinned revision), on both backends:
+# the first-initialization branch writes
+# `_omnigraph-markers/<root>.<graph>.seed-pending` for every one of them
+# before the apply runs (so before `.initialized`), and they stay when the
+# apply fails; the adopt, no-op and refusal branches write none; a bootstrap
+# without seeded graphs writes none in any branch (the rows above).
 #
 # The seed program (flake.lib.omnigraphSeed) runs against a loopback stand-in
 # for the server's `POST /graphs/<graph>/load/ndjson`, reached through
@@ -50,10 +51,14 @@
 # 200 append commit deletes the marker; a 409 `key_conflict` with effects
 # `none` deletes it; a 409 `key_conflict` with partial effects, a 500
 # `outcome_unknown`, a 200 that is not an append commit, a request that times
-# out and an unreadable token each exit 1 and keep it. Every load is
-# `mode=append` on `main` and carries the bearer token, the HTTP contract the
-# packaged omnigraph reports and the seed as NDJSON. For S3 the marker is
-# deleted with a signed DELETE.
+# out and an unreadable token each exit 1 and keep it. A 400 `@card`
+# violation with effects `unknown`, the answer omnigraph 0.16.0 gives a
+# replayed seed with edges under a `@card` maximum, exits 1, keeps the marker
+# and prints the graph, the marker and the systemd-run command that clears
+# it; `--clear-pending` deletes the marker without a load, on both backends.
+# Every load is `mode=append` on `main` and carries the bearer token, the HTTP
+# contract the packaged omnigraph reports and the seed as NDJSON. For S3 the
+# marker is deleted with a signed DELETE.
 { self, lib, ... }:
 {
   perSystem =
@@ -109,6 +114,21 @@
         exit "''${STUB_APPLY_EXIT:-0}"
       '';
 
+      # The graphs magnetite seeds, so the rows run with the ids, and the
+      # number of graphs, a deployed root is initialized with.
+      seededGraphIds =
+        let
+          ids = lib.attrNames (
+            lib.filterAttrs (
+              _: graph: graph.seed != null
+            ) self.nixosConfigurations.magnetite.config.services.omnigraph.cluster.graphs
+          );
+        in
+        assert lib.assertMsg (
+          lib.length ids >= 2
+        ) "magnetite seeds fewer than two graphs; the seeded rows need several";
+        ids;
+
       mkBootstrap =
         storageUri:
         self.lib.omnigraphBootstrap pkgs {
@@ -122,29 +142,24 @@
           omnigraph = stubOmnigraph;
           applyProgram = stubApply;
           inherit storageUri;
-          seededGraphs = [
-            "dev"
-            "ops"
-          ];
+          seededGraphs = seededGraphIds;
         };
 
       s3Root = "s3://${bucket}/clusters/dev-graph/";
       s3Bootstrap = mkBootstrap s3Root;
       s3SeededBootstrap = mkSeededBootstrap s3Root;
       s3MarkerKey = "/${bucket}/clusters/_omnigraph-markers/dev-graph.initialized";
-      s3PendingKeys = map (g: "/${bucket}/clusters/_omnigraph-markers/dev-graph.${g}.seed-pending") [
-        "dev"
-        "ops"
-      ];
+      s3PendingKeys = map (
+        g: "/${bucket}/clusters/_omnigraph-markers/dev-graph.${g}.seed-pending"
+      ) seededGraphIds;
       # Relative, so each row resolves it under its own working directory.
       localRoot = "store/root/";
       localBootstrap = mkBootstrap localRoot;
       localSeededBootstrap = mkSeededBootstrap localRoot;
       localMarker = "store/_omnigraph-markers/root.initialized";
-      localPendingMarkers = map (g: "store/_omnigraph-markers/root.${g}.seed-pending") [
-        "dev"
-        "ops"
-      ];
+      localPendingMarkers = map (g: "store/_omnigraph-markers/root.${g}.seed-pending") seededGraphIds;
+      # The pending marker of graph `dev`, the graph the seed program rows load.
+      s3SeedPendingKey = "/${bucket}/clusters/_omnigraph-markers/dev-graph.dev.seed-pending";
       bucketRootBootstrap = mkBootstrap "s3://${bucket}/";
       slashRootBootstrap = mkBootstrap "/";
       gsBootstrap = mkBootstrap "gs://${bucket}/root";
@@ -162,6 +177,8 @@
           serverUrl = seedServer;
           tokenCredential = "seed-token";
           timeout = 3;
+          environmentFile = "/run/rehearsal/env";
+          environment.AWS_REGION = "auto";
         };
       localSeed = mkSeed localRoot;
       s3Seed = mkSeed s3Root;
@@ -190,6 +207,9 @@
                 return 409, {"error": "node type 'Person' already has id 'ada'", "code": "conflict",
                              "disposition": {"effects": "partial", "action": "refresh"},
                              "key_conflict": {"entity_kind": "node", "type_name": "Person", "entity_id": "ada"}}
+            if mode == "card":
+                return 400, {"error": "@card violation on edge OwnedBy: source 'ada' has 2 edges (max 1)",
+                             "code": "bad_request", "disposition": {"effects": "unknown", "action": "reconcile"}}
             return 500, {"error": "the write's outcome is unknown", "code": "outcome_unknown",
                          "disposition": {"effects": "unknown", "action": "inspect"}}
 
@@ -537,7 +557,7 @@
               done < <(pending_files)
             }
             expect_pending() {
-              for graph in dev ops; do
+              for graph in ${lib.escapeShellArgs seededGraphIds}; do
                 p=$(pending_files | grep -F ".$graph.seed-pending")
                 jq -e --arg g "$graph" '.graph == $g and .reason == "first-initialization" and .storage_uri != null and .written_at != null' \
                   "$p" > /dev/null || fail "no seed-pending record for $graph at $p"
@@ -561,8 +581,8 @@
               seeded_setup "$backend seeded: state missing, marker absent" "$backend" missing absent
               run_seeded
               expect_rc 0
-              [ "$(cat "$STUB_APPLY_LOG")" = "applied marker=absent pending=present present" ] \
-                || fail "expected one apply after both pending markers and before the marker, got: $(cat "$STUB_APPLY_LOG")"
+              [ "$(cat "$STUB_APPLY_LOG")" = ${lib.escapeShellArg "applied marker=absent pending=${lib.concatMapStringsSep " " (_: "present") seededGraphIds}"} ] \
+                || fail "expected one apply after every pending marker and before the marker, got: $(cat "$STUB_APPLY_LOG")"
               jq -e '.reason == "first-initialization"' "$STUB_MARKER_FILE" > /dev/null \
                 || fail "marker missing or not a first-initialization record"
               expect_pending
@@ -601,7 +621,7 @@
             mkdir -p "$CREDENTIALS_DIRECTORY"
             printf 'rehearsal-seed-token' > "$CREDENTIALS_DIRECTORY/seed-token"
             local_pending=store/_omnigraph-markers/root.dev.seed-pending
-            s3_pending_key=/${bucket}/clusters/_omnigraph-markers/dev-graph.dev.seed-pending
+            s3_pending_key=${s3SeedPendingKey}
 
             seed_setup() { # <label> <backend> <load answer> <pending: present|absent>
               row_setup "$1" "$2" found present
@@ -657,6 +677,35 @@
               expect_pending_kept
             done
 
+            # A replay refused as a @card violation with effects unknown names
+            # the graph, the marker and the command that clears it.
+            for backend in local s3; do
+              seed_setup "seed: $backend card refusal" "$backend" card present
+              run_seed
+              expect_rc 1
+              expect_one_load
+              expect_pending_kept
+              if [ "$backend" = s3 ]; then
+                marker_uri=s3://${bucket}/clusters/_omnigraph-markers/dev-graph.dev.seed-pending
+                seed_program=${lib.getExe s3Seed}
+              else
+                marker_uri=$local_pending
+                seed_program=${lib.getExe localSeed}
+              fi
+              for expected in "into graph dev answered HTTP 400" "$marker_uri" \
+                "systemd-run --wait --pipe --collect '--property=EnvironmentFile=/run/rehearsal/env' '--setenv=AWS_REGION=auto' $seed_program --clear-pending"; do
+                grep -qF -- "$expected" "$TMPDIR/stderr" || fail "the refusal does not name: $expected"
+              done
+
+              seed_setup "seed: $backend clear pending" "$backend" ok present
+              rc=0
+              "$seed_program" --clear-pending > "$TMPDIR/stdout" 2> "$TMPDIR/stderr" || rc=$?
+              cat "$TMPDIR/stdout" "$TMPDIR/stderr" >&2
+              expect_rc 0
+              [ "$(loads)" = 0 ] || fail "--clear-pending sent a load: $(cat "$load_requests")"
+              expect_pending_deleted
+            done
+
             seed_setup "seed: token unreadable" local ok present
             CREDENTIALS_DIRECTORY="$TMPDIR/no-credentials" run_seed
             expect_rc 1
@@ -681,7 +730,15 @@
             echo "--- $row is path-style and SigV4-signed for the configured key and region"
             cat "$requests" >> "$TMPDIR/all-requests.jsonl"
             jq -e -s --argjson keys ${
-              lib.escapeShellArg (builtins.toJSON ([ s3MarkerKey ] ++ s3PendingKeys))
+              lib.escapeShellArg (
+                builtins.toJSON (
+                  [
+                    s3MarkerKey
+                    s3SeedPendingKey
+                  ]
+                  ++ s3PendingKeys
+                )
+              )
             } 'length > 0 and all(.[];
                 (.path | IN($keys[]))
                 and (.authorization | startswith("AWS4-HMAC-SHA256 Credential=${accessKey}/"))
@@ -698,7 +755,9 @@
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
       testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
-        # nixbot: median 20 s, slowest 28 s, all 5 runs 2026-10-02..2026-11-11
+        # nixbot: median 20 s, slowest 28 s, all 5 runs 2026-10-02..2026-11-11;
+        # with magnetite's ten seeded graphs, 6 s in three --rebuild runs on
+        # magnetite's store, 2026-11-25
         omnigraph-bootstrap-rehearsal.class = "small";
       };
       checks = lib.optionalAttrs (system == "x86_64-linux") {

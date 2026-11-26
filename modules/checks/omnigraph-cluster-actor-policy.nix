@@ -1,4 +1,4 @@
-# Behavioural check: the policy magnetite applies to its omnigraph graph lets
+# Behavioural check: the policy magnetite applies to its omnigraph graphs lets
 # the host's cluster actor run the operations its units and its
 # omnigraph-cluster wrapper perform, and nothing more; lets the seed actor
 # load into `main`, and nothing more; and keeps the bearer-token actor
@@ -22,7 +22,11 @@
 #
 # Each allow case names the operation that needs it; the deny cases hold the
 # cluster actor and the seed actor to those operations, and the `admin` cases
-# hold the bearer-token actor to its access.
+# hold the bearer-token actor to its access. The cases run on two of the
+# graphs, the first and the last by id, which one bundle binds like the rest.
+# Every graph magnetite declares must then let `admin` read it: the server
+# denies every read on a graph no applied policy binds, so a graph left out of
+# the bundle's `applies_to` fails here.
 { self, lib, ... }:
 {
   perSystem =
@@ -31,20 +35,20 @@
       magnetite = self.nixosConfigurations.magnetite.config;
       omnigraph = magnetite.services.omnigraph;
       actor = omnigraph.cluster.actor;
-      seeder = omnigraph.cluster.graphs.${graph}.seed.actor;
-      graph = "dev";
+      graphs = lib.attrNames omnigraph.cluster.settings.graphs;
+      sampledGraphs = lib.unique [
+        (lib.head graphs)
+        (lib.last graphs)
+      ];
       clusterConfig = magnetite.environment.etc."omnigraph/cluster".source;
-      # The bundle file bound to the graph; the binding rules allow one.
-      graphPolicyFiles = lib.mapAttrsToList (_: policy: policy.file) (
-        lib.filterAttrs (_: policy: lib.elem graph (policy.applies_to or [ ])) (
-          omnigraph.cluster.settings.policies or { }
+      # The bundle files bound to graphs rather than to the cluster scope.
+      graphPolicyFiles = lib.unique (
+        lib.mapAttrsToList (_: policy: policy.file) (
+          lib.filterAttrs (_: policy: lib.any (g: lib.elem g graphs) (policy.applies_to or [ ])) (
+            omnigraph.cluster.settings.policies or { }
+          )
         )
       );
-      graphPolicyFile =
-        assert lib.assertMsg (
-          lib.length graphPolicyFiles == 1
-        ) "magnetite binds ${toString (lib.length graphPolicyFiles)} policies to graph ${graph}, not one";
-        lib.head graphPolicyFiles;
 
       case =
         id: actorName: action: extra: expect:
@@ -61,47 +65,58 @@
       };
       mainToMain = onMain // intoMain;
 
-      policyTests = pkgs.writeText "omnigraph-cluster-actor-policy.tests.yaml" (
-        builtins.toJSON {
-          version = 1;
-          cases = [
-            # cluster apply of a schema change, and recovery of a started one
-            (case "cluster-actor-schema-apply-for-cluster-apply" actor "schema_apply" intoMain "allow")
-            # cluster apply that deletes the graph, and recovery of that deletion
-            (case "cluster-actor-read-for-graph-deletion" actor "read" onMain "allow")
-            # omnigraph-optimize
-            (case "cluster-actor-maintain-for-optimize" actor "maintain" onMain "allow")
-            # Nothing runs cleanup or writes data as the cluster actor.
-            (case "cluster-actor-no-reclaim" actor "reclaim" { } "deny")
-            (case "cluster-actor-no-change" actor "change" onMain "deny")
-            (case "cluster-actor-no-export" actor "export" onMain "deny")
-            (case "cluster-actor-no-branch-create" actor "branch_create" mainToMain "deny")
-            (case "admin-read" "admin" "read" onMain "allow")
-            (case "admin-export" "admin" "export" onMain "allow")
-            (case "admin-change" "admin" "change" onMain "allow")
-            (case "admin-invoke-query" "admin" "invoke_query" { } "allow")
-            (case "admin-schema-apply" "admin" "schema_apply" intoMain "allow")
-            (case "admin-branch-create" "admin" "branch_create" mainToMain "allow")
-            (case "admin-branch-delete" "admin" "branch_delete" intoMain "allow")
-            (case "admin-branch-merge" "admin" "branch_merge" mainToMain "allow")
-            (case "admin-no-maintain" "admin" "maintain" onMain "deny")
-            (case "admin-no-reclaim" "admin" "reclaim" { } "deny")
-            # omnigraph-seed-dev: a served load into the existing `main`
-            # checks `change` on `main` alone.
-            (case "seeder-change-main-for-seed-load" seeder "change" onMain "allow")
-            (case "seeder-no-change-other-branch" seeder "change" { branch = "feature"; } "deny")
-            (case "seeder-no-read" seeder "read" onMain "deny")
-            (case "seeder-no-export" seeder "export" onMain "deny")
-            (case "seeder-no-invoke-query" seeder "invoke_query" { } "deny")
-            (case "seeder-no-schema-apply" seeder "schema_apply" intoMain "deny")
-            (case "seeder-no-branch-create" seeder "branch_create" mainToMain "deny")
-            (case "seeder-no-branch-delete" seeder "branch_delete" intoMain "deny")
-            (case "seeder-no-branch-merge" seeder "branch_merge" mainToMain "deny")
-            (case "seeder-no-maintain" seeder "maintain" onMain "deny")
-            (case "seeder-no-reclaim" seeder "reclaim" { } "deny")
-          ];
-        }
-      );
+      testsFile =
+        name: cases:
+        pkgs.writeText "omnigraph-cluster-actor-policy-${name}.tests.yaml" (
+          builtins.toJSON {
+            version = 1;
+            inherit cases;
+          }
+        );
+
+      policyTests =
+        graph:
+        let
+          seeder = omnigraph.cluster.graphs.${graph}.seed.actor;
+        in
+        testsFile graph [
+          # cluster apply of a schema change, and recovery of a started one
+          (case "cluster-actor-schema-apply-for-cluster-apply" actor "schema_apply" intoMain "allow")
+          # cluster apply that deletes the graph, and recovery of that deletion
+          (case "cluster-actor-read-for-graph-deletion" actor "read" onMain "allow")
+          # omnigraph-optimize
+          (case "cluster-actor-maintain-for-optimize" actor "maintain" onMain "allow")
+          # Nothing runs cleanup or writes data as the cluster actor.
+          (case "cluster-actor-no-reclaim" actor "reclaim" { } "deny")
+          (case "cluster-actor-no-change" actor "change" onMain "deny")
+          (case "cluster-actor-no-export" actor "export" onMain "deny")
+          (case "cluster-actor-no-branch-create" actor "branch_create" mainToMain "deny")
+          (case "admin-read" "admin" "read" onMain "allow")
+          (case "admin-export" "admin" "export" onMain "allow")
+          (case "admin-change" "admin" "change" onMain "allow")
+          (case "admin-invoke-query" "admin" "invoke_query" { } "allow")
+          (case "admin-schema-apply" "admin" "schema_apply" intoMain "allow")
+          (case "admin-branch-create" "admin" "branch_create" mainToMain "allow")
+          (case "admin-branch-delete" "admin" "branch_delete" intoMain "allow")
+          (case "admin-branch-merge" "admin" "branch_merge" mainToMain "allow")
+          (case "admin-no-maintain" "admin" "maintain" onMain "deny")
+          (case "admin-no-reclaim" "admin" "reclaim" { } "deny")
+          # omnigraph-seed-<graph>: a served load into the existing `main`
+          # checks `change` on `main` alone.
+          (case "seeder-change-main-for-seed-load" seeder "change" onMain "allow")
+          (case "seeder-no-change-other-branch" seeder "change" { branch = "feature"; } "deny")
+          (case "seeder-no-read" seeder "read" onMain "deny")
+          (case "seeder-no-export" seeder "export" onMain "deny")
+          (case "seeder-no-invoke-query" seeder "invoke_query" { } "deny")
+          (case "seeder-no-schema-apply" seeder "schema_apply" intoMain "deny")
+          (case "seeder-no-branch-create" seeder "branch_create" mainToMain "deny")
+          (case "seeder-no-branch-delete" seeder "branch_delete" intoMain "deny")
+          (case "seeder-no-branch-merge" seeder "branch_merge" mainToMain "deny")
+          (case "seeder-no-maintain" seeder "maintain" onMain "deny")
+          (case "seeder-no-reclaim" seeder "reclaim" { } "deny")
+        ];
+
+      readableTests = testsFile "admin-read" [ (case "admin-read" "admin" "read" onMain "allow") ];
 
       # The first state: a graph policy that names only `admin`.
       adminOnlyPolicy = pkgs.writeText "admin-only.policy.yaml" ''
@@ -144,8 +159,9 @@
               [ "$(grep -c '^storage: ' "$TMPDIR/config/cluster.yaml")" = 1 ] \
                 || fail "cluster.yaml has no single top-level storage line"
               sed -i "s|^storage: .*|storage: $root|" "$TMPDIR/config/cluster.yaml"
-              [ -f "$TMPDIR/config/"${lib.escapeShellArg graphPolicyFile} ] \
-                || fail "the rendered configuration has no policy file ${graphPolicyFile}"
+              for file in ${lib.escapeShellArgs graphPolicyFiles}; do
+                [ -f "$TMPDIR/config/$file" ] || fail "the rendered configuration has no policy file $file"
+              done
             }
 
             # A local root takes an unleased lock and waits for nothing, so
@@ -162,7 +178,9 @@
             }
 
             render
-            cp ${adminOnlyPolicy} "$TMPDIR/config/"${lib.escapeShellArg graphPolicyFile}
+            for file in ${lib.escapeShellArgs graphPolicyFiles}; do
+              cp ${adminOnlyPolicy} "$TMPDIR/config/$file"
+            done
             apply admin-only
 
             render
@@ -171,14 +189,22 @@
             lock=$(timeout 60 omnigraph --target "$root" cluster status --json | jq -r '.lock_id // empty')
             [ -z "$lock" ] || fail "the converged apply left the admission lock $lock held"
 
-            timeout 60 omnigraph --target "$root" --graph ${graph} policy validate
-            timeout 60 omnigraph --target "$root" --graph ${graph} policy test --tests ${policyTests}
+            for graph in ${lib.escapeShellArgs sampledGraphs}; do
+              timeout 60 omnigraph --target "$root" --graph "$graph" policy validate
+            done
+            ${lib.concatMapStrings (graph: ''
+              timeout 60 omnigraph --target "$root" --graph ${lib.escapeShellArg graph} policy test --tests ${policyTests graph}
+            '') sampledGraphs}
+            for graph in ${lib.escapeShellArgs graphs}; do
+              timeout 60 omnigraph --target "$root" --graph "$graph" policy test --tests ${readableTests} \
+                || fail "admin cannot read graph $graph: no applied policy grants it"
+            done
             touch "$out"
           '';
     in
     {
-      # 3 s: one --rebuild on magnetite's store, 2026-11-25 (11 s for the
-      # first build, evaluation and the rendered configuration included).
+      # 11 s: three --rebuild runs on magnetite's store, 2026-11-25 (10.5 to
+      # 10.9 s each), with the ten cookbook graphs.
       testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
         omnigraph-cluster-actor-policy.class = "small";
       };

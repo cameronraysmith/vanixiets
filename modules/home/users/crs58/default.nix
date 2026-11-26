@@ -21,7 +21,7 @@ let
       # e.g. `omnigraph alias issue --params '{"slug":"iss-…"}'`.
       devGraphAlias = query: {
         target = "magnetite";
-        graph = "dev";
+        graph = "cookbook-dev-graph";
         inherit query;
       };
     in
@@ -84,7 +84,7 @@ let
           targets.magnetite = {
             kind = "server";
             endpoint = "https://omnigraph.${flake.lib.fleet.domain}";
-            default_graph = "dev";
+            default_graph = "cookbook-dev-graph";
             auth = {
               provider = "token";
               source.store = { };

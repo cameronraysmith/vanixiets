@@ -3,13 +3,22 @@
 #
 # Recreating an example-data root (a cluster graph keeps the storage format
 # it was created with, and `omnigraph upgrade` refuses cluster graphs):
-#   1. change the root's suffix in services.omnigraph.storageUri and set
+#   1. point services.omnigraph.storageUri at a new root and set
 #      services.omnigraph.cluster.createdAtFormat to the format the packaged
-#      omnigraph writes (`omnigraph version --json`, internal_schema.writes);
+#      omnigraph writes (`omnigraph version --json`, internal_schema.writes).
+#      A root in the `sciexp` bucket is named by
+#      flake.lib.omnigraphClusterRoots.name from that format, `<family>-f<N>`
+#      (modules/lib/omnigraph-cluster-roots.nix); a deliberate fresh copy at
+#      the same format, to replay the seeds, takes `-r2`, `-r3`, and so on;
 #   2. deploy: the bootstrap initializes the new root and marks each seeded
 #      graph's seed pending, and omnigraph-seed-<graph> loads it once the
 #      server serves;
-#   3. the old root and its marker stay in place, untouched, as the way back.
+#   3. the old root and its markers stay in place, untouched, as the way
+#      back: list it in flake.lib.omnigraphClusterRoots.rollback;
+#   4. once nothing will roll back to it, move it to
+#      flake.lib.omnigraphClusterRoots.retired in a later change, and apply
+#      the terraform configuration, whose lifecycle rules then delete its
+#      data and its markers from the bucket.
 { config, ... }:
 let
   flakeLib = config.flake.lib;
@@ -260,8 +269,25 @@ in
         '';
       };
 
+      # The root this host serves, when it lies in the bucket prefix whose
+      # retired roots the terraform configuration deletes.
+      servedClusterRoot = flakeLib.omnigraphClusterRoots.rootOf cfg.storageUri;
+      retiredRootConflicts = lib.optionals (servedClusterRoot != null) (
+        flakeLib.omnigraphClusterRoots.conflicts { keptRoots = [ servedClusterRoot ]; }
+      );
+
       createdAtFormat = cfg.cluster.createdAtFormat;
       servesFloor = cfg.cluster.servesFloor;
+
+      # The seed unit each seed unit waits for: the one of the seeded graph
+      # before it in id order, or none for the first.
+      seedPredecessor =
+        let
+          ids = lib.attrNames seededGraphs;
+        in
+        lib.listToAttrs (
+          lib.zipListsWith (id: previous: lib.nameValuePair id previous) (lib.drop 1 ids) ids
+        );
 
       seedUnits = lib.mapAttrs' (
         id: graph:
@@ -275,10 +301,17 @@ in
           wantedBy = [ "omnigraph-server.service" ];
           partOf = [ "omnigraph-server.service" ];
           requires = [ "omnigraph-server.service" ];
+          # The loads run one at a time, in graph id order. Every load is
+          # written by the server over the same link to the store as its lease
+          # heartbeat, and a store whose requests stall for seconds at a time
+          # would hold all of them in flight together; one after another keeps
+          # at most one commit beside the heartbeat, for a few seconds per
+          # small seed. Ordering only, so a failed load leaves the next to run.
           after = [
             "omnigraph-server.service"
             "network-online.target"
-          ];
+          ]
+          ++ lib.optional (seedPredecessor ? ${id}) "${seedUnitName seedPredecessor.${id}}.service";
           wants = [ "network-online.target" ];
           # A deploy that changes only this unit does not run it; it runs at
           # the next server start, the only time a pending seed can appear.
@@ -301,6 +334,8 @@ in
                 seedFile = graph.seed.file;
                 serverUrl = "http://${bindTarget}";
                 tokenCredential = seedTokenCredential;
+                environmentFile = cfg.environmentFile;
+                environment = storageEnvironment;
               }
             );
             EnvironmentFile = environmentFiles;
@@ -812,13 +847,23 @@ in
                       it. Any other outcome fails the unit and keeps the marker:
                       one load is one commit, all or nothing, and `append` never
                       replaces an existing id, so the retry on the next start
-                      either commits the seed or meets that `key_conflict`.
+                      commits the seed, or, when an earlier load committed it,
+                      is refused. That refusal is the `key_conflict` above,
+                      except for a seed that writes edges under a `@card`
+                      maximum: omnigraph 0.16.0 refuses its replay as a `@card`
+                      violation with effects `unknown`, so its unit fails at
+                      every start. The unit then prints the graph, the marker
+                      and the command that clears it, to run as root once the
+                      graph's snapshot shows it holds the seed.
 
                       The unit is wanted by and part of `omnigraph-server`, so it
                       runs whenever the server starts or restarts, and sets
                       `restartIfChanged = false`, so a deploy that changes only
-                      the seed unit does not run it. Nothing in this path
-                      applies, deletes or recreates a graph or a root.
+                      the seed unit does not run it. With several seeded graphs
+                      the units run one at a time, in graph id order, each
+                      after the one before it has finished, whatever its
+                      outcome. Nothing in this path applies, deletes or
+                      recreates a graph or a root.
                     '';
                   };
                 };
@@ -827,7 +872,7 @@ in
             default = { };
             example = lib.literalExpression ''
               {
-                dev = {
+                cookbook-dev-graph = {
                   exampleDataOnly = true;
                   seed = {
                     file = "''${pkgs.omnigraph-cookbooks}/dev-graph/seed.jsonl";
@@ -862,15 +907,22 @@ in
               the range the packaged binary reads, and the configuration warns
               while it equals {option}`servesFloor`.
 
-              To recreate an example-data root: change the root's suffix in
-              {option}`services.omnigraph.storageUri` and set this to the
-              format the packaged omnigraph writes (`omnigraph version --json`,
-              `internal_schema.writes`), then deploy. The bootstrap initializes
-              the new root and marks each seeded graph's seed pending, and the
-              seed units load it once the server is serving. The old root and
-              its marker stay in place, untouched, as the way back. A root
-              holding data that is not example data must first be exported
-              with the binary that still reads it.
+              To recreate an example-data root: point
+              {option}`services.omnigraph.storageUri` at a new root and set
+              this to the format the packaged omnigraph writes
+              (`omnigraph version --json`, `internal_schema.writes`), then
+              deploy. A root in the `sciexp` bucket is named
+              `<family>-f<format>` from this value by
+              `flake.lib.omnigraphClusterRoots.name`, and a deliberate fresh
+              copy at the same format takes `-r2`, `-r3`, and so on. The
+              bootstrap initializes the new root and marks each seeded graph's
+              seed pending, and the seed units load them once the server is
+              serving. The old root and its markers stay in place, untouched,
+              as the way back, listed in
+              `flake.lib.omnigraphClusterRoots.rollback` until a later change
+              moves them to its `retired` list. A root holding data that is
+              not example data must first be exported with the binary that
+              still reads it.
             '';
           };
 
@@ -1088,6 +1140,15 @@ in
               services.omnigraph.cluster.createdAtFormat and
               services.omnigraph.cluster.servesFloor are recorded together: the
               format window compares the one with the other.
+            '';
+          }
+          {
+            assertion = retiredRootConflicts == [ ];
+            message = ''
+              services.omnigraph.storageUri (${cfg.storageUri}) is a root the
+              terraform configuration deletes from its bucket
+              (flake.lib.omnigraphClusterRoots.retired):
+              ${lib.concatStringsSep "; " retiredRootConflicts}.
             '';
           }
         ];

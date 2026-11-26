@@ -381,7 +381,7 @@ in
   # from `$CREDENTIALS_DIRECTORY/<tokenCredential>`, passed to curl in a config
   # on stdin. The mode is explicit because the HTTP default is `merge`. One
   # load is one graph commit, all or nothing, and `append` refuses an id that
-  # already exists with `key_conflict`, so:
+  # already exists, so:
   #
   #   marker absent                         exit 0, nothing sent
   #   200 with an append commit             delete the marker, exit 0
@@ -389,10 +389,29 @@ in
   #                                         earlier attempt committed and its
   #                                         answer was lost): delete the
   #                                         marker, exit 0
+  #   a refusal with effects unknown        exit 1, keep the marker, and name
+  #                                         the graph, the marker and the
+  #                                         command that clears it once a
+  #                                         person has checked the graph holds
+  #                                         its seed
   #   anything else (another status, a      exit 1 and keep the marker; the
-  #   timeout, no connection, a marker      next start retries, which either
-  #   that cannot be read)                  commits the seed or meets the
-  #                                         key_conflict above
+  #   timeout, no connection, a marker      next start retries
+  #   that cannot be read)
+  #
+  # A replay meets key_conflict only when the server checks keys before
+  # anything else. omnigraph 0.16.0 checks edge cardinality first: replaying a
+  # seed that writes edges under a `@card` maximum (at most one edge of a type
+  # per source, say) into a graph that already holds it is refused with
+  # `400 bad_request`, a `@card` violation, and effects `unknown`, though the
+  # graph does not change, and the load API takes no idempotency key that
+  # would return the first result instead. Such a seed's unit therefore stays
+  # failed after a committed load whose answer was lost, until a person checks
+  # the graph and clears the marker with the command the unit prints:
+  # `<this program> --clear-pending` run through `systemd-run` with the unit's
+  # storage environment, which deletes the marker and loads nothing. The
+  # request timeout keeps that case rare: 600 s, against requests to R2 that
+  # stall for 8 to 20 s (about 50 s under overload) and seed loads that take
+  # well under a second against a local root.
   #
   # Nothing here deletes, recreates or applies a graph or a root.
   flake.lib.omnigraphSeed =
@@ -405,6 +424,10 @@ in
       serverUrl,
       tokenCredential,
       timeout ? 600,
+      # The storage credentials file and environment of the unit, which the
+      # printed clearing command passes on to its run.
+      environmentFile ? null,
+      environment ? { },
     }:
     let
       location = pendingMarkerFor storageUri graph;
@@ -430,9 +453,36 @@ in
 
           say() { printf '%s: %s\n' ${lib.escapeShellArg name} "$*"; }
           err() { printf '%s: %s\n' ${lib.escapeShellArg name} "$*" >&2; }
+          clear_command=${
+            lib.escapeShellArg (
+              lib.concatStringsSep " " (
+                [
+                  "systemd-run"
+                  "--wait"
+                  "--pipe"
+                  "--collect"
+                ]
+                ++ lib.optional (environmentFile != null) (
+                  lib.escapeShellArg "--property=EnvironmentFile=${toString environmentFile}"
+                )
+                ++ lib.mapAttrsToList (k: v: lib.escapeShellArg "--setenv=${k}=${v}") environment
+              )
+            )
+          }" $(readlink -f -- "$0") --clear-pending"
 
           ${markerFunctions location.kind}
 
+          if [ "''${1-}" = --clear-pending ]; then
+            marker_present=
+            probe_marker "$marker"
+            if [ "$marker_present" = false ]; then
+              say "no seed pending for graph $graph of $storage_uri ($marker is absent); nothing to clear"
+            else
+              delete_marker "$marker"
+              say "cleared the pending seed of graph $graph: deleted $marker; $nothing_done"
+            fi
+            exit 0
+          fi
           marker_present=
           probe_marker "$marker"
           if [ "$marker_present" = false ]; then
@@ -465,7 +515,7 @@ in
                   --data-binary @${seedFile} \
                   --output "$response" --write-out '%{http_code}' \
                   "$load_url"); then
-            err "the load request to $load_url did not complete; whether it committed is unknown, so $marker is kept and the next start retries (a committed seed then answers key_conflict)"
+            err "the load request to $load_url did not complete; whether it committed is unknown, so $marker is kept and the next start retries"
             exit 1
           fi
 
@@ -477,6 +527,22 @@ in
             && jq -e '(.key_conflict | type == "object") and .disposition.effects == "none"' "$response" >/dev/null 2>&1; then
             delete_marker "$marker"
             say "graph $graph already holds the seed (append refused with key_conflict: $(jq -r '.error // .message // empty' "$response")); deleted $marker"
+          elif jq -e '.disposition.effects == "unknown"' "$response" >/dev/null 2>&1; then
+            cat -- "$response" >&2
+            printf '\n' >&2
+            cat >&2 <<EOF
+          ${name}: the load into graph $graph answered HTTP $code: $(jq -r '.error // .message // empty' "$response")
+          The server cannot say whether the load changed anything. The pending marker
+          $marker
+          is kept, so the next start loads again. A seed that writes edges under a
+          @card maximum is refused this way at every start once the graph holds it,
+          which is the case after an earlier load committed and its answer was lost.
+          Check whether graph $graph holds its seed: its snapshot,
+          GET ${serverUrl}/graphs/$graph/snapshot as an actor that may read it, lists
+          the entity count of every type. If it does, clear the marker as root with:
+            $clear_command
+          EOF
+            exit 1
           else
             cat -- "$response" >&2
             printf '\n' >&2

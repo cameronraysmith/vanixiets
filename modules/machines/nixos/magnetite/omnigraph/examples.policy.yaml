@@ -1,3 +1,5 @@
+# The policy of every example graph magnetite serves (one `cookbook-<name>`
+# graph per cookbook), bound to all of them by one bundle.
 version: 1
 groups:
   operators: [admin]
@@ -6,8 +8,8 @@ groups:
   # omnigraph-optimize unit pass as `--as`. Direct writes to a cluster graph
   # are judged by this policy, and a direct actor it does not name is denied.
   cluster-operators: [magnetite]
-  # The bearer-token actor of the omnigraph-seed-dev unit, which loads the
-  # cookbooks' seed into a newly created root through the server.
+  # The bearer-token actor of the omnigraph-seed-<graph> units, which load
+  # each cookbook's seed into a newly created root through the server.
   seeders: [seeder]
 # Names `main` for the seeder rule's branch scope; protection has no other
 # effect in a policy bundle.
