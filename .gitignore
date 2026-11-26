@@ -52,6 +52,7 @@ terraform/config.tf.json
 terraform/.terraform-deploy-key
 terraform/.gcp-terraform-deploy-key
 terraform/result
+terraform/tfplan
 
 # Deployment logs
 *.log

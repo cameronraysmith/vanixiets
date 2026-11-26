@@ -86,15 +86,17 @@ On both hosts `nix-eval-jobs` takes a host-wide evaluation lock, so a remote run
 ## Terraform
 
 Terraform/terranix infrastructure management for cloud resources.
-Recipes manage Hetzner VPS infrastructure through terranix-generated configurations.
+Recipes manage Hetzner, GCP, and Cloudflare resources through the terranix configuration in `modules/terranix/`.
 
 | Recipe | Arguments | Description | CI-tested |
 |--------|-----------|-------------|-----------|
-| `terraform` | `*ARGS` | Run terraform apply (removes stale lockfile first) | No |
-| `terraform-plan` | `*ARGS` | Run terraform plan only | No |
-| `terraform-destroy` | `*ARGS` | Run terraform destroy | No |
+| `terraform` | | Render the configuration, initialize, and run `tofu apply`, which asks for confirmation | No |
+| `terraform-init` | | Link `terraform/config.tf.json` to the configuration rendered from the current tree and run `tofu init` | No |
+| `terraform-plan` | `*ARGS` | Run `terraform-init`, then save a plan to `terraform/tfplan` | No |
+| `terraform-apply` | `*ARGS` | Run `terraform-init`, then apply the saved `terraform/tfplan` without asking again | No |
+| `terraform-destroy` | `*ARGS` | Run `terraform-init`, then run `tofu destroy` | No |
 
-**Note:** These recipes remove stale `.terraform.lock.hcl` files to sync with nix-provided providers.
+**Note:** `terraform` and `terraform-init` delete `terraform/.terraform.lock.hcl` first, so `tofu init` records the providers bundled by nix instead of checking them against a lock file written for other provider versions.
 
 ## Clan
 

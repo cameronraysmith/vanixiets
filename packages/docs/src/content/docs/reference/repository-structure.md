@@ -277,7 +277,7 @@ resource.google_compute_instance.galena = {
 };
 ```
 
-**Deployment**: `nix run .#terraform -- apply`
+**Deployment**: `just terraform-plan`, then `just terraform-apply`
 
 ## Key flake outputs
 

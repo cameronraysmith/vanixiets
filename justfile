@@ -913,11 +913,11 @@ terraform:
   rm -f terraform/.terraform.lock.hcl
   {{nix_cmd}} run .#terraform
 
-# Initialize terraform
+# Link terraform/config.tf.json to the configuration rendered from the current tree, then initialize
 [group('terraform')]
 terraform-init:
   rm -f terraform/.terraform.lock.hcl
-  {{nix_cmd}} run .#terraform.terraform -- init -input=false
+  {{nix_cmd}} run .#terraform.init -- -input=false
 
 # Save terraform plan for review (writes terraform/tfplan)
 [group('terraform')]

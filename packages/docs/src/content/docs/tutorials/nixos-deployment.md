@@ -140,10 +140,11 @@ We'll use an existing configuration to understand the flow.
 First, see what infrastructure exists:
 
 ```bash
-nix run .#terraform -- state list
+just terraform-init
+nix run .#terraform.terraform -- state list
 ```
 
-This shows resources terraform currently manages.
+`just terraform-init` links `terraform/config.tf.json` to the configuration rendered from the current tree; the second command lists the resources terraform currently manages.
 If you haven't run terraform before, this may be empty or show only existing resources.
 
 ### Review the configuration
@@ -167,10 +168,10 @@ Key elements:
 Before applying, always plan:
 
 ```bash
-nix run .#terraform -- plan
+just terraform-plan
 ```
 
-Terraform shows what it will create, modify, or destroy.
+Terraform shows what it will create, modify, or destroy, and saves the plan to `terraform/tfplan`.
 Review this carefully, especially for destroy operations.
 
 ### Apply infrastructure
@@ -178,10 +179,10 @@ Review this carefully, especially for destroy operations.
 If the plan looks correct:
 
 ```bash
-nix run .#terraform -- apply
+just terraform-apply
 ```
 
-Terraform prompts for confirmation, then provisions resources.
+Terraform applies the saved plan without asking again, so it changes exactly what you reviewed.
 This takes a few minutes for new VMs.
 
 ### Note the outputs
@@ -189,7 +190,7 @@ This takes a few minutes for new VMs.
 After apply, terraform shows outputs including IP addresses:
 
 ```bash
-nix run .#terraform -- output
+nix run .#terraform.terraform -- output
 ```
 
 You'll need these IPs for the clan deployment step.
@@ -483,8 +484,9 @@ The toggle pattern prevents surprise bills:
 # Disable expensive resources when not needed
 # In gcp.nix, set: scheelite.enabled = false
 
-# Then apply
-nix run .#terraform -- apply
+# Then plan, review, and apply
+just terraform-plan
+just terraform-apply
 
 # Resources are destroyed but configuration preserved
 ```
@@ -493,7 +495,8 @@ To re-enable:
 
 ```bash
 # Set: scheelite.enabled = true
-nix run .#terraform -- apply
+just terraform-plan
+just terraform-apply
 # Resources recreated with same configuration
 
 # Then deploy NixOS config

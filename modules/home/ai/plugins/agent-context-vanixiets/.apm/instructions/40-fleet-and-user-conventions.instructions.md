@@ -5,7 +5,7 @@ description: vanixiets machine and user conventions — provisioning state, admi
 ## Machine configuration
 
 Cloud machines are declared through terranix in `modules/terranix/`, one file per provider.
-Each machine carries an `enabled` boolean: setting it to `false` and running `nix run .#terraform` removes the cloud resources while leaving the machine's full NixOS configuration, clan inventory entry, and disko layout in the repository.
+Each machine carries an `enabled` boolean: setting it to `false` and running `nix run .#terraform`, which runs `tofu apply` on the configuration rendered from the current tree and asks for confirmation, removes the cloud resources while leaving the machine's full NixOS configuration, clan inventory entry, and disko layout in the repository.
 A machine present in `machines/` is therefore not necessarily provisioned, and agents should not assume any machine is reachable or attempt remote operations against one.
 
 Every account on every host has `fastfetch` and `nix-info` (`cli-host-inspection`, imported by the NixOS and nix-darwin `base` aspects and `homeManager.engineering-tools`), so `fastfetch --format json -s <modules>` (for example `-s os:kernel:cpu:memory`) and `nix-info -m` describe a host without root.

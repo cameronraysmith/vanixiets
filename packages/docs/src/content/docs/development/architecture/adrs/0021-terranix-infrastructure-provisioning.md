@@ -79,7 +79,7 @@ Terranix converts Nix module configuration to Terraform JSON:
 }
 ```
 
-Generated via: `nix build .#terraform && cat result/config.tf.json`
+Generated via: `nix build .#terraform.config`, which links `result` to the rendered `config.tf.json`
 
 ### Toggle mechanism
 
@@ -140,7 +140,7 @@ Terranix output defined in flake-parts:
 }
 ```
 
-Build and apply: `nix run .#terraform -- apply`
+Build and apply: `nix run .#terraform`
 
 ### Clan handoff pattern
 
