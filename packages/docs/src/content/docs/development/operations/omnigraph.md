@@ -18,7 +18,7 @@ The internal option `vanixiets.omnigraphRootStore`, declared and set in magnetit
 
 On either value every omnigraph unit runs as the static user `omnigraph`.
 
-magnetite is set to `"r2"`, so today it serves from R2 and nothing below that is marked local applies to it.
+magnetite is set to `"local"`, so it serves from the dataset `zroot/root/omnigraph` on its own disk, with the nightly backup on.
 The option is internal: changing it is a pull request against magnetite's module, not a host setting.
 
 The bootstrap markers sit beside the root, in `clusters/_omnigraph-markers/`, in whichever store the root is.
@@ -47,6 +47,10 @@ The rule is that every file on the dataset belongs to `omnigraph`, whoever write
 The uid of `omnigraph` comes from NixOS's system-user allocation, which is stable on one host and may differ on another, which is why a restore ends with the same `chown`.
 Earlier configurations ran the units as a `DynamicUser`, whose state directory systemd keeps at `/var/lib/private/omnigraph` behind the symlink `/var/lib/omnigraph`; at the first start under `omnigraph` systemd moves that directory to `/var/lib/omnigraph` and removes the symlink.
 A directory moved this way keeps its `nobody` owner on disk, and systemd gives the units an id-mapped mount of it instead of a `chown`; a dataset created owned by root is chowned to `omnigraph`.
+Such a directory is writable as `omnigraph` only inside a unit, through that id-mapped mount (`setup_exec_directory` in systemd's `src/core/exec-invoke.c`).
+The `omnigraph-cluster` wrapper and the lock recovery run `omnigraph` through `runuser`, outside any unit, where the directory belongs to `nobody`, so neither can write the root.
+A local root therefore needs `/var/lib/omnigraph` to be a dataset or a directory owned by `omnigraph`.
+Replace a moved directory with the dataset before switching to local disk: stop `omnigraph-server`, check that `ls -A /var/lib/omnigraph` prints nothing, `sudo rmdir /var/lib/omnigraph`, `sudo zfs create -o mountpoint=/var/lib/omnigraph -o quota=20G zroot/root/omnigraph`, and start the server, whose start hands the dataset to `omnigraph`.
 
 OmniGraph admits one writer at a time.
 A direct writer, an apply included, needs `omnigraph-server` stopped first.
@@ -124,7 +128,7 @@ Optimize on a local root is not provided; on an R2 root the option is unchanged 
 ## The nightly backup
 
 `vanixiets.omnigraphBackup.enable` (`modules/nixos/omnigraph-backup.nix`) backs a local root up off the host every night.
-It is off on magnetite and becomes possible only once magnetite serves locally: the module's assertions refuse an `s3://` root, a job that backs up anything but the snapshot directory, a host whose `notifiedUnits` lack `restic-backups-omnigraph`, `omnigraph-backup-metric` or `zfs-set-root-omnigraph-quota`, and a host whose textfile collector does not keep the backup's series.
+It is on for magnetite's local root; the module's assertions refuse an `s3://` root, a job that backs up anything but the snapshot directory, a host whose `notifiedUnits` lack `restic-backups-omnigraph`, `omnigraph-backup-metric` or `zfs-set-root-omnigraph-quota`, and a host whose textfile collector does not keep the backup's series.
 
 A file-by-file copy of a live root may not open, so the backup is taken from an instant image.
 `restic-backups-omnigraph`, run by its timer every night at 03:30 UTC plus up to 15 minutes, and after a missed night at the next boot:
@@ -275,7 +279,8 @@ Absent means the host gives the probe no `monitor` token (`services.omnigraph.ex
 A graph whose snapshot read failed is missing from the per-graph series while the others stay.
 
 Every name is in `nodeExporterKeep` in `modules/clan/services/otel-collector/schema.nix`, and an assertion in the probe's module, and one in the backup's for its stamp, fails evaluation when one is missing there or the textfile collector is off.
-magnetite serves its graphs from R2 today, whose root was never applied with the `monitor` grants, so its file holds the first three series and `vanixiets_omnigraph_graph_reads_ok 0`, the probe's journal shows `omnigraph-probe: GET /graphs answered HTTP 403`, and the per-graph and dataset panels of the view stay empty.
+magnetite's local root is applied with the `monitor` grants when the bootstrap creates it, so its file holds every series above.
+Its R2 root was never applied with those grants: served from R2, the file holds the first three series and `vanixiets_omnigraph_graph_reads_ok 0`, the probe's journal shows `omnigraph-probe: GET /graphs answered HTTP 403`, and the per-graph and dataset panels of the view stay empty.
 
 ## The monitor actor
 

@@ -124,7 +124,7 @@ in
               switching back to "r2" serves the bucket's root as it was left.
             '';
           };
-          config.vanixiets.omnigraphRootStore = "r2";
+          config.vanixiets.omnigraphRootStore = "local";
         }
       ];
 
@@ -381,6 +381,26 @@ in
               ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/postgresql-dumps";
             };
           };
+
+      # Nightly backups of the local omnigraph root to R2 (openspec change
+      # serve-omnigraph-from-local-disk), on with this host's
+      # omnigraph-backup-r2 and omnigraph-backup-restic vars in the
+      # repository and the dataset zroot/root/omnigraph created by hand.
+      vanixiets.omnigraphBackup.enable = true;
+
+      # The local omnigraph root's dataset (disko.nix), enforced at boot
+      # because disko options apply at dataset creation only; present only
+      # with the root on the local store, as is the dataset.
+      systemd.services.zfs-set-root-omnigraph-quota = lib.mkIf (omnigraphRootStore == "local") {
+        description = "Assert quota=20G on zroot/root/omnigraph";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set quota=20G zroot/root/omnigraph";
+        };
+      };
 
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for

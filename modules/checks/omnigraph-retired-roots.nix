@@ -15,12 +15,13 @@
 # from reaching `dev-graph-v10`. It also pins the two prefixes each retired
 # root's rules delete.
 #
-# It pins uriIn and rootOf for both root stores, and evaluates magnetite
-# with vanixiets.omnigraphRootStore forced to "local" through extendModules,
-# reading only the storage URI, omnigraph-server's environment and the
-# generator names from that evaluation: the root keeps its name on disk, no
-# R2 setting reaches the server, and the omnigraph-r2 generator stays. It
-# reads none of magnetite's assertions, whose evaluation all of them force.
+# It pins uriIn and rootOf for both root stores, and reads magnetite as
+# committed, on its disk, and with vanixiets.omnigraphRootStore forced to
+# "r2" through extendModules, the way back to the bucket, reading only the
+# storage URIs, omnigraph-server's environment and the generator names: the
+# root keeps its name in both stores, no R2 setting reaches the server on
+# disk, and the omnigraph-r2 generator stays. It reads none of magnetite's
+# assertions, whose evaluation all of them force.
 { self, lib, ... }:
 {
   perSystem =
@@ -29,9 +30,9 @@
       roots = self.lib.omnigraphClusterRoots;
       magnetiteSystem = self.nixosConfigurations.magnetite;
       magnetiteRoot = roots.rootOf magnetiteSystem.config.services.omnigraph.storageUri;
-      onDisk =
+      onR2 =
         (magnetiteSystem.extendModules {
-          modules = [ { vanixiets.omnigraphRootStore = lib.mkForce "local"; } ];
+          modules = [ { vanixiets.omnigraphRootStore = lib.mkForce "r2"; } ];
         }).config;
       reports = args: roots.conflicts args != [ ];
     in
@@ -80,12 +81,12 @@
               otherStoreRejected = !(builtins.tryEval (roots.uriIn "hetzner" "cookbooks-f17")).success;
             };
             magnetite = {
-              r2StorageUri = magnetiteSystem.config.services.omnigraph.storageUri;
-              localStorageUri = onDisk.services.omnigraph.storageUri;
+              r2StorageUri = onR2.services.omnigraph.storageUri;
+              localStorageUri = magnetiteSystem.config.services.omnigraph.storageUri;
               localServerSettings = lib.filter (
                 name: lib.hasPrefix "AWS_" name || name == "OMNIGRAPH_CLUSTER_LEASE_SECONDS"
-              ) (lib.attrNames onDisk.systemd.services.omnigraph-server.environment);
-              localKeepsR2Generator = onDisk.clan.core.vars.generators ? omnigraph-r2;
+              ) (lib.attrNames magnetiteSystem.config.systemd.services.omnigraph-server.environment);
+              localKeepsR2Generator = magnetiteSystem.config.clan.core.vars.generators ? omnigraph-r2;
             };
           };
           expected = {

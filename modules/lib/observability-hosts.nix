@@ -64,6 +64,7 @@
           "greptimedb-schema"
           "otel-agent-session"
           "otel-agent-session-envelope"
+          "omnigraph-backup-metric"
           "omnigraph-server"
           "perses"
           "postgresql-dump-globals"
@@ -74,6 +75,7 @@
           "postgresqlBackup-nixbot"
           "postgresqlBackup-omnigent"
           "r2-usage"
+          "restic-backups-omnigraph"
           "restic-backups-postgresql"
           "zfs-assert-root-docker-noautosnap"
           "zfs-assert-root-greptimedb-noautosnap"
@@ -85,6 +87,7 @@
           "zfs-set-root-home-reservation"
           "zfs-set-root-nix-quota"
           "zfs-set-root-nixos-reservation"
+          "zfs-set-root-omnigraph-quota"
           "zfs-set-root-postgresql-dumps-quota"
         ]
         // {

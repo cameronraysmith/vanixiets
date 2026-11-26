@@ -111,6 +111,24 @@
               };
               mountpoint = "/var/backup/postgresql-nightly";
             };
+            # The local omnigraph root and its bootstrap markers, one dataset so
+            # one snapshot holds both (openspec change
+            # serve-omnigraph-from-local-disk). Mounted at the omnigraph units'
+            # state directory itself, quota-bound so the graph data cannot
+            # starve the pool, and left on auto-snapshot for local restore
+            # points; restic-backups-omnigraph copies its own snapshot off host.
+            # Created by hand on the installed host; this declaration covers a
+            # reinstall, and zfs-set-root-omnigraph-quota in default.nix
+            # enforces the quota on every boot. Declared only with the root on
+            # the local store, so the mount never precedes the dataset.
+            "root/omnigraph" = lib.mkIf (config.vanixiets.omnigraphRootStore == "local") {
+              type = "zfs_fs";
+              options = {
+                mountpoint = "/var/lib/omnigraph";
+                quota = "20G";
+              };
+              mountpoint = "/var/lib/omnigraph";
+            };
             # Dedicated dataset for docker graphroot to use the native ZFS
             # storage driver (docker's overlay2 does not layer cleanly on ZFS,
             # and /var/lib/docker must be its own dataset for the zfs driver).
