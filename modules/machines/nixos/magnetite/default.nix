@@ -285,14 +285,19 @@ in
         };
       };
 
+      # A reservation counts the dataset's own use, so it holds room for /
+      # only by its margin over that use, and / uses over 15G. / is the
+      # dataset whose exhaustion stops the host, and the other datasets'
+      # quotas sum to more than the pool, so only a reservation guarantees
+      # it room.
       systemd.services.zfs-set-root-nixos-reservation = {
-        description = "Assert reservation=10G on zroot/root/nixos";
+        description = "Assert reservation=25G on zroot/root/nixos";
         wantedBy = [ "multi-user.target" ];
         after = [ "zfs-import.target" ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=10G zroot/root/nixos";
+          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=25G zroot/root/nixos";
         };
       };
 
@@ -304,6 +309,33 @@ in
           Type = "oneshot";
           RemainAfterExit = true;
           ExecStart = "${pkgs.zfs}/bin/zfs set reservation=4G zroot/root/home";
+        };
+      };
+
+      # The container engines' ZFS storage drivers create a child dataset per
+      # image layer and container under these datasets. The bound is quota,
+      # which counts descendants, not refquota, which would leave the layers
+      # unbounded, so an image or container runaway fills its 20G and not
+      # the pool.
+      systemd.services.zfs-set-root-docker-quota = {
+        description = "Assert quota=20G on zroot/root/docker";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set quota=20G zroot/root/docker";
+        };
+      };
+
+      systemd.services.zfs-set-root-podman-quota = {
+        description = "Assert quota=20G on zroot/root/podman";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "zfs-import.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.zfs}/bin/zfs set quota=20G zroot/root/podman";
         };
       };
 

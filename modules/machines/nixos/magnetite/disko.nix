@@ -45,11 +45,13 @@
               type = "zfs_fs";
               options.mountpoint = "none";
             };
+            # The reservation is a total that counts the dataset's own use; see
+            # zfs-set-root-nixos-reservation in default.nix.
             "root/nixos" = {
               type = "zfs_fs";
               options = {
                 mountpoint = "/";
-                reservation = "10G";
+                reservation = "25G";
               };
               mountpoint = "/";
             };
@@ -70,9 +72,14 @@
               };
               mountpoint = "/nix";
             };
+            # quota, not refquota: it counts the storage driver's per-layer
+            # child datasets; see zfs-set-root-podman-quota in default.nix.
             "root/podman" = {
               type = "zfs_fs";
-              options.mountpoint = "/var/lib/containers";
+              options = {
+                mountpoint = "/var/lib/containers";
+                quota = "20G";
+              };
               mountpoint = "/var/lib/containers";
             };
             "root/cognee" = {
@@ -132,10 +139,15 @@
             # Dedicated dataset for docker graphroot to use the native ZFS
             # storage driver (docker's overlay2 does not layer cleanly on ZFS,
             # and /var/lib/docker must be its own dataset for the zfs driver).
-            # Coexists with zroot/root/podman; disjoint mountpoints.
+            # Coexists with zroot/root/podman; disjoint mountpoints. quota, not
+            # refquota: it counts the driver's per-layer child datasets; see
+            # zfs-set-root-docker-quota in default.nix.
             "root/docker" = {
               type = "zfs_fs";
-              options.mountpoint = "/var/lib/docker";
+              options = {
+                mountpoint = "/var/lib/docker";
+                quota = "20G";
+              };
               mountpoint = "/var/lib/docker";
             };
           };
