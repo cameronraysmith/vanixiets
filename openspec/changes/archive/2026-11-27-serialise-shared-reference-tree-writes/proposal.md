@@ -3,16 +3,19 @@ linear_story_id: CAM-128
 linear_story_identifier: CAM-128
 linear_story_title: "Serialise shared reference tree writes in the spec and split its runtime test"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-128/serialise-shared-reference-tree-writes-in-the-spec-and-split-its
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
-last_synced_state: In Review
-last_synced_at: "2026-11-27T01:25:37Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T04:54:08Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T22:35:53Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-128 created in Todo on team CAM with no project, description seeded from proposal.md; state, project and labels confirmed by read-only view" }
   - { at: "2026-11-26T22:43:20Z", transition: "Todo->In Progress", outcome: "posted", note: "First tasks.md checkbox checked; state confirmed In Progress by read-only view" }
   - { at: "2026-11-27T01:25:37Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md written with PASS WITH WARNINGS after two earlier FAIL runs closed by the writer fixes; state confirmed In Review by read-only view" }
+  - { at: "2026-11-27", transition: "In Review gates", outcome: "posted", note: "Code review accepted on the three verification runs; documentation accepted with one follow-up (verify.md, In Review gates); review_round stays 0" }
+  - { at: "2026-11-27T04:54:08Z", transition: "archive->mirror", outcome: "dropped", note: "no linear_project bound; spec mirror skipped" }
+  - { at: "2026-11-27T04:54:08Z", transition: "In Review->Done", outcome: "posted", note: "Archived after syncing shared-reference-tree-interface; state confirmed Done by read-only view, closing comment posted" }
 ---
 
 ## Why

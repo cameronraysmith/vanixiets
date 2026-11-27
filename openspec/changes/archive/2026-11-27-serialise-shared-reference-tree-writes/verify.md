@@ -195,3 +195,12 @@ The three findings of the earlier runs are closed by `b718b62ec` and `35aae997c`
 **Next step**:
 
 The code-review and docs-review gates of In Review, then sync and archive.
+
+---
+
+## In Review gates (2026-11-27)
+
+- **Code review: accepted.** The three verification runs above (2026-11-26 23:07, 2026-11-27 00:32 and 01:24 UTC) stand as the code review: each read the merged writer, its tests and the modules against the spec, and the findings of the first two are closed by `b718b62ec` and `35aae997c`. No separate review was run.
+- **Documentation: accepted as it is**, with one follow-up: the reference-repository guidance, `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`, says nothing of the writer's waiting note (`ghq-writer: waiting up to 3600 s for <repository>, in use by another request (<holder>)`) or of the writer's log line format; a paragraph on both is to be added when the change `hydrate-reference-copy-history` edits that file (its task 3.1).
+
+`review_round` stays 0: neither gate re-queued the change.
