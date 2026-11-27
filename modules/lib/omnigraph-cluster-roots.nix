@@ -94,6 +94,15 @@ in
     # StateDirectory, the only local path their sandbox lets them write.
     localDirectory = "/var/lib/omnigraph/clusters";
 
+    # Where each serving host's root lives, "local" or "r2": the one setting
+    # that moves a host between its disk and the bucket. The host's
+    # vanixiets.omnigraphRootStore and the units its row in
+    # flake.lib.observabilityHosts notifies both follow it, so switching
+    # changes nothing else.
+    stores = {
+      magnetite = "local";
+    };
+
     # The location of `root` in `store`: "local" for the serving host's
     # disk, "r2" for the bucket.
     uriIn =

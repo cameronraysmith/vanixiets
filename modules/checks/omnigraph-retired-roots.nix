@@ -15,25 +15,82 @@
 # from reaching `dev-graph-v10`. It also pins the two prefixes each retired
 # root's rules delete.
 #
-# It pins uriIn and rootOf for both root stores, and reads magnetite as
-# committed, on its disk, and with vanixiets.omnigraphRootStore forced to
-# "r2" through extendModules, the way back to the bucket, reading only the
-# storage URIs, omnigraph-server's environment and the generator names: the
-# root keeps its name in both stores, no R2 setting reaches the server on
-# disk, and the omnigraph-r2 generator stays. It reads none of magnetite's
-# assertions, whose evaluation all of them force.
+# It pins uriIn and rootOf for both root stores, and reads magnetite on
+# both: as committed, on the store flake.lib.omnigraphClusterRoots.stores
+# names for it, and on the other one, through extendModules with
+# vanixiets.omnigraphRootStore forced to it and the notified units set to
+# magnetite's row of flake.lib.observabilityHostsFor on that store, which
+# is what the otel-collector agent role sets once `stores` names it. On
+# each it reads only the values the way between the stores has failed on:
+# the storage URI, omnigraph-server's R2 environment and environment file,
+# the omnigraph-r2 generator, the backup's option, which local-root units
+# are notified, and for each notified unit whether it is a service with an
+# ExecStart, as the agent role asserts. It reads none of magnetite's
+# assertions, whose evaluation all of them force, so the rest of the
+# assertion set on the other store is not checked here.
 { self, lib, ... }:
 {
   perSystem =
     { pkgs, system, ... }:
     let
       roots = self.lib.omnigraphClusterRoots;
+      backup = self.lib.omnigraphBackup;
       magnetiteSystem = self.nixosConfigurations.magnetite;
       magnetiteRoot = roots.rootOf magnetiteSystem.config.services.omnigraph.storageUri;
-      onR2 =
+      committedStore = roots.stores.magnetite;
+      otherStore = if committedStore == "local" then "r2" else "local";
+      otherUnits =
+        (self.lib.observabilityHostsFor (roots.stores // { magnetite = otherStore; }))
+        .magnetite.notifiedUnits;
+      onOtherStore =
         (magnetiteSystem.extendModules {
-          modules = [ { vanixiets.omnigraphRootStore = lib.mkForce "r2"; } ];
+          modules = [
+            {
+              vanixiets.omnigraphRootStore = lib.mkForce otherStore;
+              services.observability-notify.units = lib.mkForce otherUnits;
+            }
+          ];
         }).config;
+      facts =
+        hostConfig:
+        let
+          server = hostConfig.systemd.services.omnigraph-server;
+          units = hostConfig.services.observability-notify.units;
+        in
+        {
+          storageUri = hostConfig.services.omnigraph.storageUri;
+          serverR2Settings = lib.filter (
+            name: lib.hasPrefix "AWS_" name || name == "OMNIGRAPH_CLUSTER_LEASE_SECONDS"
+          ) (lib.attrNames server.environment);
+          serverReadsR2Credential =
+            lib.elem hostConfig.clan.core.vars.generators.omnigraph-r2.files.env.path
+              (lib.toList (server.serviceConfig.EnvironmentFile or [ ]));
+          keepsR2Generator = hostConfig.clan.core.vars.generators ? omnigraph-r2;
+          backupEnabled = hostConfig.vanixiets.omnigraphBackup.enable;
+          localRootUnitsNotified = lib.filter (unit: lib.elem unit units) backup.localRootUnits;
+          notifiedWithoutExecStart = lib.filter (
+            unit: !(hostConfig.systemd.services.${unit}.serviceConfig or { } ? ExecStart)
+          ) units;
+        };
+      expectedFacts =
+        store:
+        let
+          local = store == "local";
+        in
+        {
+          storageUri = roots.uriIn store "cookbooks-f17";
+          serverR2Settings = lib.optionals (!local) [
+            "AWS_ENDPOINT_URL"
+            "AWS_ENDPOINT_URL_S3"
+            "AWS_REGION"
+            "OMNIGRAPH_CLUSTER_LEASE_SECONDS"
+          ];
+          serverReadsR2Credential = !local;
+          keepsR2Generator = true;
+          backupEnabled = local;
+          localRootUnitsNotified = lib.optionals local backup.localRootUnits;
+          notifiedWithoutExecStart = [ ];
+        };
       reports = args: roots.conflicts args != [ ];
     in
     {
@@ -81,12 +138,12 @@
               otherStoreRejected = !(builtins.tryEval (roots.uriIn "hetzner" "cookbooks-f17")).success;
             };
             magnetite = {
-              r2StorageUri = onR2.services.omnigraph.storageUri;
-              localStorageUri = magnetiteSystem.config.services.omnigraph.storageUri;
-              localServerSettings = lib.filter (
-                name: lib.hasPrefix "AWS_" name || name == "OMNIGRAPH_CLUSTER_LEASE_SECONDS"
-              ) (lib.attrNames magnetiteSystem.config.systemd.services.omnigraph-server.environment);
-              localKeepsR2Generator = magnetiteSystem.config.clan.core.vars.generators ? omnigraph-r2;
+              committedStoreIsTheSetting = magnetiteSystem.config.vanixiets.omnigraphRootStore == committedStore;
+              committedUnitsAreTheRow =
+                magnetiteSystem.config.services.observability-notify.units
+                == self.lib.observabilityHosts.magnetite.notifiedUnits;
+              ${committedStore} = facts magnetiteSystem.config;
+              ${otherStore} = facts onOtherStore;
             };
           };
           expected = {
@@ -112,10 +169,10 @@
               otherStoreRejected = true;
             };
             magnetite = {
-              r2StorageUri = "s3://sciexp/omnigraph/clusters/cookbooks-f17";
-              localStorageUri = "/var/lib/omnigraph/clusters/cookbooks-f17";
-              localServerSettings = [ ];
-              localKeepsR2Generator = true;
+              committedStoreIsTheSetting = true;
+              committedUnitsAreTheRow = true;
+              local = expectedFacts "local";
+              r2 = expectedFacts "r2";
             };
           };
         };

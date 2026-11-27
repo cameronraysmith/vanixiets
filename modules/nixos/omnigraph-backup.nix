@@ -301,6 +301,14 @@ in
       seriesName
       bucket
       ;
+    # The units that exist only beside a local root, the backup job, its
+    # publisher and the dataset's quota oneshot, which a host's row in
+    # flake.lib.observabilityHosts notifies only while its store is "local".
+    localRootUnits = [
+      jobUnit
+      metricUnit
+      quotaUnit
+    ];
   };
 
   flake.modules.nixos.omnigraph-backup = module;

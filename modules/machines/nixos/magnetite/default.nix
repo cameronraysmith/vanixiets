@@ -119,13 +119,16 @@ in
               name either way (flake.lib.omnigraphClusterRoots.uriIn):
               "local" serves it from /var/lib/omnigraph/clusters on this
               host's disk, "r2" from the `sciexp` bucket with the R2
-              endpoint, region, credentials and cluster lease set. The
-              `omnigraph-r2` generator, the retired and rollback roots and
-              their lifecycle rules stay defined under both values, so
-              switching back to "r2" serves the bucket's root as it was left.
+              endpoint, region, credentials and cluster lease set. Its
+              value is flake.lib.omnigraphClusterRoots.stores.magnetite,
+              which magnetite's notified units follow too, so that setting
+              is the one to change. The `omnigraph-r2` generator, the
+              retired and rollback roots and their lifecycle rules stay
+              defined under both values, so switching back to "r2" serves
+              the bucket's root as it was left.
             '';
           };
-          config.vanixiets.omnigraphRootStore = "local";
+          config.vanixiets.omnigraphRootStore = omnigraphRoots.stores.magnetite;
         }
       ];
 
@@ -411,10 +414,11 @@ in
           };
 
       # Nightly backups of the local omnigraph root to R2 (openspec change
-      # serve-omnigraph-from-local-disk), on with this host's
+      # serve-omnigraph-from-local-disk), with this host's
       # omnigraph-backup-r2 and omnigraph-backup-restic vars in the
-      # repository and the dataset zroot/root/omnigraph created by hand.
-      vanixiets.omnigraphBackup.enable = true;
+      # repository and the dataset zroot/root/omnigraph created by hand; a
+      # root in the bucket has no snapshot to back up.
+      vanixiets.omnigraphBackup.enable = omnigraphRootStore == "local";
 
       # The local omnigraph root's dataset (disko.nix), enforced at boot
       # because disko options apply at dataset creation only; present only

@@ -9,17 +9,18 @@ magnetite serves ten example graphs, one per cookbook of the pinned `omnigraph-c
 ## Where the graphs are served from
 
 The graph data of one cluster lives under one root, named `cookbooks-f17` on magnetite.
-The internal option `vanixiets.omnigraphRootStore`, declared and set in magnetite's module `modules/machines/nixos/magnetite/default.nix`, says where that root lives; `flake.lib.omnigraphClusterRoots.uriIn` turns the option and the root name into `services.omnigraph.storageUri`:
+The internal option `vanixiets.omnigraphRootStore`, declared in magnetite's module `modules/machines/nixos/magnetite/default.nix`, says where that root lives, and takes its value from `flake.lib.omnigraphClusterRoots.stores.magnetite` in `modules/lib/omnigraph-cluster-roots.nix`; `flake.lib.omnigraphClusterRoots.uriIn` turns the option and the root name into `services.omnigraph.storageUri`:
 
 | Value | Root | What it selects |
 |---|---|---|
 | `"r2"` | `s3://sciexp/omnigraph/clusters/cookbooks-f17` | the R2 endpoint, `region = "auto"`, the credentials of the clan vars generator `omnigraph-r2`, and `OMNIGRAPH_CLUSTER_LEASE_SECONDS = "120"` |
-| `"local"` | `/var/lib/omnigraph/clusters/cookbooks-f17` | the ZFS dataset `zroot/root/omnigraph`, mounted at `/var/lib/omnigraph`; every unit requires that mount; the `omnigraph-cluster` wrapper runs `omnigraph` as `omnigraph`; the server's start recovers a stale lock; the nightly backup can be turned on; the probe publishes the dataset's series |
+| `"local"` | `/var/lib/omnigraph/clusters/cookbooks-f17` | the ZFS dataset `zroot/root/omnigraph`, mounted at `/var/lib/omnigraph`; every unit requires that mount; the `omnigraph-cluster` wrapper runs `omnigraph` as `omnigraph`; the server's start recovers a stale lock; the nightly backup, which `vanixiets.omnigraphBackup.enable` turns on with the store; the dataset's quota oneshot; the failure notices of `restic-backups-omnigraph`, `omnigraph-backup-metric` and `zfs-set-root-omnigraph-quota`, which magnetite's row in `flake.lib.observabilityHosts` lists only on this value; the probe publishes the dataset's series |
 
 On either value every omnigraph unit runs as the static user `omnigraph`.
 
 magnetite is set to `"local"`, so it serves from the dataset `zroot/root/omnigraph` on its own disk, with the nightly backup on.
-The option is internal: changing it is a pull request against magnetite's module, not a host setting.
+`stores.magnetite` is the one setting: the option, the backup, the quota oneshot and the notified units all follow it.
+It is not a host setting: changing it is a pull request against `modules/lib/omnigraph-cluster-roots.nix`.
 
 The bootstrap markers sit beside the root, in `clusters/_omnigraph-markers/`, in whichever store the root is.
 A new local root starts empty: `omnigraph-cluster-bootstrap` finds no marker, creates the root, applies the cluster configuration, and the `omnigraph-seed-<graph>` units load each cookbook's seed once the server serves.
@@ -247,7 +248,7 @@ Stop the server and remove `$S` when done.
 
 ## Switching back to R2
 
-Setting `vanixiets.omnigraphRootStore = "r2"` serves `s3://sciexp/omnigraph/clusters/cookbooks-f17` as the bucket held it when magnetite left it.
+Setting `flake.lib.omnigraphClusterRoots.stores.magnetite = "r2"` serves `s3://sciexp/omnigraph/clusters/cookbooks-f17` as the bucket held it when magnetite left it.
 Its markers are still in the bucket, so the bootstrap adopts the root rather than recreating it.
 
 What carries over: nothing written while serving locally.
@@ -256,7 +257,10 @@ The R2 settings, the `omnigraph-r2` generator and the retired and rollback roots
 On R2, the dataset series and `vanixiets_omnigraph_lock_recoveries_total` are no longer written, and the per-graph series depend on whether the bucket's root was applied with the `monitor` grants.
 
 The units run as `omnigraph` on both stores, so switching changes no unit's user and no state directory, and the dataset may stay mounted at `/var/lib/omnigraph`, holding the local root for a later return; `vmTests.x86_64-linux.omnigraph-state-directory-transitions`, with RustFS standing in for R2, shows every unit starting and serving from the bucket with the dataset mounted.
-Deploy the configuration with `vanixiets.omnigraphRootStore = "r2"` and `vanixiets.omnigraphBackup.enable = false`, which the backup module requires of an R2 root.
+Change that one value and deploy magnetite; nothing else needs editing.
+The backup turns off with the store, so the nightly job, its timer and `omnigraph-backup-metric` are no longer defined, and neither is the quota oneshot; magnetite's row stops listing those three units, so no failure notice names them, and `OmnigraphBackupStale` no longer expects magnetite.
+The backup repository in `sciexp-omnigraph-backup` and the `omnigraph-backup-r2` and `omnigraph-backup-restic` vars stay as they are, for a later return to the disk.
+`checks.x86_64-linux.omnigraph-retired-roots` evaluates magnetite on both stores and holds what the switch changes: the root's location, the R2 environment and credential of the server, the backup's option, which of those three units are notified, and that every notified unit is a service with an `ExecStart`.
 
 Rolling magnetite back to a generation from before the static user is different.
 Such a generation runs the units as a `DynamicUser`, and systemd then moves a plain `/var/lib/omnigraph` into `/var/lib/private`; a mountpoint cannot be moved, so with the dataset mounted there every omnigraph unit fails to start with `Failed to set up special execution directory in /var/lib: Device or resource busy` (status 238/STATE_DIRECTORY).

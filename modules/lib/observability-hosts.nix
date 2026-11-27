@@ -42,10 +42,22 @@
 # darwin, which the class's own type does not ensure (it also admits
 # android). checks.x86_64-linux.otel-collector-config runs it over this table
 # and one mutant per rule; the readers read the table without it.
+# flake.lib.observabilityHostsFor builds the table for given omnigraph root
+# stores (flake.lib.omnigraphClusterRoots.stores), and
+# flake.lib.observabilityHosts is it for the committed ones: a row notifies
+# the units that exist only beside a local root
+# (flake.lib.omnigraphBackup.localRootUnits) only while its host's store is
+# "local", so switching a store changes the row with the host.
 { config, lib, ... }:
 {
-  flake.lib.observabilityHosts =
+  flake.lib.observabilityHostsFor =
+    omnigraphStores:
     let
+      onlyWithLocalRoot =
+        store:
+        lib.filter (
+          unit: store == "local" || !lib.elem unit config.flake.lib.omnigraphBackup.localRootUnits
+        );
       agent = extra: {
         collect = true;
         platform = "nixos";
@@ -64,44 +76,46 @@
     in
     lib.mapAttrs (name: row: row // { platform = config.flake.fleet.hosts.${name}.class; }) {
       magnetite =
-        agent [
-          "cache-completeness"
-          "devloop-pg-grants"
-          "devloop-reconcile"
-          "fleet-alert"
-          "greptimedb"
-          "greptimedb-envelope"
-          "greptimedb-schema"
-          "otel-agent-session"
-          "otel-agent-session-envelope"
-          "omnigraph-backup-metric"
-          "omnigraph-server"
-          "perses"
-          "postgresql-dump-globals"
-          "postgresqlBackup-gitea"
-          "postgresqlBackup-gitea-mq"
-          "postgresqlBackup-matrix-synapse"
-          "postgresqlBackup-niks3"
-          "postgresqlBackup-nixbot"
-          "postgresqlBackup-omnigent"
-          "r2-usage"
-          "restic-backups-omnigraph"
-          "restic-backups-postgresql"
-          "zfs-assert-root-docker-noautosnap"
-          "zfs-assert-root-greptimedb-noautosnap"
-          "zfs-assert-root-nix-noautosnap"
-          "zfs-assert-root-podman-noautosnap"
-          "zfs-assert-root-postgresql-dumps-noautosnap"
-          "zfs-set-root-docker-quota"
-          "zfs-set-root-greptimedb-quota"
-          "zfs-set-root-greptimedb-reservation"
-          "zfs-set-root-home-noreservation"
-          "zfs-set-root-nix-quota"
-          "zfs-set-root-nixos-reservation"
-          "zfs-set-root-omnigraph-quota"
-          "zfs-set-root-podman-quota"
-          "zfs-set-root-postgresql-dumps-quota"
-        ]
+        agent (
+          onlyWithLocalRoot omnigraphStores.magnetite [
+            "cache-completeness"
+            "devloop-pg-grants"
+            "devloop-reconcile"
+            "fleet-alert"
+            "greptimedb"
+            "greptimedb-envelope"
+            "greptimedb-schema"
+            "otel-agent-session"
+            "otel-agent-session-envelope"
+            "omnigraph-backup-metric"
+            "omnigraph-server"
+            "perses"
+            "postgresql-dump-globals"
+            "postgresqlBackup-gitea"
+            "postgresqlBackup-gitea-mq"
+            "postgresqlBackup-matrix-synapse"
+            "postgresqlBackup-niks3"
+            "postgresqlBackup-nixbot"
+            "postgresqlBackup-omnigent"
+            "r2-usage"
+            "restic-backups-omnigraph"
+            "restic-backups-postgresql"
+            "zfs-assert-root-docker-noautosnap"
+            "zfs-assert-root-greptimedb-noautosnap"
+            "zfs-assert-root-nix-noautosnap"
+            "zfs-assert-root-podman-noautosnap"
+            "zfs-assert-root-postgresql-dumps-noautosnap"
+            "zfs-set-root-docker-quota"
+            "zfs-set-root-greptimedb-quota"
+            "zfs-set-root-greptimedb-reservation"
+            "zfs-set-root-home-noreservation"
+            "zfs-set-root-nix-quota"
+            "zfs-set-root-nixos-reservation"
+            "zfs-set-root-omnigraph-quota"
+            "zfs-set-root-podman-quota"
+            "zfs-set-root-postgresql-dumps-quota"
+          ]
+        )
         // {
           alwaysOn = true;
           agentTelemetry = true;
@@ -163,6 +177,8 @@
         notifiedUnits = [ "otel-envelope" ];
       };
     };
+
+  flake.lib.observabilityHosts = config.flake.lib.observabilityHostsFor config.flake.lib.omnigraphClusterRoots.stores;
 
   flake.lib.observabilityHostProblems =
     let
