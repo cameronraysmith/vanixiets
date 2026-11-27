@@ -2,7 +2,7 @@
 
 <!--
 Stratum: interface.
-Trust boundary: this property guarantees only that, when the flake is evaluated, runtime-test nodes are evaluated against the same nixpkgs instance the fleet's hosts and homes use. An equal derivation does not show that a runtime test behaves the same at run time. Nothing here constrains which packages that instance permits; the fleet's allowance is its own policy.
+Trust boundary: this property guarantees only that, when the flake is evaluated, the runtime tests that set a package set for their nodes evaluate those nodes against the same nixpkgs instance the fleet's hosts and homes use. It does not cover the runtime tests that set none: the five built with `pkgs.testers.runNixOSTest` (`caddy-root-from-vars`, `tuwunel`, the two `zerotier` tests and `postgresql-backup-restore`) take the per-system `pkgs` of `modules/nixpkgs/per-system.nix`, and the two `tincr` tests take the test framework's own. An equal derivation does not show that a runtime test behaves the same at run time. Nothing here constrains which packages that instance permits; the fleet's allowance is its own policy.
 -->
 
 ### Requirement: Runtime tests evaluate against the fleet package set

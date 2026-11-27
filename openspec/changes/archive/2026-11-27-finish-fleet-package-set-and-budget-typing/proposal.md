@@ -3,17 +3,18 @@ linear_story_id: CAM-137
 linear_story_identifier: CAM-137
 linear_story_title: "Finish the fleet package set and the envelope budget typing"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-137/finish-the-fleet-package-set-and-the-envelope-budget-typing
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: In Review
-last_synced_at: "2026-11-27T09:29:20Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T09:36:55Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-27T08:16:12Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-137 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
   - { at: "2026-11-27T09:00:28Z", transition: "Todo->In Progress", outcome: "posted", note: "first checked tasks.md box (1.1); workspace confirmed by whoami; state confirmed In Progress by read-only view" }
   - { at: "2026-11-27T09:29:20Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md written (pass with warnings); workspace confirmed by whoami; state confirmed In Review by read-only view; comment posted; description re-synced down-only for the reworded envelope-budget deliverable" }
+  - { at: "2026-11-27T09:36:55Z", transition: "In Review->Done", outcome: "posted", note: "after openspec archive; workspace confirmed by whoami; project documents OpenSpec: fleet-package-set-interface (8ff9cb04) and OpenSpec: fleet-ingress-interface (e530cb24) updated from the synced main specs by stored id; state confirmed Done by read-only view; comment posted" }
 ---
 
 ## Why
