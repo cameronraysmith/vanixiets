@@ -1,0 +1,12 @@
+# Declared drvPath differences of seam-secrets-away-from-clan-vars, delivery step 1 (the seam, no consumer), from
+# the step's parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/01-seam.txt
+# Checks that embed the whole flake source are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt). Every other dumped attribute, every
+# NixOS, darwin and home toplevel and every vmTests attribute included, must
+# keep its drvPath (design D10, D12). Each may-change entry is resolved to
+# changed or removed before the step merges.
+
+checks.x86_64-linux.secrets-seam-confinement  added  # design D9: the confinement check, its literal list the full list at the parent
+checks.x86_64-linux.secrets-seam-translation  added  # design D11: the translation judge
+checks.x86_64-linux.fleet-alert  changed  # its fleet-alert-size-rule-clause input renders every testSizes.checks entry; this step adds two

@@ -1,0 +1,59 @@
+# Declared drvPath differences of declare-host-user-relations-once, from its
+# parent (main after register-fleet-obligations) to its tip:
+#   just drv-diff <parent> <tip> openspec/changes/declare-host-user-relations-once/drv-delta.txt
+# Checks that embed the whole flake source are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt), which every run applies, and are not
+# repeated here. Every NixOS, darwin and home configuration, and every other
+# dumped check and vmTests attribute, must keep its drvPath (design D12).
+# Each may-change entry is resolved to changed, with its cause, or removed
+# before archive.
+
+checks.x86_64-linux.omnigent-worker-scope  added  # the worker aspect's mutant check (design D7, task 6.4)
+checks.x86_64-linux.fleet-alert  changed  # its size-rule clause renders every testSizes.checks entry; omnigent-worker-scope adds one
+checks.x86_64-linux.eval-users-lib  changed  # modules/home/users/lib.test.nix imports ${./lib.nix} by store path, and lib.nix:103 now reads flake.lib.accountOf (design D10)
+
+# Their source files are edited (the fixtures drop the check-local poisoned
+# flake and take the worker aspect's value; the runtime tests drop
+# extraSpecialArgs.flake), while every value they read should stay the same
+# (design D5, D6).
+checks.x86_64-linux.omnigent-worker-capabilities  may-change
+checks.x86_64-linux.omnigent-worker-linux  may-change
+checks.aarch64-darwin.omnigent-worker-capabilities  may-change
+checks.aarch64-darwin.omnigent-worker-darwin  may-change
+vmTests.x86_64-linux.omnigent-worker-isolation  may-change
+vmTests.aarch64-linux.omnigent-worker-isolation  may-change
+vmTests.x86_64-linux.shared-reference-tree  may-change
+vmTests.x86_64-linux.shared-reference-tree-migration  may-change
+
+# Task 8.2 edits guides under packages/docs, which are source of the docs
+# package; every check that builds or consumes that package changes with it.
+# apps-build changes only through its deploy-docs input, which embeds the
+# package. The list is re-read at the parent revision before the run (task 9.1).
+checks.x86_64-linux.agent-skills-index  changed
+checks.x86_64-linux.apps-build  changed
+checks.x86_64-linux.deploy-docs-rehearsal  changed
+checks.x86_64-linux.package-vanixiets-docs  changed
+checks.x86_64-linux.package-vanixiets-docs-payload  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-report  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-linkcheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-typecheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-unit  changed
+checks.aarch64-darwin.apps-build  changed
+checks.aarch64-darwin.package-vanixiets-docs  changed
+checks.aarch64-darwin.package-vanixiets-docs-payload  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-report  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-linkcheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-typecheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-unit  changed

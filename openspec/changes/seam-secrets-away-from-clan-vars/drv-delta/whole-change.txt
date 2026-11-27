@@ -1,0 +1,13 @@
+# Declared drvPath differences of the whole of seam-secrets-away-from-clan-vars,
+# from delivery step 1's parent to step 13's merge (task 15.1):
+#   just drv-diff <step 1 parent> <step 13 merge> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/whole-change.txt
+# The union of the thirteen step files after each may-change was resolved; the
+# confinement check is added once over the whole range, so its per-step
+# changed entries fold into the added entry. No NixOS, darwin or home toplevel
+# and no vmTests attribute may differ.
+
+checks.x86_64-linux.secrets-seam-confinement  added  # design D9
+checks.x86_64-linux.secrets-seam-translation  added  # design D11
+checks.x86_64-linux.fleet-alert  changed  # two testSizes.checks entries added in step 1
+# Resolved changed entries of steps 4, 8, 9, 11, 12 and, if documents under
+# packages/docs/ changed, step 13 are copied here before task 15.1 runs.

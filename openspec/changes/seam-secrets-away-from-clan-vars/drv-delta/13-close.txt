@@ -1,0 +1,13 @@
+# Declared drvPath differences of seam-secrets-away-from-clan-vars, delivery step 13 (whole-tree obligations, the final confinement list, documents), from
+# the step's parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/13-close.txt
+# Checks that embed the whole flake source are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt). Every other dumped attribute, every
+# NixOS, darwin and home toplevel and every vmTests attribute included, must
+# keep its drvPath (design D10, D12). Each may-change entry is resolved to
+# changed or removed before the step merges.
+
+checks.x86_64-linux.secrets-seam-confinement  changed  # the step clears its files from the literal list and from the search result (design D9)
+# If task 14.5 edits any file under packages/docs/, add here as changed: the twelve
+# package-vanixiets-docs* checks and apps-build on both systems, and agent-skills-index
+# and deploy-docs-rehearsal on x86_64-linux (type-the-fleet-host-registry/drv-delta.txt:20-47).
