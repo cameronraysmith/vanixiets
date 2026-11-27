@@ -1,0 +1,19 @@
+# Declared drvPath differences of deleting modules/darwin/caches.nix, the
+# second writer of lib/caches.nix's substituters and trusted-public-keys into
+# flake.modules.darwin.base, from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-darwin-caches.txt
+# Each Mac's nix.conf lists the ten caches and keys once instead of twice;
+# nix-diff of each toplevel shows only the nix.conf derivation and the etc
+# derivation embedding it differing. The six NixOS toplevels, the twenty homes
+# and every other checks.aarch64-darwin entry evaluated identical; so did
+# checks.x86_64-linux agent-telemetry-emitters, darwin-mesh-resolver-flags,
+# deploy-record-order, fleet-alert, nix-builders-wiring and
+# otel-collector-darwin, which read darwin configurations by value.
+darwin.argentum changed  # modules/darwin/caches.nix deleted: nix.conf substituters and trusted-public-keys lines list each cache once
+darwin.blackphos changed  # modules/darwin/caches.nix deleted: nix.conf substituters and trusted-public-keys lines list each cache once
+darwin.rosegold changed  # modules/darwin/caches.nix deleted: nix.conf substituters and trusted-public-keys lines list each cache once
+darwin.stibnite changed  # modules/darwin/caches.nix deleted: nix.conf substituters and trusted-public-keys lines list each cache once
+checks.aarch64-darwin.darwin-argentum changed  # modules/checks/machines.nix embeds darwin.argentum's toplevel
+checks.aarch64-darwin.darwin-blackphos changed  # modules/checks/machines.nix embeds darwin.blackphos's toplevel
+checks.aarch64-darwin.darwin-rosegold changed  # modules/checks/machines.nix embeds darwin.rosegold's toplevel
+checks.aarch64-darwin.darwin-stibnite changed  # modules/checks/machines.nix embeds darwin.stibnite's toplevel

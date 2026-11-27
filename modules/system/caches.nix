@@ -1,10 +1,10 @@
 let
-  # Shared cache configuration (DRY with flake.nix and darwin/caches.nix)
+  # Shared cache configuration (kept in sync with flake.nix's nixConfig)
   cacheConfig = import ../../lib/caches.nix;
 in
 {
-  # Shared nix caches and substituters configuration
-  # Auto-merges into base namespace for both darwin and nixos
+  # The one writer of the fleet's binary caches into nix.settings for both
+  # classes; a second definition would list each cache twice in nix.conf.
   flake.modules.darwin.base = {
     nix.settings.substituters = cacheConfig.substituters;
     nix.settings.trusted-public-keys = cacheConfig.publicKeys;
