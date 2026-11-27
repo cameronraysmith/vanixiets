@@ -28,8 +28,16 @@ request ends with a reply and an exit line like any other failure. Git's
 automatic maintenance runs in the foreground with the gc strategy, so it is part
 of the command, under the repository's lock.
 
+An update or a deepen of a blobless clone then fetches, still under the lock,
+every missing blob that the diff of each commit it brought in reads, as `git show`
+shows a commit, unless more than historyLimit are missing. One status line says
+what it did; its failure leaves the request's exit status as the update or
+deepen set it, and the exit log line adds history=hydrated:<n>,
+history=not-hydrated or history=failed.
+
 Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group",
-"allowedProtocols", "lockDir" and optionally "lockTimeout" and "commandTimeout".
+"allowedProtocols", "lockDir" and optionally "lockTimeout", "commandTimeout"
+and "historyLimit".
 """
 
 import datetime
@@ -40,6 +48,7 @@ import json
 import os
 import pwd
 import re
+import selectors
 import signal
 import socket
 import struct
@@ -67,6 +76,16 @@ INTERNAL = 70
 # Seconds a timed-out command has after SIGTERM, for git to remove a partial
 # clone, before SIGKILL.
 STOP_GRACE = 10
+# The most missing blobs an update's or deepen's history fetch takes, unless
+# CONFIG's historyLimit says otherwise; past it nothing is fetched.
+HISTORY_LIMIT = 100_000
+# The most blob ids checked against a clone at once while its history is listed.
+CHECK_BATCH = 10_000
+# The listings whose raw lines name the blobs lazygit's Patch pane reads:
+# `git show --stat -p` diffs a commit against its first parent and shows a
+# merge's combined diff. Without rename detection no blob is read to list them.
+HISTORY_LISTINGS = (["--diff-merges=first-parent"], ["--merges", "--cc"])
+GITLINK = b"160000"
 
 MAX_REQUEST = 4096
 READ_TIMEOUT = 30
@@ -355,20 +374,63 @@ def stop(child):
     child.wait()
 
 
-def run(argv, env, stdin=None):
-    """Run a command in a process group of its own, its output captured, stopping it past command_timeout."""
+def run(argv, env, stdin=None, lines=None):
+    """Run a command in a process group of its own, stopping it past command_timeout.
+
+    Its output is captured, unless `lines` is given: then each line of standard
+    output goes to `lines` as it arrives, and the command is stopped as soon as
+    `lines` returns False.
+    """
     with subprocess.Popen(argv, env=env, stdin=subprocess.DEVNULL if stdin is None else subprocess.PIPE,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, process_group=0) as child:
         try:
-            out, err = child.communicate(stdin, timeout=command_timeout)
+            if lines is None:
+                out, err = child.communicate(stdin, timeout=command_timeout)
+            else:
+                out, err = b"", stream(child, lines)
         except subprocess.TimeoutExpired:
             stop(child)
             raise TimedOut(f"timed out after {command_timeout} s running {label(argv)}") from None
     return subprocess.CompletedProcess(argv, child.returncode, out, err)
 
 
-def git(path, env, *args, stdin=None):
-    return run(["git", "-C", path, *args], env, stdin)
+def stream(child, lines):
+    """Pass each line of child's standard output to lines until it returns False, then stop child; its standard error."""
+    deadline = time.monotonic() + command_timeout
+    pending, err = b"", b""
+    with selectors.DefaultSelector() as selector:
+        selector.register(child.stdout, selectors.EVENT_READ)
+        selector.register(child.stderr, selectors.EVENT_READ)
+        try:
+            while selector.get_map():
+                remaining = deadline - time.monotonic()
+                ready = selector.select(remaining) if remaining > 0 else []
+                if not ready:
+                    raise subprocess.TimeoutExpired(child.args, command_timeout)
+                for key, _ in ready:
+                    chunk = os.read(key.fd, 65536)
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                    elif key.fileobj is child.stderr:
+                        err += chunk
+                    else:
+                        *complete, pending = (pending + chunk).split(b"\n")
+                        if not all(map(lines, complete)):
+                            stop(child)
+                            return err
+        except subprocess.TimeoutExpired:
+            raise
+        except BaseException:
+            stop(child)
+            raise
+    if pending:
+        lines(pending)
+    child.wait()
+    return err
+
+
+def git(path, env, *args, stdin=None, lines=None):
+    return run(["git", "-C", path, *args], env, stdin, lines)
 
 
 def shallow_tags(path, env):
@@ -480,22 +542,156 @@ def follow_default_branch(path, env):
     return results
 
 
+class History(subprocess.CompletedProcess):
+    """A history fetch's status line, with exit status zero, and its outcome for the exit log line."""
+
+    def __init__(self, outcome, line, err=b""):
+        super().__init__([], 0, line.encode(), err)
+        self.outcome = outcome
+
+
+class HistoryFailed(Exception):
+    def __init__(self, reason, err=b""):
+        super().__init__(reason)
+        self.err = err
+
+
+def blobless(path, env):
+    return git(path, env, "config", "--type=bool", "--get", "remote.origin.promisor").stdout.strip() == b"true"
+
+
+def head(path, env):
+    found = git(path, {**env, "GIT_NO_LAZY_FETCH": "1"}, "rev-parse", "-q", "--verify", "HEAD^{commit}")
+    return found.stdout.strip().decode() if found.returncode == 0 else None
+
+
+def boundaries(path):
+    """The commits a shallow clone's history stops at."""
+    try:
+        with open(os.path.join(path, ".git", "shallow")) as handle:
+            return set(handle.read().split())
+    except FileNotFoundError:
+        return set()
+
+
+def absent(path, env, ids):
+    """Those of ids the clone lacks; env must disable lazy fetching."""
+    checked = git(path, env, "cat-file", "--batch-check=%(objectname)", stdin=b"".join(oid + b"\n" for oid in ids))
+    if checked.returncode:
+        raise HistoryFailed(f"{label(checked.args)} exited {checked.returncode}", checked.stderr)
+    return [line.split()[0] for line in checked.stdout.splitlines() if line.endswith(b" missing")]
+
+
+def missing_blobs(path, env, revisions, limit):
+    """The blobs the clone lacks that the diffs of revisions' commits read, or None once more than limit are counted.
+
+    env must disable lazy fetching. Gitlinks and null ids name no blob.
+    """
+    seen, batch, missing = set(), [], []
+
+    def check():
+        missing.extend(absent(path, env, batch))
+        batch.clear()
+        return len(missing) <= limit
+
+    def take(line):
+        meta = line.partition(b"\t")[0]
+        parents = len(meta) - len(meta.lstrip(b":"))
+        fields = meta[parents:].split()
+        for mode, oid in zip(fields[:parents + 1], fields[parents + 1:2 * parents + 2]):
+            if mode != GITLINK and oid.strip(b"0") and oid not in seen:
+                seen.add(oid)
+                batch.append(oid)
+        # No batch is larger than could take the count past the limit, so the walk
+        # stops as soon as it does; none is smaller than a sixteenth of the ids
+        # seen, so a long walk near the limit still checks in few batches.
+        if len(batch) >= min(CHECK_BATCH, max(limit - len(missing) + 1, len(seen) // 16)):
+            return check()
+        return True
+
+    for listing in HISTORY_LISTINGS:
+        listed = git(path, env, "log", *listing, "--raw", "--no-abbrev", "--no-renames", "--format=", *revisions, "--",
+                     lines=take)
+        if len(missing) > limit:
+            return None
+        if listed.returncode:
+            raise HistoryFailed(f"{label(listed.args)} exited {listed.returncode}", listed.stderr)
+    return missing if check() else None
+
+
+def fetch_blobs(path, env, missing):
+    """Fetch missing blobs by id as ghq-sync --hydrate does, a pass at a time while the set shrinks; how many arrived.
+
+    An empty --stdin fetch would fetch the remote's default refspec, so none runs.
+    """
+    fetched = 0
+    while missing:
+        got = git(path, env, "-c", "fetch.negotiationAlgorithm=noop", "fetch", "--no-tags", "--no-write-fetch-head",
+                  "--recurse-submodules=no", "--filter=blob:none", "--stdin", "origin",
+                  stdin=b"".join(oid + b"\n" for oid in missing))
+        if got.returncode:
+            raise HistoryFailed(f"{label(got.args)} exited {got.returncode}", got.stderr)
+        still = absent(path, {**env, "GIT_NO_LAZY_FETCH": "1"}, missing)
+        fetched += len(missing) - len(still)
+        if len(still) == len(missing):
+            raise HistoryFailed(f"{len(still)} blobs still missing after a fetch")
+        missing = still
+    return fetched
+
+
+def hydrate_history(path, env, config, revisions):
+    """Make the commits revisions name readable as diffs, up to the history limit; its status line, never a failure."""
+    limit = config.get("historyLimit", HISTORY_LIMIT)
+    try:
+        missing = missing_blobs(path, {**env, "GIT_NO_LAZY_FETCH": "1"}, revisions, limit)
+        if missing is None:
+            return History("not-hydrated", f"history not hydrated: {path} (more than {limit} blobs missing;"
+                                           " ghq-sync --hydrate REV makes a revision readable)\n")
+        fetched = fetch_blobs(path, env, missing)
+    except (HistoryFailed, TimedOut) as failure:
+        return History("failed", f"history hydrate failed: {path} ({failure})\n", getattr(failure, "err", b""))
+    return History(f"hydrated:{fetched}", f"hydrated history: {path} ({fetched} objects fetched)\n")
+
+
 def run_get(request, argv, config, env):
-    """ghq get, with the default-branch and tag fetches the request and clone shape call for."""
+    """ghq get, with the default-branch and tag fetches the request and clone shape call for.
+
+    An update of a blobless clone then makes the commits it brought in readable as diffs.
+    """
     results = []
     path = repo_dir(request["target"], config["root"])
-    if path and request.get("update") is True:
+    update = path and request.get("update") is True
+    old = head(path, env) if update and blobless(path, env) else None
+    if update:
         results.extend(follow_default_branch(path, env))
     full = path and git(path, env, "rev-parse", "--is-shallow-repository").stdout.strip() == b"false"
-    if path and full and request.get("update") is True:
+    if update and full:
         results.append(git(path, env, "fetch", "--tags", "origin"))
     results.append(run(argv, env))
+    new = old and head(path, env)
+    if new and new != old:
+        results.append(hydrate_history(path, env, config, [new, f"^{old}"]))
     if request.get("tags") is True:
         path = repo_dir(request["target"], config["root"])
         if path and git(path, env, "rev-parse", "--is-shallow-repository").stdout.strip() == b"true":
             results.extend(shallow_tags(path, env))
         elif path and not (full and request.get("update") is True):
             results.append(git(path, env, "fetch", "--tags", "origin"))
+    return results
+
+
+def run_deepen(argv, path, config, env):
+    """ghq-sync --deepen, then, for a blobless clone, its history fetch.
+
+    The commits it brought in run from each boundary it removed down to, and
+    excluding, the boundaries now present.
+    """
+    lazy = blobless(path, env)
+    before = boundaries(path)
+    results = [run(argv, env)]
+    after = boundaries(path)
+    if lazy and before - after:
+        results.append(hydrate_history(path, env, config, sorted(before - after) + [f"^{c}" for c in sorted(after)]))
     return results
 
 
@@ -513,6 +709,7 @@ class Session:
         self.verb = self.repo = "-"
         self.target = self.reason = None
         self.gone = self.notes = False
+        self.history = None
 
     def log(self, event):
         try:
@@ -597,12 +794,15 @@ def serve(session, config):
         env = environment(config)
         if request["action"] == "get":
             results = run_get(request, argv, config, env)
+        elif request["action"] == "deepen":
+            results = run_deepen(argv, os.path.join(os.path.realpath(config["root"]), repo), config, env)
         else:
             results = [run(argv, env)]
     except TimedOut as timeout:
         return session.fail(TIMED_OUT, str(timeout), f"ghq-writer: {timeout}\n")
     finally:
         os.close(held)
+    session.history = next((r.outcome for r in results if isinstance(r, History)), None)
     failed = next((r for r in results if r.returncode), None)
     if failed:
         session.reason = f"{label(failed.args)} exited {failed.returncode}"
@@ -632,8 +832,9 @@ def main():
         status = INTERNAL
     session.send(reply)
     session.conn.close()
+    history = f" history={session.history}" if session.history else ""
     reason = f" reason: {session.reason}" if session.reason else ""
-    session.log(f"exit status={reply['exit']} duration={time.monotonic() - session.started:.3f}s{reason}")
+    session.log(f"exit status={reply['exit']} duration={time.monotonic() - session.started:.3f}s{history}{reason}")
     sys.exit(status)
 
 

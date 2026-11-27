@@ -52,7 +52,7 @@ Delivery to the hosts is by deploy; a copy changes only at its next update or de
 
 ### D4: The bound counts missing blobs, 100,000, and stops early
 
-- **Choice**: the writer counts missing blobs from the D1 listing as it streams and stops reading, terminating the `git log` it reads from, once the count exceeds `historyLimit`: 100,000 unless the handler's configuration names another value. Above it nothing is fetched and the reply carries `history not hydrated: <path> (more than <limit> blobs missing; ghq-sync --hydrate REV makes a revision readable)`.
+- **Choice**: the writer counts missing blobs from the D1 listing as it streams and stops reading, terminating the `git log` it reads from, once the count exceeds `historyLimit`: 100,000 unless the handler's configuration names another value (decided 2026-11-27). It checks the listed ids with `git cat-file --batch-check` in batches of the smaller of 10,000 ids and the larger of one more than the count still allowed and a sixteenth of the ids listed so far, so the walk stops at the first batch that passes the limit, and a long walk close to it still checks in few batches. Above it nothing is fetched and the reply carries `history not hydrated: <path> (more than <limit> blobs missing; ghq-sync --hydrate REV makes a revision readable)`.
 - **Rationale**: bytes cannot be known before fetching, and the commit count is a loose proxy (nixpkgs, about two days: 1,354 commits, 337 blobs; one week: 6,795 commits, 77,424 blobs, almost all from one merge's first-parent diff). The missing-blob count is known from local trees before any blob moves and is what the fetch's time and size follow. 100,000 covers every window measured: a month of nixpkgs `master` (89,180 blobs, 178 MB of pack, 28 s of fetch), a month of jj (951), perses (211) and nix (565), and the first update of a depth-1 copy of nix, which brought in 25,024 commits (61,705 blobs). The request then holds its lock for well under a minute more, against the 3600 s a queued request waits. Stopping the stream keeps the walk cheap when an update brought in a very long history (D9).
 - **Alternatives considered**: a commit count (known earlier, loosely tied to cost); a byte bound (unknowable before fetching); no bound (a long-unrefreshed nixpkgs copy could hold its lock for minutes and add gigabytes).
 - **Boundary**: first-party handler configuration; the NixOS and darwin modules pass no `historyLimit`, so the default applies; the handler tests set a small one.
@@ -61,7 +61,7 @@ Delivery to the hosts is by deploy; a copy changes only at its next update or de
 
 - **Choice**: the work appends one status line with exit status zero: `hydrated history: <path> (<n> objects fetched)`, `history not hydrated: …` or `history hydrate failed: <path> (<reason>)`. Objects already fetched stay. The request's exit status remains the first non-zero status of the update or deepen itself.
 - **Rationale**: the copy is valid either way: a missing blob is a promised object, which a reader's `ghq-sync --hydrate` fetches later. Failing the update would make `ghq-sync -u` report a fault the reader cannot act on.
-- **Alternatives considered**: recording an unhydrated range for a later request to retry (open question 3).
+- **Alternatives considered**: recording an unhydrated range for a later request to retry: not adopted on 2026-11-27, `ghq-sync --hydrate` serves unhydrated history.
 
 ### D6: Readers' git refuses every transport beneath the shared root
 
@@ -82,17 +82,29 @@ Delivery to the hosts is by deploy; a copy changes only at its next update or de
 
 - **Choice**: the skill's reference-repository paragraph, `ghq-sync --hydrate`'s usage text and the interface spec say that commits an update or deepen brought in are readable up to the bound, that `git show <rev>` otherwise needs `<rev>` and each parent hydrated (`ghq-sync --hydrate <rev>` and `--hydrate <rev>^<n>`), that `git diff A B` needs `A` and `B`, and what the refusal looks like.
 - **Rationale**: the approved outline; `--hydrate` stays a one-revision tree fetch.
-- **Alternatives considered**: making `--hydrate <rev>` also fetch the D1 set for `<rev>` alone, so one request readies `git show <rev>` (open question 2).
+- **Alternatives considered**: making `--hydrate <rev>` also fetch the D1 set for `<rev>` alone, so one request readies `git show <rev>`: left to a later change on 2026-11-27.
 
 ### D9: The first update of a depth-1 copy of a repository with merges
 
 - **Choice**: unchanged in what it fetches; its range is walked like any other, so it is hydrated when its missing blobs are within the bound and reported otherwise.
-- **Rationale**: measured on 2026-11-26: a depth-1 blobless clone of `NixOS/nix` at `master` of 2026-11-19, updated a week later (21 first-parent commits), received 25,024 commits, because each merge's second parent leads past the single shallow boundary; that range needs 61,705 missing blobs, within the bound. A depth-1 copy of nixpkgs updated one day later was still transferring after 11 minutes and 430 MB when stopped, and the tree's own nixpkgs copy, cloned shallow, holds 1,131,078 commits; such a range exceeds the bound, and the early stop keeps its walk cheap. Every later update brings in a true window. Changing how updates fetch changes which history a copy holds, which is outside this change (open question 5).
+- **Rationale**: measured on 2026-11-26: a depth-1 blobless clone of `NixOS/nix` at `master` of 2026-11-19, updated a week later (21 first-parent commits), received 25,024 commits, because each merge's second parent leads past the single shallow boundary; that range needs 61,705 missing blobs, within the bound. A depth-1 copy of nixpkgs updated one day later was still transferring after 11 minutes and 430 MB when stopped, and the tree's own nixpkgs copy, cloned shallow, holds 1,131,078 commits; such a range exceeds the bound, and the early stop keeps its walk cheap. Every later update brings in a true window. Changing how updates fetch changes which history a copy holds, which is outside this change and left to a later one (decided 2026-11-27).
+
+### D10: The exit log line carries the history fetch's outcome
+
+- **Choice**: when a request ran a history walk, its exit log line adds `history=hydrated:<n>`, `history=not-hydrated` or `history=failed` after the duration and before a failure's ` reason:`; a request that ran none adds nothing.
+- **Rationale**: the replies go to the readers; the writer's journal then shows which updates left history unreadable. The token names neither the target nor a command's arguments, as the requirement defining the line asks (`The writer logs each request without its target`, archived with `serialise-shared-reference-tree-writes`).
+- **Alternatives considered**: the failure's reason on the line as well: the reply carries it, and the reason of a failed request already follows ` reason:`.
+
+### D11: The history fetch and automatic maintenance
+
+- **Choice**: the history fetch runs after `ghq get -u` or `ghq-sync --deepen` has returned, so after the automatic maintenance that git runs at the end of the update's own fetch. The history fetch is a `git fetch` too, so git runs automatic maintenance again after it, in the foreground with the gc strategy (the handler's `MAINTENANCE_POLICY`), under the same lock. The order within a request is: update, its maintenance, history fetch, maintenance.
+- **Rationale**: each history fetch adds one promisor pack. The gc strategy consolidates promisor packs once more than `gc.autoPackLimit` (default 50) are present, and repacks promisor objects into a promisor pack, keeping them; the blobs are reachable from the copy's history in any case. Shown by the handler test case "An update of a blobless clone makes every commit it brought in readable as a diff with lazy fetching disabled" with `gc.autoPackLimit` 1 and `gc.pruneExpire` now set on the clone: after the request the clone holds one pack, so the maintenance after the history fetch consolidated that fetch's pack, and every commit the update brought in still reads with lazy fetching disabled.
+- **Alternatives considered**: `--no-auto-maintenance` on the history fetch, leaving consolidation to a later request's fetch: the pack would wait for that request, with nothing gained.
 
 ## Risks / Trade-offs
 
 - [Risk] The hydrate lengthens a request that holds the repository's lock, so a queued request waits longer. → Mitigation: the bound keeps the added fetch under about 30 s on every window measured; the lock wait is 3600 s.
-- [Trade-off] Disk grows by each update's fetched blobs: about 178 MB of pack for a month of nixpkgs in one update, and at most a few MB a month for the other repositories measured; nothing prunes it, as nothing prunes the history updates already add. Each fetch adds a pack, and the tree's nixpkgs copy already holds 1,688 packs. → Accepted; repacking copies is a separate change (open question 6).
+- [Trade-off] Disk grows by each update's fetched blobs: about 178 MB of pack for a month of nixpkgs in one update, and at most a few MB a month for the other repositories measured; nothing prunes it, as nothing prunes the history updates already add. Each history fetch adds a promisor pack, which the maintenance after it consolidates with the others once more than `gc.autoPackLimit` are present (D11). → Accepted.
 - [Trade-off] Readers' `git ls-remote origin` and `git remote show origin` inside a copy are refused. → Accepted; `git ls-remote <url>` from elsewhere and `ghq-sync --audit` serve.
 - [Risk] A lazygit release changes its per-repository configuration lookup or its show command. → Mitigation: task 4.1's inspection at each deploy that bumps lazygit; D6 keeps any failure immediate and clear.
 - [Risk] The runtime test's write probe `git fetch` becomes vacuous, refused before any write. → Mitigation: task 2.3 also runs it with `-c protocol.allow=always`, which must meet the permission error.
@@ -103,14 +115,19 @@ Deploy order: magnetite, pyrite, stibnite, each by its usual deploy; a host's co
 `<root>/.lazygit.yml` appears at activation; on a host not yet migrated, `ghq-shared-migrate` moves it aside around the rename (D7).
 Rollback: revert the commits and deploy; fetched blobs stay as valid objects, and the include goes with the configuration; the tmpfiles rule's removal leaves `.lazygit.yml`, which an administrator removes as the writer.
 
+## Decisions of 2026-11-27
+
+The plan's open questions were settled on 2026-11-27.
+
+1. The bound is 100,000 missing blobs per update or deepen, `historyLimit`, as D4 proposed.
+2. The read-side refusal is `protocol.allow = never` under the shared root's existing `gitdir:` includes, as D6 proposed, accepting that a reader's `git ls-remote origin` and `git remote show origin` inside a copy are refused.
+3. `ghq-sync --hydrate <rev>` fetching the parent side of `<rev>`'s diff is left to a later change; the skill keeps the per-parent step (D8).
+4. Unhydrated history gets no retry record; `ghq-sync --hydrate` serves it (D5).
+5. The rewording of the scenario "A participating account bypasses the wrapper" of `Acquisition is delegated to the writer through a socket-activated entry point`, after this change refused by git before the operating system, as `git -c protocol.allow=always fetch`, together with splitting that requirement below the validator's limit for a modified requirement, is left to a later spec-only change.
+6. The first update of a depth-1 copy of a repository with merges, which brings in most of its history (D9), is left to a later change.
+7. The hydrate's outcome is on the writer's exit log line (D10), delivered with the commit that adds the history fetch.
+8. Pack accumulation is no longer open: the writer runs git's automatic maintenance in the foreground with the gc strategy, which consolidates promisor packs within the request; D11 places the history fetch before the maintenance that consolidates its pack.
+
 ## Open Questions
 
-Each with the recommended answer.
-
-1. The reader-side refusal uses `protocol.allow = never` under the existing `gitdir:` includes (D6), not the environment variable set by wrappers or a `git` wrapper that the outline named. Recommended: accept; it is the narrowest mechanism that covers both lazygit and an agent's plain `git -C`, needs no wrapper, and was shown to fail at once with git's missing-object message.
-2. Should `ghq-sync --hydrate <rev>` also fetch the D1 set for `<rev>`, so one request readies `git show <rev>`? Recommended: yes, in a follow-up change once this one lands; the skill then drops the per-parent step.
-3. History left unhydrated (copies from before this change, skipped or failed ranges) has no record a later request could retry. Recommended: leave it to `ghq-sync --hydrate`; revisit with a marker ref per copy only if readers report it.
-4. The scenario "A participating account bypasses the wrapper" of `Acquisition is delegated to the writer through a socket-activated entry point` says the operating system refuses a reader's `git fetch` with a permission error; after this change git refuses it first, and the requirement's 737 characters exceed the validator's limit for a modified requirement. Recommended: a spec-only change after this one archives that splits that requirement below the limit and rewords the scenario as `git -c protocol.allow=always fetch`.
-5. Updates of shallow copies of repositories with merges bring in most of their history at the first update (D9). Recommended: a separate change bounding the update's fetch (for example `--shallow-since` of OLD's committer date), weighed against which history readers expect a copy to hold.
-6. Copies accumulate packs (1,688 in the nixpkgs copy) and nothing repacks them; this change adds one pack per hydrating update. Recommended: a separate change for periodic repacking by the writer, after finding why `gc --auto` has not consolidated them.
-7. The hydrate's outcome appears only in the reply, not in the writer's log line. Recommended: add it to the exit log line once the requirement that defines that line is in the main spec.
+None.

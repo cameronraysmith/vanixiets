@@ -52,6 +52,24 @@ When the walk or the fetch that makes an update's or a deepen's commits readable
 
 Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A history fetch that fails leaves the update's exit status and says so".
 
+### Requirement: The writer's exit log line names what the history fetch did
+
+When an update or a deepen runs the walk that makes its commits readable, the writer SHALL add to the request's exit log line, after the duration and before any failure's reason, `history=hydrated:<N>`, `history=not-hydrated` or `history=failed`, naming neither the target nor a command's arguments; a request that runs no walk SHALL add none.
+
+#### Scenario: Requests that run a history walk end
+
+- **WHEN** a `get` with an update of a blobless clone is hydrated, exceeds the history limit, or meets a refused history fetch
+- **THEN** its exit log line holds `history=hydrated:<N>`, `history=not-hydrated` or `history=failed` respectively, and the refused fetch adds no ` reason:`
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, cases "An update of a blobless clone makes every commit it brought in readable as a diff with lazy fetching disabled", "An update bringing in more missing blobs than the limit fetches none and says so" and "A history fetch that fails leaves the update's exit status and says so".
+
+#### Scenario: A request runs no history walk
+
+- **WHEN** a `get` with an update names a full clone, or brings in no commit
+- **THEN** its exit log line holds no `history=` token
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "An update of a full clone, or one that brings in nothing, walks no history".
+
 ### Requirement: A first acquisition fetches nothing more than before
 
 A lazy `get` of a repository absent from the shared root SHALL fetch at depth 1 with the `blob:none` filter and SHALL fetch no blob beyond those its checkout needs; the writer SHALL run no history walk for it.

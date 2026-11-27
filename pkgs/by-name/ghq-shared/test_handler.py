@@ -51,13 +51,15 @@ locks = os.path.join(work, "locks")
 os.makedirs(locks)
 
 
-def config(group=own_group, protocols=("https",), lock_timeout=None, command_timeout=None):
-    path = os.path.join(work, f"config-{group}-{'-'.join(protocols)}-{lock_timeout}-{command_timeout}.json")
+def config(group=own_group, protocols=("https",), lock_timeout=None, command_timeout=None, history_limit=None):
+    path = os.path.join(work, f"config-{group}-{'-'.join(protocols)}-{lock_timeout}-{command_timeout}-{history_limit}.json")
     settings = {"root": root, "group": group, "allowedProtocols": list(protocols), "lockDir": locks}
     if lock_timeout is not None:
         settings["lockTimeout"] = lock_timeout
     if command_timeout is not None:
         settings["commandTimeout"] = command_timeout
+    if history_limit is not None:
+        settings["historyLimit"] = history_limit
     with open(path, "w") as handle:
         json.dump(settings, handle)
     return path
@@ -854,6 +856,240 @@ if not os.path.exists(s_pids) or running or reply["exit"] != 124:
                     f"{os.path.exists(s_pids)}, still running: {running}, {reply}")
 for pid in running:
     os.kill(pid, signal.SIGKILL)
+
+
+def change(work_tree, message, **files):
+    for name, text in files.items():
+        put(os.path.join(work_tree, name), text)
+    git("add", "-A", cwd=work_tree)
+    git("commit", "-q", "-m", message, cwd=work_tree)
+
+
+def lazy_clone_of(name):
+    """A new upstream and a depth-1 blobless clone of it under the root."""
+    work_tree, bare = upstream(name)
+    clone_dir = os.path.join(root, "github.com", "o", name)
+    git("clone", "-q", "--depth", "1", "--filter=blob:none", "--no-tags", f"file://{bare}", clone_dir)
+    return work_tree, bare, clone_dir
+
+
+def offline(clone_dir, *args):
+    return subprocess.run(["git", *args], cwd=clone_dir, capture_output=True, text=True,
+                          env=dict(os.environ, GIT_NO_LAZY_FETCH="1", GIT_CONFIG_NOSYSTEM="1",
+                                   GIT_CONFIG_GLOBAL="/dev/null"))
+
+
+def unreadable(clone_dir, commits):
+    """The commits whose diff, as lazygit's Patch pane shows it, needs a blob the clone lacks."""
+    return [c for c in commits if offline(clone_dir, "--no-lazy-fetch", "show", "--find-renames=50%", "--submodule",
+                                          "--stat", "--decorate", "-p", c).returncode]
+
+
+def brought_in(clone_dir, old):
+    return offline(clone_dir, "rev-list", f"{old}..HEAD").stdout.split()
+
+
+def history_token(reply):
+    found = re.search(r" exit status=\d+ duration=\d+\.\d{3}s history=(\S+)", reply["log"])
+    return found and found.group(1)
+
+
+def history_lines(reply):
+    return [line for line in reply["stdout"].splitlines()
+            if line.startswith(("hydrated history:", "history not hydrated:", "history hydrate failed:"))]
+
+
+file_cfg = config(protocols=("file",))
+
+# An update of a blobless clone makes every commit it brought in readable as a
+# diff with lazy fetching disabled: a merge whose first-parent diff (h, added on
+# the side branch) and combined diff (g, resolved differently from both parents)
+# both need blobs, then a renamed default branch. gc.autoPackLimit 1 makes the
+# maintenance after each fetch consolidate every pack, the range hydrate's
+# included, so its blobs must survive a gc that prunes at once.
+h_tree, h_bare, h_clone = lazy_clone_of("history")
+git("fetch", "-q", "--deepen", "2", cwd=h_clone)
+for key, value in (("gc.autoPackLimit", "1"), ("gc.pruneExpire", "now")):
+    git("config", key, value, cwd=h_clone)
+with open(os.path.join(h_clone, ".git", "shallow")) as handle:
+    h_boundary = handle.read()
+change(h_tree, "four", f="four\n")
+git("checkout", "-q", "-b", "side", cwd=h_tree)
+change(h_tree, "side", g="side\n", h="from side\n")
+git("checkout", "-q", "master", cwd=h_tree)
+change(h_tree, "master", g="master\n")
+subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "side"], cwd=h_tree,
+               capture_output=True, env=dict(os.environ, GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null"))
+change(h_tree, "merge side", g="resolved\n")
+change(h_tree, "six", f="six\n")
+git("push", "-q", "up", "master", cwd=h_tree)
+old = git("rev-parse", "HEAD", cwd=h_clone)
+reply = ask({"action": "get", "target": "github.com/o/history", "update": True, "lazy": True}, file_cfg)
+commits = brought_in(h_clone, old)
+merges = offline(h_clone, "rev-list", "--merges", f"{old}..HEAD").stdout.split()
+if reply["exit"] != 0 or len(commits) != 5 or len(merges) != 1:
+    failures.append(f"history fixture: the update must bring in 5 commits with one merge: {commits} {merges} {reply}")
+if unreadable(h_clone, commits) or f"hydrated history: {os.path.realpath(h_clone)} (" not in reply["stdout"]:
+    failures.append(f"an update must make every commit it brought in readable as a diff: "
+                    f"unreadable {unreadable(h_clone, commits)}, {reply}")
+with open(os.path.join(h_clone, ".git", "shallow")) as handle:
+    if handle.read() != h_boundary:
+        failures.append("an update's history hydrate must keep the clone's shallow boundaries")
+if git("config", "--get", "remote.origin.partialclonefilter", cwd=h_clone) != "blob:none":
+    failures.append("an update's history hydrate must keep the clone's filter")
+if not (history_token(reply) or "").startswith("hydrated:"):
+    failures.append(f"the exit log line must carry history=hydrated:<n>: {reply['log']!r}")
+if len(packs(h_clone)) > 1:
+    failures.append(f"the maintenance after the history fetch must consolidate its pack: {packs(h_clone)}")
+git("branch", "-q", "-m", "master", "main", cwd=h_bare)
+git("symbolic-ref", "HEAD", "refs/heads/main", cwd=h_bare)
+git("branch", "-q", "-m", "master", "main", cwd=h_tree)
+change(h_tree, "seven", f="seven\n")
+change(h_tree, "eight", f="eight\n")
+git("push", "-q", "up", "main", cwd=h_tree)
+old = git("rev-parse", "HEAD", cwd=h_clone)
+reply = ask({"action": "get", "target": "github.com/o/history", "update": True, "lazy": True}, file_cfg)
+commits = brought_in(h_clone, old)
+if (reply["exit"] != 0 or "default branch: master -> main" not in reply["stdout"] or len(commits) != 2
+        or unreadable(h_clone, commits) or "hydrated history:" not in reply["stdout"]):
+    failures.append(f"an update following a renamed default branch must make its new commits readable: "
+                    f"{commits} unreadable {unreadable(h_clone, commits)}, {reply}")
+
+# An update of a full clone, or one that brings in nothing, walks no history.
+n_tree, n_bare = upstream("history-full")
+n_clone = os.path.join(root, "github.com", "o", "history-full")
+git("clone", "-q", "--no-tags", f"file://{n_bare}", n_clone)
+change(n_tree, "more", f="more\n")
+git("push", "-q", "up", "master", cwd=n_tree)
+for case, target in (("a full clone", "github.com/o/history-full"), ("an update bringing in nothing", "github.com/o/history")):
+    reply = ask({"action": "get", "target": target, "update": True, "lazy": True}, file_cfg)
+    if reply["exit"] != 0 or history_lines(reply) or history_token(reply):
+        failures.append(f"{case} must walk no history: {reply}")
+
+# An update bringing in more missing blobs than the limit fetches none and says
+# so, and its walk stops once the count passes the limit: no merge listing runs,
+# and fewer ids are checked than the first-parent listing names (seven).
+l_tree, _, l_clone = lazy_clone_of("history-limit")
+for i in range(6):
+    change(l_tree, f"limit{i}", f=f"limit{i}\n")
+git("push", "-q", "up", "master", cwd=l_tree)
+calls = os.path.join(work, "history-limit-calls.jsonl")
+recording = ("import json, os\n"
+             "real_run = handler.run\n"
+             "def run(argv, env, *rest, **options):\n"
+             "    stdin = options.get('stdin', rest[0] if rest else None) or b''\n"
+             f"    with open({calls!r}, 'a') as handle:\n"
+             "        handle.write(json.dumps({'argv': [os.fsdecode(a) for a in argv], 'stdin': stdin.decode()}) + '\\n')\n"
+             "    return real_run(argv, env, *rest, **options)\n"
+             "handler.run = run\n")
+old = git("rev-parse", "HEAD", cwd=l_clone)
+reply = finish(*start({"action": "get", "target": "github.com/o/history-limit", "update": True, "lazy": True},
+                      config(protocols=("file",), history_limit=2), recording))
+with open(calls) as handle:
+    recorded = [json.loads(line) for line in handle]
+checked = sum(len(call["stdin"].split()) for call in recorded if "--batch-check" in " ".join(call["argv"]))
+expected = (f"history not hydrated: {os.path.realpath(l_clone)} (more than 2 blobs missing;"
+            " ghq-sync --hydrate REV makes a revision readable)\n")
+if (reply["exit"] != 0 or expected not in reply["stdout"] or history_token(reply) != "not-hydrated"
+        or git("rev-parse", "HEAD", cwd=l_clone) != git("rev-parse", "master", cwd=l_tree)):
+    failures.append(f"an update past the history limit must succeed and say it hydrated nothing: {reply}")
+if len(unreadable(l_clone, brought_in(l_clone, old))) < 3:
+    failures.append("an update past the history limit must fetch no blob for its range")
+if any("--merges" in call["argv"] or "--stdin" in call["argv"] for call in recorded) or not 0 < checked < 7:
+    failures.append(f"the walk must stop once the count passes the limit: {checked} ids checked, {recorded}")
+
+# A history fetch that fails leaves the update's exit status and says so: the
+# remote's upload-pack refuses any request that wants a blob of the range's
+# older commits, which only the history fetch asks for.
+d_tree, _, d_clone = lazy_clone_of("history-refused")
+for i in range(3):
+    change(d_tree, f"refused{i}", f=f"refused{i}\n")
+git("push", "-q", "up", "master", cwd=d_tree)
+refused_ids = os.path.join(work, "refused-ids")
+put(refused_ids, "\n".join(git("rev-parse", f"master~{n}:f", cwd=d_tree) for n in (1, 2)) + "\n")
+refusing = os.path.join(work, "refusing-upload-pack")
+put(refusing, f"#!{sys.executable}\n" + """import os, subprocess, sys
+refused = open(REFUSED).read().split()
+child = subprocess.Popen(["git", "upload-pack", *sys.argv[1:]], stdin=subprocess.PIPE)
+seen = b""
+while chunk := os.read(0, 65536):
+    seen += chunk
+    if any(oid.encode() in seen for oid in refused):
+        child.kill()
+        sys.exit(1)
+    child.stdin.write(chunk)
+    child.stdin.flush()
+child.stdin.close()
+sys.exit(child.wait())
+""".replace("REFUSED", repr(refused_ids)))
+os.chmod(refusing, 0o755)
+git("config", "remote.origin.uploadpack", refusing, cwd=d_clone)
+old = git("rev-parse", "HEAD", cwd=d_clone)
+reply = ask({"action": "get", "target": "github.com/o/history-refused", "update": True, "lazy": True}, file_cfg)
+if (reply["exit"] != 0 or f"history hydrate failed: {os.path.realpath(d_clone)} (git fetch exited " not in reply["stdout"]
+        or history_token(reply) != "failed" or " reason: " in reply["log"]
+        or git("rev-parse", "HEAD", cwd=d_clone) != git("rev-parse", "master", cwd=d_tree)):
+    failures.append(f"a failed history fetch must leave the update's exit status and say so: {reply}")
+if not unreadable(d_clone, brought_in(d_clone, old)):
+    failures.append("history fixture: the refused blobs arrived, so the failure case is vacuous")
+
+# A deepen makes every commit it brought in, but the new deepest, readable as a diff.
+e_tree, e_bare = upstream("history-deepen")
+for i in range(3):
+    change(e_tree, f"deepen{i}", f=f"deepen{i}\n")
+git("push", "-q", "up", "master", cwd=e_tree)
+e_clone = os.path.join(root, "github.com", "o", "history-deepen")
+git("clone", "-q", "--depth", "1", "--filter=blob:none", "--no-tags", f"file://{e_bare}", e_clone)
+old_boundary = git("rev-parse", "HEAD", cwd=e_clone)
+reply = ask({"action": "deepen", "depth": 2, "path": e_clone}, file_cfg)
+deepened = offline(e_clone, "rev-list", "HEAD").stdout.split()
+if (reply["exit"] != 0 or len(deepened) != 3 or deepened[0] != old_boundary
+        or f"hydrated history: {os.path.realpath(e_clone)} (" not in reply["stdout"]):
+    failures.append(f"a deepen must make the commits it brought in readable: {deepened} {reply}")
+if unreadable(e_clone, deepened[:2]):
+    failures.append(f"a deepen must make every commit it brought in but the new deepest readable: "
+                    f"unreadable {unreadable(e_clone, deepened[:2])}")
+if git("config", "--get", "remote.origin.partialclonefilter", cwd=e_clone) != "blob:none":
+    failures.append("a deepen's history hydrate must keep the clone's filter")
+
+# A first lazy acquisition fetches no blob beyond its tip's tree: the clone
+# holds one commit and only the blobs of that commit's tree, and the reply holds
+# no history line.
+a_tree, a_bare = upstream("first")
+change(a_tree, "g", g="first g\n")
+git("push", "-q", "up", "master", cwd=a_tree)
+first_cfg = config(protocols=("https", "file"))
+first_rewrite = f"url.file://{a_bare.removesuffix('.git')}.insteadOf=https://github.com/o/first"
+reply = finish(*start({"action": "get", "target": "https://github.com/o/first.git", "lazy": True}, first_cfg,
+                      f"handler.LFS_POLICY = handler.LFS_POLICY + [{first_rewrite!r}]"))
+a_clone = os.path.join(root, "github.com", "o", "first")
+held = offline(a_clone, "cat-file", "--batch-all-objects", "--batch-check=%(objectname) %(objecttype)").stdout.split("\n")
+held_blobs = {line.split()[0] for line in held if line.endswith(" blob")}
+tip_blobs = {line.split()[2] for line in offline(a_clone, "ls-tree", "-r", "HEAD").stdout.splitlines()}
+listed = offline(a_clone, "rev-list", "--objects", "--missing=print", "HEAD").stdout.splitlines()
+if (reply["exit"] != 0 or history_lines(reply) or offline(a_clone, "rev-list", "--count", "HEAD").stdout.strip() != "1"
+        or any(line.startswith("?") for line in listed) or not held_blobs or held_blobs != tip_blobs):
+    failures.append(f"a first lazy acquisition must fetch nothing beyond its tip's tree: "
+                    f"blobs {held_blobs} tip {tip_blobs} listed {listed} {reply}")
+
+# Hydrating a commit and then each of its parents makes its diff readable, and
+# the commit alone does not: with historyLimit 0 the update hydrates no range.
+g_tree, _, g_clone = lazy_clone_of("history-parents")
+for i in range(3):
+    change(g_tree, f"parents{i}", f=f"parents{i}\n")
+git("push", "-q", "up", "master", cwd=g_tree)
+reply = ask({"action": "get", "target": "github.com/o/history-parents", "update": True, "lazy": True},
+            config(protocols=("file",), history_limit=0))
+commit_x = git("rev-parse", "HEAD~1", cwd=g_clone)
+parent_x = git("rev-parse", "HEAD~2", cwd=g_clone)
+if "history not hydrated:" not in reply["stdout"] or not unreadable(g_clone, [commit_x]):
+    failures.append(f"historyLimit 0 must leave the range unhydrated, so the case is not vacuous: {reply}")
+ask({"action": "hydrate", "rev": commit_x, "path": g_clone}, file_cfg)
+if not unreadable(g_clone, [commit_x]):
+    failures.append("hydrating a commit alone must not make its diff readable while a parent's blob is missing")
+ask({"action": "hydrate", "rev": parent_x, "path": g_clone}, file_cfg)
+if unreadable(g_clone, [commit_x]):
+    failures.append("hydrating a commit and its parent must make its diff readable")
 
 if failures:
     sys.exit("\n".join(failures))

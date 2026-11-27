@@ -204,21 +204,27 @@
               assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
 
           with subtest("hydrate makes a revision's blobs present for readers"):
+              # A tag on a branch never merged, fetched at depth 1 by --tags: no update or
+              # deepen brings in its history, so its blob stays absent until hydrated.
               machine.succeed(
                   "git init -q --bare -b main /srv/git/fixture/blobs.git"
                   " && git -C /srv/git/fixture/blobs.git config uploadpack.allowFilter true"
                   " && git init -q -b main /tmp/blobs"
                   " && for i in 1 2 3; do echo v$i > /tmp/blobs/f && git -C /tmp/blobs add f"
                   " && git -C /tmp/blobs -c user.name=t -c user.email=t@t commit -q -m v$i; done"
-                  " && git -C /tmp/blobs push -q /srv/git/fixture/blobs.git main"
+                  " && git -C /tmp/blobs checkout -q -b unmerged HEAD~2 && echo unmerged > /tmp/blobs/f"
+                  " && git -C /tmp/blobs -c user.name=t -c user.email=t@t commit -q -am unmerged"
+                  " && git -C /tmp/blobs tag t-unmerged"
+                  " && git -C /tmp/blobs push -q /srv/git/fixture/blobs.git main t-unmerged"
                   " && chown -R git:git /srv/git"
               )
               B = f"{R}/localhost/fixture/blobs"
-              machine.succeed(as_user("cameron", f"ghq-sync git://localhost/fixture/blobs && ghq-sync --deepen 2 {B}"))
-              machine.fail(as_user("omnigent-cameron", f"GIT_NO_LAZY_FETCH=1 git -C {B} show HEAD~2:f"))
-              out = machine.succeed(as_user("omnigent-cameron", f"ghq-sync --hydrate HEAD~2 {B}"))
+              machine.succeed(as_user("cameron", "ghq-sync git://localhost/fixture/blobs && ghq-sync -u --tags git://localhost/fixture/blobs"))
+              machine.succeed(as_user("omnigent-cameron", f"GIT_NO_LAZY_FETCH=1 git -C {B} rev-parse -q --verify 't-unmerged^{{commit}}'"))
+              machine.fail(as_user("omnigent-cameron", f"GIT_NO_LAZY_FETCH=1 git -C {B} show t-unmerged:f"))
+              out = machine.succeed(as_user("omnigent-cameron", f"ghq-sync --hydrate t-unmerged {B}"))
               assert out.startswith(f"hydrated: {B} "), out
-              assert machine.succeed(as_user("omnigent-cameron", f"GIT_NO_LAZY_FETCH=1 git -C {B} show HEAD~2:f")).strip() == "v1"
+              assert machine.succeed(as_user("omnigent-cameron", f"GIT_NO_LAZY_FETCH=1 git -C {B} show t-unmerged:f")).strip() == "unmerged"
               out = machine.fail(as_user("omnigent-cameron", f"{client} hydrate HEAD..main {B} 2>&1"))
               assert "refused" in out, out
               assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
