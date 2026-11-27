@@ -144,4 +144,14 @@ projects:
     id: "06049a4f18a4"
     name: "Den-ready fleet architecture"
     teams: ["CAM"]
-    archive_documents: {}
+    archive_documents:
+      "host-configuration-independence":
+        id: "5b5e07bb-e093-4c40-8c38-a73cf7033b14"
+      "host-configuration-independence-interface":
+        id: "7883ca19-041f-4b75-8169-d1255e515b89"
+      "refactor-identity-oracle":
+        id: "8a18c207-3c66-4e84-b5a2-e806a419925a"
+      "refactor-identity-oracle-interface":
+        id: "55363500-f3fb-4abf-90eb-c06f80c4e400"
+      "world-assumptions":
+        id: "69e977af-c46d-48c4-9208-138bbd795ab1"

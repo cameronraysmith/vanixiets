@@ -3,17 +3,20 @@ linear_story_id: CAM-133
 linear_story_identifier: CAM-133
 linear_story_title: "Build each fleet host without evaluating the other hosts"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-133/build-each-fleet-host-without-evaluating-the-other-hosts
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: In Review
-last_synced_at: "2026-11-27T04:00:29Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T05:44:13Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:02:05Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-133 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
   - { at: "2026-11-27T03:23:07Z", transition: "Todo->In Progress", outcome: "posted", note: "First tasks.md checkbox (1.1) ticked; state set by name and confirmed by read-only view; start comment posted" }
   - { at: "2026-11-27T04:00:29Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md written (PASS WITH WARNINGS); state set by name and confirmed by read-only view; review comment posted" }
+  - { at: "2026-11-27", transition: "In Review gates", outcome: "posted", note: "Operator waived the code and documentation review sub-gates and approved archiving on the verify record; review_round stays 0" }
+  - { at: "2026-11-27T05:44:13Z", transition: "archive->mirror", outcome: "posted", note: "Documents in project Den-ready fleet architecture (06049a4f18a4): OpenSpec: host-configuration-independence (5b5e07bb) and host-configuration-independence-interface (7883ca19) created, world-assumptions (69e977af) updated in place; ids stored in openspec/linear.yaml" }
+  - { at: "2026-11-27T05:44:13Z", transition: "In Review->Done", outcome: "posted", note: "Archived after syncing host-configuration-independence, host-configuration-independence-interface and world-assumptions (verify S1 applied to A322's Evidence); workspace confirmed by linear auth whoami; state confirmed Done by read-only view, closing comment posted" }
 ---
 
 ## Why

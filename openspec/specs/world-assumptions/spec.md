@@ -411,11 +411,22 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | Claude user | — | a person who has added the marketplace in a Claude app and installs plugin groups from it | world-only |
 | skills CLI | — | the `skills` command-line program (vercel-labs/skills, run as `npx skills`), which clones a repository by its forge name and installs the individual skills it finds there | world-only |
 | skills CLI user | — | a person who lists or installs skills from this repository with the skills CLI | world-only |
+| evaluator | Nix | the program that computes the derivations a commit's declarations describe: stock Nix, or an alternative implementation such as iets answering to the same command name | shared |
+| home configuration | — | the declared settings from which one user's environment on one platform is built and activated, separately from any host's configuration | shared |
+| check | — | a test the build service builds for a pull request whose inputs it depends on, publishing its outcome as a check run | shared |
+| refactor | — | a change to the repository whose author states that it alters no host's configuration, home configuration, check or runtime test, or only those it names as declared differences | shared |
+| declared difference | — | a host's configuration, home configuration, check or runtime test that a refactor names, with its reason, before it is accepted, as one it changes, adds or removes, either certainly or possibly | shared |
+| base commit | — | the commit a refactor starts from, against which its effect is judged | shared |
+| candidate commit | — | the commit that carries a refactor's edits | shared |
+| comparison | refactor | setting the derivations of every host's configuration, home configuration, check and runtime test at a refactor's base commit beside those at its candidate commit | shared |
+| evaluation cost | — | the processor time, memory and work an evaluator spends computing one derivation, or the names of a set of them, from a commit's declarations | shared |
+| cost measurement | — | one computation, by a fresh evaluator process, whose evaluation cost is recorded together with the evaluator, host and other work running at the time | shared |
+| baseline | evaluation cost | the cost measurements of an unchanged commit, kept in the repository, against which a later claim about evaluation cost is compared | shared |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-six terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, and `closure`, of which `probe`, `release` and `credential` carry three and every other term two
+- **THEN** twenty-six terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, and `closure`, of which `probe`, `release`, `credential` and `evaluator` carry three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 
@@ -1595,3 +1606,150 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** the container runtime test finds a session whose user record was kept answered 401 by `whoami` after a restart, or a Perses release adds a permission to the user record
 - **THEN** this assumption is void for that version, and the `fleet-dashboard-interface` requirement `Committed files are the only source of views and datasources` loses its discharge until the wipe or the assumption is restated
+
+### Requirement: A310 — A derivation path names its build recipe, and the same recipe builds the same thing only where builds are sandboxed
+
+It is true of Nix, independent of this fleet, that a derivation's path is computed from its builder, arguments, environment and inputs, so the same derivation path describes the same build; and that a build reproduces from it only as far as its sandbox keeps it from reading anything else, which darwin's default does not.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Mechanism**: input-addressed derivations are named by a hash of the derivation's contents; fixed-output derivations also carry their expected output hash; nix-darwin hosts build with the sandbox off unless `sandbox = true` is set.
+
+**Evidence**: the Nix reference manual's store-path and derivation chapters; `nix config show sandbox` on a darwin host of the fleet, to be read at apply time and recorded in the baselines note.
+
+#### Scenario: Read on 2026-11-26
+
+- **WHEN** the Nix manual's derivation chapter was read on 2026-11-26
+- **THEN** the store path of a derivation was a function of its contents as stated
+
+#### Scenario: A derivation path stops naming the build
+
+- **WHEN** the fleet adopts impure derivations, a Nix release names derivations by something other than their contents, or a darwin host is found building a derivation whose output differs between two builds of the same path
+- **THEN** this assumption is void; the `refactor-identity-oracle` requirement `A refactor changes no derivation it did not declare` no longer shows that an unchanged derivation means an unchanged build, for the affected derivations
+
+### Requirement: A311 — A commit-pinned flake reference evaluates exactly the committed tree
+
+It is true of Nix's `git+file` flake fetcher that a reference with `?rev=<commit>` evaluates the tree recorded in that commit, with its `flake.lock`, and nothing from the working copy, and that pure evaluation denies the evaluation access to the environment, the current system and files outside the flake.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the Nix manual's flake reference section (`git` fetcher, `rev` attribute); `modules/apps/nix-eval-jobs-identity.sh:53`, which evaluates `git+file://$repo?rev=$rev`.
+
+#### Scenario: Read on 2026-11-26
+
+- **WHEN** the flake reference documentation and the existing identity app were read on 2026-11-26
+- **THEN** a `rev`-pinned `git+file` reference fetched only the committed tree
+
+#### Scenario: Working-copy state leaks in
+
+- **WHEN** an evaluation of a `rev`-pinned reference is observed to depend on an uncommitted file, an environment variable or the evaluating host's system, for example through `--impure` or a default of `builtins.currentSystem` being reached
+- **THEN** this assumption is void; the `refactor-identity-oracle` requirements lose their discharge for the attributes so affected, since their derivations depend on more than the two commits
+
+### Requirement: A312 — Stock Nix's work counts are reproducible for one expression and evaluator; its time is not
+
+It is true of stock Nix's evaluation statistics that, for the same expression, commit and evaluator binary, the thunk count is identical between runs and the total allocation nearly so, while CPU and wall time vary with the host's other load, its caches and the store's state.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `logs/cross-host-eval-cost-b-20261126-174313.stats.json` and `-b2-20261126-174337.stats.json`, the stibnite toplevel evaluated twice on 2026-11-26: `nrThunks` 24,376,302 in both, `gc.totalBytes` 3,148,532,208 and 3,148,547,760, `cpuTime` 10.97 s and 10.70 s.
+
+#### Scenario: The two stibnite runs
+
+- **WHEN** the two runs above were compared
+- **THEN** thunks were equal, allocation differed by under 0.001 %, and CPU time by 2.5 %
+
+#### Scenario: Work counts drift between identical runs
+
+- **WHEN** two cost measurements of the same expression, commit and evaluator binary differ in thunk count
+- **THEN** this assumption is void; the `refactor-identity-oracle` requirement `An evaluation-cost claim rests on alternating cost measurements against a recorded baseline` must rest on more than two cost measurements per commit before work counts alone separate the commits
+
+### Requirement: A313 — The command name `nix` can resolve to an alternative evaluator
+
+It is true of this fleet's hosts that the command a person or agent types as `nix` can be iets' classic mode, which evaluates some subcommands itself and hands the rest to the real Nix, while the real Nix stays reachable as `nix-stock`; and that `nix-eval-jobs` can be iets with the stock tool beside it as `nix-eval-jobs-stock`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `modules/README.md` (the iets and classic-mode paragraphs, read 2026-11-26); `justfile:4-6` (`nix_stock`); `modules/apps/nix-eval-jobs-identity.sh:38-41`.
+
+#### Scenario: Read on 2026-11-26
+
+- **WHEN** the README and the recipes were read on 2026-11-26
+- **THEN** `nix` on stibnite could be classic mode and `nix-eval-jobs` could be iets, with the stock tools under their `-stock` names
+
+#### Scenario: The names move
+
+- **WHEN** a host's PATH changes which program answers to `nix`, `nix-stock`, `nix-eval-jobs` or `nix-eval-jobs-stock`
+- **THEN** this assumption is void; cost measurements and comparisons recorded before and after the move are not comparable until the evaluator they used is re-established from the recorded binary path
+
+### Requirement: A320 — clan reads a public var's value as the committed file, untrimmed, at a path fixed by machine, generator and file
+
+It is true of clan-core at the locked revision 78d5de23, independent of what this fleet builds, that an `in_repo` public vars file's value is the untrimmed contents of `<directory>/vars/per-machine/<machine>/<generator>/<file>/value`, or of `<directory>/vars/shared/<generator>/<file>/value` for a shared generator.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: clan-core 78d5de23, `nixosModules/clanCore/vars/public/in_repo.nix:14-21` (`flakePath = settings.directory + "/vars/${rel_dir}/${name}/value"`; `value = readFile flakePath` when the file exists). The value of each NixOS host's `openssh` public key, forced on 2026-11-26, ends in `" \n"` (`logs/cross-host-eval-cost-c-20261126-174313.log`), and each committed `vars/per-machine/<h>/openssh/ssh.id_ed25519.pub/value` ends in a newline.
+
+#### Scenario: Read at the source and forced on 2026-11-26
+
+- **WHEN** the file above was read and the six NixOS hosts' `openssh` public values were forced on 2026-11-26
+- **THEN** the path form and the untrimmed read were as stated, and each value equalled its committed file byte for byte
+
+#### Scenario: Secret files and recipients share the layout
+
+- **WHEN** the committed tree of a secret vars file is read at that revision
+- **THEN** its encrypted contents sit at the same location with `secret` in place of `value`, and its recipients at `machines/<m>`, `users/<u>` and `groups/<g>` beside it
+
+#### Scenario: clan changes the public store
+
+- **WHEN** a clan-core update moves the public value file, renames `rel_dir`'s form, trims the value, or makes `in_repo` no longer the public store; the own-host host-key obligation failing on every NixOS host at once is how this shows
+- **THEN** this assumption is void; the `host-configuration-independence` requirement `Each host takes other hosts' host keys from the keys the fleet pins` and the `host-configuration-independence-interface` requirements on `flake.lib.vars` and `flake.lib.hostKeys` lose their discharge until the accessor is restated against the new layout
+
+### Requirement: A321 — The sshd service's host key generator is per machine and its public half is public
+
+It is true of clan-core's sshd service at the locked revision, independent of what this fleet builds, that it declares a vars generator `openssh` with a secret file `ssh.id_ed25519` and a public file `ssh.id_ed25519.pub`, without `share`, produced by `ssh-keygen -t ed25519 -N "" -C ""`, and that the host's sshd presents that key.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: clan-core 78d5de23, `clanServices/sshd/default.nix:29-31` (the host key path) and `:41-51` (the generator).
+
+#### Scenario: Read at the source on 2026-11-26
+
+- **WHEN** the sshd service was read on 2026-11-26
+- **THEN** the generator's name, files, absence of `share` and key type were as stated
+
+#### Scenario: The sshd service changes its generator
+
+- **WHEN** a clan-core update renames the generator or its files, shares it across machines, or makes sshd present a different key
+- **THEN** this assumption is void; `flake.lib.hostKeys` may read a file sshd no longer presents, and the `host-configuration-independence` requirement `A host whose configuration presents a host key other than its pinned one fails before deploy` loses its discharge until the obligation is restated against the new generator
+
+### Requirement: A322 — A committed file reads the same through a repository path and through the flake source string
+
+It is true of Nix as this fleet evaluates it that `readFile`, `pathExists` and `hashFile` on a file of this repository give the same result whether it is named by a path relative to a module file or by the string `"${self}/<relative path>"`, and that interpolating such a path into a string copies only that file into the store.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: observed 2026-11-27. The flake source is a store path without references, so neither form carries a string context; `just drv-diff 390f72f0c809 bbb7c5ccc978` (`logs/drv-diff-390f72f0c809-bbb7c5ccc978-20261127T033555Z`, re-judged `report.20261127T035524Z`, exit 0) found every system, home and vm-test drvPath unchanged across six readers that moved from the string form to the path form.
+
+#### Scenario: The drvPath diff is taken
+
+- **WHEN** the before/after drvPath diff of every system, home and check output is taken across a change that switches readers between the two forms
+- **THEN** an empty diff confirms this assumption for the forms that change used
+
+#### Scenario: The two forms diverge
+
+- **WHEN** a drvPath moves at a site whose only change was the form of the name, or a Nix update gives `readFile` of a source-tree string a store context
+- **THEN** this assumption is void; the `host-configuration-independence-interface` requirement `Every reader of the committed vars tree uses one accessor and keeps its read` loses its discharge for that site until the site is restored to its previous form
+
+### Requirement: A323 — The evaluation cost of other hosts' configurations on stibnite, measured 2026-11-26
+
+It is true of the fleet at revision 53c949b30, measured on stibnite on 2026-11-26 with one fresh evaluation per figure, independent of this change, that the four evaluations in the scenario below cost the CPU time, thunks and bytes allocated stated there.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `logs/cross-host-eval-cost-{b,b2,base-host,c,d}-20261126-*.stats.json` (`cpuTime`, `nrThunks`, `gc.totalBytes`). Differences between these figures are upper bounds on any saving, because the parts of the work may overlap.
+
+#### Scenario: Measured on 2026-11-26
+
+- **WHEN** the five stats files were read on 2026-11-26
+- **THEN** they gave:
+  - stibnite's toplevel derivation: 10.97 s of CPU, 24,376,302 thunks, 3,148,532,208 bytes (a repeat gave 10.70 s with the same thunk count);
+  - stibnite's host-only baseline: 0.39 s, 681,965 thunks, 138,745,408 bytes;
+  - forcing stibnite's `programs.ssh.knownHosts`: 1.37 s, 4,402,939 thunks, 562,100,704 bytes;
+  - forcing magnetite's `stibnite-agent-session` public value alone: 0.57 s, 1,182,490 thunks, 176,070,096 bytes.
+
+#### Scenario: The baseline moves before the after-measurement
+
+- **WHEN** the before-measurement this change takes at its parent revision differs from these figures by more than run-to-run variance
+- **THEN** this assumption is void as the comparison point; the `host-configuration-independence-interface` requirement `The evaluation saving is measured, not inferred` is discharged against the parent-revision measurement instead

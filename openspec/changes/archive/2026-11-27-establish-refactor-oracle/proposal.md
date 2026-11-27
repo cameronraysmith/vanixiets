@@ -3,17 +3,20 @@ linear_story_id: CAM-131
 linear_story_identifier: CAM-131
 linear_story_title: "Prove each fleet refactor changes only what it declares"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-131/prove-each-fleet-refactor-changes-only-what-it-declares
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: In Review
-last_synced_at: "2026-11-27T04:01:16Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T05:40:57Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:00:30Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-131 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
   - { at: "2026-11-27T00:48:47Z", transition: "Todo->In Progress", outcome: "posted", note: "Fired by the first checked task (1.1); workspace confirmed by linear auth whoami; Linear was Todo, strictly behind; state confirmed In Progress by read-only view; comment posted" }
   - { at: "2026-11-27T04:01:16Z", transition: "In Progress->In Review", outcome: "posted", note: "Fired by verify.md creation (PASS WITH WARNINGS); workspace confirmed by linear auth whoami; Linear was In Progress, strictly behind; state confirmed In Review by read-only view; comment posted" }
+  - { at: "2026-11-27", transition: "In Review gates", outcome: "posted", note: "Operator waived the code and documentation review sub-gates and approved archiving on the verify record; review_round stays 0" }
+  - { at: "2026-11-27T05:40:57Z", transition: "archive->mirror", outcome: "posted", note: "Documents created in project Den-ready fleet architecture (06049a4f18a4): OpenSpec: refactor-identity-oracle (8a18c207), refactor-identity-oracle-interface (55363500), world-assumptions (69e977af); ids stored in openspec/linear.yaml" }
+  - { at: "2026-11-27T05:40:57Z", transition: "In Review->Done", outcome: "posted", note: "Archived after syncing refactor-identity-oracle, refactor-identity-oracle-interface and world-assumptions; workspace confirmed by linear auth whoami; state confirmed Done by read-only view, closing comment posted" }
 ---
 
 ## Why

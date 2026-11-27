@@ -44,7 +44,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of Nix as this fleet evaluates it that `readFile`, `pathExists` and `hashFile` on a file of this repository give the same result whether it is named by a path relative to a module file or by the string `"${self}/<relative path>"`, and that interpolating such a path into a string copies only that file into the store.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: [INFERENCE] not yet observed. The flake source is a store path without references, so neither form is expected to carry a string context; the before/after drvPath diff this change requires is the observation that confirms or voids it.
+**Evidence**: observed 2026-11-27. The flake source is a store path without references, so neither form carries a string context; `just drv-diff 390f72f0c809 bbb7c5ccc978` (`logs/drv-diff-390f72f0c809-bbb7c5ccc978-20261127T033555Z`, re-judged `report.20261127T035524Z`, exit 0) found every system, home and vm-test drvPath unchanged across six readers that moved from the string form to the path form.
 
 #### Scenario: The drvPath diff is taken
 
