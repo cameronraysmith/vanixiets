@@ -145,6 +145,12 @@ projects:
     name: "Den-ready fleet architecture"
     teams: ["CAM"]
     archive_documents:
+      "fleet-ingress-interface":
+        id: "e530cb24-f8c6-4034-b1f4-e45e621460c5"
+      "fleet-obligation-registry-interface":
+        id: "da864c97-bebf-4dda-885e-9525009e9f33"
+      "fleet-package-set-interface":
+        id: "8ff9cb04-3e24-401f-b099-0c03626700c5"
       "fleet-host-registry":
         id: "e4383d41-49c0-478c-9790-ac99fa80d02b"
       "fleet-host-registry-interface":

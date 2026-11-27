@@ -3,17 +3,18 @@ linear_story_id: CAM-135
 linear_story_identifier: CAM-135
 linear_story_title: "Register each fleet host rule once and test every rule the same way"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-135/register-each-fleet-host-rule-once-and-test-every-rule-the-same-way
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: In Review
-last_synced_at: "2026-11-27T07:42:34Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T08:22:07Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:04:01Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-135 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted. A first create attempt with --json returned non-JSON output and created nothing (project query showed no new issue before the retry)" }
   - { at: "2026-11-27T07:09:21Z", transition: "Todo->In Progress", outcome: "posted", note: "Fired on the first checked task; state confirmed In Progress by read-only view; milestone comment posted" }
   - { at: "2026-11-27T07:42:34Z", transition: "In Progress->In Review", outcome: "posted", note: "Fired on verify.md creation (PASS WITH WARNINGS: commit verified for landing, archive blocked by open tasks); description re-synced from the corrected proposal.md (26 conditions, eleven fixture copies, held tests and envelope typing following, docs-site checks changing); state confirmed In Review by read-only view; milestone comment posted" }
+  - { at: "2026-11-27T08:22:07Z", transition: "In Review->Done", outcome: "posted", note: "Fired after openspec archive; documents upserted to project 06049a4f18a4: world-assumptions updated in place, fleet-ingress-interface, fleet-obligation-registry-interface and fleet-package-set-interface created and their ids stored in openspec/linear.yaml; state confirmed Done by read-only view; archive comment posted. Code and docs review sub-gates waived by the operator" }
 ---
 
 ## Why
