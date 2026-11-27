@@ -691,11 +691,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1795553953,
-        "narHash": "sha256-XO49TWQlhF3+9fDr3aH0us9/ofAgZF4NTAewAVsR2lQ=",
+        "lastModified": 1795762022,
+        "narHash": "sha256-sFuCVDFH9UOAObat0UHH7smNnit1w1KhT3421B3GLIo=",
         "owner": "numtide",
         "repo": "iets",
-        "rev": "cdc7dca531f0bac418ca11cea01b3a02101c953e",
+        "rev": "6a04c45dd0ff457e9ff681eee1615c586764e899",
         "type": "github"
       },
       "original": {
