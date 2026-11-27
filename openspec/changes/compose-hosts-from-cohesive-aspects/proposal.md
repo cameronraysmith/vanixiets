@@ -47,11 +47,12 @@ A host should read as the list of capabilities it runs plus what is particular t
 - magnetite's fourteen ZFS boot oneshots and their `notifiedUnits` are generated from a dataset table in `flake.lib`; `disko.nix` stays an independent literal so `greptimedb-envelope` still compares install-time with boot-time.
 - `base` gets named sub-aspects, and `homeManager.ai` becomes one aspect per harness, with `ai` importing them all; the obligation modules stay in base.
 
-**Acceptance for every step**: `just drv-diff <parent> <tip> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta.txt`, the oracle from `establish-refactor-oracle`. It compares every NixOS and darwin toplevel, home activation package, `checks.{x86_64-linux,aarch64-darwin}` and `vmTests.{x86_64-linux,aarch64-linux}` derivation at the two commits and fails on any difference the allow-list does not name, or on a `changed` entry that did not change. The allow-list names exact attribute paths, no globs:
+**Acceptance, per commit**: the change ships as seven commits, one pull request each, each accepted on its own `just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-<n>.txt` (design D12). The oracle compares every NixOS and darwin toplevel, home activation package, `checks.{x86_64-linux,aarch64-darwin}` and `vmTests.{x86_64-linux,aarch64-linux}` derivation at the two commits and fails on any difference the allow-list does not name, or on a `changed` entry that did not change. Allow-lists name exact attribute paths, no globs:
 
-- `changed`: `darwin.argentum`, `darwin.blackphos`, `darwin.rosegold`, `darwin.stibnite` (each `nix.conf` lists every cache once; the activation script may also reorder); `checks.aarch64-darwin.darwin-argentum`, `checks.aarch64-darwin.darwin-blackphos`, `checks.aarch64-darwin.darwin-rosegold`, `checks.aarch64-darwin.darwin-stibnite` (each embeds its host's darwin system); `checks.x86_64-linux.deploy-record-order` (gains the "record is last" clause and its mutant).
-- `may-change`: `vmTests.x86_64-linux.devloop-ingest`, `vmTests.x86_64-linux.devloop-ingest-reconcile`, `vmTests.x86_64-linux.fleet-ingress`, `vmTests.x86_64-linux.fleet-ingress-outage`, `vmTests.x86_64-linux.greptimedb-oom-order` (their nodes stop setting the deleted `enable` flags and import or omit the module instead; the resolved node configuration is meant to stay the same).
-- Every other NixOS toplevel, home activation package, check and runtime test is expected unchanged, including the `nixos-*` machine checks and the runtime tests that import the moved otel-collector, GreptimeDB and Perses modules.
+- Commits 1-4 (otel-collector split, cinnabar keys, provider and workstation aspects with the state-version read, magnetite's server aspects with the ZFS table): no entries; every derivation is expected identical.
+- Commit 5 (flags deleted): the runtime tests whose files are edited (`devloop-ingest`, `fleet-ingress`, `greptimedb-pipeline`, `greptimedb-oom-order`, `shared-reference-tree` and the attributes built from them), resolved to `changed` with their cause or removed.
+- Commit 6 (identity, activation order, named parts): `checks.x86_64-linux.deploy-record-order changed`. The activation order reproduces today's, so no darwin activation script changes.
+- Commit 7 (darwin caches): `darwin.{argentum,blackphos,rosegold,stibnite}` and `checks.aarch64-darwin.darwin-{argentum,blackphos,rosegold,stibnite}` `changed`: each `nix.conf` lists every cache once. This is the only commit that changes a host, and the four Macs are deployed after it.
 
 `just eval-identity` is not this oracle: it compares two evaluators at one revision.
 
@@ -61,17 +62,15 @@ A host should read as the list of capabilities it runs plus what is particular t
 
 - `establish-refactor-oracle`: `just drv-diff`, the acceptance above.
 - `type-the-fleet-host-registry`: the typed `flake.fleet.hosts.<host>` record (read through `flake.lib.hosts`) with `system` and `stateVersion`. That change declares and fills `stateVersion` and reads it nowhere (its design D9); this change switches the darwin hosts and `darwin/base.nix` to read it, which removes the second copy D9 accepts until then.
-- `declare-host-user-relations-once`: the per-(host, user) record giving each darwin host's admin, primary user and uids, and the single `flake` value that replaces the ambient specialArg the darwin template sets today (`darwin/laptop.nix:52,127`).
+- `declare-host-user-relations-once` (merged at `302236090`): the per-(host, account) attachments and the `home-manager-integration` aspect, which already generate each darwin host's admin, primary user, uids and homes; `darwin-workstation` keeps only the remaining template (imports, documentation, accounts' home fields, `knownUsers`).
 
 This change lands after `declare-host-user-relations-once` and before `seam-secrets-away-from-clan-vars`, because all three edit `machines/nixos/magnetite/default.nix` and the cinnabar feature files. The full order is `establish-refactor-oracle`, `stop-reading-other-hosts-configs`, `type-the-fleet-host-registry`, `register-fleet-obligations`, `declare-host-user-relations-once`, this change, `seam-secrets-away-from-clan-vars`; it re-runs `just drv-diff` after rebasing onto its predecessor and archives in the same order.
 
-The darwin-workstation aspect and the `stateVersion` read are designed against those contracts, so `design.md` is written after both changes' designs settle. The other parts do not read them and may be staged first.
+Every dependency has landed; design.md is written against main at `302236090`. Another session is landing commits to `machines/nixos/magnetite/default.nix`, the backup modules, `lib/observability-hosts.nix` and the reference-tree modules; commits 3-5, which touch those files, land after it.
 
 ### Open questions
 
-1. Which key spelling wins, `vanixiets#name` (`nixos/observability-notify.nix:82`) or `vanixiets/name` (`home/ai/agent-telemetry.nix:133`), and how is a parameter written in it?
-2. What keys do the cinnabar features take where the natural name is already a site-neutral key (`fleet-alert`, `matrix`, `zt-dns`)?
-3. galena's and scheelite's `boot.loader.grub.enable = lib.mkForce false`: proven necessary only on electrum; plain values if the diff shows no change?
+Carried to design.md's Open Questions for the operator, each with a recommended answer: the key spelling (`vanixiets/<name>`), the cinnabar feature keys, GRUB written plainly, NixOS state versions from the registry, the seven-commit split, the darwin deploy order, renaming `darwin/laptop.nix`, and the reference-tree flag.
 
 ## Capabilities
 
@@ -88,6 +87,6 @@ The darwin-workstation aspect and the `stateVersion` read are designed against t
 
 ## Impact
 
-- Code: `machines/nixos/{magnetite,cinnabar,electrum,galena,scheelite,pyrite}/`, `machines/darwin/{blackphos,stibnite,argentum,rosegold}/default.nix`, `darwin/{laptop,base,homebrew,profile,caches}.nix`, `system/{zram-swap,deploy-record,stibnite-access}.nix`, `nixos/{greptimedb,perses,fleet-alert,omnigraph,memory-pressure-guards,shared-reference-tree}.nix`, `clan/services/otel-collector/`, `lib/observability-hosts.nix`, `home/terminal/`, `home/tools/agents-md.nix`, `home/development/{git,wezterm}`, `home/ai/` (moshi and the per-harness split), `checks/deploy-record-order`, and the runtime tests `devloop-ingest`, `fleet-ingress` and `greptimedb-oom-order` (all under `modules/`).
-- Hosts: every NixOS and darwin host is re-evaluated; only the four darwin toplevels are declared to change (`nix.conf` caches, possibly the activation script).
-- Checks: `greptimedb-envelope`, `omnigraph-retired-roots`, `deploy-record-order`, `otel-collector-config`, the `nixos-*`/`darwin-*` machine checks, and the runtime tests above; of these only the `darwin-*` machine checks and `deploy-record-order` are declared to change, and the three runtime tests' five attributes may.
+- Code: `machines/nixos/{magnetite,cinnabar,electrum,galena,scheelite,pyrite}/`, `machines/darwin/{blackphos,stibnite,argentum,rosegold}/default.nix`, `darwin/{laptop,base,homebrew,profile,caches}.nix`, `system/{zram-swap,deploy-record,stibnite-session,shared-reference-tree}.nix`, `nixos/{memory-pressure-guards,shared-reference-tree}.nix` and new `nixos/{omnigraph,greptimedb,perses,fleet-alert}-server.nix`, `nixos/{hetzner-cloud,gcp-cloud}.nix`, `lib/zfs-boot-invariants.nix`, `clan/services/otel-collector/`, `lib/observability-hosts.nix`, `home/terminal/`, `home/tools/agents-md.nix`, `home/development/{git,wezterm}`, `home/ai/` (moshi and the per-harness split), `checks/deploy-record-order`, and the runtime tests `devloop-ingest`, `fleet-ingress`, `greptimedb-pipeline`, `greptimedb-oom-order` and `shared-reference-tree` (all under `modules/`).
+- Hosts: every NixOS and darwin host is re-evaluated; only the four darwin toplevels are declared to change, in commit 7 (`nix.conf` caches), and those four Macs are deployed after it.
+- Checks: `greptimedb-envelope`, `omnigraph-retired-roots`, `deploy-record-order`, `otel-collector-config`, the `nixos-*`/`darwin-*` machine checks, and the runtime tests above; of these only the `darwin-*` machine checks (commit 7) and `deploy-record-order` (commit 6) are declared to change, and the edited runtime tests (commit 5) may.
