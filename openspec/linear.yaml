@@ -4,6 +4,13 @@ defaults:
   archive_documents:
     enabled: true
     title_prefix: "OpenSpec:"
+    # Capabilities the archive-time document UPSERT skips. Each one's spec exceeds
+    # Linear's 250,000-character document limit (world-assumptions measured
+    # 263,052 characters on 2026-11-27), so openspec/specs/<capability>/spec.md is
+    # its only current copy and the documents listed for it under a project's
+    # archive_documents are no longer updated.
+    unmirrored:
+      - "world-assumptions"
   max_review_rounds: 3
 teams:
   "CAM":

@@ -65,7 +65,8 @@ The capture guards on repo mode (`select(.planningHome.kind=="repo")`): in works
 
 The document commands and `.nodes[]` connection shape in this recipe are verified against v2.6.0 using command help and `listCommand` in `src/commands/document/document-list.ts`.
 
-For each capability the change produces:
+A capability listed in `defaults.archive_documents.unmirrored` is skipped, because its spec exceeds Linear's document size limit, and the skip is recorded in the attempt log (`{ outcome: "dropped", note: "<capability> exceeds Linear's document size limit; spec mirror skipped" }`).
+For each other capability the change produces:
 
 1. Look up the stored document id first: read `projects."<project-slug>".archive_documents."<capability>".id` from openspec/linear.yaml, where `<project-slug>` is the change's `linear_project`.
 2. If a stored id exists, update in place: `linear document update <stored-id> --title "OpenSpec: <capability>" --content-file <spec-file> --workspace <slug>`.
@@ -181,6 +182,11 @@ elif [ -z "$planning_root" ]; then
   :
 else
 for cap in $caps; do
+  # A capability whose spec exceeds Linear's document size limit is listed in unmirrored and skipped.
+  # { transition: "archive->mirror", outcome: "dropped", note: "<capability> exceeds Linear's document size limit; spec mirror skipped" }
+  if yq -e --arg c "$cap" '(.defaults.archive_documents.unmirrored // []) | any(. == $c)' openspec/linear.yaml >/dev/null; then
+    continue
+  fi
   # Primary lookup: the stored per-capability document id under this project in openspec/linear.yaml.
   DOC_ID=$(yq -r ".projects.\"<pslug>\".archive_documents.\"$cap\".id // \"\"" openspec/linear.yaml)
   if [ -z "$DOC_ID" ]; then

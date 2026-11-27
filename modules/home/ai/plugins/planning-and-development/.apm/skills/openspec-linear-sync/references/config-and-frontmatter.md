@@ -58,6 +58,7 @@ defaults:
   archive_documents:
     enabled: true
     title_prefix: "OpenSpec:"
+    unmirrored: ["<capability-name>"]  # never mirrored: the spec exceeds Linear's document size limit
   max_review_rounds: 3              # default; a change may override in its frontmatter
   issue_label_filter:
     name: "<optional-default-label>"   # narrows Backlog candidates only; explicit no-label option at setup
@@ -80,7 +81,8 @@ projects:                          # normalized registry; keyed by a stable loca
 Teams and projects are sibling registries.
 A project references its teams by key via `teams: [..]`, honoring Linear's many-to-many relationship between projects and teams; team identity is never nested under a project.
 The project slug and team key are stable local identifiers, assigned once and never renamed, and are decoupled from Linear's mutable project and team display names because the registry value carries the immutable Linear id; a per-change `linear_project` or `linear_team` reference therefore stays valid even if the Linear project or team is renamed.
-The `defaults.archive_documents` block carries only `enabled` and `title_prefix`; the per-capability document entries belong under each project's own `archive_documents`, because a Linear project owns its documents.
+The `defaults.archive_documents` block carries only `enabled`, `title_prefix` and `unmirrored`; the per-capability document entries belong under each project's own `archive_documents`, because a Linear project owns its documents.
+A capability goes into `unmirrored` when its spec exceeds Linear's document size limit, since the UPSERT can then no longer write it; the repository file is its only current copy, and documents already listed for it under a project stay where they are but are no longer updated.
 Each per-capability entry's `id` is the stored-id home that the archive-time UPSERT prefers over a title-match lookup; the UPSERT resolves the change's project from `linear_project`, iterates every capability, reads its stored id first, and on create writes the returned id back under that project's capability entry (see references/linear-cli-mapping.md).
 A single change routinely produces multiple capability specs that each become their own Linear document under the same project, so each project's `archive_documents` map holds one entry per capability the change produces.
 

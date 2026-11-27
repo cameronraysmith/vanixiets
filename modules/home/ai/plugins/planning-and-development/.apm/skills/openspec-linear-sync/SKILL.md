@@ -29,6 +29,7 @@ Setup asks a single question that selects the team and project context and offer
 The team is required but the project is optional: an issue with no Linear project binds team-only, runs the full lifecycle on the team board, and has only the archive-time Project Document mirror skipped (logged in the attempt log), never blocking the lifecycle.
 The overlay never auto-selects a Backlog candidate: a candidate that could be inferred is still deferred to the human.
 Spec content is mirrored to Linear only at archive time; no design.md or tasks.md content is ever copied to Linear.
+A capability listed in openspec/linear.yaml's `defaults.archive_documents.unmirrored` is never mirrored, because its spec exceeds Linear's document size limit: the repository file is its only current copy, and the archive records the skip in the attempt log.
 
 The Linear workspace safety gate is the hardest constraint and is owned by the linear-project-management hub's `linear-workspace-safety-gate.md`: never propose a mutation until `linear auth whoami` confirms the correct personal-versus-work workspace, key the gate on confirmed credentials rather than on LINEAR_WORKSPACE, pass an explicit `--workspace <slug>` (or rely on the confirmed `credentials.toml` default) on every mutation, and never run a mutating `linear auth` command.
 
