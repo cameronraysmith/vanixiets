@@ -3,17 +3,19 @@ linear_story_id: CAM-134
 linear_story_identifier: CAM-134
 linear_story_title: "Record each fleet host once, as one typed record"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-134/record-each-fleet-host-once-as-one-typed-record
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: In Review
-last_synced_at: "2026-11-27T06:20:11Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T07:08:45Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:02:17Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-134 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
   - { at: "2026-11-27T05:44:22Z", transition: "Todo->In Progress", outcome: "posted", note: "first tasks.md checkbox (1.2 baseline) checked; state confirmed In Progress by read-only view" }
   - { at: "2026-11-27T06:20:11Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md written (PASS WITH WARNINGS); state confirmed In Review by read-only view; comment posted" }
+  - { at: "2026-11-27T07:08:40Z", transition: "archive->mirror", outcome: "posted", note: "Documents in project Den-ready fleet architecture (06049a4f18a4): OpenSpec: fleet-host-registry (e4383d41) and fleet-host-registry-interface (324b364f) created, world-assumptions (69e977af) updated in place; ids stored in openspec/linear.yaml" }
+  - { at: "2026-11-27T07:08:45Z", transition: "In Review->Done", outcome: "posted", note: "Archived after the post-merge tasks 6.1-8.3 held and fleet-host-registry, fleet-host-registry-interface and world-assumptions were synced (17 designation rows appended to main's table, A300-A305 placed before A310); operator waived the code and docs review sub-gates; workspace confirmed by linear auth whoami; state confirmed Done by read-only view, closing comment posted" }
 ---
 
 ## Why

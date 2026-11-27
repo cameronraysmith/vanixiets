@@ -145,6 +145,10 @@ projects:
     name: "Den-ready fleet architecture"
     teams: ["CAM"]
     archive_documents:
+      "fleet-host-registry":
+        id: "e4383d41-49c0-478c-9790-ac99fa80d02b"
+      "fleet-host-registry-interface":
+        id: "324b364f-7b64-437d-a785-bab3253e1a11"
       "host-configuration-independence":
         id: "5b5e07bb-e093-4c40-8c38-a73cf7033b14"
       "host-configuration-independence-interface":

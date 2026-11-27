@@ -175,14 +175,14 @@ These checks are agent-executed; `openspec validate` does not perform them.
 
 ## Issues by Priority
 
-**CRITICAL** (before archive): the open tasks 6.1, 7.1, 7.2, 8.1, 8.2 and 8.3 (§2). None blocks review of the commit.
+**CRITICAL** (before archive): the open tasks 6.1, 7.1, 7.2, 8.1, 8.2 and 8.3 (§2). None blocks review of the commit. Resolved after merge (2026-11-27): all six are ticked in `tasks.md` with their evidence, on main `9055ae0f1333` (#4386).
 
 **WARNING**:
-- Task 6.1's README edit is committed but unverified. Run `prek run --files modules/README.md`, read ADR-0019 (:70-75) and ADR-0020 (:116-121), log the result and tick it.
-- `fleet-host-registry`, scenario `A host disappears from the registry`: no mutant removes a record. m6 and m7 cover the neighbouring cases. Run one at 8.x, or cite the `structure-fleet` literal pin's failure.
-- A301's evidence cites `lib/modules.nix:1240,1249`; at the locked nixpkgs the throws are at `:1434,1443`. Correct the citation in `specs/world-assumptions/spec.md`.
-- The drvPath diff dumped `66c5a7768fc5`, not the current commit. The trees differ only in `drv-delta.txt`; 8.1 at the merged head closes the gap.
-- 8a and 8c findings above.
+- (resolved) Task 6.1's README edit is committed but unverified. Run `prek run --files modules/README.md`, read ADR-0019 (:70-75) and ADR-0020 (:116-121), log the result and tick it. Resolved: `prek` passed on every file of the commit before publishing, and both ADRs' `clan.machines` example is what `modules/clan/machines.nix` now generates; no amendment (task 6.1).
+- (open, non-blocking) `fleet-host-registry`, scenario `A host disappears from the registry`: no mutant removes a record. m6 and m7 cover the neighbouring cases. Run one at 8.x, or cite the `structure-fleet` literal pin's failure. Still open at archive: no record-removal mutant was run, and m5–m7 show the directory assert fires before `structure-fleet` compares, so whether this scenario's THEN names the pin's failure or the directory assert's is unobserved.
+- (resolved by wording) A301's evidence cites `lib/modules.nix:1240,1249`; at the locked nixpkgs the throws are at `:1434,1443`. Correct the citation in `specs/world-assumptions/spec.md`. Resolved: the delta spec's A301 Evidence now cites `:1434`, `:1443` at the locked revision `bd5b7d01`.
+- (resolved) The drvPath diff dumped `66c5a7768fc5`, not the current commit. The trees differ only in `drv-delta.txt`; 8.1 at the merged head closes the gap. Resolved: task 8.1 ran `just drv-diff 07e3f1affe2d 9055ae0f1333` at the merged head, PASS.
+- (open, non-blocking) 8a and 8c findings above. Not reworded at sync; the unlisted nouns stay as recorded in 8a.
 
 **SUGGESTION**: none.
 

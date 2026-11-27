@@ -422,6 +422,23 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | evaluation cost | — | the processor time, memory and work an evaluator spends computing one derivation, or the names of a set of them, from a commit's declarations | shared |
 | cost measurement | — | one computation, by a fresh evaluator process, whose evaluation cost is recorded together with the evaluator, host and other work running at the time | shared |
 | baseline | evaluation cost | the cost measurements of an unchanged commit, kept in the repository, against which a later claim about evaluation cost is compared | shared |
+| fleet member | — | an apparatus enrolled by name in the fleet's overlay network and recorded in the host registry: a host, or a phone | shared |
+| phone | — | a fleet member a person carries that runs no configuration this fleet builds | world-only |
+| host kind | — | whether a fleet member is a NixOS host, a nix-darwin host or a phone, which decides how it is built and reached | shared |
+| system | — | the processor architecture and operating system pair a host's configuration is built for, such as x86_64-linux or aarch64-darwin | shared |
+| host registry | — | the one record per fleet member, kept in the repository, of its name, system and the other facts about it | shared |
+| host fact | — | one property of a fleet member that the host registry records, such as its system, its memory or the account it is deployed as | shared |
+| derived fact | — | a host fact computed from other host facts rather than written down | shared |
+| fleet pin | — | the literal list of hosts and their kinds kept in the repository apart from the host registry, against which the registry's derived kinds are compared | shared |
+| checked host | — | a host whose configuration the fleet's per-host checks evaluate before a change merges | shared |
+| enrolled host | — | a host whose name a machine has taken, holding a machine key the fleet's secret store recognises | shared |
+| cloud server | — | a rented virtual server at a cloud provider on which a host runs, which exists or not by the operator's decision | world-only |
+| cloud machine type | — | a provider's named size of cloud server, which fixes its processors and memory | world-only |
+| service role | — | the part a service gives one host or device, such as controller, peer, server or agent, which decides what that member does for the service | shared |
+| role membership | — | the set of hosts that play one service role | shared |
+| inventory tag | — | a label the operator gives hosts to select them as a group, both for a service role and for deploying several hosts in one command | shared |
+| externally joined member | — | a fleet member that joins the overlay network with its own client rather than through the fleet's configuration, today the nix-darwin hosts and the phones | shared |
+| state version | — | the release a host's stateful defaults were first set from, fixed when the host is installed and not changed afterwards | shared |
 
 #### Scenario: The terms with two senses are read
 
@@ -1606,6 +1623,108 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** the container runtime test finds a session whose user record was kept answered 401 by `whoami` after a restart, or a Perses release adds a permission to the user record
 - **THEN** this assumption is void for that version, and the `fleet-dashboard-interface` requirement `Committed files are the only source of views and datasources` loses its discharge until the wipe or the assumption is restated
+
+### Requirement: A300 — clan's ZeroTier controller authorises its external members in the order its settings list them
+
+It is true of clan-core's ZeroTier service at the revision this repository locks, independent of what this fleet builds, that the controller writes its `allowedIps` setting, in list order and ahead of the clan-managed members' addresses, into the script that authorises members; the set decides who is admitted, the order only the script's text.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: clan-core `clanServices/zerotier/default.nix:173` declares `allowedIps`; `:241` sets `allHostIPs = settings.allowedIps ++ networkIps`; `:338` maps `allHostIPs` into the script text (read 2026-11-26 in the store copies of clan-core present on stibnite; the locked revision is `78d5de23`, to be re-read at apply).
+
+#### Scenario: Read at the source on 2026-11-26
+
+- **WHEN** the lines above were read on 2026-11-26
+- **THEN** the setting, its concatenation and its rendering in list order were as stated
+
+#### Scenario: clan changes how the controller uses the list
+
+- **WHEN** a clan-core update stops rendering `allowedIps` into the controller's script, sorts it, or admits members by some other setting
+- **THEN** this assumption is void; the `fleet-host-registry` requirement `The overlay network controller admits exactly the externally joined members` loses its discharge until the derivation of the list is restated against the new service
+
+### Requirement: A301 — The module system's type errors and lib.assertMsg fail with a catchable throw
+
+It is true of nixpkgs' `lib` at the revision this repository locks, independent of what this fleet builds, that a definition not matching its option's type and a failed `lib.assertMsg` both fail by `builtins.throw`, which `builtins.tryEval` catches, rather than by `abort` or a bare `assert`, which it does not.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: nixpkgs `lib/modules.nix` raises "A definition for option … is not of type …" with `throw` (`:1434`, `:1443` at the locked revision `bd5b7d01`, read 2026-11-27); `lib.assertMsg pred msg` is `pred || builtins.throw msg`.
+
+#### Scenario: Read at the source on 2026-11-26
+
+- **WHEN** the definitions above were read on 2026-11-26
+- **THEN** both failures were `throw`
+
+#### Scenario: nixpkgs changes how a type error fails
+
+- **WHEN** a nixpkgs update makes a type error or `assertMsg` fail by `abort` or an uncatchable error, which the `unclassifiedIets` mutant of `checks.x86_64-linux.nix-eval-jobs-iets` shows by failing evaluation instead of being reported
+- **THEN** this assumption is void; the `fleet-host-registry` requirement `A host whose memory cannot be read is reported, never silently classified` loses its discharge until the report reads memory without relying on `tryEval`
+
+### Requirement: A302 — clan's inventory makes a machine a member of a service role when it is named in the role or carries one of its tags, and the tag all matches every machine
+
+It is true of clan-core's inventory at the revision this repository locks, independent of what this fleet runs, that an instance's role has as members the machines named under its `machines` and every inventory machine carrying any tag listed under its `tags`, with the tag `all` matching every inventory machine.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: clan-core's own inventory tests declare `roles.peer.tags.all = { }` to place every machine in a role (`lib/inventory/distributed-service/tests/default.nix:267,321`, read 2026-11-26); `modules/lib/fleet-topology.nix:89-98` restates the rule and its committed topology files agree with the deployed roles. The resolving function in clan-core is located and cited at apply.
+
+#### Scenario: Read on 2026-11-26
+
+- **WHEN** clan-core's inventory tests and fleet-topology's rule were read on 2026-11-26
+- **THEN** both agreed with the rule as stated
+
+#### Scenario: clan changes role resolution
+
+- **WHEN** a clan-core update adds a membership source (for example tags matched by pattern), drops `all`, or lets a role exclude a tagged machine
+- **THEN** this assumption is void; the `fleet-host-registry` requirement `Membership in a service role is decided by one rule` loses its discharge until the resolver is restated against clan's new rule
+
+### Requirement: A303 — Each cloud machine type the fleet uses has a fixed memory
+
+It is true of Hetzner Cloud and Google Compute Engine, independent of what this fleet builds, that a server of a given machine type has a fixed amount of memory: `cx43` 16 GiB, `ccx23` 16 GiB, `cx53` 32 GiB, `e2-standard-8` 32 GiB, `n1-standard-8` 30 GiB.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the memory each host's registry entry carried on 2026-11-26 beside its type (`modules/lib/hosts.nix:168-172`), which for cinnabar and magnetite was read on the running server, and the providers' published type tables.
+
+#### Scenario: Recorded on 2026-11-26
+
+- **WHEN** the registry's figures and the providers' tables were compared on 2026-11-26
+- **THEN** each type had the memory stated
+
+#### Scenario: A provider changes a type, or a host reports other memory
+
+- **WHEN** a provider redefines a type's memory, or a cloud host's measured total memory differs from its type's figure by more than rounding
+- **THEN** this assumption is void; the `fleet-host-registry` requirement `A cloud host's memory follows from its cloud machine type` loses its discharge until the table is corrected
+
+### Requirement: A304 — A clan machine key exists in the repository exactly for the hosts enrolled with clan
+
+It is true of this repository as clan manages it, independent of what this change builds, that clan writes a host's machine key under `sops/machines/<name>` when the host is enrolled and that no other step writes there, so the directory's presence tells whether a machine has taken the name.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: on 2026-11-26 `sops/machines/` held every NixOS and darwin host except blackphos, plus `gcp-vm`, which is not a fleet host; blackphos's tincr peer and collector rows already treat it as a reserved name with no machine; `modules/lib/commit-signing.nix:183` tests the same directory.
+
+#### Scenario: Read on 2026-11-26
+
+- **WHEN** `sops/machines/` was listed on 2026-11-26
+- **THEN** it held the hosts stated
+
+#### Scenario: clan moves or stops writing machine keys
+
+- **WHEN** a clan-core update stores machine keys elsewhere, or a host gets a key without being enrolled (or the reverse)
+- **THEN** this assumption is void; the `fleet-host-registry` requirement `Lifecycle facts about a host are independent of each other` loses its discharge for the enrolled fact until it is read from clan's new location
+
+### Requirement: A305 — A configuration's result depends on its option values, not on which module defines them
+
+It is true of the NixOS and nix-darwin module systems, independent of what this fleet builds, that moving a definition of an option, at the same priority and with the same value, from one module of a configuration to another leaves the evaluated configuration and its derivation unchanged.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the module system merges definitions by priority and value; a definition's file is used only in error messages and `options.<o>.files`, which no system derivation reads. The before/after drvPath diff of this change's commits observes it for `nixpkgs.hostPlatform`.
+
+#### Scenario: Observed by the drvPath diff
+
+- **WHEN** the before/after drvPath diff runs over a commit that moves `nixpkgs.hostPlatform` from host modules to the module that composes them
+- **THEN** no NixOS or darwin system drvPath differs
+
+#### Scenario: A derivation reads where an option was defined
+
+- **WHEN** the diff shows a system drvPath difference after a move that changed no value, for example because a manual or a declaration list built into the system records definition files
+- **THEN** this assumption is void; the `fleet-host-registry` requirement `Each fact about a fleet host is recorded once` keeps its discharge only after the difference is explained and declared
 
 ### Requirement: A310 — A derivation path names its build recipe, and the same recipe builds the same thing only where builds are sandboxed
 
