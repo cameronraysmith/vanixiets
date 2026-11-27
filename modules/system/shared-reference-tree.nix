@@ -1,7 +1,7 @@
-# Per-host declaration of the shared ghq reference tree: whether this host shares
-# one, which accounts read it, and the writer account that alone may change it.
-# The NixOS and darwin adapters (modules/{nixos,darwin}/shared-reference-tree.nix)
-# consume these options.
+# Per-host declaration of the shared ghq reference tree: which accounts read it,
+# and the writer account that alone may change it. A host shares one by
+# importing the NixOS or darwin adapter (modules/{nixos,darwin}/shared-reference-tree.nix),
+# which consume these options.
 { lib, ... }:
 let
   # The shared root as readers' gitdir: includes and the evaluation check use
@@ -28,7 +28,6 @@ let
     { ... }:
     {
       options.services.shared-reference-tree = {
-        enable = lib.mkEnableOption "one ghq reference tree shared by this host's participating accounts";
         participants = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];

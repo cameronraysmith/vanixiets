@@ -83,7 +83,6 @@
             };
             users.groups.omnigent-cameron = { };
             services.shared-reference-tree = {
-              enable = true;
               participants = readers;
               allowedProtocols = [
                 "https"

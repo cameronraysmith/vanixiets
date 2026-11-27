@@ -119,11 +119,13 @@ let
       memberships = lib.attrNames (
         lib.filterAttrs (_: g: lib.elem user g.members) hostConfig.users.groups
       );
-      sharing = hostConfig.services.shared-reference-tree or { enable = false; };
+      sharing = hostConfig.services.shared-reference-tree;
       admittedGroups = [
         user
       ]
-      ++ lib.optional (sharing.enable && lib.elem user sharing.participants) sharing.writer
+      ++ lib.optional (
+        hostConfig.services ? shared-reference-tree && lib.elem user sharing.participants
+      ) sharing.writer
       ++ lib.optional (worker.containers.incus == "restricted") "incus";
     in
     worker.owner == owner

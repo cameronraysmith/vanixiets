@@ -154,7 +154,7 @@ in
             })
           ]
           ++ lib.optional (
-            (config.services.shared-reference-tree.enable or false)
+            (config.services ? shared-reference-tree)
             && lib.elem worker.user config.services.shared-reference-tree.participants
           ) { programs.ghq-shared.root = config.services.shared-reference-tree.root; }
           ++ worker.extraHomeModules;
@@ -441,11 +441,11 @@ in
               {
                 assertion =
                   let
-                    sharing = config.services.shared-reference-tree or { enable = false; };
+                    sharing = config.services.shared-reference-tree;
                     home = workerHomes.${name}.config;
                     participant = lib.elem worker.user sharing.participants;
                   in
-                  !sharing.enable
+                  !(config.services ? shared-reference-tree)
                   || (
                     (
                       !participant

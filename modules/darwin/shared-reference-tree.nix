@@ -86,7 +86,7 @@ in
     {
       imports = [ flakeConfig.flake.modules.darwin.shared-reference-tree-options ];
 
-      config = lib.mkIf cfg.enable {
+      config = {
         assertions =
           let
             hm = config.home-manager.users;

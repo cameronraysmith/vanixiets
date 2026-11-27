@@ -71,7 +71,6 @@ in
       ]);
 
       services.shared-reference-tree = {
-        enable = true;
         participants = [ "cameron" ] ++ workerAccountsOn "magnetite";
       };
 

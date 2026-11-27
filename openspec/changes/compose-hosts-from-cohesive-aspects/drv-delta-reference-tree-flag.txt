@@ -1,0 +1,17 @@
+# Declared drvPath differences of deleting services.shared-reference-tree.enable
+# (design D6), from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-reference-tree-flag.txt
+# Measured against main ae13fcfa12c7 and the working copy before and after the
+# edit (logs/chca-reference-tree-flag-{before-20261127-164459,after-20261127-164736}.log):
+# all six NixOS and four darwin toplevels keep their drvPaths, and so do
+# vmTests.x86_64-linux.{shared-reference-tree,shared-reference-tree-migration}
+# (8cz1zq2r…, ng03kyzm…) and their vm-test-evaluates-* checks, the edited
+# runtime test included: a runtime test's derivation takes its node
+# configuration, not its file's text. Checks that embed the whole flake source
+# or every .nix file under modules/ are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt).
+
+# The nix-unit check's test file embeds modules/system/shared-reference-tree.nix,
+# whose option declaration and header comment change
+# (z24ckiys…-evalCheck-shared-reference-tree.drv to h3rl68j0…).
+checks.x86_64-linux.eval-shared-reference-tree  changed

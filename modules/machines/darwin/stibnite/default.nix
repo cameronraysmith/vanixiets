@@ -23,7 +23,6 @@ in
       ];
 
       services.shared-reference-tree = {
-        enable = true;
         participants = [ "crs58" ] ++ workerAccountsOn "stibnite";
         # Approved 2026-10-17 from live dscl collision evidence on stibnite;
         # see openspec/changes/share-ghq-reference-tree/design.md (D3).
