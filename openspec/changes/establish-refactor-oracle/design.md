@@ -28,7 +28,7 @@ Stakeholders: the operator, who accepts each refactor and decides principle revi
 - Changing `just eval-identity` or the iets oracles.
 - Editing the `preferences-nix-checks-architecture` skill. Its procedure stays the reference; the recipe implements it.
 - Building anything. Both tools instantiate derivations only.
-- Deciding the candidate fifth principle or the `controller` tag rename.
+- Renaming stibnite's `controller` tag; type-the-fleet-host-registry does that.
 
 ## Decisions
 
@@ -88,12 +88,12 @@ Stakeholders: the operator, who accepts each refactor and decides principle revi
   - remove O07, O08 and O13 (resolved, and O07/O08 landed with `migrate-mesh-to-tincr`'s registry readers more than one merge cycle ago); mark O14 and O16 resolved with the commits that resolved them, found with `git log -S`, for removal after the next merge per `:460-462`;
   - correct O06's severity note: an unimported module is never evaluated;
   - mark the `mkMachine{Darwin,NixOS}` cluster (`:111`) superseded by derivation from a typed host record plus aspects;
-  - fold the open audit findings into the existing entries they extend (O01, O02, O04, O05, O09, O10, O15, O19, O20, O21, O22) and add the ones with no entry, each tagged with its principle or with "no principle" where P1–P4 do not derive it;
+  - fold the open audit findings into the existing entries they extend (O01, O02, O04, O05, O09, O10, O15, O19, O20, O21, O22) and add the ones with no entry, each tagged with the principle that derives it (P1–P5) or with "no principle" where none does;
   - replace "Planned decomposition into beads epics and PRs" and "Status of preceding nix-0pd epic" with "Planned decomposition as OpenSpec changes": the project's seven changes and their order (see Migration Plan), each with the opportunities it closes; the nix-0pd history becomes one paragraph without the `bd` command;
   - replace the remaining tracker references (`:6-7`, `:417`, `:475`);
-  - add "Candidate principle P5: composition is order-free and demand-driven; a module never reads another entity's evaluated config", with its evidence (cross-host evaluated-config reads, unkeyed dual-exported modules, deploy-record order resting on import order), marked as proposed and awaiting the operator, per `:466-469`.
+  - rename "The four principles" to "The five principles" and add "P5. Composition is order-free and demand-driven; a module never reads another entity's evaluated config" after P4, with its evidence (cross-host evaluated-config reads, unkeyed dual-exported modules, deploy-record order resting on import order); the text of P1–P4 stays unchanged, and the findings P5 derives are tagged `[P5]`.
 - **Rationale**: the document is the planning entry point the other changes cite; the update protocol is the document's own.
-- **Alternatives considered**: inserting P5 into "The four principles". Rejected: revision is the operator's call.
+- **Alternatives considered**: P5 as a proposal in its own section outside the principles. Rejected: the operator accepted it, and an accepted principle stands with the others.
 
 ### D11: ADR amendments
 - **Choice**: each of ADR-0018, -0019, -0020 gains a status line `- **Amended**: 2026-11-<dd>, see Amendment` and a closing `## Amendment (2026-11-<dd>)` section before References that states what changed and where it lives now; the original text stays.
@@ -103,11 +103,17 @@ Stakeholders: the operator, who accepts each refactor and decides principle revi
 ### D12: README corrections
 - **Choice**: `modules/README.md:88` adds that `eval-identity` compares evaluators at one commit and that a refactor across commits uses `just drv-diff`. `modules/home/README.md:32` reads that Den is `github:denful/den`, which drupol's infra uses.
 
-### D13: A base allow-list for checks built from the whole flake source
-- **Choice**: `modules/apps/drv-diff-base-allow.txt`, in the D6 format, holds one `may-change` entry per dumped check whose derivation takes the whole flake source as an input (`checks.<s>.gitleaks`, from `src = self` at `modules/checks/security.nix:25`, and any others task 1.4 finds, such as treefmt-nix's `checks.<s>.treefmt`, each with its file and line as the reason). The app reads it on every run and merges it with the `allow` argument; a change's entry that repeats a base entry is a usage error (exit 2). Per-change `drv-delta.txt` files never list these checks.
-- **Rationale**: such a check's drvPath changes on every commit, whatever the commit touches, so every change would otherwise declare it, and seven changes would carry the same lines. Owning it once in the oracle keeps the declaration with the cause and keeps each change's file to the differences that change makes.
+### D13: A base allow-list for checks built from the whole flake source or every source file of a kind
+- **Choice**: `modules/apps/drv-diff-base-allow.txt`, in the D6 format, holds one `may-change` entry per dumped check whose derivation takes as an input the whole flake source, or every source file of some kinds under `modules/` and `pkgs/` (`checks.<s>.gitleaks`, from `src = self` at `modules/checks/security.nix:25`; treefmt-nix's `checks.<s>.treefmt`, from `modules/formatting.nix:4`; `checks.x86_64-linux.ntfy-tls-verification`, whose source at `modules/checks/ntfy-tls-verification.nix:45-65` is every `.sh`, `.bash`, `.nix`, `.py`, `.ts` and `.js` file under `modules/` and `pkgs/`; and any others task 1.4 finds, each with its file and line as the reason). The app reads it on every run and merges it with the `allow` argument; a change's entry that repeats a base entry is a usage error (exit 2). Per-change `drv-delta.txt` files never list these checks.
+- **Rationale**: such a check's drvPath changes on nearly every commit, whatever the commit touches (a per-kind scan on every commit that edits a file of those kinds, which almost every change does), so every change would otherwise declare it, and seven changes would carry the same lines. Owning it once in the oracle keeps the declaration with the cause and keeps each change's file to the differences that change makes.
 - **Boundary**: first-party-versus-vendored. treefmt-nix supplies `checks.treefmt` and its default project root; the base list depends only on the resulting attribute name, confirmed by task 3.5 rather than by reading the vendored module.
 - **Alternatives considered**: filtering those checks' sources so their derivations depend only on the files they scan. Out of scope: it changes checks, which this change does not. `changed` entries instead of `may-change`: rejected, since 3.1's self-identity run compares a commit with itself, where nothing changes.
+
+### D14: Re-judging recorded dumps without evaluating
+- **Choice**: `drv-diff --reuse DIR [--allow FILE]`, and the recipe `just drv-diff-rejudge dir allow=""`, read the revisions and the dumped systems from `DIR/header` and the dumps from `DIR/<set>.{before,after}.jsonl`, evaluate nothing, and apply the current base allow-list (D13) and the given allow-list with the decision of D6: same report format, same exit codes. The report goes to `DIR/report.<UTC>` and the re-judgement's conditions (both allow-lists, host, time) to `DIR/header.<UTC>`, with `-2`, `-3`, ... appended when that name is taken; the run's own `header` and `report` are never written. A directory without a header naming both revisions and both system lists, or lacking a dump of a set its header names, is refused with exit 2; `--before`, `--after`, `--systems`, `--vm-systems`, `--workers` and `--max-memory-size` do not combine with `--reuse`.
+- **Rationale**: allow-lists are edited after a run (a `drv-delta.txt` entry is traced from the run's report; an entry moves to the base list when it turns out to scan every source file of a kind), and the dumps do not depend on the allow-lists. Re-evaluating the fleet only to re-judge costs about 14 minutes per run (857.5 s for this change's own run, 831.1 s for the mutant's); re-judging takes seconds, so the allow-list cases of 3.3 run against one mutant dump.
+- **Boundary**: a re-judgement trusts the recorded dumps; it does not re-establish that they still match the commits, and its header names the run it re-judges so the evaluator and dump conditions stay those recorded there.
+- **Alternatives considered**: overwriting `DIR/report`. Rejected: the original report is the evidence of the run as executed with the lists of its time.
 
 ## Risks / Trade-offs
 
@@ -117,7 +123,8 @@ Stakeholders: the operator, who accepts each refactor and decides principle revi
 - [Risk] A whole-source check missing from the base allow-list makes every later change fail with an undeclared difference; an extra entry hides a real difference in a check that does not take the whole source. → Mitigation: task 3.5's whole-source mutant must report exactly the base list's attributes.
 - [Risk] `vmTests.aarch64-linux` may fail to instantiate on a host with no aarch64-linux builder if any test uses import-from-derivation. → Mitigation: IFD is disallowed, so such a test reports an error at both revisions, which is listed and does not fail.
 - [Trade-off] Per-attribute processes repeat the flake load (1.6 s CPU each). Accepted for bounded memory.
-- [Trade-off] Adding the two apps changes `apps.<system>`, which no dumped map contains; the change's own oracle run is therefore expected to show only the base allow-list's whole-source checks.
+- [Trade-off] Adding the two apps changes `apps.<system>`, which no dumped map contains, but the checks that consume what this change edits do change: `apps-build` (every app's program), `ntfy-tls-verification` (every `.nix` and `.sh` under `modules/`), `deploy-stock-nix` (the `justfile`), and the docs package, its test checks and the docs-payload consumers (the ADR amendments under `packages/docs`). The change's own oracle run declares them in `drv-delta.txt`.
+- [Risk] Four vmTests fail to evaluate at both commits of this change's own run, so the oracle reports them and cannot compare them: `caddy-root-from-vars`, `tincr-mesh` and `tincr-mesh-partition` need import-from-derivation, which the oracle disallows (`cannot build '…-caddy-root-from-vars-pki.drv^out' during evaluation because the option 'allow-import-from-derivation' is disabled`, likewise `merged-test-dir-tincr-mesh{,-partition}.drv^out`), and `omnigraph-seed` fails on main regardless (`The option 'nodes.machine.vanixiets.nodeExporter' does not exist`, from `modules/nixos/omnigraph-probe.nix`). → Mitigation: listed as failing at both commits in every report; changes touching these tests verify them by other means until they evaluate without IFD.
 - [Risk] An archive-time conflict on `world-assumptions`' grounded-vocabulary requirement, which this and several active changes each modify in full. → Mitigation: the delta copies the corpus requirement and only appends rows and adds `evaluator` to the three-sense list in the scenario. The `check` row is the same row declare-test-size-classes adds, word for word: whichever archives second keeps one row, not two. At archive, rows other changes added since (for example declare-test-size-classes' `run` sense, which moves the scenario's count from twenty-six to twenty-seven) are merged by hand before syncing, and later changes in the landing order rebase their copy onto this one's archived table.
 
 ## Migration Plan
@@ -126,8 +133,8 @@ N/A for deployment: no host's configuration changes.
 Order within the project, by landing and by archive: establish-refactor-oracle, stop-reading-other-hosts-configs, type-the-fleet-host-registry, register-fleet-obligations, declare-host-user-relations-once (CAM-130), compose-hosts-from-cohesive-aspects, seam-secrets-away-from-clan-vars (CAM-129). declare-host-user-relations-once depends on stop-reading-other-hosts-configs: `modules/system/ssh-known-hosts.nix` is the last system module that takes `flake`, and stop-reading-other-hosts-configs removes that. Each change runs `just drv-diff` against its base with its own `drv-delta.txt` after rebasing onto its predecessor.
 Rollback: revert the commits; nothing deployed depends on them.
 
-## Open Questions
+## Open Questions (resolved)
 
-- **Stibnite's `controller` tag.** `controller` names both the deploy controller (stibnite) and the ZeroTier controller. Renaming stibnite's to `deployer-workstation` is recommended only if the operator's `clan machines update --tags controller` habits do not rely on it. Recorded for the operator; not decided here.
-- **Candidate principle P5.** Accept, reject or reword. Until decided, the findings it would derive stay tagged "no principle".
-- **Strictness of `may-change`.** Whether an undecidable expected difference should instead block until measured. Default here: allowed and reported.
+- **Stibnite's `controller` tag.** `controller` names both the deploy controller (stibnite) and the ZeroTier controller. Resolved: stibnite's tag is renamed to `deployer-workstation` by type-the-fleet-host-registry; this change does not touch it.
+- **Principle P5.** Resolved: accepted. It joins P1–P4 as the fifth principle (D10), and the findings it derives are tagged `[P5]` rather than "no principle".
+- **Strictness of `may-change`.** Resolved: `may-change` entries are accepted as written, and each `may-change` entry in a change's own `drv-delta.txt` is resolved to `changed`, or removed from the file, before that change archives. The base allow-list (D13) is exempt: its entries are `may-change` permanently by design, since a whole-source check changes on every commit except when a commit is compared with itself.

@@ -6,6 +6,7 @@ title: "ADR-0018: Deferred Module Composition Architecture"
 - **Date**: 2024-11-20
 - **Scope**: Nix configuration architecture
 - **Related**: [ADR-0017: Deferred module composition overlay patterns](0017-deferred-module-composition-overlay-patterns/)
+- **Amended**: 2026-11-26, see [Amendment](#amendment-2026-11-26)
 
 ## Context
 
@@ -354,6 +355,14 @@ Production migration to infra repository:
 - New machines (rosegold, argentum) created using patterns
 
 Result: 8-machine fleet fully operational under deferred module composition architecture.
+
+## Amendment (2026-11-26)
+
+The decision above stands; these statements describe the repository as it was in November 2024 and are no longer current.
+
+- The fleet is 10 machines, 6 NixOS (cinnabar, electrum, galena, scheelite, magnetite, pyrite) and 4 darwin (blackphos, stibnite, rosegold, argentum), registered in `modules/clan/machines.nix`, not 8 machines across 4 darwin laptops and 4 NixOS servers.
+- The users are those `flake.users` declares (`modules/home/users/`), not a fixed 5.
+- A host no longer imports `flakeModulesHome."users/crs58"` (the machine configuration example above): a user's home modules are `flake.users.<user>.modules`, which a host imports as `home-manager.users.crs58.imports = flakeUsers.crs58.modules ++ …` (`modules/machines/darwin/stibnite/default.nix`).
 
 ## References
 

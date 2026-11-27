@@ -3,15 +3,17 @@ linear_story_id: CAM-131
 linear_story_identifier: CAM-131
 linear_story_title: "Prove each fleet refactor changes only what it declares"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-131/prove-each-fleet-refactor-changes-only-what-it-declares
-linear_story_state: Todo
+linear_story_state: In Review
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: Todo
-last_synced_at: "2026-11-26T23:00:30Z"
+last_synced_state: In Review
+last_synced_at: "2026-11-27T04:01:16Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:00:30Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-131 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
+  - { at: "2026-11-27T00:48:47Z", transition: "Todo->In Progress", outcome: "posted", note: "Fired by the first checked task (1.1); workspace confirmed by linear auth whoami; Linear was Todo, strictly behind; state confirmed In Progress by read-only view; comment posted" }
+  - { at: "2026-11-27T04:01:16Z", transition: "In Progress->In Review", outcome: "posted", note: "Fired by verify.md creation (PASS WITH WARNINGS); workspace confirmed by linear auth whoami; Linear was In Progress, strictly behind; state confirmed In Review by read-only view; comment posted" }
 ---
 
 ## Why
@@ -30,12 +32,13 @@ The den-ready refactors reshape how hosts, users and checks are composed and are
 - To: `just eval-cost` runs interleaved base/candidate/base/candidate measurements with stock Nix and writes every run with its conditions; a committed baselines note records the stibnite and cinnabar system cost and the `checks.x86_64-linux` key-set cost, with the 2026-11-26 cross-host figures as reference.
 
 **Planning and architecture documents (docs only)**
-- `docs/notes/development/architectural-principles.md`: resolved opportunities (O07, O08, O13, O14, O16) removed or marked; the tracker-based decomposition re-planned as the OpenSpec changes of the Linear project "Den-ready fleet architecture"; superseded host-constructor plan and false O06 note corrected; a candidate fifth principle, "composition is order-free and demand-driven; a module never reads another entity's evaluated config", proposed for the operator's decision.
+- `docs/notes/development/architectural-principles.md`: resolved opportunities (O07, O08, O13, O14, O16) removed or marked; the tracker-based decomposition re-planned as the OpenSpec changes of the Linear project "Den-ready fleet architecture"; superseded host-constructor plan and false O06 note corrected; a fifth principle, "composition is order-free and demand-driven; a module never reads another entity's evaluated config", added beside P1–P4.
 - ADR-0018, ADR-0019, ADR-0020: dated amendment notes for the fleet's size, where the host platform is set, the user-module example, and the known-hosts module path.
 - `modules/README.md`: `just eval-identity` described as single-revision, pointing to `just drv-diff`. `modules/home/README.md`: Den attributed to `denful/den`.
 
-**Open question recorded for the operator (not decided here)**
-- Whether stibnite's `controller` inventory tag is renamed to `deployer-workstation` depends on whether the operator's `clan machines update --tags` habits use `controller`.
+**Operator decisions recorded (resolved)**
+- Stibnite's `controller` inventory tag is renamed to `deployer-workstation` by type-the-fleet-host-registry, not here.
+- `may-change` entries are accepted as written; each one in a change's own `drv-delta.txt` is resolved to `changed`, or removed, before that change archives. The oracle's base allow-list stays `may-change` by design.
 
 **Non-goals**: any refactor of the fleet itself; changing `just eval-identity`; editing the `preferences-nix-checks-architecture` skill; dumping `checks.aarch64-linux`, `packages`, `apps` or `devShells`; adopting den.
 

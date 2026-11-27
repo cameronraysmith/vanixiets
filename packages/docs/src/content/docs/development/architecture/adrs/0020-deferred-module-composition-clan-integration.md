@@ -6,6 +6,7 @@ title: "ADR-0020: Deferred Module Composition + Clan Integration"
 - **Date**: 2024-11-20
 - **Scope**: Architecture integration
 - **Synthesizes**: [ADR-0018: Deferred module composition architecture](0018-deferred-module-composition-architecture/), [ADR-0019: Clan-core orchestration](0019-clan-core-orchestration/)
+- **Amended**: 2026-11-26, see [Amendment](#amendment-2026-11-26)
 
 ## Context
 
@@ -361,6 +362,15 @@ GCP nodes validated pattern at scale:
 - galena, scheelite added via standard pattern
 - No pattern modifications needed
 - Integration approach stable
+
+## Amendment (2026-11-26)
+
+The decision above stands; these statements describe the repository as it was in November 2024 and are no longer current.
+
+- Pattern 1's `flakeModulesHome."users/crs58"` is now `flake.users.crs58.modules`: a host imports `home-manager.users.crs58.imports = flakeUsers.crs58.modules ++ …` (`modules/machines/darwin/stibnite/default.nix`).
+- Pattern 2's `nixpkgs.hostPlatform` is not set in `clan.machines`: each entry of `modules/clan/machines.nix` only imports its host module, and the host module sets the platform (`modules/machines/<class>/<host>/default.nix`, or `modules/darwin/laptop.nix:69` for the darwin laptops that import it).
+- Pattern 3's example no longer exists: there is no `modules/clan/inventory/services/ssh-known-hosts.nix` and no `flake.modules.common.ssh-known-hosts`. Known hosts come from `modules/system/ssh-known-hosts.nix`, which exports an `ssh-known-hosts` module that each host imports from its own class's namespace (Pattern 1's `imports = with flakeModules; [ base ssh-known-hosts ]`), not a clan inventory service.
+- The fleet is 10 machines, 6 NixOS and 4 darwin, not the 8 the registry example implies.
 
 ## References
 

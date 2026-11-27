@@ -6,6 +6,7 @@ title: "ADR-0019: Clan-Core Orchestration"
 - **Date**: 2024-11-20
 - **Scope**: Multi-machine coordination and deployment
 - **Related**: [ADR-0011: SOPS secrets management](0011-sops-secrets-management/), [ADR-0018: Deferred module composition architecture](0018-deferred-module-composition-architecture/)
+- **Amended**: 2026-11-26, see [Amendment](#amendment-2026-11-26)
 
 ## Context
 
@@ -300,6 +301,13 @@ GCP infrastructure:
 - GPU compute (scheelite) orchestrated via clan
 
 Result: 8-machine fleet fully operational under clan orchestration.
+
+## Amendment (2026-11-26)
+
+The decision above stands; these statements describe the repository as it was in November 2024 and are no longer current.
+
+- The fleet is 10 machines, 6 NixOS and 4 darwin, not 8 across 4 darwin laptops and 4 NixOS servers, and its users are those `flake.users` declares (`modules/home/users/`), not a fixed 5.
+- `nixpkgs.hostPlatform` is not set in `clan.machines` (the machine registry example above): each entry of `modules/clan/machines.nix` only imports its host module, and the host module sets the platform, `modules/machines/<class>/<host>/default.nix` for most hosts and `modules/darwin/laptop.nix:69` for the darwin laptops that import it.
 
 ## References
 

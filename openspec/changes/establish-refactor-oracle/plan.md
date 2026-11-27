@@ -70,7 +70,7 @@
   ```
   A failure of `names` itself is exit 2.
 - [ ] **Step 3:** Write the `checks`/`vmTests` dump with the vendored argument list above (`--force-recurse` for `checks` only); project with `jq -c -S '{attr, drvPath, error: has("error")}' | sort`. Pick `nix-eval-jobs-stock` if `command -v` finds it, else `nix-eval-jobs`; a non-zero exit is exit 2.
-- [ ] **Step 4:** Write `header`: both commits, `readlink -f` and `--version` of `$NIX_STOCK` and the chosen `nix-eval-jobs`, host name, `date -u`.
+- [ ] **Step 4:** Write `header`: both commits, `readlink -f` and `--version` of `$NIX_STOCK`, `readlink -f` of the chosen `nix-eval-jobs` (its store path name carries the version; iets rejects `--version`), host name, `date -u`.
 - [ ] **Step 5:** Write the comparison: for each set, `jq -s` over both dumps into `{attr: {before, after}}`; classify each key as identical, both-error, changed, added, removed, error-at-one. Parse the base allow-list (`$DRV_DIFF_BASE_ALLOW`, design D13) and then the `--allow` file (strip `#…`, skip blanks, split on whitespace into key and expectation; an unknown expectation or set is exit 2; a key present at neither commit is exit 2; a key of the `--allow` file already in the base list is exit 2). Fail (exit 1) for every non-identical, non-both-error key without an entry whose expectation matches (`may-change` matches any difference; `changed` matches changed and error-at-one; `added`/`removed` match their own), and for every `changed`/`added`/`removed` entry whose key is identical. Print counts per set and every difference with both drvPaths, marking those allowed by the base list, to stdout and `report`.
 - [ ] **Step 6:** `shellcheck modules/apps/drv-diff.sh`. Expected: clean.
 - [ ] **Step 7:** Write `drv-diff.nix` from `modules/apps/nix-classic-identity.nix`: `runtimeInputs = [ pkgs.coreutils pkgs.diffutils pkgs.git pkgs.jq ]`, `runtimeEnv.NIX_STOCK = lib.getExe (flakeLib.fleetNix pkgs)`, `runtimeEnv.DRV_DIFF_BASE_ALLOW = ./drv-diff-base-allow.txt`, `meta.description = "Diff drvPaths of every system, home, check and runtime test between two commits"`. Do not put `nix-eval-jobs` in `runtimeInputs`: the host's own name must be used, as in the identity app.
@@ -130,7 +130,7 @@
 - [ ] **Step 2:** Apply tasks.md 5.1–5.4 in order. For 5.2, first commit the list of den-readiness findings in the principles document; each listed finding not already an O-entry becomes `### Onn [principle or "no principle"] [severity] <title>` with Location, Current shape, Why this matters, Approach, and the change that closes it.
 - [ ] **Step 3:** Apply 6.1–6.3: after the `- **Scope**` / `- **Synthesizes**` line add `- **Amended**: <date>, see [Amendment](#amendment-<date>)`; before `## References` (ADR-0018, -0019) or at the end (ADR-0020, if it has none) add `## Amendment (<date>)` with one bullet per stale statement: what it said, what is true now, where.
 - [ ] **Step 4:** Apply 7.1–7.2.
-- [ ] **Step 5:** `just docs-check`. Expected: pass.
+- [ ] **Step 5:** `just docs-linkcheck`. Expected: pass (the site builds with internal link validation).
 - [ ] **Step 6:** Commit: `docs: fold the den-readiness audit into the principles, amend ADR-0018/0019/0020, correct READMEs`.
 
 ## Task 6: Self-neutrality (tasks.md 3.4, 8.2)

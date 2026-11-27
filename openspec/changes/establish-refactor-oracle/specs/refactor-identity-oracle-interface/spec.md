@@ -43,12 +43,12 @@
 ### Requirement: `just drv-diff` holds the evaluator fixed and records the run
 
 `just drv-diff` SHALL evaluate configurations and home configurations one attribute per process with `flake.lib.fleetNix`, and `checks.<s>` and `vmTests.<s>` with `nix-eval-jobs-stock` where it is on PATH and `nix-eval-jobs` otherwise, with import-from-derivation and the evaluation cache disabled.
-It SHALL write the dumps, the resolved evaluator paths and versions, and its report to `logs/drv-diff-<before12>-<after12>-<UTC>/`.
+It SHALL write the dumps, each evaluator's resolved path, `nix --version`, and its report to `logs/drv-diff-<before12>-<after12>-<UTC>/`.
 
 #### Scenario: `nix` names another evaluator
 
 - **WHEN** the `nix` on the caller's PATH is iets' classic mode
-- **THEN** the dumps are still produced by `flake.lib.fleetNix`, and the run's header records the resolved path and version of each evaluator used
+- **THEN** the dumps are still produced by `flake.lib.fleetNix`, and the run's header records the resolved path of each evaluator used and `nix`'s `--version` output; for `nix-eval-jobs` it records only the store path, whose name carries the version, because iets rejects `--version`
 
 ### Requirement: The allow-list declares expected differences
 
@@ -108,6 +108,21 @@ The base allow-list SHALL name every dumped check whose derivation takes the who
 
 - **WHEN** the candidate commit changes one value in one host's configuration and nothing else, and no allow-list is given
 - **THEN** the report names that host's toplevel and the checks that build it, besides the base allow-list's whole-source checks, and nothing else
+
+### Requirement: A recorded run can be re-judged without evaluating
+
+`drv-diff --reuse <dir>` SHALL judge the dumps recorded in an earlier run's evidence directory against the current allow-lists, with a run's report format and exit codes, without evaluating anything.
+It SHALL write a new report file and SHALL NOT write the run's own header or report.
+
+#### Scenario: An allow-list edited after the run
+
+- **WHEN** an entry has moved from a change's `drv-delta.txt` to the base allow-list since the run, and `just drv-diff-rejudge <dir> <drv-delta.txt>` is run on that run's directory
+- **THEN** the new report lists that attribute as allowed by the base list, the command exits as the edited lists decide, no evaluation runs, and the run's original `report` is unchanged
+
+#### Scenario: A directory missing a dump
+
+- **WHEN** `<dir>/header` names `checks.aarch64-darwin` among its systems and `<dir>/checks.aarch64-darwin.after.jsonl` does not exist, or `<dir>/header` is missing
+- **THEN** the command exits 2 and names what is missing
 
 ### Requirement: An attribute failing to evaluate differs only when it fails at one commit
 

@@ -23,6 +23,60 @@ A baseline is measured with the same commit on both sides, so its before and aft
 
 ## Baselines
 
+All three were measured on 2026-11-27 at commit `b718b62ec596a92784e69c030723a3c3285836fa` on both sides, on stibnite (Darwin arm64, 65,536 MiB), with the fleet's stock Nix `/nix/store/g2n4lw86lg8xa3kml84hmynm22kla7j5-nix-2.35.6/bin/nix` (Nix 2.35.6), no other evaluation running at the start of each measurement.
+Stibnite's `sandbox` setting is `false`: darwin builds there are not sandboxed, so an equal derivation path is evidence of an equal build recipe, not of an equal build.
+
+### `darwinConfigurations.stibnite.config.system.build.toplevel` (drv)
+
+`logs/eval-cost-darwinConfigurations-stibnite-config-system-build-toplevel-20261127T005522Z.{log,jsonl}`, started 2026-11-27T00:55:22Z.
+
+| run | side | wall s | cpuTime s | gc.totalBytes | nrThunks | envs.number |
+|---|---|---|---|---|---|---|
+| 1 | before | 13.23 | 10.89 | 3,165,576,192 | 24,376,445 | 16,103,250 |
+| 1 | after | 13.17 | 10.84 | 3,165,583,792 | 24,376,445 | 16,103,250 |
+| 2 | before | 13.42 | 10.91 | 3,165,588,352 | 24,376,445 | 16,103,250 |
+| 2 | after | 13.26 | 10.90 | 3,165,588,368 | 24,376,445 | 16,103,250 |
+
+### `nixosConfigurations.cinnabar.config.system.build.toplevel` (drv)
+
+`logs/eval-cost-nixosConfigurations-cinnabar-config-system-build-toplevel-20261127T005644Z.{log,jsonl}`, started 2026-11-27T00:56:44Z.
+
+| run | side | wall s | cpuTime s | gc.totalBytes | nrThunks | envs.number |
+|---|---|---|---|---|---|---|
+| 1 | before | 30.73 | 12.28 | 2,679,411,792 | 24,154,292 | 16,859,178 |
+| 1 | after | 29.17 | 12.36 | 2,679,407,936 | 24,154,292 | 16,859,178 |
+| 2 | before | 28.85 | 12.59 | 2,679,408,592 | 24,154,292 | 16,859,178 |
+| 2 | after | 26.63 | 12.28 | 2,679,410,128 | 24,154,292 | 16,859,178 |
+
+Wall time exceeds CPU time by 14 to 18 s on every run; the log does not say where that time went, so compare cinnabar's wall time only with runs on the same host.
+
+### `checks.x86_64-linux` (keys)
+
+`logs/eval-cost-checks-x86_64-linux-20261127T005938Z.{log,jsonl}`, started 2026-11-27T00:59:38Z.
+
+| run | side | wall s | cpuTime s | gc.totalBytes | nrThunks | envs.number |
+|---|---|---|---|---|---|---|
+| 1 | before | 0.37 | 0.31 | 199,098,208 | 792,380 | 294,009 |
+| 1 | after | 0.36 | 0.31 | 199,098,208 | 792,380 | 294,009 |
+| 2 | before | 0.37 | 0.31 | 199,098,208 | 792,380 | 294,009 |
+| 2 | after | 0.36 | 0.31 | 199,098,208 | 792,380 | 294,009 |
+
+### `just drv-diff` over the fleet
+
+One full run of the cross-revision oracle (task 3.1), from `b718b62ec596` to `07877c74b4e5` on stibnite, started 2026-11-27T01:20:31Z with the fleet's stock Nix 2.35.6 and `nix-eval-jobs` 2.35.4 at 2 workers and 4,096 MiB per worker, took 857.5 s (`logs/drv-diff-b718b62ec596-07877c74b4e5-20261127T012031Z/header`, gitignored).
+The mutant run of task 3.2, from `096de303b53b` to `8270a07764a7` under the same conditions, took 831.1 s.
+Re-judging a recorded run with `just drv-diff-rejudge` evaluates nothing and takes seconds.
+
+| set | attributes | before s | after s |
+|---|---|---|---|
+| nixos | 6 | 82.4 | 77.9 |
+| darwin | 4 | 36.9 | 36.4 |
+| home | 20 | 117.7 | 116.1 |
+| checks.x86_64-linux | 238 | 113.8 | 133.3 |
+| checks.aarch64-darwin | 115 | 35.9 | 32.8 |
+| vmTests.x86_64-linux | 21 | 30.6 | 27.6 |
+| vmTests.aarch64-linux | 3 | 8.8 | 6.5 |
+
 ## Reference, not comparable (2026-11-26)
 
 These figures come from single runs on stibnite on 2026-11-26 (`logs/cross-host-eval-cost-<label>-20261126-*.stats.json`, gitignored) and are restated from the den-readiness audit.

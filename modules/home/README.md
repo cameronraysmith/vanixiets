@@ -29,7 +29,7 @@ A user who cannot run one module of an aggregate imports the aggregate and disab
 The `sandbox` aggregate does this for `programs.bash.enable` and `services.ssh-agent.enable` in `users/ubuntu` and `users/claude-sandbox`, the profiles that run in a hosted agent sandbox.
 
 Reusable options and shared data are named deferred modules or `flake.lib` values, never `_name.nix` files pulled in through `imports`; `core/catppuccin.nix` shows the pattern.
-Neither Den (drupol's aspect framework over dendritic flake-parts) nor `flake-file` (generating `flake.nix` from modules) is adopted here; both are evaluated in `github:drupol/infra`.
+Neither Den (`github:denful/den`, an aspect framework over dendritic flake-parts, which drupol's infra uses) nor `flake-file` (generating `flake.nix` from modules) is adopted here; both are evaluated in `github:drupol/infra`.
 
 ## Selectable development capabilities
 
