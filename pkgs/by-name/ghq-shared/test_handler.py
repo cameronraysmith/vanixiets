@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -742,6 +743,117 @@ ended_without_target("an unexpected error", reply, "github.com/o/hang", "get", 7
                      r"unexpected RuntimeError: cannot reach <target>")
 if proc.returncode == 0:
     failures.append(f"an unexpected error must end the handler with a non-zero status: {reply}")
+
+
+def maintained(name, hook_sleep):
+    """A blobless clone of a new upstream, its packs all promisor packs, with a
+    pre-auto-gc hook that records its pid in <work>/<name>.pids.
+
+    git maintenance runs the hook twice: in its need check, before it would
+    detach, and in the gc it then starts, after. The second run sleeps
+    hook_sleep seconds, so a sleeping hook marks maintenance's background work.
+    """
+    work_tree, bare = upstream(name)
+    clone_dir = os.path.join(root, "github.com", "o", name)
+    git("clone", "-q", "--filter=blob:none", f"file://{bare}", clone_dir)
+    pids = os.path.join(work, f"{name}.pids")
+    hook = os.path.join(clone_dir, ".git", "hooks", "pre-auto-gc")
+    os.makedirs(os.path.dirname(hook), exist_ok=True)
+    put(hook, f"#!{sys.executable}\nimport os, time\n"
+              f"with open({pids!r}, 'a') as handle:\n    handle.write(f'{{os.getpid()}}\\n')\n"
+              f"if len(open({pids!r}).readlines()) > 1:\n    time.sleep({hook_sleep})\n")
+    os.chmod(hook, 0o755)
+    return work_tree, bare, clone_dir, pids
+
+
+def alive(pids):
+    """The recorded pids still running, zombies aside."""
+    found = []
+    for pid in (int(line) for line in open(pids)) if os.path.exists(pids) else ():
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            continue
+        stat = f"/proc/{pid}/stat"
+        if not os.path.exists(stat) or open(stat).read().rsplit(")", 1)[1].split()[0] != "Z":
+            found.append(pid)
+    return found
+
+
+def packs(clone_dir):
+    return sorted(n for n in os.listdir(os.path.join(clone_dir, ".git", "objects", "pack")) if n.endswith(".pack"))
+
+
+def present(clone_dir, obj):
+    return subprocess.run(["git", "cat-file", "-e", obj], cwd=clone_dir, capture_output=True,
+                          env=dict(os.environ, GIT_NO_LAZY_FETCH="1", GIT_CONFIG_NOSYSTEM="1",
+                                   GIT_CONFIG_GLOBAL="/dev/null")).returncode == 0
+
+
+# Auto maintenance after an update runs gc in the foreground, inside the request:
+# the promisor packs of a blobless clone past gc.autoPackLimit are consolidated
+# before the handler exits, no process the request started outlives it, and the
+# blobs hydrated for an older commit and for a commit that a forced update leaves
+# unreachable are still present.
+m_tree, m_bare, m_clone, m_pids = maintained("maint", 0)
+old_blob = git("rev-parse", "master~2:f", cwd=m_tree)
+git("checkout", "-q", "-b", "side", cwd=m_tree)
+put(os.path.join(m_tree, "f"), "doomed\n")
+git("commit", "-q", "-am", "doomed", cwd=m_tree)
+doomed_blob = git("rev-parse", "side:f", cwd=m_tree)
+git("push", "-q", "up", "side", cwd=m_tree)
+git("fetch", "-q", "origin", cwd=m_clone)
+for rev in ("master~2", "origin/side"):
+    reply = ask({"action": "hydrate", "rev": rev, "path": m_clone}, tags_cfg)
+    if reply["exit"] != 0:
+        failures.append(f"maintenance fixture: hydrate {rev} failed: {reply}")
+if not (present(m_clone, old_blob) and present(m_clone, doomed_blob)):
+    failures.append("maintenance fixture: the hydrated blobs are absent before the update, so the case is vacuous")
+git("reset", "-q", "--hard", "master", cwd=m_tree)
+git("commit", "-q", "--allow-empty", "-m", "side rewritten", cwd=m_tree)
+git("push", "-q", "--force", "up", "side", cwd=m_tree)
+git("checkout", "-q", "master", cwd=m_tree)
+git("commit", "-q", "--allow-empty", "-m", "advance", cwd=m_tree)
+git("push", "-q", "up", "master", cwd=m_tree)
+for key, value in (("gc.autoPackLimit", "2"), ("gc.reflogExpireUnreachable", "now"), ("gc.pruneExpire", "now")):
+    git("config", key, value, cwd=m_clone)
+before_packs = packs(m_clone)
+reply = ask({"action": "get", "target": "github.com/o/maint", "update": True}, tags_cfg)
+after_packs = packs(m_clone)
+if reply["exit"] != 0 or not os.path.exists(m_pids) or len(after_packs) > 2:
+    failures.append(f"an update past gc.autoPackLimit must consolidate the packs before the handler exits: "
+                    f"{len(before_packs)} -> {len(after_packs)} packs, hook ran: {os.path.exists(m_pids)}, {reply}")
+if alive(m_pids):
+    failures.append(f"maintenance must not outlive the request that started it: {alive(m_pids)} still running")
+if not (present(m_clone, old_blob) and present(m_clone, doomed_blob)):
+    failures.append("maintenance must keep hydrated blobs, of an older commit and of a commit left unreachable")
+pack_dir = os.path.join(m_clone, ".git", "objects", "pack")
+written = [os.path.join(pack_dir, n) for n in os.listdir(pack_dir)
+           if n.startswith("pack-") and n.rsplit(".", 1)[0] + ".pack" not in before_packs]
+exposed = [p for p in written if os.lstat(p).st_mode & 0o027 or not os.lstat(p).st_mode & 0o040]
+if exposed or not written:
+    failures.append("maintenance must write packs readable by the group and by no one else: "
+                    f"{[(os.path.basename(p), oct(os.lstat(p).st_mode & 0o777)) for p in written]}")
+if not lock_free("github.com/o/maint"):
+    failures.append("maintenance: the repository's lock must be free afterwards")
+
+# A timed-out command's stop ends the maintenance it started: the update's fetch
+# runs gc, whose pre-auto-gc hook outlasts the command timeout. The clone's own
+# maintenance.strategy=gc makes git run gc whatever the handler sets.
+s_tree, _, s_clone, s_pids = maintained("maint-slow", 60)
+git("config", "maintenance.strategy", "gc", cwd=s_clone)
+git("config", "gc.autoPackLimit", "1", cwd=s_clone)
+git("commit", "-q", "--allow-empty", "-m", "advance", cwd=s_tree)
+git("push", "-q", "up", "master", cwd=s_tree)
+reply = finish(*start({"action": "get", "target": "github.com/o/maint-slow", "update": True},
+                      config(protocols=("file",), command_timeout=3)), within=60)
+time.sleep(1)
+running = alive(s_pids)
+if not os.path.exists(s_pids) or running or reply["exit"] != 124:
+    failures.append(f"a timed-out command's stop must end the maintenance it started: hook ran: "
+                    f"{os.path.exists(s_pids)}, still running: {running}, {reply}")
+for pid in running:
+    os.kill(pid, signal.SIGKILL)
 
 if failures:
     sys.exit("\n".join(failures))

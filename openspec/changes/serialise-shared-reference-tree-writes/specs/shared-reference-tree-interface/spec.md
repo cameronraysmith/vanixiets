@@ -122,6 +122,24 @@ Each command the writer runs SHALL be given at most 3600 s; one that outlasts it
 
 Witness: `pkgs/by-name/ghq-shared/test_handler.py`, cases "A get whose clone outlasts the command timeout: ghq and the git it started are stopped, and git removes its partial clone" and "A git step that outlasts the command timeout: an update's first step lists the remote", each run with a 1 s limit.
 
+### Requirement: Git's automatic maintenance is part of the request that starts it
+
+The writer's git SHALL run automatic maintenance in the foreground (`maintenance.autoDetach` and `gc.autoDetach` false), inside the command that starts it, so under its repository's lock and within the command's limit, and with the `gc` strategy (`maintenance.strategy=gc`), so a clone whose promisor packs exceed `gc.autoPackLimit` is consolidated; objects in promisor packs SHALL be kept.
+
+#### Scenario: An update starts maintenance
+
+- **WHEN** an update's fetch leaves a blobless clone with more packs than `gc.autoPackLimit`
+- **THEN** before the handler exits the packs are consolidated into new packs readable by the writer's group, no process the request started is running, the lock is free, and blobs hydrated for an older commit and for a commit a forced update left unreachable are still present
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "Auto maintenance after an update runs gc in the foreground, inside the request".
+
+#### Scenario: Maintenance outlasts the command limit
+
+- **WHEN** the maintenance an update's fetch starts is still running when the command limit passes
+- **THEN** it is stopped with the command, and the request ends with exit status 124
+
+Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A timed-out command's stop ends the maintenance it started", run with a 3 s limit.
+
 ### Requirement: A caller that disconnects does not stop its request
 
 When a caller closes its connection before its reply, the writer SHALL finish the request's operation, log the disconnection, drop the reply, and release the repository's lock when its handler exits.

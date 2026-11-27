@@ -24,7 +24,9 @@ its program and subcommand only.
 
 Each command runs in a process group of its own; one that outlasts
 commandTimeout seconds is stopped with every process it started, and its
-request ends with a reply and an exit line like any other failure.
+request ends with a reply and an exit line like any other failure. Git's
+automatic maintenance runs in the foreground with the gc strategy, so it is part
+of the command, under the repository's lock.
 
 Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group",
 "allowedProtocols", "lockDir" and optionally "lockTimeout" and "commandTimeout".
@@ -89,6 +91,19 @@ LFS_POLICY = [
     "filter.lfs.clean=",
     "filter.lfs.smudge=",
     "filter.lfs.required=false",
+]
+
+# Automatic maintenance after a fetch runs in the foreground, inside the command:
+# detached, it would leave the command's process group and go on writing the
+# repository after the lock is released, out of reach of a timed-out command's
+# stop. The gc strategy consolidates promisor packs once gc.autoPackLimit is
+# passed; git's default for automatic maintenance, the geometric strategy, decides
+# whether to repack from non-promisor packs only, so the packs of a blobless
+# clone, all promisor packs, would accumulate without bound.
+MAINTENANCE_POLICY = [
+    "maintenance.autoDetach=false",
+    "gc.autoDetach=false",
+    "maintenance.strategy=gc",
 ]
 
 
@@ -181,7 +196,7 @@ def command(request, config):
 
 def environment(config):
     protocols = ["protocol.allow=never"] + [f"protocol.{p}.allow=always" for p in config["allowedProtocols"]]
-    entries = protocols + LFS_POLICY
+    entries = protocols + LFS_POLICY + MAINTENANCE_POLICY
     env = {
         "PATH": TOOL_PATH,
         "HOME": "/var/empty",
