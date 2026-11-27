@@ -9,6 +9,8 @@ Magnetite, pyrite and stibnite do: their root is the read-only `/var/lib/ghq`, w
 `ghq list -p <name>` is the authority for whether a copy exists, because it walks the filesystem rather than consulting an index; `zoxide query -l <name>` is a fast path only and must be validated against `ghq list -p` before it is relied on.
 On a miss, `ghq-sync <url>` clones shallow and blobless and registers the path with the caller's zoxide.
 Before reading at a revision other than the checked-out one, `ghq-sync --hydrate <rev> <path-or-owner/repo>` fetches the file contents that revision needs; Git LFS paths in the shared tree hold pointer files.
+In the shared tree the writer also makes every commit an update or a deepen brought in readable as a diff, unless more than 100,000 blobs are missing, which its answer reports; any other commit's diff (`git show <rev>`) needs `<rev>` and each parent hydrated, and `git diff A B` needs both `A` and `B`.
+Readers' git there refuses every network transport, so a read needing absent contents fails at once with `transport '<scheme>' not allowed` and `could not fetch <oid> from promisor remote`, and `git ls-remote origin`, `git remote show origin` and `git fetch` inside a copy fail too; a request waiting for a busy repository prints `ghq-writer: waiting up to 3600 s for <repository>, …`, and the writer logs each request, without its target, to the `ghq-writer@` journal (magnetite, pyrite) or `/var/log/ghq-writer/writer.log` (stibnite).
 `ghq-sync` is built from `pkgs/by-name/` in this repository.
 Prefer the canonical upstream over a personal fork; acquire a personal fork only when contribution back to that upstream is anticipated.
 

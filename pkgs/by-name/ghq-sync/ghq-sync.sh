@@ -44,6 +44,13 @@ Options:
                    `git show REV:PATH` and checkouts of REV need no lazy fetch.
                    REV is a ref or object name, optionally with ~N or ^N, and its
                    commit must already be in the clone (fetch tags with -u --tags).
+                   A diff reads both sides: `git show REV` needs REV and each of
+                   its parents hydrated (REV^1, and REV^2 for a merge), and
+                   `git diff A B` needs A and B. On a host-shared tree the writer
+                   already does this for the commits an update or deepen brought
+                   in, and readers' git there refuses every transport, so a read
+                   needing absent contents fails with "transport '<scheme>' not
+                   allowed" and "could not fetch <oid> from promisor remote".
   --seed-zoxide [QUERY]
                    Register every repo in `ghq list -p [QUERY]` with zoxide
                    without any network access, printing one `added: <path>` line
