@@ -67,7 +67,7 @@ It decides by the first matching row:
 |---|---|---|
 | 1 | no `lock.json` | nothing; the start goes on |
 | 2 | a process table it cannot read: `/proc` does not list, a process with a command line has an executable it cannot read, or a process it must judge by owner has an owner it cannot read; or the user `omnigraph` does not exist | refuses |
-| 3 | a process that may write the root with an argument naming it: its executable is named `omnigraph` or `omnigraph-server`, and lies in an omnigraph package in the Nix store or runs as root or `omnigraph` | refuses |
+| 3 | a process that may write the root with an argument naming it, however the path is spelled (`/var/lib/omnigraph//clusters/cookbooks-f17/`, `file:///var/lib/omnigraph/clusters/cookbooks-f17`): its executable is named `omnigraph` or `omnigraph-server`, and lies in an omnigraph package in the Nix store or runs as root or `omnigraph` | refuses |
 | 4 | a record not of the shape OmniGraph writes for a held lock (version 1, string `lock_id` and `operation`, RFC 3339 `created_at`, positive integer `pid`) | refuses |
 | 5 | a `created_at` that is not a date | refuses |
 | 6 | `omnigraph cluster status` failing | refuses |
@@ -84,8 +84,9 @@ An executable named `omnigraph` outside the Nix store and run by another user is
 A recovery adds one to `/var/lib/omnigraph-metrics/lock-recoveries`, which the probe publishes as `vanixiets_omnigraph_lock_recoveries_total`, logs `omnigraph-lock-recovery: omnigraph-server on magnetite cleared the stale serve lock <id> of <root> (pid <pid>, taken <created_at>) and starts; lock recoveries on magnetite: <n>`, and posts that message at low priority to `fleet-alerts` with the title `omnigraph lock recovered on magnetite`.
 A recovery is an expected event after a crash, not an alert; a failed post does not fail the start.
 
-A refusal leaves `lock.json` exactly as it was and fails the start: `Restart=on-failure` tries again within the start limit, the failure notice `FAILED omnigraph-server.service on magnetite` arrives, and `OmnigraphNotServing` fires after 5 minutes.
-Read the reason from the start's journal:
+A refusal leaves `lock.json` exactly as it was and fails the start: it posts the reason and the manual step below to `fleet-alerts` at default priority, titled `omnigraph lock not recovered on magnetite`, as `omnigraph-server on magnetite stays stopped: omnigraph-lock-recovery left <root>/__cluster/lock.json in place: <reason>. <manual step>`, never with the lock file's content; `Restart=on-failure` tries again within the start limit, posting once per refused start, the failure notice `FAILED omnigraph-server.service on magnetite` arrives, and `OmnigraphNotServing` fires after 5 minutes.
+A post that fails is logged as `omnigraph-lock-recovery: the refusal notice was not posted` and changes neither the refusal nor its exit status.
+The start's journal holds the same reason:
 
 ```bash
 sudo journalctl -u omnigraph-server -n 50 --no-pager | grep omnigraph-lock-recovery
@@ -109,7 +110,7 @@ Each refusal prints two lines, `omnigraph-lock-recovery: left <root>/__cluster/l
 | 11 | `lock <id> was taken in this boot (<created_at>) by pid <pid>, which is running` | `Confirm pid <pid> is not an omnigraph-server holding the root (ps -o pid,args -p <pid>), then run omnigraph-cluster force-unlock <id> and systemctl restart omnigraph-server` |
 
 Run the manual commands as root (`sudo omnigraph-cluster …`, `sudo systemctl …`).
-A `force-unlock` that does not report the lock removed fails the start with `omnigraph cluster force-unlock <id> did not report the lock removed`; read the command's output in the same journal.
+A `force-unlock` that does not report the lock removed fails the start with `omnigraph cluster force-unlock <id> did not report the lock removed` and posts that with its manual step, titled as a refusal; read the command's output in the same journal.
 Once the start limit is spent, systemd refuses further starts until `sudo systemctl reset-failed omnigraph-server.service`.
 
 The recovery cannot tell a server in another pid namespace, such as a container, from a dead one: that server's record holds its pid inside the namespace, which on the host is absent or another program, so row 10 never sees it, row 11 stops the unlock only while some host process happens to hold that pid, and otherwise only row 3 does, when the scan finds the server by its arguments.

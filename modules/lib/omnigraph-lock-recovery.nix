@@ -23,7 +23,11 @@
 #      run by root or `writerUser` (a direct writer run as root included,
 #      which the server's sandbox would hide from it); an executable of that
 #      name elsewhere, run by another user, is not omnigraph's, and counting
-#      it would let any user hold the server down;
+#      it would let any user hold the server down. Each argument and the
+#      root are compared with runs of slashes collapsed, `.` segments
+#      dropped and a trailing slash removed, so that
+#      `/var/lib/omnigraph//clusters/<root>/` and
+#      `file:///var/lib/omnigraph/clusters/<root>` name the root too;
 #   4. the record is OmniGraph's held-lock shape (version 1, string lock_id,
 #      operation and created_at, positive integer pid), its created_at is a
 #      date, and `omnigraph cluster status --json` reports the same lock_id;
@@ -42,7 +46,11 @@
 # `counterFile` (0 when absent), which omnigraph-probe publishes, and posts a
 # low-priority notice to fleet-alerts through ntfy-send, whose failure does
 # not fail the start. Any other case leaves lock.json as it is, prints the
-# reason and the manual step, and exits 1, so the start fails visibly.
+# reason and the manual step, posts both to fleet-alerts in one notice of
+# default priority, never with the lock file's content, and exits 1, so the
+# start fails visibly; a failed post is logged and changes nothing else. An
+# unlock that does not report the lock removed also posts a notice and exits
+# 1.
 #
 # A server in another pid namespace (a container) passes steps 7 and 8:
 # its record's pid is the namespace's, which on the host is absent or
@@ -101,11 +109,35 @@
         }
         manual=${lib.escapeShellArg manualCli}
 
+        post() { # <what> <title> <message> [ntfy-send options...]
+          local what=$1 title=$2 message=$3
+          shift 3
+          ${lib.optionalString (tokenFile != null) "NTFY_TOKEN_FILE=${lib.escapeShellArg tokenFile} \\"}
+          timeout 30 ${ntfySend} "$message" fleet-alerts "$@" -H "Title: $title" \
+            || echo "omnigraph-lock-recovery: the $what was not posted" >&2
+        }
+        refusal_title=${lib.escapeShellArg "omnigraph lock not recovered on ${hostName}"}
+
         refuse() { # <reason> <manual step>
           printf 'omnigraph-lock-recovery: left %s in place: %s\n' "$lock" "$1" >&2
           printf 'omnigraph-lock-recovery: omnigraph-server stays stopped until the lock is cleared. %s\n' "$2" >&2
+          post "refusal notice" "$refusal_title" \
+            "omnigraph-server on ${hostName} stays stopped: omnigraph-lock-recovery left $lock in place: $1. $2"
           exit 1
         }
+
+        # Sets `normalised` to $1 with runs of slashes collapsed, `.`
+        # segments dropped and a trailing slash removed.
+        normalise() {
+          local p=$1
+          while [[ $p == *//* ]]; do p=''${p//\/\//\/}; done
+          while [[ $p == */./* ]]; do p=''${p//\/.\//\/}; done
+          p=''${p%/.}
+          [ "$p" = / ] || p=''${p%/}
+          normalised=$p
+        }
+        normalise "$root"
+        root_path=$normalised
 
         # Reads the process directory $1 into `args` (its command line) and
         # `exe` (its executable, without " (deleted)"). Fails for a process
@@ -163,8 +195,9 @@
               *) writer_owned "$proc/$entry" || continue ;;
             esac
             for arg in "''${args[@]}"; do
-              case $arg in
-                *"$root" | *"$root"/*)
+              normalise "$arg"
+              case $normalised in
+                *"$root_path" | *"$root_path"/*)
                   holder="pid $entry: ''${args[*]}"
                   return 0
                   ;;
@@ -250,6 +283,8 @@
         if ! unlocked=$(og --target "$root" cluster force-unlock "$lock_id" --json) \
           || ! jq -e '.unlocked == true' <<<"$unlocked" >/dev/null; then
           printf 'omnigraph-lock-recovery: omnigraph cluster force-unlock %s did not report the lock removed: %s\n' "$lock_id" "''${unlocked:-}" >&2
+          post "refusal notice" "$refusal_title" \
+            "omnigraph-server on ${hostName} stays stopped: omnigraph cluster force-unlock $lock_id did not report the lock removed. Read its output with journalctl -u omnigraph-server, and once no omnigraph process runs against the root, run: $manual force-unlock $lock_id"
           exit 1
         fi
 
@@ -269,9 +304,7 @@
 
         message="omnigraph-server on ${hostName} cleared the stale serve lock $lock_id of $root (pid $pid, taken $created_at) and starts; lock recoveries on ${hostName}: $count"
         echo "omnigraph-lock-recovery: $message"
-        ${lib.optionalString (tokenFile != null) "NTFY_TOKEN_FILE=${lib.escapeShellArg tokenFile} \\"}
-        timeout 30 ${ntfySend} "$message" fleet-alerts -H "Priority: low" -H "Title: omnigraph lock recovered on ${hostName}" \
-          || echo "omnigraph-lock-recovery: the recovery notice was not posted" >&2
+        post "recovery notice" "omnigraph lock recovered on ${hostName}" "$message" -H "Priority: low"
       '';
     };
 }

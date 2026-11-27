@@ -15,14 +15,17 @@
 # btime; an /etc/passwd names root, `omnigraph` and one other user. A row
 # asserts the exit status, the stub's argument log, the lock file
 # (unchanged, byte for byte, or removed), the counter, the notices posted
-# and, for a refusal, the reason printed.
+# and, for a refusal, the reason printed and the one notice carrying that
+# reason and the manual step and nothing of the lock file's content.
 #
 # There is one row per scenario of the requirement `The server's start
 # clears a stale serve lock` (openspec change serve-omnigraph-from-local-disk,
-# graph-store-interface), and rows for an unconfirmed unlock, a failed notice,
-# a counter that already holds a count, and the processes the scan counts as
-# writers. The row `packaged-record` runs the packaged omnigraph instead: it
-# applies a one-graph cluster to the root,
+# graph-store-interface), and rows for an unconfirmed unlock, a failed
+# recovery notice, a failed refusal notice, a counter that already holds a
+# count, the processes the scan counts as writers, and a writer or a
+# configured root that spells the root with a doubled slash, a `.` segment
+# or a trailing slash. The row `packaged-record` runs the packaged omnigraph
+# instead: it applies a one-graph cluster to the root,
 # starts omnigraph-server, kills it with SIGKILL, and requires the record it
 # left to have exactly the fields the program reads, the program built with
 # the packaged omnigraph and the real /proc to clear it, and the server to
@@ -85,8 +88,8 @@
         [ -z "''${NTFY_FAIL:-}" ]
       '';
 
-      recovery =
-        omnigraph: proc:
+      recoveryAt =
+        root: omnigraph: proc:
         self.lib.omnigraphLockRecovery pkgs {
           inherit
             omnigraph
@@ -99,8 +102,12 @@
           manualCli = "omnigraph-cluster";
           writerUser = "omnigraph";
         };
+      recovery = recoveryAt root;
       program = recovery stubOmnigraph procDir;
       packagedProgram = recovery packages.omnigraph "/proc";
+      spelledRootProgram =
+        recoveryAt "/var/lib/omnigraph//clusters/./cookbooks-f17/" stubOmnigraph
+          procDir;
 
       mutants = {
         scanSkipped = {
@@ -292,12 +299,29 @@
             }
             expect_reason() { # <fixed string>
               grep -qF -- "$1" "$dir/err" || fail "the reason does not name '$1': $(cat "$dir/err")"
+              grep -qF -- "$1" "$dir/log/ntfy" || fail "the notice does not name '$1': $(cat "$dir/log/ntfy")"
+            }
+            # One notice, to fleet-alerts with the alerter token, carrying the
+            # printed reason and manual step and none of lock.json's content.
+            expect_refusal_notice() {
+              local reason manual
+              expect_notices 1
+              reason=$(sed -n 's/^omnigraph-lock-recovery: left .* in place: //p' "$dir/err")
+              manual=$(sed -n 's/^omnigraph-lock-recovery: omnigraph-server stays stopped until the lock is cleared\. //p' "$dir/err")
+              [ -n "$reason" ] && [ -n "$manual" ] || fail "no reason or manual step printed: $(cat "$dir/err")"
+              grep -qF '${tokenFile}|' "$dir/log/ntfy" || fail "the refusal notice did not use the alerter token"
+              grep -qF ' fleet-alerts ' "$dir/log/ntfy" || fail "the refusal notice is not a fleet-alerts post: $(cat "$dir/log/ntfy")"
+              grep -qF -- "$reason" "$dir/log/ntfy" || fail "the refusal notice lacks the reason '$reason': $(cat "$dir/log/ntfy")"
+              grep -qF -- "$manual" "$dir/log/ntfy" || fail "the refusal notice lacks the manual step '$manual': $(cat "$dir/log/ntfy")"
+              if grep -qE '"lock_id"|lock_id=' "$dir/log/ntfy"; then
+                fail "the refusal notice carries lock.json's content: $(cat "$dir/log/ntfy")"
+              fi
             }
             refused_untouched() {
               expect_code refused
               expect_lock_unchanged
               expect_counter absent
-              expect_notices 0
+              expect_refusal_notice
             }
 
             # --- rows -----------------------------------------------------------
@@ -346,6 +370,7 @@
               process 12 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target ${root}-r2 cluster status
               process 13 ${toString otherUid} /run/current-system/sw/bin/ls ls ${root}
               process 14 ${toString omnigraphUid} ${omnigraphExe} omnigraph version
+              process 15 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target /var/lib/omnigraph//clusters/cookbooks-f17-r2/ cluster status
               kernel_thread 2
               run_program
               expect_code 0
@@ -422,7 +447,8 @@
               expect_code refused
               expect_calls "$status_call" "$unlock_call"
               expect_counter absent
-              expect_notices 0
+              expect_notices 1
+              grep -qF 'did not report the lock removed' "$dir/log/ntfy" || fail "the notice does not say the unlock was not confirmed: $(cat "$dir/log/ntfy")"
             }
             row_counter_counts_on() {
               start_row counter-counts-on
@@ -538,6 +564,48 @@
               counted_writer other-binary-as-root 0 /usr/local/bin/omnigraph
             }
 
+            # A writer may spell the root with doubled slashes, `.` segments,
+            # a trailing slash or as a file URI, and so may the configured
+            # root; the scan compares both normalised.
+            spelled_writer() { # <name> <root as the writer names it>
+              start_row "$1"
+              serve_lock
+              process 57 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target "$2" load --data /tmp/seed.jsonl
+              run_program
+              refused_untouched
+              expect_calls
+              expect_reason "pid 57: omnigraph --target $2 load"
+            }
+            row_spelled_writers() {
+              spelled_writer doubled-slash /var/lib/omnigraph//clusters/cookbooks-f17
+              spelled_writer dot-segment-trailing-slash /var/lib/omnigraph/./clusters/cookbooks-f17/
+              spelled_writer file-uri file:///var/lib/omnigraph//clusters/cookbooks-f17/
+            }
+            row_spelled_root() {
+              start_row spelled-root
+              serve_lock
+              process 58 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target ${root} load --data /tmp/seed.jsonl
+              program=${lib.getExe spelledRootProgram}
+              run_program
+              refused_untouched
+              expect_calls
+              expect_reason "pid 58: omnigraph --target ${root} load"
+            }
+
+            # A refusal whose notice fails still refuses, with exit status 1.
+            row_refusal_notice_fails() {
+              start_row refusal-notice-fails
+              serve_lock
+              process 77 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target ${root} load --data /tmp/seed.jsonl --graph cookbook-beads
+              export NTFY_FAIL=1
+              run_program
+              [ "$code" = 1 ] || fail "exit $code, expected 1"
+              expect_lock_unchanged
+              expect_counter absent
+              expect_refusal_notice
+              grep -qF 'omnigraph-lock-recovery: the refusal notice was not posted' "$dir/err" || fail "the failed post is not logged: $(cat "$dir/err")"
+            }
+
             # The packaged omnigraph's own record: apply, serve, SIGKILL, then
             # the program built with the packaged omnigraph and the real /proc.
             row_packaged_record() {
@@ -591,9 +659,9 @@
             rows=(
               no_lock dead_server running_writer running_server unrelated_processes
               direct_writer_lock live_pid_this_boot lock_before_boot id_mismatch status_failed
-              unreadable unlock_unconfirmed counter_counts_on notice_fails
+              unreadable unlock_unconfirmed counter_counts_on notice_fails refusal_notice_fails
               listing_unreadable exe_unreadable owner_unreadable btime_missing stat_unreadable
-              stepped_clock_server imposter_ignored counted_writers
+              stepped_clock_server imposter_ignored counted_writers spelled_writers spelled_root
             )
             program=${lib.getExe program}
             for r in "''${rows[@]}"; do

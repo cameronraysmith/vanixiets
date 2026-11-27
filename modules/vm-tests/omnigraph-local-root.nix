@@ -28,8 +28,8 @@
 #      answers, and counts the recovery;
 #   3. with the server killed again and a direct `omnigraph` writer running
 #      as `omnigraph` against the root, the start refuses, names the
-#      writer, and leaves lock.json byte for byte; once the writer is gone
-#      the start recovers;
+#      writer, attempts its refusal notice, and leaves lock.json byte for
+#      byte; once the writer is gone the start recovers;
 #   4. the backup job takes the snapshot zroot/root/omnigraph@restic, backs up
 #      its directory, destroys it and stamps its success, recording every
 #      file of the dataset with omnigraph's uid and gid; after the dataset is
@@ -386,6 +386,8 @@
                   refusal = f"an omnigraph process has the root open (pid {writer}: "
                   assert refusal in journal, journal
                   print(journal[journal.index(refusal) - 60:][:400])
+                  # The refusal notice is attempted; this VM reaches no ntfy server.
+                  assert "omnigraph-lock-recovery: the refusal notice was not posted" in journal, journal
                   machine.succeed("sha256sum --check --status /tmp/lock.sha256")
                   print(f"lock.json unchanged after the refusal: {machine.succeed(f'cat {LOCK}')}")
                   assert counter() == "1", counter()
