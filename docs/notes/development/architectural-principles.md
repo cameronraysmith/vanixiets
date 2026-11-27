@@ -134,13 +134,13 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 | A5 | Vars layout read ad hoc | `modules/clan/inventory/services/tincr.nix`, `modules/darwin/fleet-services-trust.nix`, about fifteen readers | P3 | O24 |
 | A6 | No seam for secret consumption; features reach into each other's generators | `modules/nixos/nixbot.nix`, `modules/nixos/matrix.nix`, `modules/home/development/vcs-signing.nix` | P3 | O25 |
 | A7 | Ambient `flake` specialArg with an order-dependent merge | `_module.args.flake` in nine hosts; `extraSpecialArgs.flake` in seven files | P1, P3 | O20 |
-| A8 | Home-manager integration block repeated six times | the three user services, `modules/darwin/laptop.nix`, stibnite, blackphos | P1 | O01 |
+| A8 | Home-manager integration block repeated six times | the three user services, `modules/darwin/laptop.nix` (now `modules/darwin/darwin-workstation.nix`), stibnite, blackphos | P1 | O01 |
 | A9 | Magnetite body holds service wiring | `modules/machines/nixos/magnetite/default.nix` | P1 | O26 |
-| A10 | Cinnabar features keyed to the host | `modules/machines/nixos/cinnabar/` | P1 | O27 |
+| A10 | Cinnabar features keyed to the host | `modules/machines/nixos/cinnabar/` (each feature now under its own key, O27) | P1 | O27 |
 | A11 | Cloud-server boilerplate repeated five times | the five cloud servers' `default.nix` | P1 | O28 |
-| A12 | Host data written as priority fights | `modules/darwin/base.nix`, `modules/darwin/laptop.nix`, host bodies | P1 | O02 |
-| A13 | Darwin host template drift | `modules/machines/darwin/{blackphos,stibnite}/default.nix` copy `modules/darwin/laptop.nix` | P1 | O19 |
-| A14 | Double opt-in and dead flags | host bodies, `modules/darwin/profile.nix` | P2 | O05 |
+| A12 | Host data written as priority fights | `modules/darwin/base.nix`, `modules/darwin/laptop.nix` (now `modules/darwin/darwin-workstation.nix`), host bodies | P1 | O02 |
+| A13 | Darwin host template drift | `modules/machines/darwin/{blackphos,stibnite}/default.nix` copy `modules/darwin/laptop.nix` (now `modules/darwin/darwin-workstation.nix`) | P1 | O19 |
+| A14 | Double opt-in and dead flags | host bodies, `modules/darwin/profile.nix` (deleted) | P2 | O05 |
 | A15 | Host literal in a user module | `modules/home/users/crs58/default.nix` | P3 | O29 |
 | A16 | Omnigent worker relation hand-copied | `modules/clan/inventory/services/omnigent.nix`, `modules/lib/fleet-deployer.nix` | P3 | O30 |
 | A17 | Person and account vocabulary; file and key mismatch | `modules/lib/commit-signing.nix`, `modules/home/ai/agent-telemetry.nix`, `modules/system/stibnite-access.nix` | P3 | O31 |
@@ -153,11 +153,11 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 | A24 | Deploy-record order rests on import order | `modules/system/deploy-record.nix` | P5 | O38 |
 | A25 | Extra nixpkgs instantiations in tests | `modules/vm-tests/`, `modules/checks/{omnigent-workers,devin-worker}.nix` | P1 | O39 |
 | A26 | Unused import-from-derivation `patched` channel | `modules/nixpkgs/overlays/channels.nix` | P2 | O40 |
-| A27 | otel-collector file holds three units | `modules/clan/services/otel-collector/flake-module.nix` | no principle | O41 |
-| A28 | Untyped envelope and host-facts schemas | `modules/clan/services/otel-collector/flake-module.nix`, `modules/lib/observability-hosts.nix` | P2, P4 | O42 |
+| A27 | otel-collector file holds three units | `modules/clan/services/otel-collector/flake-module.nix` (now `agent.nix`, `ingress.nix`, `service.nix` and `_shared.nix` in that directory) | no principle | O41 |
+| A28 | Untyped envelope and host-facts schemas | `modules/clan/services/otel-collector/flake-module.nix` (the envelope budget now in `_shared.nix`), `modules/lib/observability-hosts.nix` | P2, P4 | O42 |
 | A29 | ZFS boot invariants written fourteen times | `modules/machines/nixos/magnetite/default.nix` | P1 | O43 |
 | A30 | `base` and `homeManager.ai` have no named includes | the `darwin.base`, `nixos.base` and `ai` contributors | P2 | O44 |
-| A31 | `darwin/caches.nix` duplicates `system/caches.nix` | `modules/darwin/caches.nix` | P1 | O45 |
+| A31 | `darwin/caches.nix` duplicates `system/caches.nix` | `modules/darwin/caches.nix` (deleted) | P1 | O45 |
 | A32 | Magnetite-shared facts read from the host in tests | `modules/vm-tests/{greptimedb-pipeline,fleet-ingress}.nix` | P5 | O46 |
 
 ### O01 [P1, P3] [HIGH] Cross-host duplication of `_module.args.flake`, `flakeForHomeManager`, and home-manager wiring block in every host module
@@ -176,7 +176,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Why this matters: P1 — the construction recipe is restated 9 times rather than derived once. P3 — `inputs.self` and `config.flake` are the same value via different evaluation contexts; recomputing the splice at every host site distributes responsibility for the same identity across 9 sites.
 - Approach: introduce a base `flake.modules.<class>.machine-base` (or `flake.lib.mkMachineHomeManagerInfra { class }`) that sets `_module.args.flake`, the home-manager infrastructure block, and exposes `flakeUsers` / `flakeModules` as a smart constructor. Hosts then read `users.<u>.imports = flakeUsers.<u>.modules` only.
 - Dependencies: O02 (host docs block). Landing both at once gives clean per-host files of ~50 lines instead of ~150.
-- Den-readiness finding: **Home-manager integration block repeated six times** (A8). The integration block (`useGlobalPkgs`, `useUserPackages`, `backupFileExtension`, the home-manager module import) is written in the three clan user services, `modules/darwin/laptop.nix`, stibnite and blackphos; one `{nixos,darwin}.home-manager-integration` aspect replaces them, keeping the machine-level imports that deduplicate catppuccin. Closed by declare-host-user-relations-once.
+- Den-readiness finding: **Home-manager integration block repeated six times** (A8). The integration block (`useGlobalPkgs`, `useUserPackages`, `backupFileExtension`, the home-manager module import) is written in the three clan user services, `modules/darwin/laptop.nix` (now `modules/darwin/darwin-workstation.nix`), stibnite and blackphos; one `{nixos,darwin}.home-manager-integration` aspect replaces them, keeping the machine-level imports that deduplicate catppuccin. Closed by declare-host-user-relations-once.
 
 ### O02 [P1] [MEDIUM] Cross-darwin-host duplication of documentation override block
 
@@ -188,7 +188,8 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Current shape: every darwin host repeats the same 7-line `srvos.server.docs.enable + documentation.* + programs.{info,man}.enable = lib.mkForce true` block.
 - Why this matters: P1 — recipe at every callsite when the four laptop hosts share an "isDesktop" property already.
 - Approach: move into a darwin module conditioned on `config.custom.profile.isDesktop` (or a new `flake.modules.darwin.docs-for-laptops` aggregate), then drop the 7-line block from each host.
-- Den-readiness finding: **Host data written as priority fights** (A12). Darwin `stateVersion` 5 in `modules/darwin/base.nix` is forced to 4 in `modules/darwin/laptop.nix`, blackphos and stibnite; the documentation block above is three `mkForce` sites (`laptop.nix`, blackphos, stibnite); zram and GRUB are forced over base. Bases use `mkDefault` and hosts write plain values, with `stateVersion` in the host record; the `isDesktop` approach above is superseded, since `custom.profile` has no reader (O05). Closed by compose-hosts-from-cohesive-aspects.
+- Den-readiness finding: **Host data written as priority fights** (A12). Darwin `stateVersion` 5 in `modules/darwin/base.nix` is forced to 4 in `modules/darwin/laptop.nix`, blackphos and stibnite; the documentation block above is three `mkForce` sites (`laptop.nix`, blackphos, stibnite); zram and GRUB are forced over base. Bases use `mkDefault` and hosts write plain values, with `stateVersion` in the host record; the `isDesktop` approach above is superseded, since `custom.profile` has no reader (O05).
+- Status: partly resolved by compose-hosts-from-cohesive-aspects (pull request 4453). `system.stateVersion` is read from `flake.fleet.hosts.<host>.stateVersion` in `modules/darwin/base.nix` and `modules/system/nix-settings.nix`, and no host writes it; `modules/system/zram-swap.nix` sets `zramSwap.memoryPercent = lib.mkDefault 100` and magnetite writes 150 plainly; electrum, galena and scheelite write `boot.loader.grub.enable = false` plainly. `modules/darwin/darwin-workstation.nix` writes the seven documentation options plainly for argentum, rosegold and blackphos. stibnite does not import that aspect and keeps its seven `lib.mkForce true` lines (`modules/machines/darwin/stibnite/default.nix:50-56`), because importing it reorders stibnite's `users.knownUsers` and colima's system packages (that change's design, Open Question 11).
 
 ### O03 [P1] [HIGH] Per-user content `default.nix` recipe is 90% identical across 5 users; sopsFile path hardcodes attribute key
 
@@ -217,11 +218,12 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O05 [P2] [MEDIUM] `custom.profile.{isServer,isWorkstation,isHeadless}` declared with no consumer
 
-- Location: `modules/darwin/profile.nix:21-39`
+- Location: `modules/darwin/profile.nix:21-39` (deleted by pull request 4462)
 - Current shape: `options.custom.profile` declares `isDesktop`, `isServer`, `isWorkstation`, `isHeadless`. `rg` for `isServer|isWorkstation|isHeadless` returns hits only in the declaration site itself; only `isDesktop` is actually written by hosts.
 - Why this matters: P2 — three of four slots are speculative; no consumer references them.
 - Approach: drop the unused slots; keep only `isDesktop`. Or, if a future feature is genuinely planned, capture the intended consumer in the same commit that adds the slot.
-- Den-readiness finding: **Double opt-in and dead flags** (A14). Features imported and then enabled again (memory-pressure guards, colima, shared reference tree, greptimedb, the stibnite session pair), always-true `custom.homebrew.enable` and `services.moshi-hook.enable`, and the whole of `custom.profile` (`modules/darwin/profile.nix`), which nothing reads. Delete the flags and the option; mergify, dnscrypt and k3s-server stay. Closed by compose-hosts-from-cohesive-aspects.
+- Den-readiness finding: **Double opt-in and dead flags** (A14). Features imported and then enabled again (memory-pressure guards, colima, shared reference tree, greptimedb, the stibnite session pair), always-true `custom.homebrew.enable` and `services.moshi-hook.enable`, and the whole of `custom.profile` (`modules/darwin/profile.nix`), which nothing reads. Delete the flags and the option; mergify, dnscrypt and k3s-server stay.
+- Status: partly resolved by compose-hosts-from-cohesive-aspects (pull request 4462). `modules/darwin/profile.nix` and every `custom.profile` line are deleted, and so are the memory-pressure-guards, colima, greptimedb, `stibnite-session`, `stibnite-session-host`, `custom.homebrew` and `services.moshi-hook` flags; importing the module is the decision. `services.shared-reference-tree.enable` remains (`modules/system/shared-reference-tree.nix:31`), read by `modules/darwin/omnigent-host.nix:157` and set by `modules/vm-tests/shared-reference-tree.nix`.
 
 ### O06 [P2] [MEDIUM] `flake.modules.nixos.k3s-server` declares a typed option set with no host enabling it
 
@@ -328,7 +330,8 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Why this matters: P1 — recipe at every callsite. `home` and `description` are derivable from the user shortname; only `uid` is genuinely host-specific.
 - Approach: a `flake.lib.mkDarwinUser { name, uid, ... }` smart constructor produces the block; the recipe lives once.
 - Dependencies: independent of O01, but lands cleanly together.
-- Den-readiness finding: **Darwin host template drift** (A13). blackphos and stibnite copy `modules/darwin/laptop.nix`, which hard-codes cameron as admin with uid 502 while those hosts use crs58; a shared `darwin-workstation` aspect with the admin as a parameter, plus a per-host delta, replaces the copies. The user blocks themselves come from O04's per-(host, user) record. Closed by compose-hosts-from-cohesive-aspects (template) and declare-host-user-relations-once (user blocks).
+- Den-readiness finding: **Darwin host template drift** (A13). blackphos and stibnite copy `modules/darwin/laptop.nix`, which hard-codes cameron as admin with uid 502 while those hosts use crs58; a shared `darwin-workstation` aspect with the admin as a parameter, plus a per-host delta, replaces the copies. The user blocks themselves come from O04's per-(host, user) record. The user blocks are closed by declare-host-user-relations-once.
+- Status of the template: partly resolved by compose-hosts-from-cohesive-aspects (pull request 4453). `modules/darwin/darwin-workstation.nix` defines `flake.modules.darwin.darwin-workstation`, which takes each Mac's human accounts from its attachments in `flake.fleet.hosts.<host>.users`; argentum, rosegold and blackphos import it and state only their deltas (host name, casks, dnscrypt-proxy). stibnite does not import it, for the reason in O02's status.
 
 ### O20 [P1, P3] [HIGH] Inventory `extraModules` block nested-function reconstruction of inputs.self splice repeated 3 times
 
@@ -339,7 +342,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Current shape: all three inventory user services restate `extraSpecialArgs = { flake = inputs.self // { inherit inputs; }; }` inside an `extraModules` lambda; the same construct is also restated in every darwin host (O01).
 - Why this matters: P1 — recipe duplication across 3 inventory files plus 4 darwin hosts (= 7 sites for the same splice). P3 — this is the same `inputs.self` identity flowing through 7 different writers, each creating the same `// { inherit inputs; }` synthesis.
 - Approach: a `flake.lib.flakeForHomeManager = inputs.self // { inherit inputs; };` (or pre-baked attribute on the flake) computed once. Consumers reference it.
-- Den-readiness finding: **Ambient `flake` specialArg with an order-dependent merge** (A7). The splices are not the same value: `extraSpecialArgs.flake` is `config.flake // { inherit inputs; }` in `modules/darwin/laptop.nix`, stibnite, blackphos and `mk-home.nix`, but `inputs.self // { inherit inputs; }` in the three user services, and home-manager types it `types.attrs`, so on stibnite, blackphos, argentum and rosegold the last writer wins. Raised to HIGH. Pick one value and set it once; the poisoned `flake` of `modules/checks/omnigent-workers.nix` needs a replacement guard first. Closed by declare-host-user-relations-once.
+- Den-readiness finding: **Ambient `flake` specialArg with an order-dependent merge** (A7). The splices are not the same value: `extraSpecialArgs.flake` is `config.flake // { inherit inputs; }` in `modules/darwin/laptop.nix` (now `modules/darwin/darwin-workstation.nix`), stibnite, blackphos and `mk-home.nix`, but `inputs.self // { inherit inputs; }` in the three user services, and home-manager types it `types.attrs`, so on stibnite, blackphos, argentum and rosegold the last writer wins. Raised to HIGH. Pick one value and set it once; the poisoned `flake` of `modules/checks/omnigent-workers.nix` needs a replacement guard first. Closed by declare-host-user-relations-once.
 
 ### O21 [P3] [WATCH] `home-manager.users.cameron = { imports = flakeUsers.cameron.modules; };` — alias resolution still requires consumers to know `cameron` exists in `flake.users` post-aliases-fold
 
@@ -399,18 +402,18 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 ### O26 [P1] [MEDIUM] Magnetite body holds service wiring
 
 - Den-readiness finding: **Magnetite body holds service wiring** (A9).
-- Location: `modules/machines/nixos/magnetite/default.nix` (about 520 lines of omnigraph, GreptimeDB, Perses and fleet-alert generators, credentials and services).
+- Location: `modules/machines/nixos/magnetite/default.nix` (at the audit, about 520 lines of omnigraph, GreptimeDB, Perses and fleet-alert generators, credentials and services).
 - Why this matters: P1 — a host should be the list of capabilities it runs plus what is particular to it; service wiring in the host body cannot be reused.
 - Approach: move each block to a new `<svc>-server` aspect in its feature file, never into the site-neutral `<svc>` key the runtime tests import; credential-holder assertions stay at host scope.
-- Closed by compose-hosts-from-cohesive-aspects.
+- Status: resolved by compose-hosts-from-cohesive-aspects (pull request 4461). The wiring is in `modules/nixos/{perses,fleet-alert,omnigraph,greptimedb}-server.nix`, which magnetite imports; the site-neutral `perses`, `fleet-alert`, `omnigraph` and `greptimedb` keys the runtime tests import are unchanged, and the credential-holder and unit-relation assertions stay in magnetite's `default.nix`.
 
 ### O27 [P1] [MEDIUM] Cinnabar features keyed to the host
 
 - Den-readiness finding: **Cinnabar features keyed to the host** (A10).
-- Location: the feature files under `modules/machines/nixos/cinnabar/`, each assigning `flake.modules.nixos."machines/nixos/cinnabar"`.
+- Location: the feature files under `modules/machines/nixos/cinnabar/`, each of which assigned `flake.modules.nixos."machines/nixos/cinnabar"` at the audit.
 - Why this matters: P1 — the features cannot be imported by any other host.
 - Approach: re-key them as `flake.modules.nixos.<feature>` and have cinnabar import them; per-machine generators stay cinnabar's.
-- Closed by compose-hosts-from-cohesive-aspects.
+- Status: resolved by compose-hosts-from-cohesive-aspects (pull request 4443). The eight feature files assign `flake.modules.nixos.{caddy-root-ca,caddy-root-check,caddy,fleet-alert-deadman,matrix-server,ntfy-server,radicle-node,zt-dns-server}`, which cinnabar's `default.nix` imports; only `default.nix` and `disko.nix` assign the host key.
 
 ### O28 [P1] [MEDIUM] Cloud-server boilerplate repeated five times
 
@@ -418,7 +421,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Locations: the `10-uplink` network and ZFS `devNodes` in cinnabar, electrum, galena, scheelite and magnetite; `MaxAuthTries` in six NixOS hosts against `modules/darwin/base.nix`.
 - Why this matters: P1 — a shared host shape restated per host.
 - Approach: a Hetzner cloud-server aspect for cinnabar, electrum and magnetite and a separate GCP cloud-server aspect for galena and scheelite; `MaxAuthTries` moves into `nixos.base`; pyrite, which uses `by-id`, is excluded.
-- Closed by compose-hosts-from-cohesive-aspects.
+- Status: resolved by compose-hosts-from-cohesive-aspects (pull request 4453). `modules/nixos/hetzner-cloud.nix` (imported by cinnabar, electrum and magnetite) and `modules/nixos/gcp-cloud.nix` (galena and scheelite) hold the ZFS device nodes and the `10-uplink` network, and each asserts the host's `flake.fleet.hosts.<host>.cloud.provider`; `MaxAuthTries = 20` is in `nixos.base` (`modules/system/sshd-max-auth-tries.nix`).
 
 ### O29 [P3] [LOW] Host literal in a user module
 
@@ -495,7 +498,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 ### O38 [P5] [MEDIUM] Deploy-record order rests on import order
 
 - Den-readiness finding: **Deploy-record order rests on import order** (A24).
-- Locations: `modules/system/deploy-record.nix` against same-priority `mkAfter` snippets in `modules/darwin/casks.nix`, `modules/darwin/fleet-services-trust.nix` and the dnscrypt module; `modules/darwin/laptop.nix`.
+- Locations: `modules/system/deploy-record.nix` against same-priority `mkAfter` snippets in `modules/darwin/casks.nix`, `modules/darwin/fleet-services-trust.nix` and the dnscrypt module; `modules/darwin/laptop.nix` (now `modules/darwin/darwin-workstation.nix`).
 - Why this matters: P5 — the record is last in the darwin activation script only because of import order.
 - Approach: a `flake.lib.activationOrder` placing each snippet with `mkOrder`, and a "record is last" clause with a mutant in `deploy-record-order`. Declared to change the darwin activation scripts.
 - Closed by compose-hosts-from-cohesive-aspects.
@@ -519,7 +522,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 ### O41 [no principle] [MEDIUM] otel-collector file holds three units
 
 - Den-readiness finding: **otel-collector file holds three units** (A27).
-- Location: `modules/clan/services/otel-collector/flake-module.nix` (1,743 lines: agent, ingress and service).
+- Location: `modules/clan/services/otel-collector/flake-module.nix` (1,743 lines: agent, ingress and service), split by pull request 4448 into `agent.nix`, `ingress.nix`, `service.nix` and `_shared.nix` in the same directory.
 - Why this matters: file cohesion, which P1–P5 do not derive.
 - Approach: split into `agent.nix`, `ingress.nix`, `service.nix` and an `_`-prefixed shared file, keeping the `flake.modules` names.
 - Closed by compose-hosts-from-cohesive-aspects.
@@ -527,7 +530,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 ### O42 [P2, P4] [MEDIUM] Untyped envelope and host-facts schemas
 
 - Den-readiness finding: **Untyped envelope and host-facts schemas** (A28).
-- Locations: the envelope budget (`nullOr attrs`) in `modules/clan/services/otel-collector/flake-module.nix`; `modules/lib/observability-hosts.nix`.
+- Locations: the envelope budget (`nullOr attrs`) in `modules/clan/services/otel-collector/flake-module.nix` (now `_shared.nix`); `modules/lib/observability-hosts.nix`.
 - Why this matters: P2 — the consumer field is untyped; P4 — a malformed entry is not rejected.
 - Approach: a submodule for the envelope budget and a library-level validator for the observability host table.
 - Closed by register-fleet-obligations.
@@ -538,7 +541,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Location: `modules/machines/nixos/magnetite/default.nix` (fourteen boot oneshots and their `notifiedUnits`).
 - Why this matters: P1 — one recipe per dataset.
 - Approach: generate the oneshots and `notifiedUnits` from a dataset table in `flake.lib`; `disko.nix` stays an independent literal so `greptimedb-envelope` still compares install time with boot time.
-- Closed by compose-hosts-from-cohesive-aspects.
+- Status: resolved by compose-hosts-from-cohesive-aspects (pull request 4461). Magnetite generates the fourteen oneshots from `flake.lib.zfsBootInvariants.magnetite` (`modules/lib/zfs-boot-invariants.nix`), and `modules/lib/observability-hosts.nix` reads their unit names from the same table.
 
 ### O44 [P2] [LOW] `base` and `homeManager.ai` have no named includes
 
@@ -546,7 +549,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Locations: the roughly 34 `darwin.base` and 28 `nixos.base` contributors; `homeManager.ai`.
 - Why this matters: P2 (C3) — the aggregate's parts have no names a consumer could select.
 - Approach: named sub-aspects of `base`, and one aspect per agent harness with `ai` importing them all; the obligation modules stay in base.
-- Closed by compose-hosts-from-cohesive-aspects.
+- Status: not done. compose-hosts-from-cohesive-aspects measured that naming the parts reorders argentum's system packages and every home importing `ai`, so `base` and `ai` stay implicit and named parts are left to a later change (that change's design D11 and Resolved Question 10).
 
 ### O45 [P1] [LOW] `darwin/caches.nix` duplicates `system/caches.nix`
 
@@ -554,7 +557,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Location: `modules/darwin/caches.nix`.
 - Why this matters: P1 — the cache list written twice, so each darwin `nix.conf` lists every cache twice.
 - Approach: delete the duplicate. Declared to change every darwin toplevel.
-- Closed by compose-hosts-from-cohesive-aspects.
+- Status: resolved by compose-hosts-from-cohesive-aspects (pull request 4452). `modules/darwin/caches.nix` is deleted; each darwin `nix.conf` lists the ten caches of `lib/caches.nix` once, followed by nix-darwin's own `https://cache.nixos.org/`.
 
 ### O46 [P5] [LOW] Magnetite-shared facts read from the host in tests
 
@@ -574,7 +577,7 @@ They land, and archive, in this order; each rebases onto its predecessor and is 
 3. **type-the-fleet-host-registry** (CAM-134): one typed record per host with the system, role membership and lifecycle facts derived from it; stibnite's `controller` tag renamed to `deployer-workstation`. Closes O10, O23, O32, O33. Depends on 1.
 4. **register-fleet-obligations** (CAM-135): judges registered beside their code, one judge-check convention, the fleet package set in tests, the `patched` channel removed, the two schemas declared. Closes O34, O35, O36, O39, O40, O42. Depends on 1.
 5. **declare-host-user-relations-once** (CAM-130): the per-(host, user) record, the home-manager integration aspect, one `flake` value, the omnigent worker relation, `accountOf`. Closes O01, O04, O09, O15, O20, O21, O29, O30, O31 and the user blocks of O19. Depends on 1, on 3 (the attachment record is a field of the typed host record) and on 2: `modules/system/ssh-known-hosts.nix` is the last system module that takes `flake`, and stop-reading-other-hosts-configs removes that.
-6. **compose-hosts-from-cohesive-aspects** (CAM-132): service wiring out of host bodies, cinnabar's features re-keyed, the Hetzner and GCP cloud-server aspects, the darwin workstation aspect, host facts and flags written once, module keys and activation order, the otel-collector split, generated ZFS invariants, named includes. Closes O02, O05, O26, O27, O28, O37, O38, O41, O43, O44, O45 and the template half of O19. Depends on 1, 3 and 5.
+6. **compose-hosts-from-cohesive-aspects** (CAM-132): service wiring out of host bodies, cinnabar's features re-keyed, the Hetzner and GCP cloud-server aspects, the darwin workstation aspect, host facts and flags written once, module keys and activation order, the otel-collector split, generated ZFS invariants, named includes. Closes O02, O05, O26, O27, O28, O37, O38, O41, O43, O44, O45 and the template half of O19. Depends on 1, 3 and 5. As landed, O44 was not done, and O02, O05 and the template half of O19 remain open for stibnite's documentation lines and template and the shared-reference-tree flag (see each entry's status).
 7. **seam-secrets-away-from-clan-vars** (CAM-129): one secrets seam, the only writer and reader of clan vars. Closes O25. Depends on 1, 2 and 6.
 
 O03, O06, O11, O12, O17 and O22 are outside the project and stay open.
