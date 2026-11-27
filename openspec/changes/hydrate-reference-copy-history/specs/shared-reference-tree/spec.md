@@ -2,13 +2,18 @@
 
 ### Requirement: A refreshed or deepened reference repository shows what each commit it gained changed
 
-When the writer refreshes, deepens or fetches the tags of a reference repository whose file contents the reference tree holds only in part, every participating account SHALL be able to read what each commit thereby brought into its branches' history changed, with no further acquisition request, unless the writer's answer says it could not make them readable then.
+When the writer refreshes, deepens or fetches the tags of a reference repository whose file contents the reference tree holds only in part, every participating account SHALL be able to read what each commit thereby brought into its branches' history changed, merges included, with no further acquisition request, unless the writer's answer says it could not make them readable then.
 Adding a reference repository SHALL take no more history and no more file contents than before.
 
 #### Scenario: A reference repository is refreshed
 
 - **WHEN** the writer refreshes a reference repository and the commits it brings in are few enough to make readable then
 - **THEN** every participating account reads what each of those commits changed, with no further acquisition request, and the reference tree is written by the writer alone
+
+#### Scenario: A refresh brings in merges
+
+- **WHEN** the writer refreshes a reference repository and the commits it brings in include merges, one of them merging a branch that still holds a file the reference repository's main branch had deleted before, and one of them merging two branches at once
+- **THEN** every participating account reads what each of those merges changed, as git shows a merge by default and as lazygit shows it, with no further acquisition request
 
 #### Scenario: A refresh brings in more than the writer makes readable at once
 
@@ -34,6 +39,15 @@ Adding a reference repository SHALL take no more history and no more file conten
 
 - **WHEN** a participating account makes an acquisition request for a reference repository absent from the reference tree
 - **THEN** the reference repository arrives with the same history and the same file contents as before this requirement, in no more time
+
+### Requirement: A refresh that stopped after fetching is made readable by the next
+
+When a refresh, deepening or tag fetch of a reference repository brought commits in and failed or was stopped before making them readable, the writer's next refresh, deepening or tag fetch of that reference repository SHALL make them readable as it does what it brings in itself, under the same bound.
+
+#### Scenario: A refresh stops after fetching
+
+- **WHEN** a refresh fetches a reference repository's new commits and then fails or is stopped, by a time limit or by the writer being stopped, before making them readable, and a later refresh of that reference repository brings in nothing more
+- **THEN** after that later refresh every participating account reads what each of those commits changed, with no further acquisition request
 
 ### Requirement: A tag's commit fetched without its history is readable once requested
 

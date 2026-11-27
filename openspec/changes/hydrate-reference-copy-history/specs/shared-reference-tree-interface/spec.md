@@ -2,7 +2,7 @@
 
 ### Requirement: An update makes every commit it brought in readable as a diff
 
-On a `get` of a clone already present whose `remote.origin.promisor` is true, the writer SHALL, after every command that can move a branch ref and before any tag fetch at depth 1, fetch every blob the clone lacks that `git log --diff-merges=first-parent --raw` or `git log --merges --cc --raw` names for the commits the refs under `refs/heads` and `refs/remotes` gained that none reached before, reporting the outcome in one status line.
+On a `get` of a clone already present whose `remote.origin.promisor` is true, the writer SHALL, after every command that can move a branch ref and before any tag fetch at depth 1, fetch every blob the clone lacks that `git log --diff-merges=first-parent --raw` or `git log --merges --cc --raw` names for the commits the refs under `refs/heads` and `refs/remotes` gained that none of the refs its record names reached, reporting the outcome in one status line.
 
 #### Scenario: An update brings in commits
 
@@ -18,9 +18,21 @@ Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "An update of a
 
 Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "An update of a full clone, or one that brings in nothing, walks no history".
 
+### Requirement: An update makes the merges it brought in readable with rename detection
+
+For each merge a walk covers, the writer SHALL also count and fetch the missing blobs on either side of each path `git diff-tree --raw --no-renames --diff-filter=AD` names between a parent after the first and the merge, gitlinks excluded.
+Every commit brought in then reads with lazy fetching off by `git show` and by lazygit, merges included, except under `-C`, `--find-copies-harder`, `diff.renames = copies`, `-B`, and, on a merge, `-m`, `--diff-merges=separate` or `--remerge-diff`.
+
+#### Scenario: An update brings in merges whose other sides hold paths the first parent's side lacks
+
+- **WHEN** a `get` with an update of a blobless clone brings in a merge whose second parent holds a file the first parent's side deleted before the clone was made, a merge of two branches at once whose third parent alone holds such a file, and, on a branch the clone has not checked out, a merge whose first parent's side holds a file added before the clone was made that its second parent lacks
+- **THEN** a participating account's `git --no-lazy-fetch show <commit>` and `git --no-lazy-fetch show --find-renames=50% --submodule --stat --decorate -p <commit>` succeed for every commit it brought in, and the exit log line holds `history=hydrated:4`, the four blobs no first-parent or combined listing names
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "Every commit an update brings in reads as `git show` reads it, merges included, with rename detection on" (clone `history-merges`).
+
 ### Requirement: A request that brings in no commit runs no history walk
 
-When no ref under `refs/heads` or `refs/remotes` reaches, after a request, a commit that no such ref and no shallow boundary reached before it, the request brings in nothing, and the writer SHALL run no history listing and no history fetch for it.
+When no ref under `refs/heads` or `refs/remotes` reaches, after a request, a commit that no ref the clone's record names, no boundary it names and no boundary present when the request began reached, and no such boundary is gone, the request brings in nothing, and the writer SHALL run no history listing and no history fetch for it.
 
 #### Scenario: An update moves refs only to commits the clone held
 
@@ -95,6 +107,50 @@ Before fetching any blob for a request, the writer SHALL count the missing blobs
 - **THEN** the writer fetches no blob for them, the update's exit status is unchanged, the reply holds the `history not hydrated` line, and the walk stopped once the count passed the limit
 
 Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "An update bringing in more missing blobs than the limit fetches none and says so".
+
+#### Scenario: A merge's other sides take the count past the limit
+
+- **WHEN** a `get` with an update brings in merges whose diffs against parents after the first name blobs that, with those the first-parent listing names, number one more than the history limit, and exactly the limit
+- **THEN** past the limit the writer fetches no blob and the reply holds the `history not hydrated` line, and at the limit it fetches all of them and every commit brought in is readable as a diff
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "Every commit an update brings in reads as `git show` reads it, merges included, with rename detection on" (clones `history-merges-over`, limit 3, and `history-merges-at`, limit 4).
+
+### Requirement: The writer keeps a record of what its last complete history walk saw
+
+A blobless clone's `.git/ghq-writer-hydrated`, written by the writer alone, SHALL name each `refs/heads` and `refs/remotes` ref's commit (`ref <id> <name>`) and each shallow boundary (`shallow <id>`) that its last history walk that did not fail saw.
+A clone with none SHALL get one from its refs and boundaries before the request's first fetch; after a walk that did not fail and saw other refs or boundaries, a new file SHALL be renamed over it; nothing else changes it.
+
+#### Scenario: A request brings in nothing
+
+- **WHEN** an update of a blobless clone whose record names its refs brings in nothing
+- **THEN** the record is not rewritten, and no history line or token appears
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A copy with no record gets one before the request's first fetch" (the third update of `history-killed`).
+
+### Requirement: The writer hydrates what an earlier request fetched and left unhydrated
+
+A `get` or `deepen` SHALL take what it brought in from the clone's record, so that what a timed-out, killed or failed request fetched and did not hydrate is hydrated by the next; a recorded commit the clone lacks SHALL be left out of the walk, never failing the request.
+
+#### Scenario: A request stops between its fetch and its history fetch
+
+- **WHEN** an update of a blobless clone with a record moves `origin/master` and then outlasts `commandTimeout` in its checkout, or an update of one with no record moves both branches and is killed with SIGKILL before its history walk, and a later update brings in nothing more
+- **THEN** the update on the clone with no record has written one naming the refs the clone held before that update, and each later update's reply holds `hydrated history: <path> (<N> objects fetched)`, every commit the stopped update brought in is readable as a diff, and the record names the clone's refs
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, cases "history-left-timeout" of "The writer hydrates, at the next request for a copy, what an earlier request brought in and did not hydrate" and "A copy with no record gets one before the request's first fetch".
+
+#### Scenario: An update fails and so does its history fetch
+
+- **WHEN** the remote stops serving blobs after an update's fetch, so that its checkout fails and its history fetch fails, and a later update, served again, brings in nothing more
+- **THEN** the first update exits non-zero with the `history hydrate failed` line, and the later one hydrates every commit the first brought in
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "history-left-refused" of "The writer hydrates, at the next request for a copy, what an earlier request brought in and did not hydrate".
+
+#### Scenario: The record names a commit the clone lacks
+
+- **WHEN** the record of a clone whose last update was killed before its walk also names a ref and a shallow boundary at an id no object has, and a later update brings in nothing more
+- **THEN** the later update succeeds, hydrates what the killed one brought in, and replaces the record with the clone's refs
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A copy with no record gets one before the request's first fetch" (its last two updates). git's gc keeps every object of a promisor pack, so a force-push and a gc do not make a recorded commit vanish (`logs/cam136-r4-promisor-gc-scratch-20261127-135803.log`).
 
 ### Requirement: A failed history fetch leaves the request's outcome as it was
 
@@ -193,6 +249,17 @@ Witness: `vmTests.x86_64-linux.shared-reference-tree`, subtest "readers cannot w
 - **THEN** that host's configuration fails evaluation, naming that account
 
 Witness: the assertions of `modules/nixos/shared-reference-tree.nix`, `modules/darwin/shared-reference-tree.nix` and, for darwin Omnigent workers, `modules/darwin/omnigent-host.nix`, evaluated by the per-machine checks of magnetite, pyrite and stibnite; `checks.x86_64-linux.eval-shared-reference-tree`, cases `testMissingForm`, `testNoGit` and `testSettingsNamedKey`.
+
+### Requirement: The shared root is declared as a path a gitdir: include can match
+
+`services.shared-reference-tree.root`, on NixOS and on darwin, SHALL be an absolute path with no trailing slash and no empty, `.` or `..` component; evaluation SHALL fail for any other value, naming the option, since the readers' `gitdir:<root>/` include would otherwise never apply beneath the root, or, for an empty root, apply to every repository.
+
+#### Scenario: A host declares the root with a trailing slash
+
+- **WHEN** a host declares the root as `/var/lib/ghq/`, `""`, `var/lib/ghq`, `/var//lib/ghq`, `/var/./lib/ghq` or `/var/lib/../lib/ghq`
+- **THEN** evaluation fails with ``is not of type `absolute path with no trailing slash and no empty, `.` or `..` component'``, while `/var/lib/ghq` and `/srv/.ghq/..x/...` evaluate
+
+Witness: `checks.x86_64-linux.eval-shared-reference-tree`, cases `testRootDefault`, `testRootDotted`, `testRootTrailingSlash`, `testRootEmpty`, `testRootRelative`, `testRootEmptyComponent`, `testRootDotComponent` and `testRootDotDotComponent`; the per-machine evaluation of magnetite, pyrite and stibnite.
 
 ### Requirement: Evaluation rejects an include that reopens a transport beneath the shared root
 

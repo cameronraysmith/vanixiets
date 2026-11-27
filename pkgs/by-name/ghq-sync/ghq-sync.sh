@@ -49,12 +49,13 @@ Options:
                    `git diff A B` needs A and B. On a host-shared tree the writer
                    already does this for the commits an update, deepen or tag
                    fetch brings into a clone's branches and remote-tracking
-                   branches, but not for a commit only a tag reaches, as --tags
-                   fetches one at depth 1, which needs --hydrate TAG until a
-                   branch reaches it; readers' git there refuses every
-                   transport, so a read needing absent contents fails with
-                   "transport '<scheme>' not allowed" and "could not fetch <oid>
-                   from promisor remote".
+                   branches, merges included, or at the clone's next update or
+                   deepen for a request that stops after its fetch, but not for
+                   a commit only a tag reaches, as --tags fetches one at depth
+                   1, which needs --hydrate TAG until a branch reaches it;
+                   readers' git there refuses every transport, so a read
+                   needing absent contents fails with "transport '<scheme>' not
+                   allowed" and "could not fetch <oid> from promisor remote".
   --seed-zoxide [QUERY]
                    Register every repo in `ghq list -p [QUERY]` with zoxide
                    without any network access, printing one `added: <path>` line
