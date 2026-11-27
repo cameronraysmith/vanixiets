@@ -448,4 +448,199 @@ if reply["exit"] != 0 or unreadable(y_clone, ["HEAD", "t-merged"]):
     failures.append(f"once a branch commit the update brings in reaches a tag's commit, it must be hydrated: "
                     f"unreadable {unreadable(y_clone, ['HEAD', 't-merged'])}, {reply}")
 
+# Every commit an update brings in reads as `git show` reads it, merges included,
+# with rename detection on, as lazygit's --find-renames=50% has it: on a merge it
+# diffs the merge against each parent and reads the blobs of the paths added or
+# deleted there. The files gone, big and big3 enter history before the copies
+# are cloned, and master deletes them, so no checkout fetches their blobs and no
+# first-parent diff in the update names them; same holds gone's content, so that
+# blob is present. master merges side, whose side of the diff still holds big
+# (a file the first parent's side deleted), then side2b and side3 at once, whose
+# third parent alone holds big3; other merges side2, whose side lacks x, which
+# other added before the copies were cloned and no checkout of master fetched (a
+# file added only on the mainline side). The update leaves four blobs to fetch:
+# those of s2, big, big3 and x. A limit of 3 must then fetch none and say so, as
+# for any range past it; a limit of 4 hydrates every one.
+def lines(name):
+    return "".join(f"{name} line {i}\n" for i in range(20))
+
+
+def unreadable_shown(clone_dir, commits):
+    """The commits a plain `git show`, with git's default rename detection, cannot read."""
+    return [c for c in commits if offline(clone_dir, "--no-lazy-fetch", "show", c).returncode]
+
+
+m_tree, m_bare = upstream("history-merges")
+change(m_tree, "gone", gone=lines("same"), same=lines("same"))
+m_bases = [git("rev-parse", "HEAD", cwd=m_tree)]
+for name in ("big", "big3"):
+    change(m_tree, name, **{name: lines(name)})
+    m_bases.append(git("rev-parse", "HEAD", cwd=m_tree))
+for branch, base in (("side2", 0), ("side2b", 0), ("side", 1), ("side3", 2)):
+    git("checkout", "-q", "-b", branch, m_bases[base], cwd=m_tree)
+    change(m_tree, branch, **{branch.replace("side", "s"): lines(branch)})
+git("checkout", "-q", "master", cwd=m_tree)
+for name in ("gone", "big", "big3"):
+    os.remove(os.path.join(m_tree, name))
+change(m_tree, "trim", new=lines("new"))
+git("checkout", "-q", "-b", "other", cwd=m_tree)
+change(m_tree, "x", x=lines("x"))
+git("checkout", "-q", "master", cwd=m_tree)
+git("push", "-q", "up", "master", "other", cwd=m_tree)
+m_clones = {}
+for name in ("history-merges", "history-merges-over", "history-merges-at"):
+    m_clones[name] = os.path.join(root, "github.com", "o", name)
+    git("clone", "-q", "--filter=blob:none", "--no-tags", f"file://{m_bare}", m_clones[name])
+m_old = git("for-each-ref", "--format=^%(objectname)", "refs/remotes/origin", cwd=m_clones["history-merges"]).split()
+git("merge", "-q", "--no-ff", "-m", "merge side", "side", cwd=m_tree)
+git("merge", "-q", "--no-ff", "-m", "merge side2b and side3", "side2b", "side3", cwd=m_tree)
+git("checkout", "-q", "other", cwd=m_tree)
+git("merge", "-q", "--no-ff", "-m", "merge side2", "side2", cwd=m_tree)
+git("checkout", "-q", "master", cwd=m_tree)
+git("push", "-q", "up", "master", "other", cwd=m_tree)
+for name, limit in (("history-merges", None), ("history-merges-over", 3), ("history-merges-at", 4)):
+    clone_dir = m_clones[name]
+    reply = ask({"action": "get", "target": f"github.com/o/{name}", "update": True},
+                file_cfg if limit is None else config(protocols=("file",), history_limit=limit))
+    gained = offline(clone_dir, "rev-list", "origin/master", "origin/other", *m_old).stdout.split()
+    merged = offline(clone_dir, "rev-list", "--merges", "--parents", "origin/master", "origin/other", *m_old).stdout
+    if reply["exit"] != 0 or len(gained) != 7 or sorted(len(m.split()) for m in merged.splitlines()) != [3, 3, 4]:
+        failures.append(f"merge fixture: the update must bring in 7 commits, two merges and an octopus: {gained} {merged} {reply}")
+    elif limit == 3:
+        expected = (f"history not hydrated: {os.path.realpath(clone_dir)} (more than 3 blobs missing;"
+                    " ghq-sync --hydrate REV makes a revision readable)\n")
+        if expected not in reply["stdout"] or history_token(reply) != "not-hydrated" or len(unreadable(clone_dir, gained)) < 4:
+            failures.append(f"the blobs a merge's other sides need must count against the history limit: "
+                            f"unreadable {unreadable(clone_dir, gained)}, {reply}")
+    elif unreadable(clone_dir, gained) or unreadable_shown(clone_dir, gained) or history_token(reply) != "hydrated:4":
+        failures.append(f"every merge an update brings in must read with rename detection{'' if limit is None else ' at the limit'}: "
+                        f"unreadable {unreadable(clone_dir, gained)}, by plain git show {unreadable_shown(clone_dir, gained)}, {reply}")
+
+# The writer hydrates, at the next request for a copy, what an earlier request
+# brought in and did not hydrate. Its record is the copy's
+# .git/ghq-writer-hydrated, naming the refs and shallow boundaries the last
+# complete walk ended with.
+RECORD = os.path.join(".git", "ghq-writer-hydrated")
+
+
+def recorded_refs(clone_dir):
+    """The refs the copy's record names, or None when it has none."""
+    try:
+        with open(os.path.join(clone_dir, RECORD)) as handle:
+            return sorted(line.split()[1:] for line in handle if line.startswith("ref "))
+    except FileNotFoundError:
+        return None
+
+
+def record_version(clone_dir):
+    """The record's inode and modification time, which a rewrite changes, or None when it has none."""
+    try:
+        found = os.stat(os.path.join(clone_dir, RECORD))
+    except FileNotFoundError:
+        return None
+    return found.st_ino, found.st_mtime_ns
+
+
+def current_refs(clone_dir):
+    return sorted(line.split()
+                  for line in git("for-each-ref", "--format=%(objectname) %(refname)", "refs/heads", "refs/remotes",
+                                  cwd=clone_dir).splitlines())
+
+
+def update(name, cfg=file_cfg, patch=None):
+    return finish(*start({"action": "get", "target": f"github.com/o/{name}", "update": True, "lazy": True}, cfg, patch),
+                  within=60)
+
+
+def left_behind(name, failing):
+    """An update whose fetch moves origin/master and which then fails as failing says, and the next update, which
+    brings nothing more in; the second's reply, and the commits the first brought in."""
+    tree, _, clone_dir = lazy_clone_of(name)
+    if update(name)["exit"] != 0:
+        failures.append(f"{name}: the first update must succeed")
+    for i in range(2):
+        change(tree, f"{name}{i}", f=f"{name}{i}\n")
+    git("push", "-q", "up", "master", cwd=tree)
+    old = git("rev-parse", "HEAD", cwd=clone_dir)
+    first = failing(tree, clone_dir)
+    if (git("rev-parse", "origin/master", cwd=clone_dir) != git("rev-parse", "master", cwd=tree)
+            or git("rev-parse", "HEAD", cwd=clone_dir) != old
+            or not unreadable(clone_dir, offline(clone_dir, "rev-list", "HEAD..origin/master").stdout.split())):
+        failures.append(f"{name}: the failing update must move origin/master alone and hydrate nothing: {first}")
+    git("config", "--unset", "remote.origin.uploadpack", cwd=clone_dir)
+    second = update(name)
+    return second, clone_dir, brought_in(clone_dir, old)
+
+
+def timed_out(tree, clone_dir):
+    """The checkout's on-demand fetch of the new tip's blob stalls past the command timeout."""
+    put(stalled_ids, git("rev-parse", "master:f", cwd=tree) + "\n")
+    git("config", "remote.origin.uploadpack", stalling, cwd=clone_dir)
+    reply = update(os.path.basename(clone_dir), config(protocols=("file",), command_timeout=2))
+    if reply["exit"] != 124 or history_lines(reply):
+        failures.append(f"the timed-out update must end before its history fetch: {reply}")
+    return reply
+
+
+def refused(tree, clone_dir):
+    """The remote stops serving blobs after the update's fetch: the checkout and the history fetch both fail."""
+    put(refused_ids, "\n".join(git("rev-parse", f"master~{n}:f", cwd=tree) for n in (0, 1)) + "\n")
+    git("config", "remote.origin.uploadpack", refusing, cwd=clone_dir)
+    reply = update(os.path.basename(clone_dir))
+    if reply["exit"] in (0, None) or "history hydrate failed:" not in reply["stdout"]:
+        failures.append(f"the refused update must fail, and its history fetch with it: {reply}")
+    return reply
+
+
+for name, failing in (("history-left-timeout", timed_out), ("history-left-refused", refused)):
+    reply, clone_dir, commits = left_behind(name, failing)
+    if (reply["exit"] != 0 or len(commits) != 2 or unreadable(clone_dir, commits)
+            or not (history_token(reply) or "").startswith("hydrated:") or recorded_refs(clone_dir) != current_refs(clone_dir)):
+        failures.append(f"{name}: the next update must hydrate what the failed one brought in and record its refs: "
+                        f"{commits} unreadable {unreadable(clone_dir, commits)}, {reply}")
+
+# A copy with no record gets one before the request's first fetch, from the refs
+# the copy holds then, so a request killed with SIGKILL between its fetch and its
+# history fetch leaves its commits to the next request. A request that brings
+# nothing in leaves the record as it is. A record naming a commit the copy no
+# longer holds is read without it: git's gc keeps the commits of a promisor pack,
+# so a force-push and a gc do not remove one, and the case writes an id no
+# object has into the record instead.
+killing = "import os, signal\ndef walk_history(*args):\n    os.kill(os.getpid(), signal.SIGKILL)\nhandler.walk_history = walk_history\n"
+k_tree, _, k_clone = lazy_clone_of("history-killed")
+held_refs = current_refs(k_clone)
+for i in range(2):
+    change(k_tree, f"killed{i}", f=f"killed{i}\n")
+git("push", "-q", "up", "master", cwd=k_tree)
+old = git("rev-parse", "HEAD", cwd=k_clone)
+reply = update("history-killed", patch=killing)
+if reply["exit"] is not None or recorded_refs(k_clone) != held_refs:
+    failures.append(f"a copy with no record must get one, naming the refs it held, before the request's first fetch: {reply}")
+reply = update("history-killed")
+commits = brought_in(k_clone, old)
+if (reply["exit"] != 0 or len(commits) != 2 or unreadable(k_clone, commits)
+        or not (history_token(reply) or "").startswith("hydrated:") or recorded_refs(k_clone) != current_refs(k_clone)):
+    failures.append(f"the update after a killed one must hydrate what the killed one brought in: "
+                    f"{commits} unreadable {unreadable(k_clone, commits)}, {reply}")
+record_stat = record_version(k_clone)
+reply = update("history-killed")
+if (reply["exit"] != 0 or history_lines(reply) or history_token(reply) or record_stat is None
+        or record_version(k_clone) != record_stat):
+    failures.append(f"an update that brings nothing in must leave the record as it is: {reply}")
+for i in range(2):
+    change(k_tree, f"killed again{i}", f=f"killed again{i}\n")
+git("push", "-q", "up", "master", cwd=k_tree)
+old = git("rev-parse", "HEAD", cwd=k_clone)
+update("history-killed", patch=killing)
+vanished = subprocess.run(["git", "hash-object", "--stdin"], input=b"no such commit\n", capture_output=True,
+                          check=True).stdout.decode().strip()
+with open(os.path.join(k_clone, RECORD), "a") as handle:
+    handle.write(f"ref {vanished} refs/remotes/origin/vanished\nshallow {vanished}\n")
+reply = update("history-killed")
+commits = brought_in(k_clone, old)
+if (reply["exit"] != 0 or len(commits) != 2 or unreadable(k_clone, commits)
+        or not (history_token(reply) or "").startswith("hydrated:") or recorded_refs(k_clone) != current_refs(k_clone)):
+    failures.append(f"a record naming a commit the copy lacks must not fail the update or its history fetch: "
+                    f"{commits} unreadable {unreadable(k_clone, commits)}, {reply}")
+
 report("ghq-writer-handler: every history case behaved")

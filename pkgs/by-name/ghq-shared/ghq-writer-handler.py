@@ -31,16 +31,21 @@ of the command, under the repository's lock.
 A get of a clone already present, and a deepen, of a blobless clone then fetch,
 still under the lock, every missing blob that the diff of each commit the
 request brought into the clone's branches and remote-tracking branches, or below
-a shallow boundary it removed, reads, as `git show` shows a commit, with the
-filter the clone records, unless more than historyLimit are missing or the clone
-records no filter. A request that brought no commit in walks nothing. A commit
-only a tag fetched at depth 1 reaches is left as it arrives, until a commit a
-branch gains reaches it; `ghq-sync --hydrate TAG` makes one readable. One status
-line says what the history fetch did. Any exception while reading the clone's
-refs before the request or walking after it is the history fetch's failure:
-the request's exit status stays as its other commands set it, and the exit log
-line adds history=hydrated:<n>, history=not-hydrated or history=failed, on every
-path after the history fetch.
+a shallow boundary it removed, reads, as `git show` shows a commit with rename
+detection, merges included, with the filter the clone records, unless more than
+historyLimit are missing or the clone records no filter. What a request brought
+in is measured from the refs and boundaries the clone's last complete history
+walk ended with, recorded in .git/ghq-writer-hydrated, so a later request
+hydrates what one that failed or was killed after its fetch left behind; a clone
+with no record gets one from its refs before the request's first fetch. A
+request that brought no commit in walks nothing. A commit only a tag fetched at
+depth 1 reaches is left as it arrives, until a commit a branch gains reaches it;
+`ghq-sync --hydrate TAG` makes one readable. One status line says what the
+history fetch did. Any exception while reading the clone's refs before the
+request or walking after it is the history fetch's failure: the request's exit
+status stays as its other commands set it, and the exit log line adds
+history=hydrated:<n>, history=not-hydrated or history=failed, on every path
+after the history fetch.
 
 Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group",
 "allowedProtocols", "lockDir" and optionally "lockTimeout", "commandTimeout"
@@ -92,7 +97,16 @@ CHECK_BATCH = 10_000
 # `git show --stat -p` diffs a commit against its first parent and shows a
 # merge's combined diff. Without rename detection no blob is read to list them.
 HISTORY_LISTINGS = (["--diff-merges=first-parent"], ["--merges", "--cc"])
+# Rename detection on a merge also diffs it against each parent after the first
+# and reads the blobs of the paths added or deleted there, which neither listing
+# names when the merge and its first parent agree on the path.
+MERGE_SIDES = ["diff-tree", "--stdin", "-r", "--raw", "--no-abbrev", "--no-renames", "--no-commit-id",
+               "--diff-filter=AD"]
 GITLINK = b"160000"
+# The refs and shallow boundaries a clone's last complete history walk ended
+# with, under its .git, which only the writer can write.
+RECORD = "ghq-writer-hydrated"
+RECORD_LINE = re.compile(rb"(?:ref ([0-9a-f]{40}|[0-9a-f]{64}) (refs/\S+)|shallow ([0-9a-f]{40}|[0-9a-f]{64}))\Z")
 
 MAX_REQUEST = 4096
 READ_TIMEOUT = 30
@@ -618,16 +632,62 @@ def history_failed(path, phase, failure):
     return History("failed", f"history hydrate failed: {path} ({phase}: {reason})\n", getattr(failure, "err", b""))
 
 
-def history_before(path, env):
-    """A blobless clone's branch refs and shallow boundaries before a request changes them; None for any other clone.
+def read_record(path):
+    """The branch refs, by name, and shallow boundaries the clone's record names, or None when it has none.
 
-    Any exception reading them is kept as Unread, for the walk to report: the
-    request goes on without a walk. Exception, not BaseException: SystemExit and
-    KeyboardInterrupt are requests to stop the handler, which the history fetch
-    has no business absorbing.
+    Ref names and ids are bytes, boundaries text, as branch_refs and boundaries
+    give them.
     """
     try:
-        return (branch_refs(path, env), boundaries(path)) if blobless(path, env) else None
+        with open(os.path.join(path, ".git", RECORD), "rb") as handle:
+            lines = handle.read().splitlines()
+    except FileNotFoundError:
+        return None
+    refs, shallow = {}, set()
+    for line in lines:
+        parsed = RECORD_LINE.match(line)
+        if not parsed:
+            raise HistoryFailed(f"{RECORD} holds a line that is neither a ref nor a boundary")
+        oid, ref, boundary = parsed.groups()
+        if boundary:
+            shallow.add(boundary.decode())
+        else:
+            refs[ref] = oid
+    return refs, shallow
+
+
+def write_record(path, refs, shallow):
+    """Replace the clone's record in one rename, so a request stopped at any point leaves the old record or the new."""
+    record = os.path.join(path, ".git", RECORD)
+    staged = f"{record}.new"
+    with open(staged, "wb") as handle:
+        handle.write(b"".join(b"ref " + oid + b" " + ref + b"\n" for ref, oid in sorted(refs.items())))
+        handle.write("".join(f"shallow {commit}\n" for commit in sorted(shallow)).encode())
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(staged, record)
+
+
+def history_before(path, env):
+    """What a blobless clone held before a request changes it; None for any other clone.
+
+    That is the refs and boundaries its record names, which its last complete
+    history walk ended with, and the boundaries it has now. A clone with no
+    record gets one from the refs and boundaries it has now, written before the
+    request's first fetch. Any exception reading them is kept as Unread, for the
+    walk to report: the request goes on without a walk. Exception, not
+    BaseException: SystemExit and KeyboardInterrupt are requests to stop the
+    handler, which the history fetch has no business absorbing.
+    """
+    try:
+        if not blobless(path, env):
+            return None
+        start = boundaries(path)
+        recorded = read_record(path)
+        if recorded is None:
+            recorded = branch_refs(path, env), start
+            write_record(path, *recorded)
+        return recorded, start
     except Exception as failure:
         return Unread(failure)
 
@@ -642,31 +702,42 @@ def gains_commits(path, env, revisions):
 
 
 def walk_history(path, env, config, before):
-    """The history fetch of what a request brought into a blobless clone, or None when it brought in nothing.
+    """The history fetch of what a blobless clone gained since its last complete walk, or None when it gained nothing.
 
-    What it brought in is the commits its branches and remote-tracking branches
-    reach that neither any ref nor any shallow boundary reached before, and those
-    from each shallow boundary it removed down to, and excluding, the boundaries
-    now present. A ref moved to a commit the clone already held, or deleted,
-    brings in nothing. The walked range excludes only what the refs reached
-    before, so a commit that only a tag reached, at depth 1, is walked once a
-    commit a branch gained reaches it; one only a tag reaches is not. Any
+    What it gained is the commits its branches and remote-tracking branches
+    reach that neither a recorded ref nor a recorded or present shallow boundary
+    reached, and those from each such boundary since removed down to, and
+    excluding, the boundaries now present; a request killed or failed after its
+    fetch leaves its commits to the next. A ref moved to a commit the clone
+    already held, or deleted, brings in nothing. A recorded commit the clone no
+    longer holds is left out. The walked range excludes only what the recorded
+    refs reached, so a commit that only a tag reached, at depth 1, is walked once
+    a commit a branch gained reaches it; one only a tag reaches is not. Unless the
+    walk fails, the record then names the refs and boundaries the walk saw. Any
     exception is the history fetch's failure, never the request's.
     """
     if isinstance(before, Unread):
         return history_failed(path, "snapshot", before.failure)
     try:
-        old_refs, old_boundaries = before
+        (old_refs, recorded_boundaries), start = before
+        old_boundaries = recorded_boundaries | start
         new_refs, new_boundaries = branch_refs(path, env), boundaries(path)
         reached = {oid.decode() for oid in old_refs.values()}
         moved = {oid.decode() for ref, oid in new_refs.items() if old_refs.get(ref) != oid} - reached
+        removed = old_boundaries - new_boundaries
+        if moved or removed:
+            lacking = {oid.decode() for oid in absent(path, {**env, "GIT_NO_LAZY_FETCH": "1"},
+                                                     [c.encode() for c in sorted(reached | old_boundaries)])}
+            reached, old_boundaries, removed = reached - lacking, old_boundaries - lacking, removed - lacking
         ranges = []
         if moved and gains_commits(path, env, sorted(moved) + [f"^{c}" for c in sorted(reached | old_boundaries)]):
             ranges.append(sorted(moved) + [f"^{commit}" for commit in sorted(reached)])
-        removed = sorted(old_boundaries - new_boundaries)
         if removed:
-            ranges.append(removed + [f"^{commit}" for commit in sorted(new_boundaries)])
-        return hydrate_history(path, env, config, ranges) if ranges else None
+            ranges.append(sorted(removed) + [f"^{commit}" for commit in sorted(new_boundaries)])
+        history = hydrate_history(path, env, config, ranges) if ranges else None
+        if (new_refs, new_boundaries) != (old_refs, recorded_boundaries):
+            write_record(path, new_refs, new_boundaries)
+        return history
     except Exception as failure:
         return history_failed(path, "walk", failure)
 
@@ -679,12 +750,23 @@ def absent(path, env, ids):
     return [line.split()[0] for line in checked.stdout.splitlines() if line.endswith(b" missing")]
 
 
+def merge_sides(path, env, given):
+    """A line `<merge> <parent>` for each merge among the revisions given and each of its parents after the first."""
+    merges = git(path, env, "rev-list", "--merges", "--parents", "--stdin", stdin=given)
+    if merges.returncode:
+        raise HistoryFailed(f"{label(merges.args)} exited {merges.returncode}", merges.stderr)
+    return b"".join(merge + b" " + parent + b"\n"
+                    for merge, _, *others in (line.split() for line in merges.stdout.splitlines()) for parent in others)
+
+
 def missing_blobs(path, env, ranges, limit):
     """The blobs the clone lacks that the diffs of the commits in ranges read, or None once more than limit are counted.
 
     Each range is a list of revisions, `^` marking an excluded one, given to git
-    on standard input, as a range may name every boundary of a clone. env must
-    disable lazy fetching. Gitlinks and null ids name no blob.
+    on standard input, as a range may name every boundary of a clone. The blobs
+    are those of the two listings, and for each merge those of the paths added or
+    deleted between each parent after the first and the merge, all under one
+    count. env must disable lazy fetching. Gitlinks and null ids name no blob.
     """
     seen, batch, missing = set(), [], []
 
@@ -708,14 +790,24 @@ def missing_blobs(path, env, ranges, limit):
             return check()
         return True
 
+    def within(*args, stdin):
+        """Whether the count is still within the limit after the raw lines of git's args, given stdin, are taken."""
+        listed = git(path, env, *args, stdin=stdin, lines=take)
+        if len(missing) > limit:
+            return False
+        if listed.returncode:
+            raise HistoryFailed(f"{label(listed.args)} exited {listed.returncode}", listed.stderr)
+        return True
+
     for revisions in ranges:
+        given = "".join(f"{revision}\n" for revision in revisions).encode()
         for listing in HISTORY_LISTINGS:
-            listed = git(path, env, "log", *listing, "--raw", "--no-abbrev", "--no-renames", "--format=", "--stdin",
-                         "--", stdin="".join(f"{revision}\n" for revision in revisions).encode(), lines=take)
-            if len(missing) > limit:
+            if not within("log", *listing, "--raw", "--no-abbrev", "--no-renames", "--format=", "--stdin", "--",
+                          stdin=given):
                 return None
-            if listed.returncode:
-                raise HistoryFailed(f"{label(listed.args)} exited {listed.returncode}", listed.stderr)
+        sides = merge_sides(path, env, given)
+        if sides and not within(*MERGE_SIDES, stdin=sides):
+            return None
     return missing if check() else None
 
 
