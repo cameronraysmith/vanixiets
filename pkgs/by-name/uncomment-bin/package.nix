@@ -57,7 +57,12 @@ stdenv.mkDerivation (finalAttrs: {
   versionCheckProgram = "${placeholder "out"}/bin/uncomment";
   doInstallCheck = true;
 
-  passthru = { inherit pin pinPlan; };
+  passthru = {
+    inherit pin pinPlan;
+    # Commit the release tag points at; structure-release-alignment-uncomment
+    # requires the uncomment skill's apm.yml ref to equal it.
+    sourceRev = pin.rev;
+  };
 
   meta = {
     description = "Fast tree-sitter based tool to remove comments from source code";

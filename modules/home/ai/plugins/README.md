@@ -48,7 +48,7 @@ The download fails when the superpowers or icskills skills declared in the group
 To bump a dependency, edit its `ref:` (for superpowers, agency and icskills, every line of the repository together), build `.#apm-skills-compose`, and copy the hash from the mismatch into `apmDepsHash`.
 After the change reaches `main`, `just agents-relock` refreshes the root `apm.lock.yaml`.
 
-Five tools ship their agent skill in the same upstream release as their CLI, and the skill's ref must equal the commit the CLI package records:
+Six tools ship their agent skill in the same upstream release as their CLI, and the skill's ref must equal the commit the CLI package records:
 
 | Skill repository | Recorded commit |
 |---|---|
@@ -57,9 +57,10 @@ Five tools ship their agent skill in the same upstream release as their CLI, and
 | `microsoft/playwright-cli` | `playwright-cli.src.rev` |
 | `max-sixty/worktrunk` | `worktrunk-bin.sourceRev` |
 | `github/gh-stack` | `gh-stack.sourceRev` (`modules/nixpkgs/overlays/gh-stack.nix`) |
+| `polylint/uncomment` | `uncomment-bin.sourceRev` |
 
 `modules/checks/structure/cli-skill-release-alignment.nix` holds one check per pair, a negative control, a refetch of `github/gh-stack` at the recorded commit with nixpkgs' source hash, and a byte comparison of the delivered `playwright-cli` skill with the CLI's source.
-For `mergify-cli-bin`, `worktrunk-bin` and `linear-cli`, `realize-pin` (`nix run .#realize-pin -- <package> <version>`) rewrites the recorded commit and the `apm.yml` ref together through each pin's `apmRef` companion, and recomputes `apmDepsHash` in `pkgs/by-name/apm-skills-compose/hashes.json` through its `fixedOutputHash` companion.
+For `mergify-cli-bin`, `worktrunk-bin`, `linear-cli` and `uncomment-bin`, `realize-pin` (`nix run .#realize-pin -- <package> <version>`) rewrites the recorded commit and the `apm.yml` ref together through each pin's `apmRef` companion, and recomputes `apmDepsHash` in `pkgs/by-name/apm-skills-compose/hashes.json` through its `fixedOutputHash` companion.
 
 ### For marketplace users
 
@@ -91,7 +92,7 @@ In the Claude desktop app, Customize > Plugins > Add marketplace takes the same 
 Each of the 18 skill groups is one plugin whose entry carries `skills: ["./.apm/skills"]`, `strict: false` and no version, so installs follow the repository's commits.
 
 The plugins carry only first-party skills.
-The 92 remote skills reach users only through apm or this repository's home-manager configuration, and the four `agent-context-*` groups are not offered to Claude.
+The 93 remote skills reach users only through apm or this repository's home-manager configuration, and the four `agent-context-*` groups are not offered to Claude.
 On a machine where home-manager already delivers the skills to `~/.claude/skills`, installing a plugin loads its skills a second time, namespaced as `<group>:<skill>`.
 
 Two behaviours the Claude file relies on are observed, not documented: that Claude installs a manifest-free entry whose skills sit in the hidden `./.apm/skills` (world assumptions A217 for Claude Code, A218 for the desktop app), and that a plugin without any version follows the marketplace's commits (A219).

@@ -36,6 +36,10 @@
           repo = "github/gh-stack";
           rev = pkgs.gh-stack.sourceRev;
         };
+        uncomment = {
+          repo = "polylint/uncomment";
+          rev = self'.packages.uncomment-bin.sourceRev;
+        };
       };
       # One comparison, shared by the pair checks and the negative control, so
       # the control exercises exactly the logic the pairs rely on.
@@ -94,6 +98,11 @@
         };
         # nixbot: 0 runs, too few to class (design D4)
         structure-release-alignment-playwright-cli = {
+          class = "medium";
+          measured = false;
+        };
+        # nixbot: 0 runs, too few to class
+        structure-release-alignment-uncomment = {
           class = "medium";
           measured = false;
         };

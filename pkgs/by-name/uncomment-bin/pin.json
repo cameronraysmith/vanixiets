@@ -35,5 +35,37 @@
         }
       }
     }
-  }
+  },
+  "rev": "ec906fabac0d8c9c7536c29718ced19c369f4f24",
+  "companions": [
+    {
+      "path": "modules/home/ai/plugins/preferences-code-and-collaboration-conventions/apm.yml",
+      "kind": {
+        "apmRef": {
+          "git": "polylint/uncomment"
+        }
+      }
+    },
+    {
+      "path": "pkgs/by-name/apm-skills-compose/hashes.json",
+      "kind": {
+        "fixedOutputHash": {
+          "package": "apm-skills-compose",
+          "attr": "apmDepsHash",
+          "fodAttr": "deps"
+        }
+      }
+    },
+    {
+      "path": "pkgs/by-name/apm-skills-compose/skills.json",
+      "kind": {
+        "remoteSkillHashes": {
+          "git": "polylint/uncomment",
+          "skills": [
+            "uncomment"
+          ]
+        }
+      }
+    }
+  ]
 }

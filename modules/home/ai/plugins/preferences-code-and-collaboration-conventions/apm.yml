@@ -8,3 +8,13 @@ dependencies:
     # claude_skill. The commit is pinned here only; Nix downloads it in apm-deps
     # (pkgs/by-name/apm-skills-compose/deps.nix).
     - theclaymethod/unslop#d81f5196167ded24f46fced04958c0c12d681798
+    # uncomment ships one agent skill under skills/uncomment/ in the same
+    # release as its CLI; the skills subset takes only that directory with its
+    # references/ sibling. The commit is pinned here only; Nix downloads it in
+    # apm-deps. It is the release commit of the CLI version and must equal
+    # pkgs.uncomment-bin.sourceRev (structure-release-alignment-uncomment);
+    # realize-pin keeps this ref and the pin's rev in step through the pin's
+    # apmRef companion.
+    - git: polylint/uncomment
+      ref: ec906fabac0d8c9c7536c29718ced19c369f4f24
+      skills: [uncomment]

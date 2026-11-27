@@ -9,6 +9,8 @@ description: Uncomment-driven workflow for auditing and removing noise comments 
 
 This skill is the operational enforcement arm of the code-comments policy defined in `preferences-style-and-conventions` §"Code comments"; it does not restate that policy but drives it over real trees.
 It is a workflow sibling to `preferences-git-history-cleanup`, and like it, a comment-only cleanup is a legitimate standalone change.
+The tool's own usage skill is `uncomment`, written by its upstream and pinned to the same release as `uncomment-bin`; load it for the commands, the scan record fields, `keep`, tag linting, configuration layering and the Rust library.
+This skill adds what that one leaves out: the policy's cautions about what uncomment removes by default and why it never runs unattended, the classification gate between census and apply, and this repository's configuration, the hardened `uncomment.toml` template beside this file.
 
 ## The tool: uncomment
 
