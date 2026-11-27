@@ -451,6 +451,36 @@ eval-identity systems="x86_64-linux aarch64-darwin" rev="" workers="2":
   nix run --accept-flake-config .#nix-classic-identity -- {{ if rev == "" { "" } else { "--rev " + rev } }} || failed=1
   exit "$failed"
 
+# The cross-revision drvPath oracle: every nixos/darwin toplevel, every home activationPackage,
+# checks.<systems> and vmTests.<vm-systems> at two commits, diffed; nothing is built. Unlike
+# eval-identity it holds the evaluator fixed (stock nix) and varies the revision. Differences must
+# be declared in `allow` (a change's drv-delta.txt; format in `nix run .#drv-diff -- --help`);
+# the checks built from the whole flake source are allowed by modules/apps/drv-diff-base-allow.txt.
+# Each side is read from its commit only, so pass a jj change by commit id:
+#   $(jj log -r <rev> --no-graph -T commit_id)
+# Usage: just drv-diff <before> <after> [openspec/changes/<change>/drv-delta.txt]
+[group('nix')]
+drv-diff before after allow="" systems="x86_64-linux aarch64-darwin" vm-systems="x86_64-linux aarch64-linux":
+  nix run --accept-flake-config .#drv-diff -- --before {{before}} --after {{after}} {{ if allow == "" { "" } else { "--allow " + allow } }} --systems "{{systems}}" --vm-systems "{{vm-systems}}"
+
+# Re-judge an earlier drv-diff run without evaluating anything: its recorded dumps against the
+# current base allow-list and `allow`; the report goes to <dir>/report.<UTC> beside the original.
+# Usage: just drv-diff-rejudge logs/drv-diff-<before12>-<after12>-<UTC> [openspec/changes/<change>/drv-delta.txt]
+[group('nix')]
+drv-diff-rejudge dir allow="":
+  nix run --accept-flake-config .#drv-diff -- --reuse {{dir}} {{ if allow == "" { "" } else { "--allow " + allow } }}
+
+# Evaluation cost of one attribute at two commits with stock nix: an untimed warm-up per commit,
+# then `runs` rounds of before, after in fresh processes with NIX_SHOW_STATS; every run and its
+# conditions go to logs/eval-cost-<label>-<UTC>.{log,jsonl}. mode=drv evaluates <attr>.drvPath,
+# mode=keys the attribute names of <attr>. Baselines: docs/notes/development/eval-cost-baselines.md.
+# Pass a jj change by commit id: $(jj log -r <rev> --no-graph -T commit_id)
+# Usage: just eval-cost darwinConfigurations.stibnite.config.system.build.toplevel <before> <after>
+#        just eval-cost checks.x86_64-linux <before> <after> 2 keys
+[group('nix')]
+eval-cost attr before after runs="2" mode="drv":
+  nix run --accept-flake-config .#eval-cost -- --attr '{{attr}}' --before {{before}} --after {{after}} --runs {{runs}} --mode {{mode}}
+
 # Verify system configuration builds after updates (run before activate)
 [group('nix')]
 verify:

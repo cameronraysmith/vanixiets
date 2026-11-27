@@ -1,0 +1,11 @@
+# The base allow-list of `just drv-diff` (modules/apps/drv-diff.sh): the
+# dumped checks whose derivation takes the whole flake source, or every
+# source file of a kind under modules/ and pkgs/, as an input, so that
+# their drvPath differs between almost any two commits. They are
+# may-change permanently and applied on every run; a change's own
+# drv-delta.txt never names them.
+checks.x86_64-linux.gitleaks may-change  # modules/checks/security.nix:25, src = self: whole flake source
+checks.aarch64-darwin.gitleaks may-change  # modules/checks/security.nix:25, src = self: whole flake source
+checks.x86_64-linux.treefmt may-change  # modules/formatting.nix:4, treefmt-nix's checks.treefmt checks projectRoot, default self: whole flake source
+checks.aarch64-darwin.treefmt may-change  # modules/formatting.nix:4, treefmt-nix's checks.treefmt checks projectRoot, default self: whole flake source
+checks.x86_64-linux.ntfy-tls-verification may-change  # modules/checks/ntfy-tls-verification.nix:45-65: every .sh/.bash/.nix/.py/.ts/.js file under modules/ and pkgs/
