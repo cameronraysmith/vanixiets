@@ -7,7 +7,7 @@ linear_story_state: In Progress
 linear_team: CAM
 last_synced_state: In Progress
 last_synced_at: "2026-11-26T04:59:43Z"
-review_round: 2
+review_round: 3
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T04:04:41Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-127 created in Todo on team CAM with no project, description seeded from proposal.md; state confirmed by read-only view" }
@@ -31,7 +31,7 @@ Decisions tagged `D<n>` are developed in `design.md`; the operator settled the s
 - From: `s3://sciexp/omnigraph/clusters/cookbooks-f17`, 4 min 50 s per start.
 - To: `/var/lib/omnigraph/clusters/cookbooks-f17` on dataset `zroot/root/omnigraph` (quota 20 GiB, auto-snapshots on) mounted at `/var/lib/omnigraph`, the omnigraph units' state directory, created and seeded fresh by the existing bootstrap (D1, D2).
 - Every omnigraph unit runs as the static user `omnigraph` instead of a `DynamicUser`, on either store, so it owns every file on the dataset; on a local root the `omnigraph-cluster` wrapper and the lock recovery run `omnigraph` as that user too (D13).
-- One setting, `flake.lib.omnigraphClusterRoots.stores.magnetite`, selects local disk or R2 for the same root name, and magnetite's internal option `vanixiets.omnigraphRootStore`, its backup and the local-root units it notifies all follow it; everything R2-specific stays, and switching back serves the R2 root as it was left (D3). On every NixOS host, activation removes each textfile in node_exporter's directory that no declared writer writes, so the backup's stamp goes with the switch rather than firing alerts on a file left in `/run` (D3).
+- One setting, `flake.lib.omnigraphClusterRoots.stores.magnetite`, selects local disk or R2 for the same root name, and magnetite's internal option `vanixiets.omnigraphRootStore`, its backup and the local-root units it notifies all follow it; everything R2-specific stays, and switching back serves the R2 root as it was left (D3). On every NixOS host, activation, at boot and on `switch-to-configuration switch` and `test`, removes each textfile in node_exporter's directory that no declared writer writes, so the backup's stamp goes with the switch, or with the reboot after a `boot` switch, rather than firing alerts on a file left in `/run` (D3).
 
 **Stale-lock recovery on a local root**
 - The server's own start clears a crashed server's lock only when no omnigraph process has the root open, the lock is a `serve` lock and its pid is dead or it predates the boot, by its exact id; each recovery is counted and posts an info notice; every other end of the recovery, an unreadable answer or an unforeseen failure included, refuses, posts its reason and manual step without any process's arguments, and the start fails visibly (D4).

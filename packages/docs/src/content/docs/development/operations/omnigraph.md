@@ -25,6 +25,7 @@ It is not a host setting: changing it is a pull request against `modules/lib/omn
 Two things must exist before a host serves `"local"` for the first time, and evaluation checks neither.
 The dataset `zroot/root/omnigraph`, mounted at `/var/lib/omnigraph`, is created by hand on an installed host; `disko.nix` declares it only for a reinstall.
 Without it the mount `var-lib-omnigraph.mount` fails at the switch, every omnigraph unit, each of which requires that mount through `RequiresMountsFor`, fails to start on that dependency, and `zfs-set-root-omnigraph-quota` fails on the missing dataset; the switch reports those units failed and their failure notices arrive.
+The mount `/var/lib/omnigraph` has the options `defaults,zfsutil` and no `nofail`, so `local-fs.target` requires it, and the next boot without the dataset stops in emergency mode; create the dataset before the first switch to `"local"`.
 The backup's vars must be generated and committed: `omnigraph-backup-r2`, whose R2 keys `clan machines update` prompts for, and `omnigraph-backup-restic`, which it generates.
 `stores` names magnetite alone today, and magnetite has both; a host added to it needs both before its first deploy on `"local"`.
 
@@ -275,6 +276,7 @@ The units run as `omnigraph` on both stores, so switching changes no unit's user
 Change that one value and deploy magnetite; nothing else needs editing.
 The backup turns off with the store, so the nightly job, its timer and `omnigraph-backup-metric` are no longer defined, and neither is the quota oneshot; magnetite's row stops listing those three units, so no failure notice names them, and `OmnigraphBackupStale` no longer expects magnetite.
 The backup's textfile goes at the switch: `omnigraph-backup` is no longer among `vanixiets.nodeExporter.textfileWriters`, so the activation removes `/run/node-exporter-textfile/omnigraph-backup.prom` and prints `node-exporter-textfile: removed /run/node-exporter-textfile/omnigraph-backup.prom, which no writer in vanixiets.nodeExporter.textfileWriters writes`; node_exporter's next scrape no longer has the stamp or the file's mtime, so neither `OmnigraphBackupStale` nor `HostProbeStale` fires on a file left behind (`modules/nixos/node-exporter-textfile.nix`, which removes every textfile no declared writer writes).
+NixOS runs that activation at boot and on `switch-to-configuration switch` and `test`, not on `boot` or `dry-activate`; after a `switch-to-configuration boot` to `"r2"` the running generation still writes the file until the reboot, which empties `/run`, and the new generation's activation at boot finds nothing to remove.
 The backup repository in `sciexp-omnigraph-backup` and the `omnigraph-backup-r2` and `omnigraph-backup-restic` vars stay as they are, for a later return to the disk.
 `checks.x86_64-linux.omnigraph-retired-roots` evaluates magnetite on both stores and holds what the switch changes: the root's location, the R2 environment and credential of the server, the backup's option, whether the backup's textfile is among the files the activation keeps, which of those three units are notified, and that every notified unit is a service with an `ExecStart`.
 

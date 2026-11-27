@@ -12,11 +12,15 @@
 # The directory is under /run, which only a reboot empties, and node_exporter
 # exports every `*.prom` file in it whoever wrote it, so a file whose writer
 # a deploy removed would stay exported, and HostProbeStale would fire on its
-# age. The activation script below, which NixOS runs at boot and on every
-# switch-to-configuration, after the units a switch stops have stopped and
-# before it starts the new ones, removes every `*.prom` file in the
-# directory that is not in vanixiets.nodeExporter.textfiles and prints a line
-# for each. A writer's temporary file ends in `.tmp` and is left alone.
+# age. The activation script below, which NixOS runs at boot, before any
+# unit starts, and on switch-to-configuration switch and test, after the
+# units the switch stops have stopped and before it starts the new ones,
+# removes every `*.prom` file in the directory that is not in
+# vanixiets.nodeExporter.textfiles and prints a line for each. A writer's
+# temporary file ends in `.tmp` and is left alone. switch-to-configuration
+# boot does not activate, so a writer that a boot switch drops keeps its
+# file until the reboot, which empties /run; until then the running
+# generation still holds that writer.
 # vmTests.x86_64-linux.omnigraph-local-root plants a file no writer
 # declares, switches, and requires it gone and the declared ones kept.
 # The assertion keeps the directory flag to at most one in node_exporter's

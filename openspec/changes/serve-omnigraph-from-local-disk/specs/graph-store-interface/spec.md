@@ -56,13 +56,18 @@ magnetite's module SHALL declare the internal option `vanixiets.omnigraphRootSto
 
 ### Requirement: Activation removes every textfile no declared writer writes
 
-`modules/nixos/node-exporter-textfile.nix` SHALL declare the read-only `vanixiets.nodeExporter.textfiles`, `<name>.prom` for each name in `vanixiets.nodeExporter.textfileWriters`, and an activation script that, at boot and on every `switch-to-configuration`, removes and prints each `*.prom` file in `textfileDirectory` not in that list and leaves every other file.
+`modules/nixos/node-exporter-textfile.nix` SHALL declare the read-only `vanixiets.nodeExporter.textfiles`, `<name>.prom` for each name in `vanixiets.nodeExporter.textfileWriters`, and an activation script that, at boot and on `switch-to-configuration switch` and `test`, removes and prints each `*.prom` file in `textfileDirectory` not in that list and leaves every other file.
 Every textfile writer SHALL write only the file its declared name gives.
 
 #### Scenario: a file no writer declares
 
 - **WHEN** `vmTests.x86_64-linux.omnigraph-local-root` plants `retired-writer.prom` beside the declared writers' files and a `.prom.tmp` file and runs `switch-to-configuration test`
 - **THEN** `retired-writer.prom` is gone and `node-exporter-textfile: removed <path>, which no writer in vanixiets.nodeExporter.textfileWriters writes` printed, every declared file and the `.tmp` file are kept, byte for byte where no writer rewrote them, and node_exporter's next scrape has none of the removed file's series
+
+#### Scenario: a boot switch that drops a writer
+
+- **WHEN** `switch-to-configuration boot` installs a generation whose `vanixiets.nodeExporter.textfileWriters` lacks a writer the running generation has
+- **THEN** the switch does not activate, so that writer's file stays in `textfileDirectory`, still written by the running generation's writer, until the reboot, which empties `/run` and runs the script, and no alert fires on the file; `dry-activate` does not run the script either
 
 #### Scenario: the backup's file on either store
 
