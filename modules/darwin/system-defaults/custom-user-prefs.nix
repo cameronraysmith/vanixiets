@@ -50,8 +50,13 @@
           "com.steipete.codexbar" = {
             SUAutomaticallyUpdate = false;
           };
+          # Modes, prompts, hotkeys and vocabulary are in ./voiceink-settings.json,
+          # imported by hand (VoiceInk → Settings → Import); its export omits the
+          # recording sounds, so they are set here.
           "com.prakashjoshipax.VoiceInk" = {
             SUAutomaticallyUpdate = false;
+            selectedStartSoundSelection = "none";
+            selectedStopSoundSelection = "none";
           };
         };
       };
