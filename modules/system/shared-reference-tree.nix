@@ -9,10 +9,20 @@ let
   # pattern spells the path a repository is reached by, so a root with a
   # trailing slash, an empty, `.` or `..` component, or a relative one never
   # matches, and an empty root makes the pattern `gitdir:/`, which matches every
-  # repository.
-  rootType = lib.types.strMatching "(/([^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+))+" // {
-    description = "absolute path with no trailing slash and no empty, `.` or `..` component";
-  };
+  # repository. git reads `*`, `?`, `[` and `\` in the pattern as glob syntax,
+  # so a root holding one is matched as a pattern, not as its own path: `[`
+  # and `\` miss the root, `*` and `?` also reach paths beside it; and a
+  # subsection name, the include's condition, cannot hold a newline. A
+  # component holds none of them.
+  rootType =
+    let
+      rest = "[^/*?[\\\n]";
+      first = "[^/.*?[\\\n]";
+    in
+    lib.types.strMatching "(/(${first}${rest}*|\\.${first}${rest}*|\\.\\.${rest}+))+"
+    // {
+      description = "absolute path with no trailing slash, no empty, `.` or `..` component, and no `*`, `?`, `[`, `\\` or newline";
+    };
   options =
     isDarwin:
     { ... }:

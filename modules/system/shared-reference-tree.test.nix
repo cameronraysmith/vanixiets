@@ -237,6 +237,30 @@
               expr = declaredRoot "nixos" "/var/lib/../lib/ghq";
               expectedError = refusedRoot;
             };
+            testRootStar = {
+              expr = declaredRoot "nixos" "/srv/ghq*";
+              expectedError = refusedRoot;
+            };
+            testRootQuestionMark = {
+              expr = declaredRoot "darwin" "/srv/gh?q";
+              expectedError = refusedRoot;
+            };
+            testRootBracket = {
+              expr = declaredRoot "nixos" "/srv/ghq[1]";
+              expectedError = refusedRoot;
+            };
+            testRootBackslash = {
+              expr = declaredRoot "nixos" "/srv/gh\\q";
+              expectedError = refusedRoot;
+            };
+            testRootNewline = {
+              expr = declaredRoot "darwin" "/srv/ghq''\nx";
+              expectedError = refusedRoot;
+            };
+            testRootClosingBracketAndSpace = {
+              expr = declaredRoot "nixos" "/srv/ghq] copy";
+              expected = "/srv/ghq] copy";
+            };
             testNoGit = {
               expr = gaps roots {
                 home.homeDirectory = "/home/someone";

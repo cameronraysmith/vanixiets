@@ -41,6 +41,13 @@ When no ref under `refs/heads` or `refs/remotes` reaches, after a request, a com
 
 Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A request that brings no commit in walks nothing, lists nothing and fetches nothing".
 
+#### Scenario: A branch moves onto a boundary a tag fetch added after the walk
+
+- **WHEN** a `get` with tags of a shallow blobless clone, after the record was written, fetches at depth 1 a tag on a branch never merged, upstream moves `master` onto that tag's commit, and an update follows
+- **THEN** that update's reply holds no history status line and its exit log line no `history=` token, the boundary present when it began counting as held
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A boundary present when a request begins counts as held".
+
 ### Requirement: Tag commits fetched at depth 1 stay unhydrated
 
 The writer SHALL NOT walk or hydrate a commit that only a tag reaches: one a `get` with tags fetches at depth 1 is a shallow boundary, whose `git show` diffs against nothing and needs its whole tree, and it stays unhydrated until `ghq-sync --hydrate <tag>`.
@@ -126,6 +133,13 @@ A clone with none SHALL get one from its refs and boundaries before the request'
 - **THEN** the record is not rewritten, and no history line or token appears
 
 Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A copy with no record gets one before the request's first fetch" (the third update of `history-killed`).
+
+#### Scenario: The walk before ended past the limit
+
+- **WHEN** an update whose walk ended `history not hydrated` (more than the limit missing) is followed by one that brings nothing in, under the same limit
+- **THEN** the later update's reply holds no history status line and its exit log line no `history=` token
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A walk that ends `history not hydrated` still advances the record".
 
 ### Requirement: The writer hydrates what an earlier request fetched and left unhydrated
 
@@ -252,14 +266,21 @@ Witness: the assertions of `modules/nixos/shared-reference-tree.nix`, `modules/d
 
 ### Requirement: The shared root is declared as a path a gitdir: include can match
 
-`services.shared-reference-tree.root`, on NixOS and on darwin, SHALL be an absolute path with no trailing slash and no empty, `.` or `..` component; evaluation SHALL fail for any other value, naming the option, since the readers' `gitdir:<root>/` include would otherwise never apply beneath the root, or, for an empty root, apply to every repository.
+`services.shared-reference-tree.root`, on NixOS and on darwin, SHALL be an absolute path with no trailing slash, no empty, `.` or `..` component, and none of `*`, `?`, `[`, `\` or a newline; evaluation SHALL fail for any other value, naming the option, since the readers' `gitdir:<root>/` include would otherwise never apply beneath the root, apply beside it, or, for an empty root, apply to every repository.
 
 #### Scenario: A host declares the root with a trailing slash
 
 - **WHEN** a host declares the root as `/var/lib/ghq/`, `""`, `var/lib/ghq`, `/var//lib/ghq`, `/var/./lib/ghq` or `/var/lib/../lib/ghq`
-- **THEN** evaluation fails with ``is not of type `absolute path with no trailing slash and no empty, `.` or `..` component'``, while `/var/lib/ghq` and `/srv/.ghq/..x/...` evaluate
+- **THEN** evaluation fails with ``is not of type `absolute path with no trailing slash`` and the rest of the type's description, while `/var/lib/ghq` and `/srv/.ghq/..x/...` evaluate
 
 Witness: `checks.x86_64-linux.eval-shared-reference-tree`, cases `testRootDefault`, `testRootDotted`, `testRootTrailingSlash`, `testRootEmpty`, `testRootRelative`, `testRootEmptyComponent`, `testRootDotComponent` and `testRootDotDotComponent`; the per-machine evaluation of magnetite, pyrite and stibnite.
+
+#### Scenario: A host declares the root with glob syntax or a newline
+
+- **WHEN** a host declares the root as `/srv/ghq*`, `/srv/gh?q`, `/srv/ghq[1]`, `/srv/gh\q` or one holding a newline
+- **THEN** evaluation fails with the same message, while `/srv/ghq] copy` evaluates
+
+Witness: `checks.x86_64-linux.eval-shared-reference-tree`, cases `testRootStar`, `testRootQuestionMark`, `testRootBracket`, `testRootBackslash`, `testRootNewline` and `testRootClosingBracketAndSpace`.
 
 ### Requirement: Evaluation rejects an include that reopens a transport beneath the shared root
 

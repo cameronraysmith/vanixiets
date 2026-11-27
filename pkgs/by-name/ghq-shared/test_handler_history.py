@@ -448,6 +448,30 @@ if reply["exit"] != 0 or unreadable(y_clone, ["HEAD", "t-merged"]):
     failures.append(f"once a branch commit the update brings in reaches a tag's commit, it must be hydrated: "
                     f"unreadable {unreadable(y_clone, ['HEAD', 't-merged'])}, {reply}")
 
+# A boundary present when a request begins counts as held, though the record,
+# written by the walk before a tag fetch at depth 1 added it, does not name it:
+# once upstream's master moves onto that tag's commit, the next update, whose
+# fast-forward onto a depth-1 boundary fails while origin/master moves, walks
+# nothing, rather than listing the commit's whole tree as a root commit's.
+b_tree, _, b_clone = lazy_clone_of("history-start-boundary")
+ask({"action": "get", "target": "github.com/o/history-start-boundary", "update": True}, file_cfg)
+git("checkout", "-q", "-b", "far", cwd=b_tree)
+change(b_tree, "far", g="far\n")
+git("tag", "t-start", cwd=b_tree)
+git("checkout", "-q", "master", cwd=b_tree)
+git("push", "-q", "up", "t-start", cwd=b_tree)
+ask({"action": "get", "target": "github.com/o/history-start-boundary", "tags": True}, file_cfg)
+tag_commit = git("rev-parse", "t-start", cwd=b_tree)
+with open(os.path.join(b_clone, ".git", "shallow")) as handle:
+    tag_held = tag_commit in handle.read().split()
+git("merge", "-q", "--ff-only", "far", cwd=b_tree)
+git("push", "-q", "up", "master", cwd=b_tree)
+reply = ask({"action": "get", "target": "github.com/o/history-start-boundary", "update": True}, file_cfg)
+if not tag_held or git("rev-parse", "origin/master", cwd=b_clone) != tag_commit:
+    failures.append(f"start-boundary fixture: the tag's commit must be a boundary and origin/master move onto it: {reply}")
+elif history_lines(reply) or history_token(reply):
+    failures.append(f"a branch moving onto a boundary present when the request began must walk nothing: {reply}")
+
 # Every commit an update brings in reads as `git show` reads it, merges included,
 # with rename detection on, as lazygit's --find-renames=50% has it: on a merge it
 # diffs the merge against each parent and reads the blobs of the paths added or
@@ -515,6 +539,14 @@ for name, limit in (("history-merges", None), ("history-merges-over", 3), ("hist
     elif unreadable(clone_dir, gained) or unreadable_shown(clone_dir, gained) or history_token(reply) != "hydrated:4":
         failures.append(f"every merge an update brings in must read with rename detection{'' if limit is None else ' at the limit'}: "
                         f"unreadable {unreadable(clone_dir, gained)}, by plain git show {unreadable_shown(clone_dir, gained)}, {reply}")
+
+# A walk that ends `history not hydrated` still advances the record: the next
+# update of the limit-3 clone, bringing nothing in, walks nothing, rather than
+# walking the range past the limit again.
+reply = ask({"action": "get", "target": "github.com/o/history-merges-over", "update": True},
+            config(protocols=("file",), history_limit=3))
+if reply["exit"] != 0 or history_lines(reply) or history_token(reply):
+    failures.append(f"a walk past the limit must advance the record, so the next update walks nothing: {reply}")
 
 # The writer hydrates, at the next request for a copy, what an earlier request
 # brought in and did not hydrate. Its record is the copy's
