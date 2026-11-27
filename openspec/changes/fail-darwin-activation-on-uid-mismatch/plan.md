@@ -25,7 +25,7 @@ Read at the locked revisions in task 1.2 and cited in a sources log:
 - nix-darwin `modules/users/default.nix:285-288`: the comparison nix-darwin warns on is `u=$(id -u ${name} 2> /dev/null) || true; if [[ -n "$u" && "$u" -ne "${uid}" ]]`. The new comparison uses the same lookup and argument list (`id -u <name>`).
 - nix-darwin `pkgs/nix-tools/darwin-rebuild.sh:218-233` and `modules/system/checks.nix:317-324`: `switch` sets the profile then activates; `check` runs `activate` with `checkActivation=1`, which exits 0 after `checks`.
 - nix-darwin `modules/services/activate-system/default.nix:61-70`: the boot daemon runs `checks`, `etc`, `keyboard`, not `preActivation`.
-- `modules/system/deploy-record.nix:207-211`: deploy-record's `preActivation` read is `mkBefore`; the comparison at default priority follows it.
+- `modules/system/deploy-record.nix:207-211`: deploy-record's `preActivation` read is `mkBefore`; the comparison at order 600 follows it and precedes nix-darwin's own default-priority text.
 
 ## Task 1: Baselines
 
@@ -76,7 +76,7 @@ home-manager-integration.uidPreflight = ''
     exit 1
   fi
 '';
-system.activationScripts.preActivation.text = config.home-manager-integration.uidPreflight;
+system.activationScripts.preActivation.text = lib.mkOrder 600 config.home-manager-integration.uidPreflight;
 ```
 
   String comparison (`!=`) is deliberate: a non-numeric `id` output is a mismatch (D3 fail closed), where `-ne` would error.
@@ -179,6 +179,6 @@ checks.x86_64-linux.fleet-alert  changed  # renders every testSizes.checks entry
 
 ## Review Focus
 
-- The comparison sits after deploy-record's `mkBefore` read and before nix-darwin's checks; a later `mkBefore` elsewhere would not move it ahead of anything that changes the system, since all of preActivation precedes `checks`.
+- The comparison sits at order 600, after deploy-record's `mkBefore` read and before nix-darwin's own default-priority `preActivation` text, which removes a leftover `/var/lib/linux-builder`; at the default priority it rendered after that removal. A later definition below order 600 that changes the Mac would run before the comparison, and `darwin-uid-preflight` would not notice: it runs the comparison's text, not its position.
 - A darwin fixture in a runtime test that sets `home-manager-integration.attachments` also renders the comparison; confirm the omnigent-worker fixtures still build.
 - A failed switch leaves the system profile one generation ahead (A371); the runbook line in the error message and design Migration Plan covers it.

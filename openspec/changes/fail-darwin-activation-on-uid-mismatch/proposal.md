@@ -3,15 +3,17 @@ linear_story_id: CAM-139
 linear_story_identifier: CAM-139
 linear_story_title: "Stop a Mac's deploy when an account's real uid differs from the recorded one"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-139/stop-a-macs-deploy-when-an-accounts-real-uid-differs-from-the-recorded
-linear_story_state: Todo
+linear_story_state: In Review
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: Todo
-last_synced_at: "2026-11-27T15:49:25Z"
+last_synced_state: In Review
+last_synced_at: "2026-11-27T19:15:09Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-27T15:49:25Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-139 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view" }
+  - { at: "2026-11-27T17:54:15Z", transition: "Todo->In Progress", outcome: "posted", note: "First tasks.md checkbox checked; state set to In Progress and a two-sentence comment posted; state confirmed by read-only view" }
+  - { at: "2026-11-27T19:15:09Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md written (PASS WITH WARNINGS; operator tasks 4.2-4.4 open); state set to In Review and a two-sentence comment posted; state confirmed by read-only view" }
 ---
 
 ## Why

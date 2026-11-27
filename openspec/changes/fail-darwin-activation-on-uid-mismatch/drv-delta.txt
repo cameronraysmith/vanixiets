@@ -1,0 +1,13 @@
+# The declared differences of fail-darwin-activation-on-uid-mismatch, for
+# `just drv-diff <parent> <commit> openspec/changes/fail-darwin-activation-on-uid-mismatch/drv-delta.txt`.
+# Every other attribute keeps its drvPath (design D6).
+darwin.stibnite changed  # preActivation gains the uid comparison (design D2), modules/system/home-manager-integration.nix
+darwin.blackphos changed  # preActivation gains the uid comparison (design D2), modules/system/home-manager-integration.nix
+darwin.argentum changed  # preActivation gains the uid comparison (design D2), modules/system/home-manager-integration.nix
+darwin.rosegold changed  # preActivation gains the uid comparison (design D2), modules/system/home-manager-integration.nix
+checks.aarch64-darwin.darwin-stibnite changed  # embeds darwin.stibnite's toplevel (modules/checks/machines.nix)
+checks.aarch64-darwin.darwin-blackphos changed  # embeds darwin.blackphos's toplevel (modules/checks/machines.nix)
+checks.aarch64-darwin.darwin-argentum changed  # embeds darwin.argentum's toplevel (modules/checks/machines.nix)
+checks.aarch64-darwin.darwin-rosegold changed  # embeds darwin.rosegold's toplevel (modules/checks/machines.nix)
+checks.x86_64-linux.darwin-uid-preflight added  # the mutant check (design D5), modules/checks/darwin-uid-preflight.nix
+checks.x86_64-linux.fleet-alert changed  # renders every testSizes.checks entry (modules/checks/fleet-alert.nix:1699, flake.lib.checkSizes), which gains darwin-uid-preflight

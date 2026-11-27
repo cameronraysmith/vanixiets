@@ -1,7 +1,9 @@
 # The home-manager integration of every NixOS and darwin host, generated from
 # the host's user attachments (flake.fleet.hosts.<host>.users,
 # lib/host-users.nix): one home per attachment, the secret bridge (NixOS), and
-# nix-darwin's admin account and the attached accounts' uids (darwin).
+# nix-darwin's admin account, the attached accounts' uids and the
+# activation-time comparison of those uids with each account's real uid
+# (darwin).
 #
 # Each host imports home-manager's own module at machine level, beside this
 # aspect; importing it from the clan user services duplicated catppuccin's
@@ -43,6 +45,13 @@ let
         description = "The host's user attachments; a fixture without a registry entry sets its own.";
       };
 
+      options.home-manager-integration.uidPreflight = lib.mkOption {
+        type = lib.types.lines;
+        internal = true;
+        readOnly = true;
+        description = "The activation-time comparison of each attached account's uid with its record (darwin; empty on NixOS).";
+      };
+
       config = lib.mkMerge [
         {
           home-manager = {
@@ -70,11 +79,50 @@ let
           hm-sops-bridge.users = lib.genAttrs (lib.filter (
             account: attachments.${account}.sopsBridge
           ) accounts) (_: { });
+          # Clan allocates NixOS uids; there is nothing to compare.
+          home-manager-integration.uidPreflight = "";
         })
         (lib.optionalAttrs (class == "darwin") {
           # nix-darwin's admin account, never inferred from the primary user.
           system.primaryUser = lib.mkIf (admins != [ ]) (lib.head admins);
           users.users = lib.mapAttrs (_: attachment: { inherit (attachment) uid; }) attachments;
+
+          # nix-darwin warns about and skips an existing account whose uid is
+          # not users.users.<a>.uid, and activation succeeds. This comparison
+          # runs first in `activate` (preActivation, under set -e, before
+          # nix-darwin's checks and every step that changes the Mac; also under
+          # `darwin-rebuild check`, not in the boot-time activate-system
+          # daemon) and fails on every attached account that exists with
+          # another uid. An absent account passes: nix-darwin creates it with
+          # the recorded uid. String comparison, so a non-numeric `id` output
+          # is a mismatch. Order 600: after deploy-record's mkBefore read of
+          # /run/current-system (system/deploy-record.nix), which changes
+          # nothing, and before nix-darwin's own preActivation text at the
+          # default priority, which removes a leftover /var/lib/linux-builder.
+          # checks.x86_64-linux.darwin-uid-preflight runs this text under a
+          # stub `id`.
+          home-manager-integration.uidPreflight = ''
+            # home-manager-integration: each attached account's uid against its record
+            uidMismatches=()
+            ${lib.concatMapStringsSep "\n" (
+              account:
+              let
+                uid = toString attachments.${account}.uid;
+              in
+              ''
+                u=$(id -u ${lib.escapeShellArg account} 2>/dev/null) || u=
+                if [[ -n "$u" && "$u" != ${uid} ]]; then
+                  uidMismatches+=(${lib.escapeShellArg "${hostName}: account ${account} has uid "}"$u"${lib.escapeShellArg ", recorded ${uid} at flake.fleet.hosts.${hostName}.users.${account}.uid"})
+                fi''
+            ) accounts}
+            if (( ''${#uidMismatches[@]} )); then
+              printf >&2 '\e[1;31merror: an attached account has a uid other than its record, aborting activation\e[0m\n'
+              printf >&2 '  %s\n' "''${uidMismatches[@]}"
+              printf >&2 'Correct the record in modules/lib/host-users.nix, or the account, and deploy again.\n'
+              exit 1
+            fi
+          '';
+          system.activationScripts.preActivation.text = lib.mkOrder 600 config.home-manager-integration.uidPreflight;
         })
       ];
     };

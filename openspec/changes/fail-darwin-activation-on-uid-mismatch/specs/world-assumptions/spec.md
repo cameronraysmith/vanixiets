@@ -2,15 +2,15 @@
 
 ### Requirement: A370 — nix-darwin's activation runs its pre-activation step first, and stops at the first failing step
 
-It is true of nix-darwin at the revision this repository locks, independent of what this fleet builds, that `activate` runs under `set -e`, runs `preActivation` first and `checks` second, and only then the steps that change the system, so a failing pre-activation step ends the activation before any change.
+It is true of nix-darwin at the revision this repository locks, independent of what this fleet builds, that `activate` runs `preActivation`, `checks`, then the rest, under `set -e`, and that its own `preActivation` text, removing a leftover `/var/lib/linux-builder`, has the default priority, so a step failing earlier ends it before any change.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: nix-darwin `modules/system/activation-scripts.nix:88-89` (`set -e`, `set -o pipefail`) and `:114-140` (the step order), read at the locked revision.
+**Evidence**: nix-darwin `modules/system/activation-scripts.nix:88-89` (`set -e`, `set -o pipefail`) and `:114-140` (the step order), and `modules/nix/linux-builder.nix:163-166` (the removal when the builder is disabled), read at the locked revision; each darwin host's rendered `preActivation`, evaluated at verify, holds nothing else that changes the Mac (a `/run/current-system` read, the uid comparison, the removal, a closure diff).
 
 #### Scenario: Read at the source at apply
 
 - **WHEN** the activation script's template is read at the locked revision
-- **THEN** `preActivation` precedes `checks`, which precede every step that changes the system, all under `set -e`
+- **THEN** `preActivation` precedes `checks`, which precede every later step, all under `set -e`, and nix-darwin's own `preActivation` text is the default-priority removal of a leftover `/var/lib/linux-builder`
 
 #### Scenario: nix-darwin reorders activation or drops set -e
 
@@ -53,7 +53,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A373 — darwin-rebuild check runs the pre-activation and checks steps and changes nothing else
 
-It is true of nix-darwin at the revision this repository locks, independent of what this fleet builds, that `darwin-rebuild check` builds the configuration, does not set the system profile, and runs its `activate` with `checkActivation=1`, under which `activate` runs `preActivation` and `checks` and then exits 0 before any step that changes the system.
+It is true of nix-darwin at the revision this repository locks, independent of what this fleet builds, that `darwin-rebuild check` builds the configuration, does not set the system profile, and runs `activate` with `checkActivation=1`, which runs `preActivation` (its linux-builder removal included) and `checks`, then exits 0 before any later step.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
 **Evidence**: nix-darwin `pkgs/nix-tools/darwin-rebuild.sh:218-233` (only `switch` sets the profile; `check` exports `checkActivation=1`) and `modules/system/checks.nix:317-324` (the exit after the checks), read at the locked revision.

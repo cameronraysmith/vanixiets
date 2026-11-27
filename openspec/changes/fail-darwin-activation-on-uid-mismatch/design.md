@@ -36,7 +36,7 @@ Relevant nix-darwin behaviour (each a world assumption in this change):
 - **Boundary**: first-party module text running inside a vendored script's slot; nix-darwin is not patched.
 
 ### D2: `preActivation`, not `system.checks.text`, not a nix-darwin patch
-- **Choice**: append the comparison to `system.activationScripts.preActivation.text` at default priority, after deploy-record's `mkBefore` read of `/run/current-system` (which only reads).
+- **Choice**: append the comparison to `system.activationScripts.preActivation.text` at order 600: after deploy-record's `mkBefore` read of `/run/current-system` (which only reads) and before nix-darwin's own `preActivation` text at the default priority, which removes a leftover `/var/lib/linux-builder` and prints the closure diff. At the default priority the comparison rendered after that removal, so a mismatch would have been reported after one change to the Mac; evaluated on stibnite, the rendered order is the read, the comparison, then the removal.
 - **Rationale**: preActivation is a public option, runs first under `set -e`, before every step that changes the system, and also under `darwin-rebuild check` (A370, A373). It is not run by the boot daemon (A372), so a wrong record does not also break the boot-time `etc` relink at every boot.
 - **Alternatives considered**: `system.checks.text` — internal, and also run by the boot daemon, where a failure would abort `etc` and `keyboard` at every boot; patching nix-darwin's users module to make the warning fatal — vendored-versus-first-party boundary, carried on every lock update, changes semantics for system accounts this change does not own.
 
