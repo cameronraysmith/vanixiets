@@ -18,7 +18,7 @@ What the fleet already has:
 - Failure notices for units listed in a host's `notifiedUnits` (`modules/lib/observability-hosts.nix`).
 - fleet-alert rules with promtool and fixture cases (`modules/nixos/fleet-alert/rules.nix`, `modules/checks/fleet-alert.nix`).
 - A textfile-collector probe pattern, `modules/nixos/postgresql-collation.nix` on chain `zqpxwylx`. node_exporter refuses a repeated `--collector.textfile.directory` flag (F75), so every textfile writer names itself in `vanixiets.nodeExporter.textfileWriters` and writes its own file into the host's one `vanixiets.nodeExporter.textfileDirectory` (`modules/nixos/node-exporter-textfile.nix`); each series must be in `nodeExporterKeep`.
-- Fleet obligations asserted on every machine check (`modules/checks/machines.nix`, `withFleetObligations`).
+- Fleet obligations asserted on every machine check: each judge registers itself as `fleetObligations.<name>`, and `modules/checks/machines.nix` folds every registered judge into each machine check.
 
 The nixpkgs modules at the pinned revision behave as follows:
 - `services.postgresqlBackup` creates one oneshot `postgresqlBackup-<db>` per database. Each runs `pg_dump -C <db>` as `postgres`, writes `<location>/<db>.sql` through an `.in-progress` file, and keeps one `.prev`. It gets a timer only when `startAt` is non-empty.
@@ -228,7 +228,7 @@ Stakeholders:
   - each dump unit, or `postgresql-dump-globals`, not named in `backupPrepareCommand`;
   - each backup unit absent from `notifiedUnits`.
 
-  `modules/checks/machines.nix` asserts `failures` in `withFleetObligations`. `modules/checks/postgresql-backup-obligations.nix` defines `checks.x86_64-linux.postgresql-backup-obligations` over literal fixtures. Four cases give 0 problems: the accepted configuration, a parked database absent from the backup set, a host awaiting its secrets with the backup off, and a host without PostgreSQL. One mutant per message gives exactly 1 problem each: missingDatabase, dumpTimer, compressed, pathMissing, prepareMissing, unitNotNotified, notEnabled, awaitingButEnabled and secretsMissing.
+  `failures` is registered as `fleetObligations.postgresqlBackupObligations`, which `modules/checks/machines.nix` folds into every machine check. `modules/checks/postgresql-backup-obligations.nix` defines `checks.x86_64-linux.postgresql-backup-obligations` over literal fixtures. Four cases give 0 problems: the accepted configuration, a parked database absent from the backup set, a host awaiting its secrets with the backup off, and a host without PostgreSQL. One mutant per message gives exactly 1 problem each: missingDatabase, dumpTimer, compressed, pathMissing, prepareMissing, unitNotNotified, notEnabled, awaitingButEnabled and secretsMissing.
 - **Rationale**:
   - The facts are configuration values, and the machine checks already evaluate every configuration, so this costs no attribute and no evaluation.
   - The fixture check's key is a literal gated on `x86_64-linux`.

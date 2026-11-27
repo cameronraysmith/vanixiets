@@ -47,7 +47,7 @@ Decisions tagged `D<n>` are developed in `design.md`. The operator settled Q50 t
 - cognee's database is not backed up while cognee is parked (D2).
 
 **Regulators**
-- `flake.lib.postgresqlBackupObligations`, asserted in `withFleetObligations` on every `nixos-<host>` check, fails a host that runs PostgreSQL when:
+- `flake.lib.postgresqlBackupObligations`, registered as `fleetObligations.postgresqlBackupObligations` and so asserted on every `nixos-<host>` check, fails a host that runs PostgreSQL when:
   - a database it creates, other than a parked one, is missing from the backup set;
   - a dump has a timer of its own;
   - the backup job does not start or upload a dump;
