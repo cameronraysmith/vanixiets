@@ -45,11 +45,8 @@ let
     "janettesmith"
   ];
   # People whose agent sessions hold a request credential: one per omnigent
-  # worker owner (modules/clan/inventory/services/omnigent.nix).
-  requesterNames = [
-    "cameron"
-    "janettesmith"
-  ];
+  # worker owner (flake.fleet.workers, modules/lib/fleet-workers.nix).
+  requesterNames = lib.attrNames config.flake.fleet.workers;
 
   # The public halves of the deployer's keys, generated on cinnabar by
   # fleet-deployer-keys on 2026-11-18 (task 2.2). Setting this to null

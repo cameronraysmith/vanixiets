@@ -1,6 +1,8 @@
 # External ML researcher on GPU/CPU cloud nodes
 {
+  config,
   inputs,
+  lib,
   ...
 }:
 {
@@ -10,9 +12,9 @@
       input = "clan-core";
     };
 
-    # GPU and CPU cloud nodes only
-    roles.default.machines."scheelite" = { };
-    roles.default.machines."galena" = { };
+    # Every host with a tara attachment (modules/lib/host-users.nix): the
+    # GPU and CPU cloud nodes
+    roles.default.machines = lib.genAttrs (config.flake.lib.hostsOfAccount "tara") (_: { });
 
     roles.default.settings = {
       user = "tara";
@@ -36,18 +38,6 @@
           users.users.tara.openssh.authorizedKeys.keys = inputs.self.users.tara.meta.sshKeys;
 
           programs.zsh.enable = true;
-
-          home-manager = {
-            useGlobalPkgs = true;
-            useUserPackages = true;
-            backupFileExtension = "before-home-manager";
-
-            extraSpecialArgs = {
-              flake = inputs.self // {
-                inherit inputs;
-              };
-            };
-          };
         }
       )
     ];

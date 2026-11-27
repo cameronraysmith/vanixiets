@@ -5,7 +5,7 @@
 }:
 let
   flakeModules = config.flake.modules.nixos;
-  flakeUsers = config.flake.users;
+  inherit (config.flake.lib) workerAccountsOn;
   inherit (config.flake.lib.hosts) magnetite;
   inherit (config.flake.lib) fleet;
   inherit (config.flake.lib) meshInterfaces;
@@ -73,6 +73,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        home-manager-integration
         deploy-record
         hm-sops-bridge
         kvm-declaration
@@ -130,15 +131,8 @@ in
 
       services.shared-reference-tree = {
         enable = true;
-        participants = [
-          "cameron"
-          "omnigent-cameron"
-          "omnigent-janettesmith"
-        ];
+        participants = [ "cameron" ] ++ workerAccountsOn "magnetite";
       };
-
-      # Ambient flake argument; its removal is tracked with the poisoned-flake guard in checks/omnigent-workers.nix
-      _module.args.flake = inputs.self;
 
       # ZFS device node path - more stable for cloud VMs
       boot.zfs.devNodes = "/dev/disk/by-path";
@@ -1122,17 +1116,5 @@ in
       # connection -- a red check naming a package that is not at fault. An
       # 18-core client reliably lost a random handful of checks per run this way.
       services.openssh.settings.MaxStartups = "64:30:256";
-
-      # Bridge NixOS-level sops to home-manager for user secret key delivery.
-      # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
-      # ("crs58" via alias-fold inheritance).
-      hm-sops-bridge.users.cameron = { };
-
-      # cameron is an alias for crs58; alias-keyed reads keep this
-      # call site ignorant of the alias->target relationship.
-      # Infrastructure settings provided by the cameron inventory service.
-      home-manager.users.cameron = {
-        imports = flakeUsers.cameron.modules;
-      };
     };
 }

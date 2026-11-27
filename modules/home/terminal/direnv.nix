@@ -3,12 +3,11 @@
 # direnv-instant makes shell prompts non-blocking by running direnv export
 # asynchronously in a daemon. When builds take longer than mux_delay, it
 # spawns a tmux pane showing progress.
-{ config, ... }:
+{ config, inputs, ... }:
 let
   flakeLib = config.flake.lib;
   content =
     {
-      flake,
       lib,
       pkgs,
       ...
@@ -16,7 +15,7 @@ let
     {
       # Import direnv-instant home-manager module
       # Provides programs.direnv-instant options and shell integration
-      imports = [ flake.inputs.direnv-instant.homeModules.direnv-instant ];
+      imports = [ inputs.direnv-instant.homeModules.direnv-instant ];
 
       programs.direnv = {
         enable = true;
@@ -56,7 +55,7 @@ let
       programs.direnv-instant = {
         enable = true;
         package =
-          flake.inputs.direnv-instant.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs
+          inputs.direnv-instant.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs
             (old: {
               # One daemon and env file per directory would serve every shell
               # in the format of whichever started it; keying the runtime dir

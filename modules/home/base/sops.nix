@@ -1,6 +1,6 @@
 {
-  # OUTER: Flake-parts module signature
-  # No 'flake' here - only config, inputs available
+  # OUTER: Flake-parts module signature. The import below reads it: a home's
+  # `flake` is a `_module.args` value, which `imports` cannot read.
   config,
   inputs,
   ...
@@ -13,16 +13,15 @@
         config,
         lib,
         pkgs,
-        flake,
         ...
-      }: # flake from extraSpecialArgs
+      }:
       let
         # sops-nix defines its agent only for a home that declares secrets.
         onDarwinWithSecrets = pkgs.stdenv.hostPlatform.isDarwin && config.sops.secrets != { };
       in
       {
         # Import sops-nix home-manager module
-        imports = [ flake.inputs.sops-nix.homeManagerModules.sops ];
+        imports = [ inputs.sops-nix.homeManagerModules.sops ];
 
         # Configure sops age key location using XDG paths
         # This provides cross-platform support and reuses the same age key

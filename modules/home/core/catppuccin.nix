@@ -1,6 +1,6 @@
 # Catppuccin theme configuration
 # Extracted from vanixiets/modules/home/all/terminal/default.nix lines 302-303
-{ inputs, ... }:
+{ config, inputs, ... }:
 {
   # Two aggregates need the upstream module: `core` sets the global theme
   # below, and `shell/tmux.nix` sets `catppuccin.tmux`. Importing the same
@@ -27,24 +27,22 @@
     ];
   };
 
-  flake.modules.homeManager.core =
-    { flake, ... }:
-    {
-      imports = [ flake.lib.catppuccinHomeModule ];
+  flake.modules.homeManager.core = {
+    imports = [ config.flake.lib.catppuccinHomeModule ];
 
-      # Global catppuccin theme enable
-      # Individual programs (tmux, bat, etc.) will use this theme automatically
-      catppuccin = {
-        enable = true;
-        autoEnable = true;
-        flavor = "mocha";
+    # Global catppuccin theme enable
+    # Individual programs (tmux, bat, etc.) will use this theme automatically
+    catppuccin = {
+      enable = true;
+      autoEnable = true;
+      flavor = "mocha";
 
-        # The default sources are build outputs read at evaluation (IFD);
-        # the same upstream revs' committed themes/ come from flake inputs.
-        sources = {
-          bottom = "${inputs.catppuccin-bottom}/themes";
-          starship = "${inputs.catppuccin-starship}/themes";
-        };
+      # The default sources are build outputs read at evaluation (IFD);
+      # the same upstream revs' committed themes/ come from flake inputs.
+      sources = {
+        bottom = "${inputs.catppuccin-bottom}/themes";
+        starship = "${inputs.catppuccin-starship}/themes";
       };
     };
+  };
 }

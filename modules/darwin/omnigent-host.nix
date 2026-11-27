@@ -104,10 +104,8 @@ in
         name: worker:
         inputs.home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
-          extraSpecialArgs = {
-            flake = inputs.self;
-            osConfig = null;
-          };
+          # The worker aspect sets the home's own (restricted) `flake`.
+          extraSpecialArgs.osConfig = null;
           modules = [
             flakeConfig.flake.modules.homeManager.omnigent-worker
             deliveries.${name}.homeModule

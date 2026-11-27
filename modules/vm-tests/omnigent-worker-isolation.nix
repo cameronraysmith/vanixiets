@@ -155,9 +155,6 @@
               home-manager = {
                 useGlobalPkgs = true;
                 useUserPackages = true;
-                extraSpecialArgs.flake = self // {
-                  inherit inputs;
-                };
               };
               users.users = lib.mapAttrs' (_: user: lib.nameValuePair user (account user)) workers;
               users.groups = lib.mapAttrs' (_: user: lib.nameValuePair user { }) workers;

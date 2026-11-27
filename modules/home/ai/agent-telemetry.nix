@@ -20,26 +20,12 @@
 #
 # The collector, not these gates, enforces what leaves the host (design D3):
 # a key added here that the collector does not allow is dropped there.
-{ config, lib, ... }:
+{ config, ... }:
 let
-  inherit (config.flake) userAliases users;
-  # The person a human home's user name is: the one flake.userAliases key
-  # naming it (crs58 is cameron, aliases.nix), else the name itself when it
-  # is a flake user or alias. Anything else fails evaluation rather than
-  # stamp a name the fleet does not know (design D10).
-  personOf =
-    name:
-    let
-      aliases = lib.attrNames (lib.filterAttrs (_: target: target == name) userAliases);
-    in
-    if lib.length aliases == 1 then
-      lib.head aliases
-    else if aliases != [ ] then
-      throw "agent-telemetry: user ${name} is the target of several flake.userAliases (${lib.concatStringsSep ", " aliases}); set agentTelemetry.person explicitly."
-    else if users ? ${name} || userAliases ? ${name} then
-      name
-    else
-      throw "agent-telemetry: user ${name} is neither a flake.users key nor a flake.userAliases key; set agentTelemetry.person explicitly rather than stamp an unknown name.";
+  # The person a human home's user name is (crs58 is cameron), from
+  # modules/home/users/aliases.nix; an unknown name fails evaluation rather
+  # than stamp a name the fleet does not know (design D10).
+  inherit (config.flake.lib) personOf;
 in
 {
   flake.modules.homeManager.agent-telemetry =

@@ -10,7 +10,7 @@ Magnetite, which carries both CI services, is x86_64-linux, so it can evaluate a
 Remote building is declared once for the whole fleet by the `nix-builders` clan service (`modules/clan/services/nix-builders/`, instance in `modules/clan/inventory/services/nix-builders.nix`), which gives each machine a `builder` role, a `dispatcher` role, or both.
 Stibnite is the primary aarch64-darwin builder, and rosegold and argentum are opportunistic ones: laptops that take darwin work when they are awake and on the mesh.
 No dispatcher sends work to rosegold or argentum yet; their builder side is in place, and each dispatcher excludes them.
-Before that service, only stibnite was declared as a darwin build target, and before `stibnite-access.nix` nothing was, which left darwin derivations without a build target at all rather than with a slow one.
+Before that service, only stibnite was declared as a darwin build target, and before `stibnite-session.nix` (then named `stibnite-access.nix`) nothing was, which left darwin derivations without a build target at all rather than with a slow one.
 
 ## Two mechanisms, two callers
 

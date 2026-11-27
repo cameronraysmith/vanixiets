@@ -36,7 +36,7 @@ Read at the locked revisions in task 1 Step 4 and cite in `logs/dhuro-1-sources-
 - home-manager `nixos/common.nix`: `extraSpecialArgs : attrs`, passed to every `home-manager.users.<n>`; `osConfig` passed; `sharedModules`. Not used here: a host's `_module.args`.
 - nixpkgs `lib/modules.nix`: special arguments take precedence over `_module.args`; `_module.args` cannot feed `imports`; `collectModules` order (a module, then its imports).
 - clan-core `clanServices/users`: `roles.default.machines.<m>`, `settings.{user,groups,share,prompt}`, `extraModules`. Settings apply on NixOS only.
-- nix-darwin: `system.primaryUser`; `users.users.<n>.uid` with `users.knownUsers`, and its activation's uid-mismatch refusal.
+- nix-darwin: `system.primaryUser`; `users.users.<n>.uid` with `users.knownUsers`, whose activation warns and skips an existing account with a different uid (A346, read at apply), so a wrong uid is not caught at deploy.
 - flake-parts `mkFlake`: outputs are `config.flake`.
 
 ## Interface contract
@@ -44,7 +44,7 @@ Read at the locked revisions in task 1 Step 4 and cite in `logs/dhuro-1-sources-
 | Kind | Name | Defined in |
 |---|---|---|
 | Lib | `flake.lib.accountOf : str -> str`, `flake.lib.personOf : str -> str` (throws on an unknown name); `flake.lib.signingPerson` removed | Task 2 |
-| Option | `flake.fleet.hosts.<h>.users.<account>`: `primary : bool`, `admin : bool`, `sopsBridge : bool` (default `class == "nixos"`), `uid : nullOr ints.positive`, `extraImports : listOf deferredModule`, `overrides : deferredModule` | Task 3 |
+| Option | `flake.fleet.hosts.<h>.users.<account>`: `primary : bool`, `admin : bool`, `sopsBridge : bool` (default `class == "nixos"`), `uid : nullOr ints.positive`, `extraImports : listOf raw` (a `deferredModule` list re-keyed each module and reordered pyrite's home), `overrides : deferredModule` | Task 3 |
 | Option (read-only) | `flake.fleet.hosts.<h>.primaryUser` from the `primary` attachment | Task 3 |
 | Lib | `flake.lib.hostsOfAccount : str -> [str]` (sorted) | Task 3 |
 | Module | `flake.modules.{nixos,darwin}.home-manager-integration` | Task 4 |
@@ -132,11 +132,12 @@ in
 
 ```nix
 home-manager.users.${account} = {
-  imports = [ a.overrides ] ++ config'.flake.users.${account}.modules ++ a.extraImports;
+  # in this order: a list option's equal-priority definitions merge in import order, so overrides come last
+  imports = config'.flake.users.${account}.modules ++ a.extraImports ++ [ a.overrides ];
 };
 ```
 
-  Add `useGlobalPkgs`, `useUserPackages` and `backupFileExtension`. On NixOS, add `hm-sops-bridge.users`. On darwin, add `system.primaryUser` and `users.users.${account}.uid`. Add the per-attachment `users.users ? account` assertion. Task 5 adds `_module.args.flake` to the entry.
+  Add `useGlobalPkgs`, `useUserPackages` and `backupFileExtension`. On NixOS, add `hm-sops-bridge.users`. On darwin, add `system.primaryUser` and `users.users.${account}.uid`. No per-attachment `users.users ? account` assertion: home-manager's NixOS module defines `users.users.<name>` for every home, so it could not fail (task 4.6). Task 5 adds `_module.args.flake` to the entry.
 - [ ] **Step 3:** Import the aspect in the ten hosts and delete the hand-written blocks of tasks 4.2 and 4.3. Bind `primaryUser` in `laptop.nix` from the registry.
 - [ ] **Step 4:** Move the per-pair settings of task 4.4, and the two flags of task 4.5.
 - [ ] **Step 5:** Evaluate the task 4.2, 4.3 and 4.5 projections against the baseline. Run task 4.6's mutant.

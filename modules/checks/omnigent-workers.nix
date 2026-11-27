@@ -9,26 +9,18 @@
     { system, fleetPkgs, ... }:
     let
       pkgs = fleetPkgs;
-      flake = config.flake // {
-        inputs = inputs // {
-          contentPrivate = throw "worker imported contentPrivate";
-        };
-        users = throw "worker imported a whole-user alias";
-      };
       failedCases = cases: lib.attrNames (lib.filterAttrs (_: ok: !ok) cases);
       sortedEqual = a: b: lib.sort builtins.lessThan a == lib.sort builtins.lessThan b;
 
       # Capabilities: one positive worker home and one composite invalid home. The four
       # worker guards hold positively on every real worker home through the machine checks;
-      # only the negative direction needs a fixture.
+      # only the negative direction needs a fixture. Each home's `flake` is the worker
+      # aspect's own restricted value (home/ai/omnigent/worker.nix).
       mkHome =
         extra:
         inputs.home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
-          extraSpecialArgs = {
-            inherit flake;
-            osConfig = null;
-          };
+          extraSpecialArgs.osConfig = null;
           modules = [
             config.flake.modules.homeManager.omnigent-worker
             {
@@ -46,26 +38,25 @@
         };
       # An unsigned author, a documentation mention of a foreign path and a synthetic
       # credential policy, including a deploy request key, must all stay accepted by the guards.
-      home = mkHome [
-        {
-          _module.args.omnigentCredentialPolicy = {
-            signingKey = null;
-            deployRequestKey = "/synthetic-deploy-request-key";
-            githubTokens.fixture = {
-              path = "/synthetic-github-token";
-              expectedLogin = "fixture";
-            };
-            claudeSetupToken = "/synthetic-claude-token";
-            linearApiKeys = { };
+      positiveFixture = {
+        _module.args.omnigentCredentialPolicy = {
+          signingKey = null;
+          deployRequestKey = "/synthetic-deploy-request-key";
+          githubTokens.fixture = {
+            path = "/synthetic-github-token";
+            expectedLogin = "fixture";
           };
-          programs.git.settings = {
-            commit.gpgSign = false;
-            tag.gpgSign = "off";
-          };
-          home.file."example.md".text =
-            "Documentation example: /home/human/project is an example path, not an input.";
-        }
-      ];
+          claudeSetupToken = "/synthetic-claude-token";
+          linearApiKeys = { };
+        };
+        programs.git.settings = {
+          commit.gpgSign = false;
+          tag.gpgSign = "off";
+        };
+        home.file."example.md".text =
+          "Documentation example: /home/human/project is an example path, not an input.";
+      };
+      home = mkHome [ positiveFixture ];
       cfg = home.config;
       # Home Manager throws on any failed assertion before `config` is readable, so the
       # failure set is only observable through an apply that neutralises the assertions.
@@ -221,7 +212,6 @@
                 home-manager = {
                   useGlobalPkgs = true;
                   useUserPackages = true;
-                  extraSpecialArgs = { inherit flake; };
                 };
                 users.users.omnigent-cameron = {
                   isNormalUser = true;
@@ -920,6 +910,130 @@
           offsetOf "omnigent-worker-keychain || exit" < offsetOf ''exec "$@"''
           && offsetOf ''exec "$@"'' < lib.stringLength loginHelper;
       };
+
+      # Worker scope (declare-host-user-relations-once design D7): what the worker
+      # aspect's restricted `flake` lets a worker home reach. The two reaches must fail
+      # under tryEval, the value's names must equal these literals, and a worker home on
+      # a host composed with the integration aspect must receive this value, not a
+      # shadowing specialArg.
+      workerFlakeNames = [
+        "inputs"
+        "packages"
+        "userAliases"
+        "users"
+      ];
+      workerInputNames = [
+        "contentPrivate"
+        "llm-agents"
+      ];
+      evaluates = h: (builtins.tryEval h.activationPackage.drvPath).success;
+      reachHome =
+        reach:
+        mkHome [
+          positiveFixture
+          (
+            { flake, ... }:
+            {
+              home.file."worker-scope-reach".text = reach flake;
+            }
+          )
+        ];
+      # The names of the `flake` the fixture worker home receives, recorded in a file
+      # (a standalone home's result exposes no `_module`).
+      workerFlake =
+        builtins.fromJSON
+          (mkHome [
+            positiveFixture
+            (
+              { flake, lib, ... }:
+              {
+                home.file."worker-scope-flake".text = builtins.toJSON {
+                  names = lib.attrNames flake;
+                  inputs = lib.attrNames flake.inputs;
+                };
+              }
+            )
+          ]).config.home.file."worker-scope-flake".text;
+      scopeHost =
+        (inputs.nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            inputs.home-manager.nixosModules.home-manager
+            config.flake.modules.nixos.home-manager-integration
+            (
+              { lib, ... }:
+              {
+                # The aspect writes the secret bridge; this fixture bridges nothing.
+                options.hm-sops-bridge.users = lib.mkOption {
+                  type = lib.types.attrs;
+                  default = { };
+                };
+                config = {
+                  nixpkgs.pkgs = pkgs;
+                  boot.isContainer = true;
+                  system.stateVersion = "25.11";
+                  networking.hostName = "worker-scope-fixture";
+                  users.users.crs58.isNormalUser = true;
+                  users.users.omnigent-probe.isNormalUser = true;
+                  home-manager-integration.attachments.crs58 = {
+                    primary = true;
+                    admin = false;
+                    sopsBridge = false;
+                    uid = null;
+                    extraImports = [ ];
+                    overrides = { };
+                  };
+                  home-manager.users.omnigent-probe =
+                    { flake, ... }:
+                    {
+                      imports = [ config.flake.modules.homeManager.omnigent-worker ];
+                      home.stateVersion = "25.11";
+                      vcs.author = {
+                        name = "Worker fixture";
+                        email = "worker@example.invalid";
+                      };
+                      home.file."worker-scope-flake".text = builtins.toJSON {
+                        names = lib.attrNames flake;
+                        inputs = lib.attrNames flake.inputs;
+                      };
+                    };
+                };
+              }
+            )
+          ];
+        }).config;
+      scopeCases = {
+        positive = {
+          holds = evaluates home;
+          message = "the fixture worker home does not evaluate";
+        };
+        reachUsers = {
+          holds = !(evaluates (reachHome (flake: flake.users.crs58.meta.email)));
+          message = "a worker home read flake.users.crs58.meta.email";
+        };
+        reachContentPrivate = {
+          holds = !(evaluates (reachHome (flake: toString flake.inputs.contentPrivate)));
+          message = "a worker home read flake.inputs.contentPrivate";
+        };
+        allowedNames = {
+          holds = workerFlake.names == workerFlakeNames && workerFlake.inputs == workerInputNames;
+          message = "the worker's flake holds ${builtins.toJSON workerFlake}";
+        };
+        noShadow =
+          let
+            received =
+              builtins.fromJSON
+                scopeHost.home-manager.users.omnigent-probe.home.file."worker-scope-flake".text;
+          in
+          {
+            holds =
+              received == {
+                names = workerFlakeNames;
+                inputs = workerInputNames;
+              };
+            message = "a worker home on a composed host received ${builtins.toJSON received}";
+          };
+      };
     in
     {
       # Size classes (declare-test-size-classes design D1, D2): the median of
@@ -938,6 +1052,11 @@
             omnigent-worker-inventory.class = "small";
             # nixbot: median 33 s, slowest 166 s, 4 runs in 30 days
             omnigent-worker-linux.class = "small";
+            # Not yet run by nixbot.
+            omnigent-worker-scope = {
+              class = "medium";
+              measured = false;
+            };
           };
           aarch64-darwin = {
             # nixbot: median 53 s, slowest 232 s, 51 runs in 30 days
@@ -959,6 +1078,13 @@
             ${lib.getExe pkgs.playwright-cli} --version | grep -Fx ${lib.escapeShellArg pkgs.playwright-cli.version}
             touch "$out"
           '';
+      }
+      // lib.optionalAttrs (system == "x86_64-linux") {
+        omnigent-worker-scope = config.flake.lib.mkJudgeCheck pkgs {
+          name = "omnigent-worker-scope";
+          judge = case: lib.optional (!case.holds) case.message;
+          cases = lib.mapAttrs (_: case: case // { problems = 0; }) scopeCases;
+        };
       }
       // lib.optionalAttrs (system == "x86_64-linux") {
         omnigent-worker-inventory = config.flake.lib.mkStructuralCheck pkgs {

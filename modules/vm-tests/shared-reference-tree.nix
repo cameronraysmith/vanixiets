@@ -63,9 +63,6 @@
             home-manager = {
               useGlobalPkgs = true;
               useUserPackages = true;
-              extraSpecialArgs.flake = self // {
-                inherit inputs;
-              };
               users = lib.genAttrs readers (_: {
                 imports = [ self.modules.homeManager.repository-acquisition ];
                 programs.git.enable = true;

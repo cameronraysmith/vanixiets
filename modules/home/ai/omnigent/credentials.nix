@@ -140,7 +140,7 @@ let
       signingGenerator =
         if worker.credentials.signingKey.enable then worker.credentials.signingKey.generator else null;
       personSigningGenerator = config.flake.lib.commitSigningGenerator (
-        config.flake.lib.signingPerson worker.owner
+        config.flake.lib.accountOf worker.owner
       );
       # The deploy request key pair is generated, not prompted: the private key stays
       # with the worker and the fleet deployer authorizes the public `key.pub`.

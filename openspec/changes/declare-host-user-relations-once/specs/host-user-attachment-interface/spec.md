@@ -7,7 +7,7 @@
 #### Scenario: The fields have their types
 
 - **WHEN** the attachment submodule is read
-- **THEN** it declares `primary : bool` (default false), `admin : bool` (default false), `sopsBridge : bool` (default `class == "nixos"`), `uid : nullOr ints.positive` (default null), `extraImports : listOf deferredModule` (default `[ ]`) and `overrides : deferredModule` (default `{ }`)
+- **THEN** it declares `primary : bool` (default false), `admin : bool` (default false), `sopsBridge : bool` (default `class == "nixos"`), `uid : nullOr ints.positive` (default null), `extraImports : listOf raw` (default `[ ]`) and `overrides : deferredModule` (default `{ }`)
 
 #### Scenario: The attachments are listed
 
@@ -21,7 +21,7 @@
 
 ### Requirement: Attachment constraints fail when read
 
-Reading an attachment field, or a host's `primaryUser`, SHALL fail with a `throw` naming `flake.fleet.hosts.<host>.users.<account>.<field>` when: more than one attachment on a host has `primary`; a darwin host does not have exactly one `admin`; a NixOS attachment has `admin`; `uid` is null on darwin or non-null on NixOS; `sopsBridge` is true on darwin; or the account is not a `flake.users` key.
+Reading an attachment field, or a host's `primaryUser`, SHALL fail with a `throw` naming `flake.fleet.hosts.<host>.users.<account>.<field>` when: more than one attachment on a host has `primary`; a darwin host does not have exactly one `admin`; a NixOS attachment has `admin`; `uid` is missing on a darwin attachment or present on a NixOS one (`uid` is required on darwin and forbidden on NixOS); `sopsBridge` is true on darwin; or the account is not a `flake.users` key.
 
 #### Scenario: Each constraint has a mutant
 
@@ -48,12 +48,12 @@ Reading an attachment field, or a host's `primaryUser`, SHALL fail with a `throw
 
 ### Requirement: One home-manager integration aspect per class
 
-`flake.modules.{nixos,darwin}.home-manager-integration`, in `modules/system/home-manager-integration.nix` and imported by every NixOS and darwin host, SHALL be the only writer of home-manager's integration settings, and SHALL generate from the host's attachments the values the scenario "What the aspect generates" lists. It SHALL assert that each attached account exists in `users.users`. `custom.laptop.primaryUser` SHALL NOT exist; `laptop.nix` SHALL read the registry's `primaryUser`.
+`flake.modules.{nixos,darwin}.home-manager-integration`, imported by every NixOS and darwin host, SHALL be the only writer of home-manager's integration settings, SHALL generate from the host's attachments the values the scenario "What the aspect generates" lists, and SHALL add no assertion of its own that an attached account exists, which could not fail (the last two scenarios). `custom.laptop.primaryUser` SHALL NOT exist; `laptop.nix` SHALL read the registry's `primaryUser`.
 
 #### Scenario: What the aspect generates
 
 - **WHEN** the aspect's definitions are read
-- **THEN** it sets `home-manager.useGlobalPkgs`, `useUserPackages` and `backupFileExtension`; one `home-manager.users.<account>` per attachment, of the form `{ imports = [ overrides ] ++ flake.users.<account>.modules ++ extraImports; _module.args.flake = flake.lib.homeFlake; }`; on NixOS, `hm-sops-bridge.users` for the attachments with `sopsBridge`; on darwin, `system.primaryUser` from the `admin` attachment and `users.users.<account>.uid` from each `uid`
+- **THEN** it sets `home-manager.useGlobalPkgs`, `useUserPackages` and `backupFileExtension`; one `home-manager.users.<account>` per attachment, of the form `{ imports = flake.users.<account>.modules ++ extraImports ++ [ overrides ]; _module.args.flake = flake.lib.homeFlake; }`, in that order, because a list option's definitions of equal priority merge in import order: the pair's `overrides` come after the person's modules and the extra imports, which keeps stibnite's crs58 `home.packages` in its parent-revision order (task 4.7); on NixOS, `hm-sops-bridge.users` for the attachments with `sopsBridge`; on darwin, `system.primaryUser` from the `admin` attachment and `users.users.<account>.uid` from each `uid`
 
 #### Scenario: The generated values equal the hand-written ones
 
@@ -68,11 +68,21 @@ Reading an attachment field, or a host's `primaryUser`, SHALL fail with a `throw
 #### Scenario: An attachment for an account nothing creates
 
 - **WHEN** a throwaway tree attaches a `flake.users` key with no clan user instance to a NixOS host
-- **THEN** evaluating that host's configuration fails with the aspect's assertion naming the host and account
+- **THEN** evaluating that host's configuration fails on NixOS's own user assertions, naming the account (`Exactly one of users.users.<a>.isSystemUser and users.users.<a>.isNormalUser must be set.` and `users.users.<a>.group is unset.`), and, for a user with a commit-signing key, on the commit-signing vars assertion naming the host; the aspect adds no assertion of its own, because home-manager's NixOS module defines `users.users.<a>` for every home, so a test that the attribute exists cannot fail
+
+#### Scenario: A darwin attachment declares its account
+
+- **WHEN** an account is attached to a darwin host
+- **THEN** the integration aspect itself declares `users.users.<a>` with the attachment's recorded uid, so there is no unmatched case to detect
 
 ### Requirement: No ambient flake argument
 
 No `home-manager.extraSpecialArgs`, `homeManagerConfiguration` `extraSpecialArgs` or host `_module.args` SHALL define `flake`. `flake.lib.homeFlake` SHALL be `config.flake // { inherit inputs; }`, defined once, and SHALL reach a home only through `_module.args.flake` set by the integration aspect or by `flake.lib.mkHome`. No home module SHALL read `flake` while its `imports` are collected. Both integration aspects SHALL assert that `home-manager.extraSpecialArgs` has no `flake` attribute.
+
+#### Scenario: The runtime-test homes receive no flake
+
+- **WHEN** the homes of `modules/vm-tests/shared-reference-tree.nix` are composed
+- **THEN** none receives a `flake` argument, and none of their modules reads one
 
 #### Scenario: The ambient writers are gone
 
@@ -188,4 +198,4 @@ The option types, evaluation-time assertions and the worker-scope check SHALL be
 #### Scenario: A recorded uid differs from the account on disk
 
 - **WHEN** a darwin attachment's `uid` differs from the uid of the existing account on that Mac
-- **THEN** no check of this interface fails, and the difference is found only when that host is deployed, as A346's monitor states
+- **THEN** no check of this interface fails and the deploy does not refuse: nix-darwin warns, skips the account and activates, leaving the account unmanaged (A346). In this change the four darwin uids are copied unchanged and the baseline projection shows them equal; after it, nothing in the repository detects a later wrong uid edit

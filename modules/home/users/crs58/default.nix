@@ -11,7 +11,7 @@ let
       config,
       pkgs,
       lib,
-      flake, # from extraSpecialArgs
+      flake, # the home's own module argument (flake.lib.homeFlake)
       # from home-manager's NixOS and nix-darwin modules; absent standalone
       osConfig ? null,
       ...
@@ -66,14 +66,9 @@ let
 
       programs.omnigraph = {
         enable = true;
-
-        # The desktop client on the two workstations used at a display.
-        # This home also reaches the servers (as cameron) and standalone
-        # home configurations, which have no use for a desktop app.
-        studio.enable = lib.elem (if osConfig == null then null else osConfig.networking.hostName) [
-          "stibnite"
-          "pyrite"
-        ];
+        # The desktop client is set per host attachment (studio.enable in
+        # modules/lib/host-users.nix: stibnite and pyrite); elsewhere this home
+        # reaches the servers and standalone configurations without it.
         settings = {
           version = 1;
 

@@ -7,12 +7,7 @@
 }:
 let
   flakeModules = config.flake.modules.darwin;
-  flakeUsers = config.flake.users;
-  inherit (config.flake.lib) hosts vars;
-  # sops-nix requires flake in extraSpecialArgs
-  flakeForHomeManager = config.flake // {
-    inherit inputs;
-  };
+  inherit (config.flake.lib) hosts vars workerAccountsOn;
 in
 {
   flake.modules.darwin."machines/darwin/stibnite" =
@@ -23,14 +18,13 @@ in
       ...
     }:
     {
-      _module.args.flake = inputs.self;
-
       imports = [
         inputs.home-manager.darwinModules.home-manager
         inputs.srvos.darwinModules.server
       ]
       ++ (with flakeModules; [
         base
+        home-manager-integration
         deploy-record
         casks
         ssh-ca-trust
@@ -45,10 +39,7 @@ in
 
       services.shared-reference-tree = {
         enable = true;
-        participants = [
-          "crs58"
-          "omnigent-cameron"
-        ];
+        participants = [ "crs58" ] ++ workerAccountsOn "stibnite";
         # Approved 2026-10-17 from live dscl collision evidence on stibnite;
         # see openspec/changes/share-ghq-reference-tree/design.md (D3).
         writerId = 460;
@@ -83,9 +74,8 @@ in
         "b4aacd0a9881fcfa9b2f943a1dbc0982f27bab041c124a7982458a00cb54fd48"
       ];
 
-      # Primary user for homebrew and system-level user operations
-      # crs58 is both admin and primary user on stibnite
-      system.primaryUser = "crs58";
+      # crs58 is both admin and primary user on stibnite; system.primaryUser
+      # follows the admin attachment (modules/lib/host-users.nix).
 
       custom.profile.isDesktop = true;
 
@@ -127,9 +117,9 @@ in
       # SSH for remote deployment and as the fleet's darwin build host.
       declaredSshd.serving = true;
 
-      # crs58: admin AND primary user (UID 501 - matches existing stibnite system)
+      # crs58: admin AND primary user (uid 501 from its attachment, matching
+      # the existing stibnite system)
       users.users.crs58 = {
-        uid = 501;
         home = "/Users/crs58";
         shell = pkgs.zsh;
         description = "crs58";
@@ -243,35 +233,5 @@ in
       '';
 
       services.fleet-services-trust.enable = true;
-
-      home-manager = {
-        useGlobalPkgs = true;
-        useUserPackages = true;
-
-        backupFileExtension = "before-home-manager";
-
-        # Pass flake as extraSpecialArgs for sops-nix access
-        extraSpecialArgs = {
-          flake = flakeForHomeManager;
-        };
-
-        users.crs58 = {
-          imports = flakeUsers.crs58.modules ++ [ inputs.self.modules.homeManager.bitwarden-key-pins ];
-
-          home.packages = [
-            pkgs.aeneas
-            (lib.hiPrio pkgs.charon)
-            pkgs.elan
-          ];
-
-          # Incus k3s profiles (see ADR-004)
-          # Provides instance profiles for k3s clusters in Colima
-          incus.k3sProfiles = {
-            k3s-dev = {
-              ip = "192.100.0.10";
-            };
-          };
-        };
-      };
     };
 }

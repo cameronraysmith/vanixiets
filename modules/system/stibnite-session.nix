@@ -1,4 +1,5 @@
-# Interactive access to stibnite under a dedicated keypair.
+# The stibnite session: interactive access to stibnite under a dedicated
+# keypair, exported as the two module keys this file is named for.
 #
 # Build access to stibnite is the nix-builders clan service
 # (modules/clan/services/nix-builders). This is the other identity: an

@@ -7,12 +7,7 @@
 }:
 let
   flakeModules = config.flake.modules.darwin;
-  flakeUsers = config.flake.users;
   inherit (config.flake.lib) hosts;
-  # sops-nix requires flake in extraSpecialArgs
-  flakeForHomeManager = config.flake // {
-    inherit inputs;
-  };
 in
 {
   flake.modules.darwin."machines/darwin/blackphos" =
@@ -23,14 +18,13 @@ in
       ...
     }:
     {
-      _module.args.flake = inputs.self;
-
       imports = [
         inputs.home-manager.darwinModules.home-manager
         inputs.srvos.darwinModules.server
       ]
       ++ (with flakeModules; [
         base
+        home-manager-integration
         deploy-record
         ssh-ca-trust
         ssh-known-hosts
@@ -80,9 +74,8 @@ in
       #   readlink /etc/nix/nix.conf        # /etc/static/... means no hash needed
       #   shasum -a 256 /etc/nix/nix.conf   # otherwise add the digest here
 
-      # Primary user for homebrew and system-level user operations
-      # crs58 is the admin user on blackphos
-      system.primaryUser = "crs58";
+      # crs58 is the admin user on blackphos; system.primaryUser follows the
+      # admin attachment (modules/lib/host-users.nix).
 
       custom.profile.isDesktop = true;
 
@@ -128,9 +121,9 @@ in
 
       services.fleet-services-trust.enable = true;
 
-      # crs58: admin (UID 502), raquel: primary (UID 506) - matches existing system
+      # crs58: admin (uid 502), raquel: primary (uid 506), from their
+      # attachments, matching the existing system
       users.users.crs58 = {
-        uid = 502;
         home = "/Users/crs58";
         shell = pkgs.zsh;
         description = "crs58";
@@ -138,7 +131,6 @@ in
       };
 
       users.users.raquel = {
-        uid = 506;
         home = "/Users/raquel";
         shell = pkgs.zsh;
         description = "raquel";
@@ -151,27 +143,5 @@ in
         "crs58"
         "raquel"
       ];
-
-      home-manager = {
-        useGlobalPkgs = true;
-        useUserPackages = true;
-
-        backupFileExtension = "before-home-manager";
-
-        # Pass flake as extraSpecialArgs for sops-nix access
-        extraSpecialArgs = {
-          flake = flakeForHomeManager;
-        };
-
-        users.crs58.imports = flakeUsers.crs58.modules;
-
-        # raquel is deployed while she has no screen session on blackphos, so
-        # her home may run no gui-domain launchd agent.
-        users.raquel = {
-          imports = flakeUsers.raquel.modules;
-          deploysWithoutScreenSession = true;
-          services.jj-pr-sync.enable = false;
-        };
-      };
     };
 }

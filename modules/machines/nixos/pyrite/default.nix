@@ -6,8 +6,7 @@
 let
   # Capture outer config for use in imports
   flakeModules = config.flake.modules.nixos;
-  flakeHomeModules = config.flake.modules.homeManager;
-  flakeUsers = config.flake.users;
+  inherit (config.flake.lib) workerAccountsOn;
 in
 {
   # Export host module to flake namespace
@@ -72,6 +71,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        home-manager-integration
         deploy-record
         dnscrypt-proxy
         enormous-tests
@@ -86,11 +86,7 @@ in
 
       services.shared-reference-tree = {
         enable = true;
-        participants = [
-          "cameron"
-          "omnigent-cameron"
-          "omnigent-janettesmith"
-        ];
+        participants = [ "cameron" ] ++ workerAccountsOn "pyrite";
       };
 
       # A disabledModules path that matches nothing is silently ignored, so a
@@ -130,9 +126,6 @@ in
           '';
         }
       ];
-
-      # Ambient flake argument; its removal is tracked with the poisoned-flake guard in checks/omnigent-workers.nix
-      _module.args.flake = inputs.self;
 
       # Bootloader: UEFI with systemd-boot. canTouchEfiVariables writes the machine's
       # 8 MiB SPI boot ROM (not the disk the install wipes); an EFI write failing is
@@ -751,27 +744,5 @@ in
       # together they can never take more than a single worker's budget from a
       # 15.5 GiB laptop.
       services.omnigent-host.workerSliceMemoryMax = "8G";
-
-      # Bridge NixOS-level sops to home-manager for user secret key delivery.
-      # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
-      # ("crs58" via alias-fold inheritance).
-      hm-sops-bridge.users.cameron = { };
-
-      # cameron is the preferred username on new machines and folds to crs58 by alias;
-      # alias-keyed reads keep this call site ignorant of the alias->target relationship.
-      # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) are provided by
-      # the cameron inventory service.
-      home-manager.users.cameron = {
-        imports = flakeUsers.cameron.modules ++ [
-          flakeHomeModules.niri
-          flakeHomeModules.dms
-          flakeHomeModules.zen-browser
-          flakeHomeModules.bitwarden-key-pins
-          flakeHomeModules.linux-workstation
-          flakeHomeModules.night-light
-        ];
-        # Validate with the exact derivation installed by nixpkgs' NixOS module.
-        programs.niri.package = config.programs.niri.package;
-      };
     };
 }

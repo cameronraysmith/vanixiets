@@ -1,7 +1,9 @@
 # Admin user for modern machines (preferred username)
 # Clan users service settings apply to NixOS only; extraModules work cross-platform
 {
+  config,
   inputs,
+  lib,
   ...
 }:
 {
@@ -11,15 +13,8 @@
       input = "clan-core";
     };
 
-    # Machine-specific targeting (modern machines)
-    roles.default.machines."cinnabar" = { };
-    roles.default.machines."electrum" = { };
-    roles.default.machines."argentum" = { };
-    roles.default.machines."rosegold" = { };
-    roles.default.machines."galena" = { };
-    roles.default.machines."scheelite" = { };
-    roles.default.machines."magnetite" = { };
-    roles.default.machines."pyrite" = { };
+    # Every host with a cameron attachment (modules/lib/host-users.nix)
+    roles.default.machines = lib.genAttrs (config.flake.lib.hostsOfAccount "cameron") (_: { });
 
     roles.default.settings = {
       user = "cameron";
@@ -31,9 +26,9 @@
       prompt = false; # Auto-generate password via xkcdpass (nixos only currently)
     };
 
-    # User overlay: shell, SSH keys, home-manager configuration
-    # Home-manager module is imported at machine level (nixos/darwin specific)
-    # This extraModule only provides configuration
+    # User overlay: shell and SSH keys. The home-manager integration and the
+    # home itself come from the host's attachment
+    # (modules/system/home-manager-integration.nix).
     roles.default.extraModules = [
       (
         {
@@ -60,27 +55,8 @@
               linger = true;
             })
           ];
-
           # Enable zsh system-wide (works on both platforms)
           programs.zsh.enable = true;
-
-          # Home-Manager infrastructure settings only
-          # Module imports are defined at machine level (argentum, rosegold, etc.)
-          # to avoid duplicate catppuccin imports when clan deploys
-          home-manager = {
-            useGlobalPkgs = true;
-            useUserPackages = true;
-            # Backup conflicting files instead of failing (prevents race condition on GCP)
-            backupFileExtension = "before-home-manager";
-
-            # Pass flake as extraSpecialArgs for sops-nix access
-            # Bridge from outer inputs to home-manager modules
-            extraSpecialArgs = {
-              flake = inputs.self // {
-                inherit inputs;
-              };
-            };
-          };
         }
       )
     ];

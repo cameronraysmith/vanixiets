@@ -25,8 +25,8 @@ Each host SHALL provide exactly the accounts declared for it, each with that per
 
 #### Scenario: A declared account that nothing creates
 
-- **WHEN** an account is declared on a host where nothing creates that account
-- **THEN** the host's configuration fails to evaluate, naming the host and the account, rather than building a home configuration for an account that does not exist
+- **WHEN** an account is declared on a NixOS host where nothing creates that account
+- **THEN** the host's configuration fails to evaluate, naming the account, rather than building a home configuration for an account that does not exist; on a darwin host the declaration itself creates the account with its recorded uid
 
 ### Requirement: A darwin host's admin account is declared separately from its primary user
 

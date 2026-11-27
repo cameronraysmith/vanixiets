@@ -6,7 +6,6 @@
 let
   # Capture outer config for use in imports
   flakeModules = config.flake.modules.nixos;
-  flakeUsers = config.flake.users;
 in
 {
   # Export host module to flake namespace
@@ -25,6 +24,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        home-manager-integration
         deploy-record
         fleet-alert
         fleet-deployer
@@ -34,9 +34,6 @@ in
         observability-notify
         ssh-known-hosts
       ]);
-
-      # Ambient flake argument; its removal is tracked with the poisoned-flake guard in checks/omnigent-workers.nix
-      _module.args.flake = inputs.self;
 
       # ZFS device node path - more stable for cloud VMs
       boot.zfs.devNodes = "/dev/disk/by-path";
@@ -90,17 +87,5 @@ in
       # Increase MaxAuthTries to accommodate agent forwarding with many keys
       # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
       services.openssh.settings.MaxAuthTries = 20;
-
-      # Bridge NixOS-level sops to home-manager for user secret key delivery.
-      # sopsIdentity defaults to flake.users.cameron.meta.sopsAgeKeyId
-      # ("crs58" via alias-fold inheritance).
-      hm-sops-bridge.users.cameron = { };
-
-      # cameron is an alias for crs58; alias-keyed reads keep this
-      # call site ignorant of the alias->target relationship.
-      # Infrastructure settings (useGlobalPkgs, extraSpecialArgs, etc.) provided by cameron inventory service
-      home-manager.users.cameron = {
-        imports = flakeUsers.cameron.modules;
-      };
     };
 }

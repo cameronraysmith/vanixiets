@@ -15,9 +15,6 @@
       # shared with every machine and home of the same system.
       pkgs = withSystem system ({ fleetPkgs, ... }: fleetPkgs);
       extraSpecialArgs = {
-        flake = config.flake // {
-          inherit inputs;
-        };
         # home-manager's NixOS and nix-darwin modules pass the enclosing system
         # configuration under this name; a standalone home configuration has no
         # such system, and saying so explicitly is what keeps a module that
@@ -27,8 +24,11 @@
         # name cannot be resolved, so the formal's own default never applies.
         osConfig = null;
       };
+      # The home's `flake` is its own module argument, never a specialArg
+      # (system/home-manager-integration.nix).
       modules = config.flake.users.${user}.modules ++ [
         config.flake.lib.sourceContextObligations.homeModule
+        { _module.args.flake = config.flake.lib.homeFlake; }
       ];
     };
 }

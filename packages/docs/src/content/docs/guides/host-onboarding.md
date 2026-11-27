@@ -378,7 +378,7 @@ The `hm-sops-bridge` module decrypts `secrets/bridge/<id>-age-key.enc` with the 
 
 Enrolling a user on this host therefore means three declarations rather than a manual key copy:
 - `flake.users.<user>.meta.sopsAgeKeyId` is set in `modules/home/users/<user>/meta.nix`
-- the host declares `hm-sops-bridge.users.<user> = { };` in `modules/machines/nixos/<host>/default.nix`
+- the user is attached to the host in `modules/lib/host-users.nix` (`flake.fleet.hosts.<host>.users.<user> = { };`), whose `sopsBridge` defaults to true on NixOS; the `home-manager-integration` aspect then enrolls the user in `hm-sops-bridge` and builds the home
 - `secrets/bridge/<id>-age-key.enc` exists and is encrypted to this machine's age key (add the machine's anchor to the `secrets/bridge/` rule and run `just update-all-keys`; the host's evaluation fails until it is)
 
 Verify on the host after deployment:

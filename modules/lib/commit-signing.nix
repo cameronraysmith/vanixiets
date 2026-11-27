@@ -2,7 +2,7 @@
 # signers file, and the fleet obligations machines.nix asserts per host.
 { config, lib, ... }:
 let
-  signingPerson = username: config.flake.userAliases.${username} or username;
+  inherit (config.flake.lib) accountOf;
   commitSigningGenerator = person: "${person}-commit-signing-key";
 
   # Machines whose homes sign with the login key (`ssh-signing-key`) because they
@@ -198,9 +198,9 @@ let
       signing = lib.filter (worker: worker.credentials.signingKey.enable) workers;
       homes = lib.filterAttrs (account: _: users ? ${account}) (hostConfig.home-manager.users or { });
       homeOwner = lib.listToAttrs (
-        map (account: lib.nameValuePair (signingPerson account) account) (lib.attrNames homes)
+        map (account: lib.nameValuePair (accountOf account) account) (lib.attrNames homes)
       );
-      persons = lib.unique (lib.attrNames homeOwner ++ map (worker: signingPerson worker.owner) workers);
+      persons = lib.unique (lib.attrNames homeOwner ++ map (worker: accountOf worker.owner) workers);
       generatorOf = person: generators.${commitSigningGenerator person} or null;
       inherit (hostConfig.vanixiets.commitSigning) program;
       loginKeys = lib.concatMap (user: user.meta.sshKeys) (lib.attrValues users);
@@ -209,7 +209,7 @@ let
         if legacy then
           homes.${account}.sops.secrets.ssh-signing-key.path or null
         else
-          (generatorOf (signingPerson account)).files.key.path or null;
+          (generatorOf (accountOf account)).files.key.path or null;
       cases = {
         signingKeyUnauthorized = unauthorized {
           inherit isDarwin hostConfig;
@@ -258,7 +258,7 @@ let
                 ownerMeta = users.${worker.owner}.meta;
                 inherit loginKeys;
                 generator = generators.${worker.credentials.signingKey.generator};
-                person = signingPerson worker.owner;
+                person = accountOf worker.owner;
               }
             ) signing;
           }
@@ -269,7 +269,6 @@ in
 {
   flake.lib = {
     inherit
-      signingPerson
       commitSigningGenerator
       commitSigningLegacyMachines
       allowedSigners

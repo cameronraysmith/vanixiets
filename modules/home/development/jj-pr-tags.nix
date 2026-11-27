@@ -296,7 +296,11 @@ in
     {
       options.services.jj-pr-sync.enable = lib.mkOption {
         type = lib.types.bool;
-        default = true;
+        # An account deployed without a screen session runs no gui-domain
+        # agent, and jj-pr-sync's launchd agent is one; `or false` keeps
+        # homes that do not import `core` (which declares the flag) evaluable.
+        default = !(config.deploysWithoutScreenSession or false);
+        defaultText = lib.literalExpression "!(config.deploysWithoutScreenSession or false)";
         description = ''
           Whether a background job refreshes the jj pull request tags of every
           registered repository: a launchd agent on darwin, a systemd user timer

@@ -5,25 +5,13 @@
 # (modules/apps/drv-diff-base-allow.txt), which every run applies, and are not
 # repeated here. Every NixOS, darwin and home configuration, and every other
 # dumped check and vmTests attribute, must keep its drvPath (design D12).
-# Each may-change entry is resolved to changed, with its cause, or removed
-# before archive.
+# The eight may-change entries for the worker checks and runtime tests whose
+# source files are edited were all identical in the run of 2026-11-27
+# (logs/drv-diff-ec2c878bf4bc-1be931444c18-20261127T092819Z) and are removed.
 
 checks.x86_64-linux.omnigent-worker-scope  added  # the worker aspect's mutant check (design D7, task 6.4)
 checks.x86_64-linux.fleet-alert  changed  # its size-rule clause renders every testSizes.checks entry; omnigent-worker-scope adds one
 checks.x86_64-linux.eval-users-lib  changed  # modules/home/users/lib.test.nix imports ${./lib.nix} by store path, and lib.nix:103 now reads flake.lib.accountOf (design D10)
-
-# Their source files are edited (the fixtures drop the check-local poisoned
-# flake and take the worker aspect's value; the runtime tests drop
-# extraSpecialArgs.flake), while every value they read should stay the same
-# (design D5, D6).
-checks.x86_64-linux.omnigent-worker-capabilities  may-change
-checks.x86_64-linux.omnigent-worker-linux  may-change
-checks.aarch64-darwin.omnigent-worker-capabilities  may-change
-checks.aarch64-darwin.omnigent-worker-darwin  may-change
-vmTests.x86_64-linux.omnigent-worker-isolation  may-change
-vmTests.aarch64-linux.omnigent-worker-isolation  may-change
-vmTests.x86_64-linux.shared-reference-tree  may-change
-vmTests.x86_64-linux.shared-reference-tree-migration  may-change
 
 # Task 8.2 edits guides under packages/docs, which are source of the docs
 # package; every check that builds or consumes that package changes with it.

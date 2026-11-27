@@ -48,9 +48,14 @@ Its build confirms that the harness executables exist in the generated profile a
 ## Host registry
 
 Each fleet member is one typed record, `flake.fleet.hosts.<name>` (`lib/hosts.nix`), and `flake.lib.hosts` is its read-only alias.
-A record declares the host's `system` (null for a phone), endpoints, deploy user, services, ZeroTier address, primary user, memory, `nixClassic`, `checked` and `stateVersion`; `class`, `fqdn`, `address`, `targetHost`, `memoryGiB`, `enrolled` (its clan machine key is committed) and `cloud` (from `flake.lib.cloudMachines`) are derived.
+A record declares the host's `system` (null for a phone), endpoints, deploy user, services, ZeroTier address, memory, `nixClassic`, `checked` and `stateVersion`; `class`, `fqdn`, `address`, `targetHost`, `memoryGiB`, `enrolled` (its clan machine key is committed), `cloud` (from `flake.lib.cloudMachines`) and `primaryUser` are derived.
 `flake.lib.machineSystems`, the inventory's `machineClass` and NixOS `deploy.targetHost`, `flake.clan.machines` with its `nixpkgs.hostPlatform`, the collector rows' `platform`, the NixOS names of `flake.lib.hostKeys` and the ZeroTier controller's external members are generated from it; the inventory keeps each host's tags and description.
 A service role's members are `flake.lib.inventoryMembers` (`lib/inventory-members.nix`), clan's own rule over the declared inventory.
+
+The accounts people hold on a host are declared once, as `flake.fleet.hosts.<name>.users.<account>` (`lib/host-users.nix`): whether the account is the host's primary person or nix-darwin's admin, its darwin uid, whether its age key is bridged (NixOS), and the pair's extra home modules and overrides.
+From them are generated the clan user instances' machine lists (`flake.lib.hostsOfAccount`), `primaryUser`, and, through `flake.modules.{nixos,darwin}.home-manager-integration` (`system/home-manager-integration.nix`), each attached account's home, the `hm-sops-bridge` users, `system.primaryUser` and the darwin uids; `checks/home.nix` derives its standalone home checks from them.
+A host gains a person's account by adding an attachment, never by writing `home-manager.users` or `hm-sops-bridge.users` in its body.
+Omnigent worker accounts are a separate relation, `flake.fleet.workers.<owner>` (`lib/fleet-workers.nix`), from which the omnigent inventory's host roles, `flake.lib.workerAccountsOn` and the fleet deployer's requesters are generated.
 
 ## Evaluators
 

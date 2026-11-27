@@ -282,9 +282,7 @@ let
             source = (selection credentials).${name};
             generator = generators.${source.generator};
             file = generator.files.${source.file};
-            personGenerator = config.flake.lib.commitSigningGenerator (
-              config.flake.lib.signingPerson worker.owner
-            );
+            personGenerator = config.flake.lib.commitSigningGenerator (config.flake.lib.accountOf worker.owner);
           in
           (
             if name == "signingKey" then

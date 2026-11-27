@@ -1,4 +1,4 @@
-{ ... }:
+{ inputs, ... }:
 {
   flake.modules = {
     homeManager.neovim.programs.neovim = {
@@ -12,11 +12,10 @@
         pkgs,
         config,
         lib,
-        flake,
         ...
       }:
       {
-        imports = [ flake.inputs.lazyvim-nix.homeManagerModules.default ];
+        imports = [ inputs.lazyvim-nix.homeManagerModules.default ];
 
         programs.lazyvim = {
           enable = true;

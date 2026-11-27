@@ -1,5 +1,8 @@
 # Tmux terminal multiplexer with extensive plugins and catppuccin theme
-{ ... }:
+{ config, ... }:
+let
+  inherit (config.flake.lib) catppuccinHomeModule;
+in
 {
   flake.modules = {
     homeManager.shell =
@@ -7,7 +10,6 @@
         pkgs,
         config,
         lib,
-        flake,
         ...
       }:
       let
@@ -35,7 +37,7 @@
         };
       in
       {
-        imports = [ flake.lib.catppuccinHomeModule ];
+        imports = [ catppuccinHomeModule ];
 
         catppuccin.tmux = {
           enable = true;

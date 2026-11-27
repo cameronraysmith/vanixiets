@@ -100,7 +100,7 @@ in
                 type = lib.types.nullOr signingKeyLine;
                 default = lib.fileContents (
                   flakeLib.vars.path {
-                    generator = flakeLib.commitSigningGenerator (flakeLib.signingPerson name);
+                    generator = flakeLib.commitSigningGenerator (flakeLib.accountOf name);
                     file = "key.pub";
                   }
                   + "/value"

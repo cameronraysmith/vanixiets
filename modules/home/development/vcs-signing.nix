@@ -11,7 +11,7 @@
     }:
     let
       inherit (flake.lib)
-        signingPerson
+        accountOf
         commitSigningGenerator
         commitSigningLegacyMachines
         agentFreeSshKeygen
@@ -24,7 +24,7 @@
         if osConfig == null then
           null
         else
-          osConfig.clan.core.vars.generators.${commitSigningGenerator (signingPerson username)} or null;
+          osConfig.clan.core.vars.generators.${commitSigningGenerator (accountOf username)} or null;
       key = config.vcs.signing.keyFile;
       program = lib.getExe (agentFreeSshKeygen pkgs);
       signers = "${config.xdg.configHome}/git/allowed_signers";

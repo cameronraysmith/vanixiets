@@ -7,7 +7,7 @@ let
     {
       # INNER: Home-manager module signature
       config,
-      flake, # from extraSpecialArgs
+      flake, # the home's own module argument (flake.lib.homeFlake)
       ...
     }:
     {

@@ -7,7 +7,8 @@ created: 2026-09-04
 
 Every `.nix` file under this directory is a flake-parts module that contributes `deferredModule` values to `flake.modules.homeManager.<aggregate>`.
 A directory is an aggregate: one user-facing capability, named for what a user gets (`shell`, `development`, `herdr`), never for how it is declared.
-A user is composed by listing aggregates in `flake.users.<name>.aggregates` (`users/<name>/meta.nix`); `configurations.nix` and `mk-home.nix` turn that list into one `homeConfigurations` output per declared system.
+A user is composed by listing aggregates in `flake.users.<name>.aggregates` (`users/<name>/meta.nix`); `configurations.nix` and `mk-home.nix` turn that list into one `homeConfigurations` output per declared system, and a host's attachment (`flake.fleet.hosts.<host>.users.<account>`, `modules/lib/host-users.nix`) gives the account a home on that host through the `home-manager-integration` aspect.
+A home's `flake` argument is its own `_module.args.flake`, set by what composes it: `flake.lib.homeFlake` for host and standalone homes, and the omnigent worker aspect's restricted value for worker homes; no `extraSpecialArgs.flake` exists, and a module that needs the flake inside `imports` reads its flake-parts scope (`inputs`, `config.flake`), because `_module.args` cannot be read while imports are collected.
 This is the dendritic pattern from `github:mightyiam/dendritic`: a file is one feature across every configuration that wants it, the path names the feature, and merging by aggregate name replaces import lists.
 
 ## Contract
@@ -82,7 +83,7 @@ On a Mac a home's sops secrets live on a RAM disk under the account's `DARWIN_US
 A launchd agent of a darwin home sets `launchd.agents.<name>.domain` where it is defined, which `core/launchd-domains.nix` asserts.
 home-manager's default, `gui`, bootstraps into the account's graphical session and fails the whole activation with `Bootstrap failed: 125` when the account has no screen session on that Mac; `user` agents load into `user/<uid>` at activation and, through home-manager's `launchd-primer` daemon, at every boot.
 `devin-worker-<n>` stays `gui` for computer use, and `jj-pr-sync` stays `gui` because `gh` keeps its token in the login keychain, which processes outside the graphical session cannot read.
-An account deployed while it has no screen session on its Mac sets `deploysWithoutScreenSession = true` beside its `home-manager.users` entry (`modules/darwin/laptop.nix` for both laptop accounts, `machines/darwin/blackphos` for `raquel`), and `core/launchd-domains.nix` then rejects any enabled `gui` agent in that home; those accounts turn `jj-pr-sync` off with `services.jj-pr-sync.enable = false`.
+An account deployed while it has no screen session on its Mac sets `deploysWithoutScreenSession = true` in its attachment's `overrides` (`modules/lib/host-users.nix`: both laptop accounts and blackphos's `raquel`), and `core/launchd-domains.nix` then rejects any enabled `gui` agent in that home; `jj-pr-sync` defaults to off in such a home.
 
 ## Verification
 

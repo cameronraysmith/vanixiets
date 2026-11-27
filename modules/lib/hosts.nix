@@ -1,8 +1,9 @@
 # Fleet host registry: flake.fleet.hosts holds one typed record per fleet
 # member, the only place a member's name, system or overlay address is
-# written. `class`, `fqdn`, `address`, `targetHost`, `memoryGiB`, `enrolled`
-# and `cloud` are read-only fields the submodule derives from the name, the
-# declared fields, the committed flake source and flake.lib.cloudMachines;
+# written. `class`, `fqdn`, `address`, `targetHost`, `memoryGiB`, `enrolled`,
+# `cloud` and `primaryUser` are read-only fields the submodule derives from the
+# name, the declared fields, the committed flake source,
+# flake.lib.cloudMachines and the host's user attachments (lib/host-users.nix);
 # `zerotier` carries today's ZeroTier address and member id until ZeroTier is
 # retired. Whether a host is checked, enrolled or has its cloud server up are
 # three independent facts. A field that contradicts the host's class throws
@@ -74,14 +75,15 @@ let
             description = "The host's ZeroTier member id.";
           };
         };
-        # The person a machine belongs to, if it is anyone's: a name under
-        # flake.users (modules/home/users, aliases included) or null for a
+        # The person a machine belongs to, if it is anyone's: the one
+        # attachment with primary = true (lib/host-users.nix), or null for a
         # shared server or a phone. flake.lib.fleetDeployer derives who may
         # deploy a machine from it, and its obligation requires the user to
         # have an account on that machine.
         primaryUser = lib.mkOption {
+          readOnly = true;
           type = types.nullOr (types.enum (lib.attrNames flakeConfig.flake.users));
-          description = "The person the host belongs to, a name under flake.users, or null.";
+          description = "The person the host belongs to, derived from its attachments: a name under flake.users, or null.";
         };
         memory = lib.mkOption {
           type = types.nullOr (types.either types.ints.positive (types.enum [ "unknown" ]));
@@ -191,6 +193,13 @@ let
             "nixos";
         fqdn = "${name}.${fleet.domain}";
         address = mesh.addressOf mesh.instance name;
+        primaryUser =
+          let
+            primaries = lib.attrNames (lib.filterAttrs (_: a: a.primary) config.users);
+          in
+          assert lib.assertMsg (lib.length primaries <= 1)
+            "flake.fleet.hosts.${name}.users: at most one attachment has primary = true, found ${lib.concatStringsSep ", " primaries}";
+          if primaries == [ ] then null else lib.head primaries;
         targetHost = if config.deployUser == null then null else "${config.deployUser}@${name}.zt";
         memoryGiB =
           let
@@ -235,7 +244,6 @@ in
         address = "fddb:4344:343b:14b9:399:93db:4344:343b";
         memberId = "db4344343b";
       };
-      primaryUser = null;
       memory = null; # cloud
       nixClassic = false;
       stateVersion = "25.05";
@@ -249,7 +257,6 @@ in
         address = "fddb:4344:343b:14b9:399:93d1:7e6d:27cc";
         memberId = "d17e6d27cc";
       };
-      primaryUser = null;
       memory = null; # cloud
       nixClassic = false;
       stateVersion = "25.05";
@@ -263,7 +270,6 @@ in
         address = "fddb:4344:343b:14b9:399:9315:c67a:dec9";
         memberId = "15c67adec9";
       };
-      primaryUser = null;
       memory = null; # cloud
       nixClassic = false;
       stateVersion = "25.05";
@@ -277,7 +283,6 @@ in
         address = "fddb:4344:343b:14b9:399:9380:46d5:3400";
         memberId = "8046d53400";
       };
-      primaryUser = null;
       memory = null; # cloud
       nixClassic = false;
       checked = false;
@@ -292,7 +297,6 @@ in
         address = "fddb:4344:343b:14b9:399:930f:39db:40d2";
         memberId = "0f39db40d2";
       };
-      primaryUser = null;
       memory = null; # cloud
       nixClassic = false;
       stateVersion = "25.05";
@@ -306,7 +310,6 @@ in
         address = "fddb:4344:343b:14b9:399:937e:8067:8028";
         memberId = "7e80678028";
       };
-      primaryUser = "cameron";
       memory = 16;
       nixClassic = false;
       stateVersion = "26.05";
@@ -320,7 +323,6 @@ in
         address = "fddb:4344:343b:14b9:399:9324:19d9:3451";
         memberId = "2419d93451";
       };
-      primaryUser = "crs58";
       memory = 64;
       nixClassic = true;
       stateVersion = 4;
@@ -334,7 +336,6 @@ in
         address = "fddb:4344:343b:14b9:399:930e:e971:d9e0";
         memberId = "0ee971d9e0";
       };
-      primaryUser = "raquel";
       memory = "unknown";
       nixClassic = false;
       stateVersion = 4;
@@ -348,7 +349,6 @@ in
         address = "fddb:4344:343b:14b9:399:93f7:54d5:ad7e";
         memberId = "f754d5ad7e";
       };
-      primaryUser = "christophersmith";
       memory = 8;
       nixClassic = false;
       stateVersion = 4;
@@ -362,7 +362,6 @@ in
         address = "fddb:4344:343b:14b9:399:9315:3431:ee8";
         memberId = "1534310ee8";
       };
-      primaryUser = "janettesmith";
       memory = 8;
       nixClassic = false;
       stateVersion = 4;
@@ -376,7 +375,6 @@ in
         address = "fddb:4344:343b:14b9:399:939f:c45d:577c";
         memberId = "9fc45d577c";
       };
-      primaryUser = null;
       memory = null;
       nixClassic = false;
       stateVersion = null;
@@ -390,7 +388,6 @@ in
         address = "fddb:4344:343b:14b9:399:933c:8999:9bb8";
         memberId = "3c89999bb8";
       };
-      primaryUser = null;
       memory = null;
       nixClassic = false;
       stateVersion = null;

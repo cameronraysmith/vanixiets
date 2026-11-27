@@ -367,7 +367,7 @@ The designated follow-up is systemd `LoadCredential`, optionally `LoadCredential
 Run `nix run .#omnigent-worker-login -- HOST OWNER TOOL` from an administrative workstation.
 The helper selects the dedicated account and its installed profile, clears inherited credentials and agents, and runs the tool from the worker's home.
 It does not change the human account's authentication or synchronize OAuth files.
-The current matrix is Cameron on magnetite, pyrite and stibnite, and Janette on magnetite and pyrite.
+The current matrix, declared once in `flake.fleet.workers` (`modules/lib/fleet-workers.nix`), from which the inventory's `roles.host.machines` and the fleet deployer's requesters are generated, is Cameron on magnetite, pyrite and stibnite, and Janette on magnetite and pyrite.
 Use `cameron` or `janettesmith` as `OWNER`.
 
 ```sh

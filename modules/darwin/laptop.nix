@@ -5,12 +5,7 @@
 }:
 let
   flakeModules = config.flake.modules.darwin;
-  flakeUsers = config.flake.users;
   inherit (config.flake.lib) hosts;
-  # sops-nix requires flake in extraSpecialArgs
-  flakeForHomeManager = config.flake // {
-    inherit inputs;
-  };
 in
 {
   flake.modules.darwin.laptop =
@@ -22,7 +17,8 @@ in
     }:
     let
       inherit (config.networking) hostName;
-      primaryUser = config.custom.laptop.primaryUser;
+      # The login user at uid 501, from the host's attachments.
+      inherit (hosts.${hostName}) primaryUser;
     in
     {
       # dnscrypt-proxy and fleet-services-trust are imported on every darwin host
@@ -35,6 +31,7 @@ in
       ]
       ++ (with flakeModules; [
         base
+        home-manager-integration
         deploy-record
         ssh-ca-trust
         ssh-known-hosts
@@ -43,14 +40,7 @@ in
         fleet-services-trust
       ]);
 
-      options.custom.laptop.primaryUser = lib.mkOption {
-        type = lib.types.str;
-        description = "Login user at uid 501; their home-manager modules and SSH keys come from the flake user inventory.";
-      };
-
       config = {
-        _module.args.flake = inputs.self;
-
         # Override both srvos and clan-core defaults, which disable documentation
         srvos.server.docs.enable = lib.mkForce true;
         documentation.enable = lib.mkForce true;
@@ -69,8 +59,8 @@ in
         # Override base.nix which sets stateVersion = 5
         system.stateVersion = lib.mkForce 4;
 
-        # cameron is the admin user and manages homebrew
-        system.primaryUser = "cameron";
+        # cameron is the admin user and manages homebrew: system.primaryUser
+        # follows the admin attachment (system/home-manager-integration.nix).
 
         custom.profile.isDesktop = true;
 
@@ -96,7 +86,6 @@ in
         };
 
         users.users.${primaryUser} = {
-          uid = 501;
           home = "/Users/${primaryUser}";
           shell = pkgs.zsh;
           description = primaryUser;
@@ -104,7 +93,6 @@ in
         };
 
         users.users.cameron = {
-          uid = 502;
           home = "/Users/cameron";
           # shell and authorizedKeys provided by cameron inventory service
           description = "cameron";
@@ -115,33 +103,6 @@ in
           primaryUser
           "cameron"
         ];
-
-        home-manager = {
-          useGlobalPkgs = true;
-          useUserPackages = true;
-
-          backupFileExtension = "before-home-manager";
-
-          extraSpecialArgs = {
-            flake = flakeForHomeManager;
-          };
-
-          # Both accounts are deployed while they have no screen session on
-          # the laptop, so neither may run a gui-domain launchd agent.
-          users.${primaryUser} = {
-            imports = flakeUsers.${primaryUser}.modules;
-            deploysWithoutScreenSession = true;
-            services.jj-pr-sync.enable = false;
-          };
-
-          # cameron is an alias for crs58; alias-keyed reads keep this
-          # call site ignorant of the alias->target relationship.
-          users.cameron = {
-            imports = flakeUsers.cameron.modules;
-            deploysWithoutScreenSession = true;
-            services.jj-pr-sync.enable = false;
-          };
-        };
       };
     };
 }

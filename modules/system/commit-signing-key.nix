@@ -11,16 +11,16 @@ let
     let
       users = flakeConfig.flake.users;
       inherit (flakeConfig.flake.lib)
-        signingPerson
+        accountOf
         commitSigningGenerator
         commitSigningLegacyMachines
         ;
       homeOwners = lib.listToAttrs (
-        map (account: lib.nameValuePair (signingPerson account) account) (
+        map (account: lib.nameValuePair (accountOf account) account) (
           lib.filter (account: users ? ${account}) (lib.attrNames (config.home-manager.users or { }))
         )
       );
-      workerPersons = map (worker: signingPerson worker.owner) (
+      workerPersons = map (worker: accountOf worker.owner) (
         lib.attrValues (config.services.omnigent-host.workers or { })
       );
       persons = lib.unique (lib.attrNames homeOwners ++ workerPersons);

@@ -40,7 +40,7 @@ Targets are derived, never listed (`flake.lib.fleetDeployer.targets`): every Nix
 A cloud machine is enabled by its `enabled` flag in `modules/lib/cloud-machines.nix`, which terranix provisions from; any other inventory machine is enabled.
 Re-enabling a cloud machine makes it a target with no other change.
 
-Reach follows each machine's `primaryUser` in `modules/lib/hosts.nix`:
+Reach follows each machine's `primaryUser`, which `modules/lib/hosts.nix` derives from the host's one attachment with `primary = true` (`modules/lib/host-users.nix`):
 
 - a shared server (no primary user) is reachable by every operator (`operators` in `modules/lib/fleet-deployer.nix`);
 - a personal machine is reachable by its primary user and by the admin.
@@ -50,13 +50,13 @@ The machine checks fail when a disabled or excluded machine would be in reach, o
 
 ## Adding a requester
 
-1. Make the person an operator in `modules/lib/fleet-deployer.nix`, or the primary user of their machine in `modules/lib/hosts.nix`, and add them to `requesterNames` if they have an omnigent worker.
+1. Make the person an operator in `modules/lib/fleet-deployer.nix`, or the primary user of their machine (`primary = true` on their attachment in `modules/lib/host-users.nix`). The requesters are the owners in `flake.fleet.workers` (`modules/lib/fleet-workers.nix`), so a person with an omnigent worker is a requester with nothing more to declare.
 2. Enable `deployRequestKey` for their worker, generate its vars on stibnite with `clan vars generate <agent host> --generator omnigent-<user>-deploy-request`, and commit both together.
 3. Deploy cinnabar, which picks up the new forced-command line, and the agent hosts, which deliver the key.
 
 ## Revoking
 
-- **A requester:** remove them from `requesterNames` and deploy cinnabar. Their key no longer opens the account.
+- **A requester:** remove their worker owner entry from `flake.fleet.workers` (which also removes their workers) and deploy cinnabar. Their key no longer opens the account.
 - **A target's trust:** a machine that stops being a target loses the deployer's key at its next deploy. To withdraw all trust at once, set `flake.lib.fleetDeployer.keys = null` and deploy the targets from stibnite.
 - **Read access:** remove the target from the targets, then run `clan secrets groups remove-secret fleet-deployers <host>-age.key` and delete the `groups/fleet-deployers` links of its activation vars, followed by `clan vars fix <host>`, on stibnite.
 

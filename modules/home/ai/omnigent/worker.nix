@@ -1,7 +1,27 @@
-{ config, lib, ... }:
+{
+  config,
+  inputs,
+  lib,
+  ...
+}:
 let
   modules = config.flake.modules.homeManager;
   runtimePackages = config.flake.lib.omnigentRuntimePackages;
+  # The only `flake` a worker home receives: the names its modules read
+  # (llm-agents through omp, pi and openspec; the packages for claude-code).
+  # A person's private content and whole home configurations are bindings to
+  # `throw` rather than absent, so a reach fails catchably under tryEval
+  # (checks.x86_64-linux.omnigent-worker-scope). A name is added only when a
+  # worker home needs it and it is no route to a person's settings.
+  workerFlake = {
+    inputs = {
+      inherit (inputs) llm-agents;
+      contentPrivate = throw "omnigent worker home: contentPrivate is outside the worker's inputs";
+    };
+    inherit (config.flake) packages;
+    users = throw "omnigent worker home: flake.users is outside the worker's inputs";
+    userAliases = throw "omnigent worker home: flake.userAliases is outside the worker's inputs";
+  };
 in
 {
   flake.modules.homeManager.omnigent-worker =
@@ -98,6 +118,11 @@ in
       ) gitSettings;
     in
     {
+      # Every builder of a worker home gets this value with the aspect; a
+      # specialArg of the same name would shadow it, which the host
+      # integration aspect asserts against.
+      _module.args.flake = workerFlake;
+
       imports = map (name: modules.${name}) [
         "omnigent"
         "omnigent-worker-credentials"

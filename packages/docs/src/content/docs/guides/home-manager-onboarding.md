@@ -96,25 +96,21 @@ Key points:
 - Imports aggregates rather than individual modules
 - User-specific settings use `lib.mkForce` to override defaults
 
-### Step 2: Import user in machine config
+### Step 2: Attach the user to the machine
 
-Add the user to the machine configuration:
+Declare the account on the host once, as an attachment in `modules/lib/host-users.nix`:
 
 ```nix
-# modules/machines/darwin/blackphos.nix
-{ config, ... }:
-{
-  flake.darwinConfigurations.blackphos = {
-    # ... system config ...
-
-    home-manager.users.raquel = {
-      imports = [
-        config.flake.modules.homeManager."users/raquel"
-      ];
-    };
-  };
-}
+# modules/lib/host-users.nix
+config.flake.fleet.hosts.blackphos.users.raquel = {
+  primary = true; # the person the machine belongs to
+  uid = 506; # darwin only: the account's existing uid
+  overrides.deploysWithoutScreenSession = true; # settings for this pair only
+};
 ```
+
+The `home-manager-integration` aspect (`modules/system/home-manager-integration.nix`), which every host imports, turns each attachment into the home `home-manager.users.raquel` from `flake.users.raquel.modules`, sets nix-darwin's admin account and the uid on darwin, and bridges the personal key on NixOS.
+On a NixOS host, the user's clan instance (`modules/clan/inventory/services/users/<user>.nix`) takes its machine list from the same attachments, so no host body names the user.
 
 ### Step 3: Create user secrets (legacy sops tree)
 
@@ -172,7 +168,7 @@ Use sops in the user module, leaving the age key file location to `base-sops`, w
 ```
 
 Do not set `sops.age.keyFile` in a user module.
-On a NixOS host that enrolls this user in `hm-sops-bridge`, the bridge assigns the same option at ordinary priority, and a second ordinary-priority definition is an evaluation conflict rather than an override.
+On a NixOS host whose attachment bridges this user's key (`sopsBridge`, true by default on NixOS), the bridge assigns the same option at ordinary priority, and a second ordinary-priority definition is an evaluation conflict rather than an override.
 
 ### Step 5: Provision the user's age key
 
@@ -180,7 +176,7 @@ On a darwin host, the user derives the key from their SSH key in Bitwarden and a
 Never generate an unrelated age key: the key must be the image of the SSH key the repository records for the user, or the correspondence check fails.
 
 On a clan-managed NixOS host, do not generate a key on the host.
-Set `flake.users.<user>.meta.sopsAgeKeyId`, declare `hm-sops-bridge.users.<user> = { };` on the host, and commit the user's age private key as `secrets/bridge/<id>-age-key.enc` encrypted to that machine's age key.
+Set `flake.users.<user>.meta.sopsAgeKeyId`, attach the user to the host (`flake.fleet.hosts.<host>.users.<user> = { };`, which bridges the key on NixOS), and commit the user's age private key as `secrets/bridge/<id>-age-key.enc` encrypted to that machine's age key.
 System activation then delivers it to `/run/secrets/<id>-age-key` and home-manager reads it from there.
 See [Host onboarding](/guides/host-onboarding/) for the host-side steps.
 
@@ -290,11 +286,11 @@ For darwin machines, continue using the integrated user setup described above.
 
 ### The flake.clan.inventory.instances.user-* pattern
 
-Clan inventory instances combine system user creation with home-manager integration:
+A clan user instance creates the system account and its password; its machine list is generated from the host attachments, and the home comes from the `home-manager-integration` aspect, not from the instance:
 
 ```nix
 # modules/clan/inventory/services/users/myuser.nix
-{ inputs, ... }:
+{ config, inputs, lib, ... }:
 {
   flake.clan.inventory.instances.user-myuser = {
     module = {
@@ -302,8 +298,8 @@ Clan inventory instances combine system user creation with home-manager integrat
       input = "clan-core";
     };
 
-    # Target specific machines
-    roles.default.machines."myhost" = { };
+    # Every host with a myuser attachment (modules/lib/host-users.nix)
+    roles.default.machines = lib.genAttrs (config.flake.lib.hostsOfAccount "myuser") (_: { });
 
     roles.default.settings = {
       user = "myuser";
@@ -312,183 +308,41 @@ Clan inventory instances combine system user creation with home-manager integrat
       prompt = false; # Auto-generate via xkcdpass
     };
 
+    # System-level user settings only
     roles.default.extraModules = [
-      inputs.home-manager.nixosModules.home-manager
       ({ pkgs, ... }: {
-        # System user configuration
         users.users.myuser.shell = pkgs.zsh;
+        users.users.myuser.openssh.authorizedKeys.keys = inputs.self.users.myuser.meta.sshKeys;
         programs.zsh.enable = true;
-
-        # Home-manager integration
-        home-manager.users.myuser = {
-          imports = [
-            inputs.self.modules.homeManager."users/myuser"
-          ];
-          home.username = "myuser";
-        };
       })
     ];
   };
 }
 ```
+
+Then attach the user to each host in `modules/lib/host-users.nix` (`flake.fleet.hosts.<host>.users.myuser = { };`).
 
 ### Settings options
 
-The `roles.default.settings` block controls system user creation:
-
-**`user`**: Username string (required)
-- Creates system user with this name
-- Must match username in home-manager configuration
-
-**`groups`**: List of system groups (required)
-- Common groups: `["wheel" "networkmanager"]`
-- `wheel`: sudo access (admin users)
-- `networkmanager`: network configuration
-
-**`share = true`**: Share password across machines (optional)
-- When `true`, all machines with this user instance use the same encrypted password
-- Password stored in clan vars
-- When `false`, each machine has unique password
-
-**`prompt = false`**: Password generation method (optional)
-- When `false`, auto-generate password using xkcdpass (recommended)
-- When `true`, prompt interactively during `clan vars generate`
-- Auto-generation is preferred for reproducible deployments
-
-### Machine targeting options
-
-Target machines using either direct machine names or tags:
-
-**Machine-specific targeting**:
-```nix
-roles.default.machines."hostname" = { };
-```
-
-**Tag-based targeting**:
-```nix
-roles.default.tags."tagname" = { };
-```
-
-Tags are defined in machine configurations and allow bulk targeting (e.g., all NixOS servers, all laptops).
+**`user`**: username; it must equal the attachment's account name.
+**`groups`**: system groups, e.g. `["wheel" "networkmanager"]`.
+**`share = true`**: one password across every machine of the instance, stored in clan vars.
+**`prompt = false`**: generate the password with xkcdpass instead of prompting during `clan vars generate`.
 
 ### Integration with home-manager
 
-The `extraModules` block bridges system user creation with home-manager:
-
-```nix
-roles.default.extraModules = [
-  inputs.home-manager.nixosModules.home-manager
-  ({ pkgs, ... }: {
-    # System-level user settings
-    users.users.myuser.shell = pkgs.zsh;
-    programs.zsh.enable = true;
-
-    # Home-manager configuration
-    home-manager = {
-      useGlobalPkgs = true;
-      useUserPackages = true;
-      backupFileExtension = "before-home-manager";
-
-      extraSpecialArgs = {
-        flake = inputs.self // { inherit inputs; };
-      };
-
-      users.myuser = {
-        imports = [
-          inputs.self.modules.homeManager."users/myuser"
-          # Import aggregates or other home modules
-        ];
-        home.username = "myuser";
-      };
-    };
-  })
-];
-```
-
-This pattern:
-- Imports the portable user module from `modules/home/users/myuser/`
-- Passes flake inputs via `extraSpecialArgs` for sops-nix and other modules
-- Uses `backupFileExtension` to handle file conflicts gracefully
-- Enables `useGlobalPkgs` and `useUserPackages` for efficiency
+Every host imports `home-manager-integration` beside home-manager's own module, which stays at machine level because importing it from the user services duplicated catppuccin's imports.
+For each attachment the aspect sets `home-manager.users.<user>` to import the person's `flake.users.<user>.modules`, then the attachment's `extraImports`, then the pair's `overrides`, sets `useGlobalPkgs`, `useUserPackages` and `backupFileExtension`, and gives the home its own `flake` argument (`flake.lib.homeFlake`).
+The order matters: a list option's definitions of equal priority merge in import order, so a list the pair's `overrides` set (stibnite's extra packages, for one) follows the person's own entries.
+No host or service sets `home-manager.extraSpecialArgs.flake`: the aspect asserts it is absent, because a specialArg would shadow each home's own value, including an Omnigent worker's restricted one.
 
 ### Vars generation
 
-After defining user instances, generate encrypted passwords:
-
 ```bash
-# Generate vars for a machine
 clan vars generate myhost
-
-# Generates encrypted password in .clan/vars/myhost/user-myuser/password.yaml
 ```
 
-With `share = true`, the password is shared across all machines with this user instance.
-With `prompt = false`, the password is auto-generated using xkcdpass.
-
-### Complete example
-
-Here's a complete user instance configuration:
-
-```nix
-{ inputs, ... }:
-{
-  flake.clan.inventory.instances.user-admin = {
-    module = {
-      name = "users";
-      input = "clan-core";
-    };
-
-    # Deploy to multiple machines
-    roles.default.machines."server1" = { };
-    roles.default.machines."server2" = { };
-
-    roles.default.settings = {
-      user = "admin";
-      groups = [ "wheel" "networkmanager" ];
-      share = true;
-      prompt = false;
-    };
-
-    roles.default.extraModules = [
-      inputs.home-manager.nixosModules.home-manager
-      ({ pkgs, ... }: {
-        users.users.admin.shell = pkgs.zsh;
-
-        users.users.admin.openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAA..."
-        ];
-
-        programs.zsh.enable = true;
-
-        home-manager = {
-          useGlobalPkgs = true;
-          useUserPackages = true;
-          backupFileExtension = "before-home-manager";
-
-          extraSpecialArgs = {
-            flake = inputs.self // { inherit inputs; };
-          };
-
-          users.admin = {
-            imports = [
-              inputs.self.modules.homeManager."users/admin"
-              inputs.self.modules.homeManager.base-sops
-            ];
-            home.username = "admin";
-          };
-        };
-      })
-    ];
-  };
-}
-```
-
-This creates an admin user on server1 and server2 with:
-- System user with wheel group access
-- Auto-generated shared password
-- SSH key for authentication
-- zsh as default shell
-- Full home-manager environment from portable user module
+With `share = true`, the password is shared across all machines with this user instance; with `prompt = false`, it is generated by xkcdpass.
 
 ---
 

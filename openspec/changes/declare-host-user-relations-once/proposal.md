@@ -3,15 +3,18 @@ linear_story_id: CAM-130
 linear_story_identifier: CAM-130
 linear_story_title: "Declare which people have accounts on which hosts once, and derive everything else from it"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-130/declare-which-people-have-accounts-on-which-hosts-once-and-derive
-linear_story_state: Todo
+linear_story_state: In Review
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: Todo
-last_synced_at: "2026-11-26T22:58:33Z"
+last_synced_state: In Review
+last_synced_at: "2026-11-27T09:51:18Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T22:58:33Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-130 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
+  - { at: "2026-11-27T08:21:40Z", transition: "Todo->In Progress", outcome: "posted", note: "first tasks.md checkbox ticked (task 1.1); state confirmed In Progress by read-only view" }
+  - { at: "2026-11-27T09:48:18Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md created (PASS WITH WARNINGS: Linux check builds and darwin worker builds not yet observed); state confirmed In Review by read-only view; milestone comment posted; description not re-synced: Why and What Changes unchanged since seeding" }
+  - { at: "2026-11-27T09:51:18Z", transition: "description-resync", outcome: "posted", note: "What Changes and Capabilities corrected (two flags, primary and admin, instead of a role; custom.laptop.primaryUser removed, not generated); the description's first deliverable re-synced to the two flags and the generated darwin admin account and uids; confirmed by read-only view; state unchanged (In Review)" }
 ---
 
 ## Why
@@ -22,7 +25,7 @@ Which people have accounts on which hosts, who is each host's primary user, and 
 
 **Host↔user relations**
 - From: user membership in `clan/inventory/services/users/{cameron:15-22,crs58:15-16,tara:14-15}.nix`, primary users in `lib/hosts.nix:144-150` and again in darwin host bodies (`machines/darwin/argentum/default.nix:7`), eight `hm-sops-bridge.users` lines and the matching `home-manager.users.<u>.imports` in NixOS host bodies, darwin uids as host literals, and `checks/home.nix:53-66` `checkedUsers` chosen by hand.
-- To: one record per (host, user) on the host entity, with a role (primary, admin or account), whether the user's personal key is bridged, extra home imports and overrides, and a darwin uid. The clan machine lists, `custom.laptop.primaryUser`, the secret bridge, the home imports and `checkedUsers` are generated from it; clan inventory remains the deployment authority.
+- To: one record per (host, user) on the host entity, with two flags (primary: the person the host belongs to; admin: nix-darwin's admin account; neither for a plain account), whether the user's personal key is bridged, extra home imports and overrides, and a darwin uid. The clan machine lists, the host's `primaryUser`, nix-darwin's `system.primaryUser` and the darwin uids, the secret bridge, the home imports and `checkedUsers` are generated from it; `custom.laptop.primaryUser` is removed and `darwin/laptop.nix` reads the host record's `primaryUser`. Clan inventory remains the deployment authority.
 - Impact: non-breaking; every host and home is expected to evaluate to the same derivation.
 
 **Home-manager integration**
@@ -30,7 +33,7 @@ Which people have accounts on which hosts, who is each host's primary user, and 
 - To: one `{nixos,darwin}.home-manager-integration` aspect. The home-manager module import stays at machine level, which avoids duplicate catppuccin imports.
 
 **The ambient `flake` argument**
-- From: `_module.args.flake = inputs.self` in nine host modules, and `extraSpecialArgs.flake` set to `config.flake // { inherit inputs; }` in some files and `inputs.self // { inherit inputs; }` in others. The worker check relies on that argument for its guard (`checks/omnigent-workers.nix:16-21`).
+- From: `_module.args.flake = inputs.self` in nine host modules covering all ten hosts (`darwin/laptop.nix` serves argentum and rosegold), and `extraSpecialArgs.flake` set to `config.flake // { inherit inputs; }` in some files and `inputs.self // { inherit inputs; }` in others. The worker check relies on that argument for its guard (`checks/omnigent-workers.nix:16-21`).
 - To: one value, set once; then the argument is removed. In the same change, worker homes get a home-manager aspect that only sees a restricted set of inputs, and a mutant check proves that reaching `contentPrivate` or a whole-user alias fails.
 - Impact: the only step that may change derivations, on the hosts where the losing value differs today. The before/after diff decides which hosts.
 
@@ -44,7 +47,7 @@ Which people have accounts on which hosts, who is each host's primary user, and 
 
 **Constraints (kept as is)**
 - No person or account key is renamed. A rename would move `vars/shared/crs58-commit-signing-key` and split the agent-session telemetry history.
-- nix-darwin's `system.primaryUser` stays the admin account (`darwin/laptop.nix:75`). It is never set from the primary role.
+- nix-darwin's `system.primaryUser` stays the admin account (`darwin/laptop.nix:75`). It is set from the admin flag, never from the primary flag.
 - `checkedUsers` reads static data only. Computing `checks.<system>` names must not force `flake.users`, a machine configuration or `pkgs` (`checks/home.nix:37-38`).
 - `omnigent-*` worker accounts stay owned by `nixos/omnigent-host.nix`, whose `:322` assertion keeps them out of the personal secret bridge. They do not get attachment records.
 - `hostMatrix`/`serverMatrix` (`checks/omnigent-workers.nix:594-600`) and the host list at `checks/omnigent-acp-spawn-env.nix:19-22` stay literal oracles. `operators` stays a separate relation.
@@ -81,8 +84,8 @@ Each question is answered in design, after the dependencies land:
 
 ### New Capabilities
 
-- `host-user-attachment` (stratum: behavioral): each account a person holds on a host is declared once, with its role, and the host provides exactly those accounts, their home environments and their secret access. Each omnigent worker owner's hosts are declared once. A worker home cannot read private content or another person's whole configuration.
-- `host-user-attachment-interface` (stratum: interface): the attachment field on the host entity and the outputs generated from it (clan machine lists, `custom.laptop.primaryUser`, `hm-sops-bridge.users`, home imports, `checkedUsers`), the home-manager integration aspect, the single `flake` value, the worker aspect and its mutant check, the `workers.<owner>.hosts` declaration, and `accountOf`/`personOf`. Trust boundary: the drvPath diff shows the derived outputs equal the hand-written ones for every attribute it dumps. It says nothing about state already on a host, such as existing accounts or uids on disk. The mutant check shows only that the two named reaches fail. It does not show that a worker home has no other route to private content.
+- `host-user-attachment` (stratum: behavioral): each account a person holds on a host is declared once, with whether it is the host's primary user and whether it is its admin account, and the host provides exactly those accounts, their home environments and their secret access. Each omnigent worker owner's hosts are declared once. A worker home cannot read private content or another person's whole configuration.
+- `host-user-attachment-interface` (stratum: interface): the attachment field on the host entity and the outputs generated from it (clan machine lists, the host record's `primaryUser`, which `darwin/laptop.nix` reads in place of the removed `custom.laptop.primaryUser`, nix-darwin's `system.primaryUser` and uids, `hm-sops-bridge.users`, home imports, `checkedUsers`), the home-manager integration aspect, the single `flake` value, the worker aspect and its mutant check, the `workers.<owner>.hosts` declaration, and `accountOf`/`personOf`. Trust boundary: the drvPath diff shows the derived outputs equal the hand-written ones for every attribute it dumps. It says nothing about state already on a host, such as existing accounts or uids on disk. The mutant check shows only that the two named reaches fail. It does not show that a worker home has no other route to private content.
 
 ### Modified Capabilities
 
