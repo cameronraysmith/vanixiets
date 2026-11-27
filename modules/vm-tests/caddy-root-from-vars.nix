@@ -20,12 +20,26 @@ in
   perSystem =
     { pkgs, system, ... }:
     let
+      # The root is the same on every build, so its fingerprint is written
+      # here rather than read from the build at evaluation: the key's scalar
+      # is the sha256 of a fixed string, ECDSA signs with RFC 6979's
+      # deterministic nonce, and the serial and validity are fixed (RFC 5280
+      # 4.1.2.5's 99991231235959Z for no expiry). Were openssl to encode the
+      # root differently, the module's recorded-root check fails the node's
+      # build and prints the root's fingerprint.
+      fingerprint = "34:B4:37:CE:5C:F2:7B:73:76:DD:33:68:AD:B5:D4:D2:CB:67:31:CF:DB:2D:0D:81:CA:AE:C9:C5:02:82:8D:ED";
       pki = pkgs.runCommand "caddy-root-from-vars-pki" { nativeBuildInputs = [ pkgs.openssl ]; } ''
         mkdir $out
-        openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -keyout $out/root.key -sha256 -days 3650 \
+        {
+          printf '\x30\x31\x02\x01\x01\x04\x20'
+          printf %s caddy-root-from-vars | openssl dgst -sha256 -binary
+          printf '\xa0\x0a\x06\x08\x2a\x86\x48\xce\x3d\x03\x01\x07'
+        } > key.der
+        openssl ec -inform DER -in key.der -out $out/root.key
+        openssl req -x509 -new -key $out/root.key -sha256 -sigopt nonce-type:1 -set_serial 1 \
+          -not_before 20260101000000Z -not_after 99991231235959Z \
           -subj "/CN=caddy-root-from-vars test root" -addext basicConstraints=critical,CA:TRUE,pathlen:1 \
           -addext keyUsage=critical,keyCertSign,cRLSign -out $out/root.crt
-        openssl x509 -in $out/root.crt -noout -fingerprint -sha256 | cut -d= -f2 | tr -d '\n' > $out/fingerprint
       '';
       site = {
         services.caddy.enable = true;
@@ -61,7 +75,7 @@ in
               vanixiets.caddyLocalRoot = {
                 certFile = "${pki}/root.crt";
                 keyFile = "/etc/caddy-test/root.key";
-                fingerprint = builtins.readFile "${pki}/fingerprint";
+                inherit fingerprint;
               };
               environment.etc."caddy-test/root.key" = {
                 source = "${pki}/root.key";
