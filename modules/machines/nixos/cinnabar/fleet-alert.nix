@@ -12,7 +12,7 @@
       ...
     }:
     let
-      alerterToken = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
+      alerterToken = config.vanixiets.secrets.ntfy-alerter.files.token.path;
       deadmanUnit = config.systemd.services.fleet-deadman;
       # The units a dead-man run needs on cinnabar: the probe and poll reach
       # ntfy, and every post goes through caddy on cinnabar's ZeroTier
@@ -35,7 +35,7 @@
       # credential, entered once by the operator at a hidden prompt, kept as
       # a curl configuration that fleet-deadman loads as external-ping and
       # curl reads on stdin.
-      clan.core.vars.generators.fleet-deadman-ping = {
+      vanixiets.secrets.fleet-deadman-ping = {
         prompts.ping-url = {
           description = ''
             healthchecks.io ping URL of the check that watches fleet-deadman,
@@ -63,7 +63,7 @@
       };
 
       services.fleet-alert.deadman.pingConfigFile =
-        config.clan.core.vars.generators.fleet-deadman-ping.files.curl-config.path;
+        config.vanixiets.secrets.fleet-deadman-ping.files.curl-config.path;
 
       # Design D12: ordered after every unit on its path, and never starting
       # one, so a boot neither probes a half-started path nor starts a unit

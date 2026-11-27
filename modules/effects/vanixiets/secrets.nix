@@ -121,7 +121,7 @@ in
       jqVar = secret: lib.replaceStrings [ "-" ] [ "_" ] secret.prompt;
     in
     {
-      clan.core.vars.generators.vanixiets-effects-secrets = {
+      vanixiets.secrets.vanixiets-effects-secrets = {
         files = {
           secrets = {
             secret = true;
@@ -185,6 +185,6 @@ in
       # delivers no secrets at all and every effect stops at its own
       # missing-secret guard — indistinguishable from not wiring it.
       services.nixbot.effects.perRepoSecretFiles."github:cameronraysmith/vanixiets" =
-        config.clan.core.vars.generators.vanixiets-effects-secrets.files.secrets.path;
+        config.vanixiets.secrets.vanixiets-effects-secrets.files.secrets.path;
     };
 }

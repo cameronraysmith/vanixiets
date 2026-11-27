@@ -24,7 +24,7 @@ let
   # operator step is `clan vars generate <machine>` plus committing both
   # outputs; stibnite reads the public value at evaluation time.
   mkSessionKeyGenerator = pkgs: {
-    clan.core.vars.generators.stibnite-agent-session = {
+    vanixiets.secrets.stibnite-agent-session = {
       files.key = { };
       files."key.pub".secret = false;
       runtimeInputs = [ pkgs.openssh ];
@@ -39,7 +39,7 @@ in
     { config, pkgs, ... }:
     let
       cfg = config.services.stibnite-session;
-      sshKeyPath = config.clan.core.vars.generators.stibnite-agent-session.files.key.path;
+      sshKeyPath = config.vanixiets.secrets.stibnite-agent-session.files.key.path;
     in
     {
       options.services.stibnite-session = {

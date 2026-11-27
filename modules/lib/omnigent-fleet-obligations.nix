@@ -182,7 +182,7 @@ let
       owners = expectedOwners.${machine};
       workers = hostConfig.services.omnigent-host.workers;
       declaredOwners = lib.filter (owner: workers ? ${owner}) owners;
-      generators = hostConfig.clan.core.vars.generators;
+      generators = lib.mapAttrs (_: s: s.resolved) hostConfig.vanixiets.secrets;
       homes = map (worker: toString hostConfig.users.users.${worker.user}.home) (lib.attrValues workers);
       agentTelemetry = hostConfig.vanixiets.otelCollector.agentTelemetry or false;
     in

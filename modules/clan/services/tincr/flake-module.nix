@@ -1,5 +1,5 @@
 # A tincr mesh per instance on every machine in the `peer` role, NixOS and
-# darwin. Addresses come from flake.lib.mesh, keys from the per-machine var
+# darwin. Addresses come from flake.lib.mesh, keys from the per-machine secret
 # tincr-<instance>, and every node carries one host file per peer and device
 # with StrictSubnets on. README.md states the settings, the trust boundary and
 # the provenance.
@@ -11,6 +11,10 @@
 }:
 let
   inherit (config.flake.lib) mesh hosts launchdSecretPoll;
+  secretsModules = {
+    nixos = config.flake.modules.nixos.secrets;
+    darwin = config.flake.modules.darwin.secrets;
+  };
 
   # One member's host file. SPTPSCipher and SPTPSKex take effect on a link
   # only when both ends' host files carry them (tincr docs/COMPAT.md), so they
@@ -148,7 +152,7 @@ in
                 nodeName = machine.name;
                 listenPort = mesh.port;
                 ed25519PrivateKeyFile =
-                  config.clan.core.vars.generators.${generatorName instanceName}.files."ed25519_key.priv".path;
+                  config.vanixiets.secrets.${generatorName instanceName}.files."ed25519_key.priv".path;
                 hosts = lib.mapAttrs (
                   name: _:
                   hostFile {
@@ -402,14 +406,20 @@ in
           nixosModule =
             { pkgs, ... }:
             {
-              imports = [ inputs.tincr.nixosModules.tincr ];
-              clan.core.vars.generators = generators pkgs;
+              imports = [
+                inputs.tincr.nixosModules.tincr
+                secretsModules.nixos
+              ];
+              vanixiets.secrets = generators pkgs;
             };
           darwinModule =
             { pkgs, ... }:
             {
-              imports = [ inputs.tincr.darwinModules.tincr ];
-              clan.core.vars.generators = generators pkgs;
+              imports = [
+                inputs.tincr.darwinModules.tincr
+                secretsModules.darwin
+              ];
+              vanixiets.secrets = generators pkgs;
             };
         };
     };

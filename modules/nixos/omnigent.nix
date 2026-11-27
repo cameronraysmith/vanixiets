@@ -39,7 +39,7 @@ in
         cookieSecretGenerator = lib.mkOption {
           type = lib.types.str;
           default = "omnigent-cookie-secret";
-          description = "Clan vars generator name for the server cookie secret.";
+          description = "Name of the `vanixiets.secrets` entry that holds the server cookie secret.";
         };
         oidc = {
           issuer = lib.mkOption {
@@ -77,7 +77,7 @@ in
           ];
         };
 
-        clan.core.vars.generators.${cfg.cookieSecretGenerator} = {
+        vanixiets.secrets.${cfg.cookieSecretGenerator} = {
           files.env = {
             secret = true;
             owner = "omnigent";
@@ -141,7 +141,7 @@ in
             StateDirectoryMode = "0700";
             WorkingDirectory = stateDirectory;
             EnvironmentFile = cfg.environmentFiles ++ [
-              config.clan.core.vars.generators.${cfg.cookieSecretGenerator}.files.env.path
+              config.vanixiets.secrets.${cfg.cookieSecretGenerator}.files.env.path
             ];
             Restart = "on-failure";
             RestartSec = 5;

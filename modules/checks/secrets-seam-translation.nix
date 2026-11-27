@@ -16,8 +16,14 @@
 #   readBack         a declared file's path, value, exists and placeholder are
 #                    the backend's, the placeholder under the sops name
 #                    vars/<rel_dir>/<file>;
+#   resolvedBack     `resolved` is the backend's generator in the option's
+#                    field names, the backend's defaults included (a file's
+#                    owner the entry left null reads as the backend's "root"),
+#                    and without the backend's own fields (a file's rel_dir,
+#                    a prompt's name);
 #   noBackend        without the stub options the module defines nothing
-#                    outside `vanixiets` and every read-only field is null.
+#                    outside `vanixiets`, and every read-only field and
+#                    `resolved` are null.
 # No host is evaluated; the fixtures are literal, so the check runs on
 # x86_64-linux only.
 { self, lib, ... }:
@@ -196,6 +202,79 @@
                   ;
               };
         };
+        resolvedBack = {
+          problems = 0;
+          judge =
+            _:
+            let
+              backendDefaults = {
+                share = false;
+                dependencies = [ ];
+                validation = null;
+                runtimeInputs = [ ];
+                script = "echo generated > $out/token";
+                prompts.passphrase = {
+                  name = "passphrase";
+                  description = "passphrase";
+                  type = "line";
+                  persist = false;
+                  display = {
+                    group = null;
+                    label = null;
+                    required = true;
+                    helperText = null;
+                  };
+                };
+                files.token = {
+                  deploy = true;
+                  owner = "root";
+                  group = "root";
+                  mode = "0400";
+                  neededFor = "services";
+                  restartUnits = [ ];
+                  rel_dir = "per-machine/m/declared";
+                  path = "/run/secrets/vars/per-machine/m/declared/token";
+                };
+              };
+              config = eval [
+                clanStub
+                {
+                  clan.core.vars.generators.declared = backendDefaults;
+                  vanixiets.secrets.declared.files.token.secret = true;
+                }
+              ];
+              entry = config.vanixiets.secrets.declared;
+            in
+            differs "resolved" {
+              inherit (backendDefaults)
+                share
+                dependencies
+                validation
+                runtimeInputs
+                script
+                ;
+              prompts.passphrase = {
+                inherit (backendDefaults.prompts.passphrase)
+                  description
+                  type
+                  persist
+                  display
+                  ;
+              };
+              files.token = {
+                secret = true;
+                inherit (backendDefaults.files.token)
+                  deploy
+                  owner
+                  group
+                  mode
+                  neededFor
+                  restartUnits
+                  ;
+              };
+            } entry.resolved
+            ++ differs "the entry's own owner" null entry.files.token.owner;
+        };
         noBackend = {
           problems = 0;
           judge =
@@ -211,6 +290,7 @@
                   value = null;
                   exists = null;
                   placeholder = null;
+                  resolved = null;
                 }
                 {
                   inherit (config.vanixiets.secrets.all.files.token)
@@ -219,6 +299,7 @@
                     exists
                     placeholder
                     ;
+                  inherit (config.vanixiets.secrets.all) resolved;
                 };
         };
       };

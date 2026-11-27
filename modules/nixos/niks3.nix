@@ -62,7 +62,7 @@ in
       });
 
       # Clan vars for niks3 R2 S3 credentials (populated manually via clan vars set)
-      clan.core.vars.generators.niks3-s3 = {
+      vanixiets.secrets.niks3-s3 = {
         files."access-key" = {
           owner = "niks3";
         };
@@ -76,7 +76,7 @@ in
       };
 
       # API authentication token (auto-generated, minimum 36 characters)
-      clan.core.vars.generators.niks3-api-token = {
+      vanixiets.secrets.niks3-api-token = {
         files."token" = {
           owner = "niks3";
         };
@@ -87,7 +87,7 @@ in
       };
 
       # Ed25519 cache signing key (auto-generated)
-      clan.core.vars.generators.niks3-signing-key = {
+      vanixiets.secrets.niks3-signing-key = {
         files."key" = {
           owner = "niks3";
         };
@@ -114,18 +114,18 @@ in
           bucket = "sciexp-nix-cache";
           region = "auto";
           useSSL = true;
-          accessKeyFile = config.clan.core.vars.generators.niks3-s3.files."access-key".path;
-          secretKeyFile = config.clan.core.vars.generators.niks3-s3.files."secret-key".path;
+          accessKeyFile = config.vanixiets.secrets.niks3-s3.files."access-key".path;
+          secretKeyFile = config.vanixiets.secrets.niks3-s3.files."secret-key".path;
         };
 
         # PostgreSQL for closure tracking and GC state
         database.createLocally = true;
 
         # API authentication token
-        apiTokenFile = config.clan.core.vars.generators.niks3-api-token.files."token".path;
+        apiTokenFile = config.vanixiets.secrets.niks3-api-token.files."token".path;
 
         # Cache signing key
-        signKeyFiles = [ config.clan.core.vars.generators.niks3-signing-key.files."key".path ];
+        signKeyFiles = [ config.vanixiets.secrets.niks3-signing-key.files."key".path ];
 
         # nginx reverse proxy with ACME TLS
         nginx.enable = true;

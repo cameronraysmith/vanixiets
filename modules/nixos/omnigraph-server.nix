@@ -78,7 +78,7 @@ in
         # Cloudflare R2 S3 credentials scoped to the sciexp bucket, delivered as an
         # EnvironmentFile. object_store has no shared-credentials-file provider, so
         # process environment variables are the only source omnigraph resolves.
-        clan.core.vars.generators.omnigraph-r2 = {
+        vanixiets.secrets.omnigraph-r2 = {
           prompts.access-key = {
             description = ''
               Cloudflare R2 S3 access key ID with read and write scope on bucket
@@ -118,7 +118,7 @@ in
           '';
         };
 
-        clan.core.vars.generators.omnigraph-bearer-tokens = {
+        vanixiets.secrets.omnigraph-bearer-tokens = {
           files."tokens.json" = {
             restartUnits = [ "omnigraph-server.service" ];
           };
@@ -135,7 +135,7 @@ in
         # leaves omnigraph-bearer-tokens, and so admin's token, as it is. The
         # server adds it to the tokens file at start
         # (services.omnigraph.cluster.graphs.<graph>.seed.tokenFile).
-        clan.core.vars.generators.omnigraph-seeder-token = {
+        vanixiets.secrets.omnigraph-seeder-token = {
           files."token" = {
             restartUnits = [ "omnigraph-server.service" ];
           };
@@ -149,7 +149,7 @@ in
         # the seeder's. omnigraph-probe reads each graph's snapshot as this
         # actor, which the policies let list the graphs and read them, nothing
         # more (services.omnigraph.extraBearerTokenFiles).
-        clan.core.vars.generators.omnigraph-monitor-token = {
+        vanixiets.secrets.omnigraph-monitor-token = {
           files."token" = {
             restartUnits = [ "omnigraph-server.service" ];
           };
@@ -216,13 +216,9 @@ in
           # docs/user/operations/storage-failures.md).
           extraEnvironment.OMNIGRAPH_CLUSTER_LEASE_SECONDS = lib.mkIf omnigraphOnR2 "120";
 
-          environmentFile =
-            lib.mkIf omnigraphOnR2
-              config.clan.core.vars.generators.omnigraph-r2.files."env".path;
-          bearerTokensFile =
-            config.clan.core.vars.generators.omnigraph-bearer-tokens.files."tokens.json".path;
-          extraBearerTokenFiles.monitor =
-            config.clan.core.vars.generators.omnigraph-monitor-token.files."token".path;
+          environmentFile = lib.mkIf omnigraphOnR2 config.vanixiets.secrets.omnigraph-r2.files."env".path;
+          bearerTokensFile = config.vanixiets.secrets.omnigraph-bearer-tokens.files."tokens.json".path;
+          extraBearerTokenFiles.monitor = config.vanixiets.secrets.omnigraph-monitor-token.files."token".path;
 
           cluster = {
             # One example graph per cookbook, seeded once when the bootstrap
@@ -235,7 +231,7 @@ in
                   seed = {
                     file = "${pkgs.omnigraph-cookbooks}/${cookbook}/seed.jsonl";
                     actor = "seeder";
-                    tokenFile = config.clan.core.vars.generators.omnigraph-seeder-token.files."token".path;
+                    tokenFile = config.vanixiets.secrets.omnigraph-seeder-token.files."token".path;
                   };
                 }
               ) cookbooks

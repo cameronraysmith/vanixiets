@@ -36,15 +36,32 @@ let
   hostKeyObligations.failures =
     name: hostConfig:
     let
-      generators = hostConfig.clan.core.vars.generators or { };
-      generated = generators.openssh.files."ssh.id_ed25519.pub".value or null;
+      backend = config.flake.lib.secretsBackend.generatorsOf hostConfig;
+      present = backend ? openssh;
+      # A generator without the public file reads as null, so the message
+      # names the file to commit rather than failing on a missing attribute.
+      generated =
+        if (backend.openssh.files or { }) ? "ssh.id_ed25519.pub" then
+          hostConfig.vanixiets.secrets.openssh.files."ssh.id_ed25519.pub".value
+        else
+          null;
     in
-    lib.optional (hostKeys ? ${name} && generators ? openssh && generated != hostKeys.${name})
-      "${name}'s generated openssh public key is not flake.lib.hostKeys.${name}; commit vars/per-machine/${name}/openssh/ssh.id_ed25519.pub";
+    lib.optional (hostKeys ? ${name} && present && generated != hostKeys.${name})
+      "${name}'s generated openssh public key is not flake.lib.hostKeys.${name}; commit ${
+        vars.relPath {
+          generator = "openssh";
+          file = "ssh.id_ed25519.pub";
+          machine = name;
+        }
+      }";
 
   assertionsModule =
     { config, ... }:
     {
+      vanixiets.secrets.openssh = {
+        provided = true;
+        files."ssh.id_ed25519.pub" = { };
+      };
       assertions = map (message: {
         assertion = false;
         inherit message;

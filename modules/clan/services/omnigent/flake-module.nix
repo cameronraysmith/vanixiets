@@ -43,6 +43,7 @@ in
             nixosModule =
               { config, ... }:
               {
+                imports = [ nixosModules.secrets ];
                 services.omnigent = {
                   enable = true;
                   inherit (settings) domain port;
@@ -52,7 +53,7 @@ in
                     clientId = "omnigent";
                   };
                   environmentFiles = [
-                    config.clan.core.vars.generators.kanidm-oauth2-omnigent.files.env.path
+                    config.vanixiets.secrets.kanidm-oauth2-omnigent.files.env.path
                   ];
                 };
               };

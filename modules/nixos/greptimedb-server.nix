@@ -1,6 +1,6 @@
 # How this fleet deploys the telemetry store (flake.modules.nixos.greptimedb,
-# which stays free of clan vars so the runtime tests can import it with their
-# own credentials): the store accounts' and the R2 credentials' generators,
+# which stays free of `vanixiets.secrets` so the runtime tests can import it with their
+# own credentials): the store accounts' and the R2 credentials' secrets,
 # the store's object storage, the credentials greptimedb, greptimedb-schema,
 # greptimedb-envelope and devloop-reconcile load, and the dataset facts
 # greptimedb-envelope checks, read from the host's ZFS boot invariants
@@ -45,7 +45,7 @@ in
       # rotation. users-sha256 is public: the sha256 of 256-bit hex passwords
       # is not reversible, and R7.4 compares it with
       # /run/greptimedb/loaded-users.sha256.
-      clan.core.vars.generators.greptimedb-users = {
+      vanixiets.secrets.greptimedb-users = {
         files.users = {
           owner = "greptimedb";
           mode = "0400";
@@ -81,7 +81,7 @@ in
       # Cloudflare R2 credentials for the store's object data, an Object Read
       # & Write token on bucket sciexp, delivered as an EnvironmentFile in
       # GreptimeDB's GREPTIMEDB_STANDALONE__ layered-config form.
-      clan.core.vars.generators.greptimedb-r2 = {
+      vanixiets.secrets.greptimedb-r2 = {
         prompts.access-key = {
           description = ''
             Cloudflare R2 S3 access key ID with Object Read & Write scope on
@@ -142,13 +142,13 @@ in
 
       systemd.services.greptimedb.serviceConfig = {
         LoadCredential = [
-          "users:${config.clan.core.vars.generators.greptimedb-users.files.users.path}"
+          "users:${config.vanixiets.secrets.greptimedb-users.files.users.path}"
         ];
-        EnvironmentFile = config.clan.core.vars.generators.greptimedb-r2.files."env".path;
+        EnvironmentFile = config.vanixiets.secrets.greptimedb-r2.files."env".path;
       };
 
       systemd.services.greptimedb-schema.serviceConfig.LoadCredential = [
-        "admin-password:${config.clan.core.vars.generators.greptimedb-users.files.admin-password.path}"
+        "admin-password:${config.vanixiets.secrets.greptimedb-users.files.admin-password.path}"
       ];
 
       # The regulator credential and the host facts greptimedb-envelope checks.
@@ -157,7 +157,7 @@ in
       # compares the dataset against the value this host enforces.
       systemd.services.greptimedb-envelope = {
         serviceConfig.LoadCredential = [
-          "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
+          "regulator-password:${config.vanixiets.secrets.greptimedb-users.files.regulator-password.path}"
         ];
         environment =
           let
@@ -175,15 +175,15 @@ in
             GREPTIMEDB_ENVELOPE_DATASET = quota.dataset;
             GREPTIMEDB_ENVELOPE_QUOTA_BYTES = gibibytes quota.value;
             GREPTIMEDB_ENVELOPE_RESERVATION_BYTES = gibibytes reservation.value;
-            GREPTIMEDB_ENVELOPE_USERS_SHA256_FILE = "${config.clan.core.vars.generators.greptimedb-users.files.users-sha256.path
+            GREPTIMEDB_ENVELOPE_USERS_SHA256_FILE = "${config.vanixiets.secrets.greptimedb-users.files.users-sha256.path
             }";
           };
       };
 
       # devloop-reconcile's store credential, the third regulator-password
-      # holder (S2 design D11); devloop-collection.nix stays free of clan vars.
+      # holder (S2 design D11); devloop-collection.nix stays free of `vanixiets.secrets`.
       systemd.services.devloop-reconcile.serviceConfig.LoadCredential = [
-        "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
+        "regulator-password:${config.vanixiets.secrets.greptimedb-users.files.regulator-password.path}"
       ];
     };
 }

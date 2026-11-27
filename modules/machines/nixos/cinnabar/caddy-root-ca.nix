@@ -13,7 +13,7 @@ in
   flake.modules.nixos.caddy-root-ca =
     { config, ... }:
     let
-      files = config.clan.core.vars.generators.caddy-root-ca.files;
+      files = config.vanixiets.secrets.caddy-root-ca.files;
     in
     {
       imports = [ caddyLocalRoot ];
@@ -23,7 +23,7 @@ in
         # Recorded from cinnabar's caddy storage on 2026-11-06; a rotation changes it with the vars.
         fingerprint = "7E:78:F6:7C:83:BD:DC:81:51:FF:EB:8F:82:1A:68:5D:02:89:9F:93:27:33:7F:9B:F2:41:9B:F9:3B:AA:2E:82";
       };
-      clan.core.vars.generators.caddy-root-ca = {
+      vanixiets.secrets.caddy-root-ca = {
         files."root.key" = {
           owner = "caddy";
           group = "caddy";

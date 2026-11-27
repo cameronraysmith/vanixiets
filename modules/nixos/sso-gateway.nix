@@ -31,8 +31,8 @@
 #   cookie; D4 distinct cookie name `_sso_gateway` (oauth2-proxy non-interference);
 #   D5 per-group scopeMaps + claimMaps.groups (new vs synapse); D6 reusable
 #   registration auto-deriving the kanidm config; D7 per-vhost group auth via
-#   query-param allowed_groups with browser-vs-API 401 split; D8 clan-vars
-#   secrets via LoadCredential with restart-on-rotation.
+#   query-param allowed_groups with browser-vs-API 401 split; D8 secrets via
+#   LoadCredential with restart-on-rotation.
 #
 # The browser-vs-API 401 split (D7) is keyed by the upstream location path: a
 # location under `/api` fails fast with `error_page 401 =401;` (API clients
@@ -63,8 +63,8 @@
       # (group declared in entitiesByName before any scopeMap references it) holds.
       allGroups = lib.unique (lib.concatMap (svc: svc.allowedGroups) (lib.attrValues cfg.services));
 
-      clientSecretPath = config.clan.core.vars.generators.kanidm-oauth2-sso.files.secret.path;
-      cookieSecretPath = config.clan.core.vars.generators.sso-cookie-secret.files.secret.path;
+      clientSecretPath = config.vanixiets.secrets.kanidm-oauth2-sso.files.secret.path;
+      cookieSecretPath = config.vanixiets.secrets.sso-cookie-secret.files.secret.path;
 
       # nginx auth_request cannot pass arguments to its subrequest, so the
       # service's authorized groups travel as a query parameter on the internal
@@ -375,7 +375,7 @@
         # names both real consumers: kanidm.service re-runs provision against the
         # new secret, oauth2-proxy-kanidm re-reads it via the unit-start
         # LoadCredential snapshot (memory: reference_loadcredential-snapshot-staleness).
-        clan.core.vars.generators.kanidm-oauth2-sso = {
+        vanixiets.secrets.kanidm-oauth2-sso = {
           files.secret = {
             secret = true;
             owner = "kanidm";
@@ -402,7 +402,7 @@
         # Consumed only by the gateway unit via LoadCredential; restartUnits names
         # it so a rotated cookie secret is not left stale behind the unit-start
         # snapshot.
-        clan.core.vars.generators.sso-cookie-secret = {
+        vanixiets.secrets.sso-cookie-secret = {
           files.secret = {
             secret = true;
             mode = "0400";

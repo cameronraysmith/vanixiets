@@ -113,7 +113,7 @@ in
       ];
 
       # GitHub App private key (populated manually via clan vars set)
-      clan.core.vars.generators.nixbot-github-app-secret-key = {
+      vanixiets.secrets.nixbot-github-app-secret-key = {
         files."key.pem" = {
           owner = "nixbot";
           restartUnits = [ "nixbot.service" ];
@@ -125,7 +125,7 @@ in
       };
 
       # GitHub OAuth secret (populated manually via clan vars set)
-      clan.core.vars.generators.nixbot-github-oauth-secret = {
+      vanixiets.secrets.nixbot-github-oauth-secret = {
         files."secret" = {
           owner = "nixbot";
           restartUnits = [ "nixbot.service" ];
@@ -136,7 +136,7 @@ in
         '';
       };
 
-      clan.core.vars.generators.nixbot-github-webhook-secret = {
+      vanixiets.secrets.nixbot-github-webhook-secret = {
         files."secret" = {
           owner = "nixbot";
           restartUnits = [ "nixbot.service" ];
@@ -207,11 +207,9 @@ in
           appId = 4743700;
           oauthId = "Iv23lie8GaDpY0cPXGg4"; # gitleaks:allow
 
-          appSecretKeyFile =
-            config.clan.core.vars.generators.nixbot-github-app-secret-key.files."key.pem".path;
-          webhookSecretFile =
-            config.clan.core.vars.generators.nixbot-github-webhook-secret.files."secret".path;
-          oauthSecretFile = config.clan.core.vars.generators.nixbot-github-oauth-secret.files."secret".path;
+          appSecretKeyFile = config.vanixiets.secrets.nixbot-github-app-secret-key.files."key.pem".path;
+          webhookSecretFile = config.vanixiets.secrets.nixbot-github-webhook-secret.files."secret".path;
+          oauthSecretFile = config.vanixiets.secrets.nixbot-github-oauth-secret.files."secret".path;
 
           # Default is "build-with-buildbot", which one-shot-imports every
           # repository carrying that topic against an empty DB.
@@ -266,7 +264,7 @@ in
         niks3 = {
           enable = true;
           serverUrl = "https://niks3.scientistexperience.net";
-          authTokenFile = config.clan.core.vars.generators.niks3-api-token.files."token".path;
+          authTokenFile = config.vanixiets.secrets.niks3-api-token.files."token".path;
           package = inputs.niks3.packages.${config.nixpkgs.hostPlatform.system}.niks3;
         };
       };

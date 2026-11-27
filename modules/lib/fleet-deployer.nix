@@ -300,7 +300,7 @@ let
   localSecretsOf =
     name: hostConfig:
     let
-      generators = hostConfig.clan.core.vars.generators or { };
+      generators = config.flake.lib.secretsBackend.generatorsOf hostConfig;
       varPath =
         generator: file:
         vars.relPath {

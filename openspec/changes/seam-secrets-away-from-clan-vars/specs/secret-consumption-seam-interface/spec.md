@@ -2,11 +2,15 @@
 
 ### Requirement: vanixiets.secrets is declared on both classes
 
-`flake.modules.nixos.secrets` and `flake.modules.darwin.secrets`, defined in `modules/system/secrets.nix`, SHALL declare `options.vanixiets.secrets`, an attribute set of submodules keyed by generator name, with the writable fields below, each defaulting to `null` (`[ ]` for a list) except `provided`. Each module SHALL carry one `key`, and SHALL be imported by `nixos.base`, `darwin.base` and every module that writes or reads `vanixiets.secrets`.
+`flake.modules.nixos.secrets` and `flake.modules.darwin.secrets`, defined in `modules/system/secrets.nix`, SHALL declare `options.vanixiets.secrets`, an attribute set of submodules keyed by generator name with the fields below, and each SHALL carry one `key` and be imported by `nixos.base` and `darwin.base`.
+
+**Self-import**: a module that writes or reads `vanixiets.secrets` imports its class's secrets module itself when some configuration evaluates it without that class's base aspect: every NixOS and darwin module of a clan service, and every feature module that a runtime test or check fixture imports without the base aspect.
 
 **Trust boundary**: the option fixes the shape of a declaration. It does not check that a declared recipe produces the files it names.
 
-**Writable fields**: `share`, `dependencies`, `validation`, `runtimeInputs`, `script`, `prompts.<p>.{description,type,persist}` and `prompts.<p>.display.{group,label,required,helperText}` on the generator; `files.<f>.{secret,deploy,owner,group,mode,neededFor,restartUnits}` on each file; and `provided`, a boolean defaulting to false.
+**Writable fields**: `share`, `dependencies`, `validation`, `runtimeInputs`, `script`, `prompts.<p>.{description,type,persist}` and `prompts.<p>.display.{group,label,required,helperText}` on the generator; `files.<f>.{secret,deploy,owner,group,mode,neededFor,restartUnits}` on each file, each defaulting to `null` (`[ ]` for a list); and `provided`, a boolean defaulting to false.
+
+**Read-only fields**: `files.<f>.{path,value,exists,placeholder}` on each file, and `resolved` on the entry: the generator as the backend evaluated it, in the writable fields' names, with the backend's defaults for every field no module set.
 
 **Discharged by**: `nix eval` of `vanixiets.secrets` on every NixOS and darwin host, and of the option's declared fields.
 
@@ -103,9 +107,11 @@ A module that reads a generator declared by a clan-core service SHALL declare `v
 
 ### Requirement: Obligations read the option or the backend function
 
-An obligation that reads one host's secret by name SHALL read `hostConfig.vanixiets.secrets.<name>`. `sharedVarsObligations` and `flake.lib.fleetDeployer`'s local secrets, which judge every generator on a host, SHALL take the generators from `flake.lib.secretsBackend.generatorsOf hostConfig`, defined in `modules/system/secrets.nix`. No obligation file SHALL name `clan.core.vars`.
+An obligation SHALL read a secret only through `hostConfig.vanixiets.secrets.<name>` or `flake.lib.secretsBackend.generatorsOf hostConfig`, and no obligation file SHALL name `clan.core.vars`.
 
-**By-name readers**: `commitSigningObligations`, `hostKeyObligations`, the omnigent fleet obligations and the r2-usage obligation.
+**By-name readers**: an obligation that reads one host's secret by name reads `hostConfig.vanixiets.secrets.<name>`, a file's location from its read-only fields and its custody from `resolved`. These are `commitSigningObligations`, `hostKeyObligations`, the omnigent fleet obligations and the r2-usage obligation.
+
+**Backend readers**: `sharedVarsObligations` and `flake.lib.fleetDeployer`'s local secrets, which judge every generator on a host, and an obligation that asks whether the backend declares a generator at all, take the generators from `flake.lib.secretsBackend.generatorsOf hostConfig`, defined in `modules/system/secrets.nix`.
 
 **Trust boundary**: the obligations keep their logic and fixtures' meaning; this fixes only where they read. `generatorsOf` is the backend's whole tree, including generators clan's own services declare.
 
@@ -124,7 +130,7 @@ An obligation that reads one host's secret by name SHALL read `hostConfig.vanixi
 
 **Search**: the sorted `.nix` files under `modules/`, `_`-prefixed path components included, that have a non-comment line naming `clan.core.vars`, `vars/shared/` or `vars/per-machine/`, excluding the two seam files `modules/system/secrets.nix` and `modules/lib/vars.nix`, which neither the search nor the literal list ever includes. The search matches text: it does not see `inherit (config.clan.core) vars;`, a quoted attribute name, a path built from strings, or a file outside `modules/`.
 
-**Final list**: `modules/vm-tests/{fleet-ingress,devloop-ingest,greptimedb-oom-order,greptimedb-pipeline,perses-greptimedb}.nix` and `modules/checks/greptimedb-envelope.nix`, which run a generator's recipe; `modules/vm-tests/clan-test-vars-fixture.nix`; `modules/checks/secrets-seam-translation.nix`, an independent judge of the translation whose literal fixture is a stub of clan's generator option; and the committed-layout exemptions `modules/lib/vars.nix` documents.
+**Final list**: `modules/vm-tests/{fleet-ingress,devloop-ingest,greptimedb-oom-order,greptimedb-pipeline,perses-greptimedb}.nix`, `modules/checks/greptimedb-envelope.nix` and `modules/checks/ntfy-provisioning.nix`, which run a generator's recipe; `modules/vm-tests/clan-test-vars-fixture.nix`; `modules/checks/secrets-seam-translation.nix`, an independent judge of the translation whose literal fixture is a stub of clan's generator option; `modules/checks/host-key-obligations.nix`, whose literal fixtures stub clan's generator tree; and the committed-layout exemptions `modules/lib/vars.nix` documents.
 
 **Discharged by**: the check building at every step; the mutant below.
 

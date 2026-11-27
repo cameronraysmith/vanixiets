@@ -29,7 +29,7 @@ in
     }:
     let
       cfg = config.vanixiets.otelCollector.darwin;
-      gens = config.clan.core.vars.generators;
+      gens = config.vanixiets.secrets;
       mib = n: n * 1024 * 1024;
       row = flakeLib.observabilityHosts.${config.networking.hostName};
       # Static data from the host table, as the role's darwinModule reads it.
@@ -554,7 +554,7 @@ in
                     ]
                   && (
                     let
-                      k = gens.otel-cert.files."key.pem";
+                      k = gens.otel-cert.resolved.files."key.pem";
                     in
                     k.owner == "_otelcol" && k.group == "_otelcert" && k.mode == "0440"
                   )
@@ -565,7 +565,7 @@ in
                         (
                           f:
                           let
-                            v = gens.langfuse.files.${f};
+                            v = gens.langfuse.resolved.files.${f};
                           in
                           v.owner == "_otelagent" && v.group == "_otelagent" && v.mode == "0400"
                         )

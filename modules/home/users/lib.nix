@@ -105,10 +105,19 @@ in
                   }
                   + "/value"
                 );
-                defaultText = lib.literalExpression ''lib.fileContents "vars/shared/<person>-commit-signing-key/key.pub/value"'';
+                defaultText = lib.literalExpression ''
+                  lib.fileContents (
+                    flake.lib.vars.path {
+                      generator = "<person>-commit-signing-key";
+                      file = "key.pub";
+                    }
+                    + "/value"
+                  )
+                '';
                 description = ''
                   Public half of the key this person signs commits with, read
-                  from the committed public file of their clan vars generator.
+                  from the committed public file of their
+                  `<person>-commit-signing-key` entry of `vanixiets.secrets`.
                   No host may authorize it for login and no secret may be
                   encrypted to it. Null only for a person whose every host is in
                   `flake.lib.commitSigningLegacyMachines`, whose homes sign with

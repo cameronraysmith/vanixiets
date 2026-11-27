@@ -57,7 +57,7 @@
       # The builders' ZeroTier IPv6 addresses, from the registry.
       address = lib.genAttrs builders (machine: self.lib.hosts.${machine}.zerotier.address);
 
-      vars = machine: (configOf machine).clan.core.vars.generators;
+      vars = machine: (configOf machine).vanixiets.secrets;
       caPath = machine: plain (vars machine).nix-grpc-ca.files."ca.crt".path;
       certPath = machine: plain (vars machine).nix-grpc-cert.files."cert.pem".path;
       keyPath = machine: plain (vars machine).nix-grpc-cert.files."key.pem".path;
@@ -147,7 +147,7 @@
               builtins.filter (lib.hasInfix clientDir) (map plain config.systemd.tmpfiles.rules)
           );
           clientIdentityAtBoot = if isDarwin machine then linker.serviceConfig.RunAtLoad else null;
-          sshDispatchKey = config.clan.core.vars.generators ? nix-remote-build;
+          sshDispatchKey = self.lib.secretsBackend.generatorsOf config ? nix-remote-build;
         };
 
       expectedDispatcherSide =
@@ -310,7 +310,7 @@
       # its authorization because nothing else does.
       sessionKey =
         lib.removeSuffix "\n"
-          magnetite.clan.core.vars.generators.stibnite-agent-session.files."key.pub".value;
+          magnetite.vanixiets.secrets.stibnite-agent-session.files."key.pub".value;
       sessionUser = stibnite.services.stibnite-session-host.user;
       sessionAuthorized = lib.concatStringsSep "\n" (
         map plain stibnite.users.users.${sessionUser}.openssh.authorizedKeys.keys

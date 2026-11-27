@@ -21,6 +21,7 @@
 { config, inputs, ... }:
 let
   d = config.flake.lib.fleetDeployer;
+  secretsModule = config.flake.modules.nixos.secrets;
 in
 {
   flake.modules.nixos.fleet-deployer =
@@ -124,6 +125,8 @@ in
       };
     in
     {
+      imports = [ secretsModule ];
+
       # Defaults are the fleet's; vmTests.x86_64-linux.fleet-deployer replaces
       # them with a local forge, cache, stubs and a test requester.
       options.services.fleet-deployer = {
@@ -147,7 +150,7 @@ in
         };
         notifyTokenFile = lib.mkOption {
           type = lib.types.str;
-          default = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
+          default = config.vanixiets.secrets.ntfy-alerter.files.token.path;
           defaultText = lib.literalExpression "the ntfy-alerter token's path";
           description = "The alerter token fleet-deploy-notify posts with; root-only.";
         };

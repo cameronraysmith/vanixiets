@@ -14,7 +14,7 @@
 #   host's name (D6), prunes to 7 daily, 4 weekly and 6 monthly copies and
 #   reads back a tenth of the repository (D7). `restic-postgresql` is the
 #   job's wrapper for listing and restoring.
-# - The key and the repository password are clan vars generators
+# - The key and the repository password are the `vanixiets.secrets` entries
 #   postgresql-backup-r2 (prompted, hidden) and postgresql-backup-restic
 #   (generated) (D8). Never regenerate postgresql-backup-restic: the
 #   repository is readable only with the password it was created under.
@@ -161,7 +161,6 @@ let
   module =
     {
       config,
-      options,
       pkgs,
       ...
     }:
@@ -173,7 +172,7 @@ let
       published = "${directory}/${writer}.prom";
       backupSet = lib.subtractLists config.vanixiets.postgresqlCollation.parkedDatabases config.services.postgresql.ensureDatabases;
       units = map (db: "${dumpUnit db}.service") backupSet ++ [ "${globalsUnit}.service" ];
-      gens = config.clan.core.vars.generators;
+      gens = config.vanixiets.secrets;
 
       # Copies the record into the textfile directory by write-then-rename,
       # so node_exporter never reads a partial file.
@@ -201,6 +200,10 @@ let
         "${lib.getExe job.package}${lib.concatMapStrings (option: " -o ${option}") job.extraOptions}";
     in
     {
+      # vanixiets.secrets, which the module system requires on hosts
+      # without the NixOS base too.
+      imports = [ modules.nixos.secrets ];
+
       options.vanixiets.postgresqlBackup.enable = lib.mkOption {
         type = lib.types.bool;
         default = false;
@@ -341,8 +344,8 @@ let
               environmentFile = lib.mkDefault gens.${generators.r2}.files.env.path;
             };
           }
-          (lib.optionalAttrs (options ? clan.core.vars) {
-            clan.core.vars.generators.${generators.r2} = {
+          {
+            vanixiets.secrets.${generators.r2} = {
               prompts.access-key = {
                 description = ''
                   Cloudflare R2 S3 access key ID of an Account API token with
@@ -376,7 +379,7 @@ let
               '';
             };
 
-            clan.core.vars.generators.${generators.restic} = {
+            vanixiets.secrets.${generators.restic} = {
               files.password = { };
               runtimeInputs = [
                 pkgs.openssl
@@ -386,7 +389,7 @@ let
                 openssl rand -base64 32 | tr -d '\n' > "$out/password"
               '';
             };
-          })
+          }
         ]
       );
     };

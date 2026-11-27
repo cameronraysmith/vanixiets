@@ -12,7 +12,7 @@
       ...
     }:
     {
-      clan.core.vars.generators.ironstar-effects-secrets = {
+      vanixiets.secrets.ironstar-effects-secrets = {
         files.secrets = {
           secret = true;
 
@@ -110,6 +110,6 @@
       # delivers no secrets at all and every effect stops at its own
       # missing-secret guard — indistinguishable from not wiring it.
       services.nixbot.effects.perRepoSecretFiles."github:sciexp/ironstar" =
-        config.clan.core.vars.generators.ironstar-effects-secrets.files.secrets.path;
+        config.vanixiets.secrets.ironstar-effects-secrets.files.secrets.path;
     };
 }

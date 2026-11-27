@@ -1,11 +1,13 @@
 # The secret seam: `vanixiets.secrets.<name>`, through which a module declares
 # the secrets it owns and reads the ones it uses without naming the backend
 # that generates and delivers them. With modules/lib/vars.nix (the committed
-# store) this file is meant to be the only first-party module that names clan
-# vars; the modules that still do are listed in
-# modules/checks/secrets-seam-confinement.nix, and they move behind this
-# option one closed set of secrets at a time (the plan is
-# openspec/changes/seam-secrets-away-from-clan-vars/design.md).
+# store) this file is the only first-party module that names clan vars,
+# besides the checks and runtime tests that must pin clan itself, which
+# modules/checks/secrets-seam-confinement.nix lists with their reasons (the
+# design is openspec/changes/seam-secrets-away-from-clan-vars/design.md).
+# A module imported somewhere without the class's `base` aspect (a clan
+# service module, or a module a runtime test imports directly) imports the
+# class's secrets module itself; its key makes the second import a no-op.
 #
 # `<name>` is the clan generator name. The writable fields are the ones the
 # fleet's generator definitions set, each null (a list: empty) unless defined,
@@ -18,17 +20,23 @@
 # evaluation where clan is present, naming the entry and the field. The
 # read-only `files.<f>.{path,value,exists,placeholder}` are clan's values,
 # read lazily, and null where clan-core is not imported (clan-free fixtures),
-# the one place that tests for it.
+# the one place that tests for it. The read-only `resolved` is the generator
+# as clan evaluated it, in the option's own field names: every writable field
+# with clan's defaults applied (a file's `owner` is "root" when no module set
+# it, where the entry's own `owner` stays null), and every file clan has,
+# also for a provided entry. Judges of custody read `resolved`; it is null
+# without clan.
 #
 # flake.modules.homeManager.secrets is the home side: a view of
 # `{ files.<f>.{path,placeholder} }` that the hm-sops-bridge modules set
 # (modules/nixos/hm-sops-bridge.nix) and that is `{ }` in a standalone home.
 # flake.lib.secretsBackend.generatorsOf is clan's whole generator tree of a
-# host, generators of clan's own services included. It is meant for judges
-# that must see every generator a host has: which shared secrets the host must
-# be a recipient of (modules/lib/shared-vars-recipients.nix) and which secrets
-# a deploy decrypts locally (modules/lib/fleet-deployer.nix), both of which
-# still read clan's tree directly.
+# host, generators of clan's own services included, for judges that need the
+# backend's own view rather than the entries a host declares: which shared
+# secrets the host must be a recipient of, which secrets a deploy decrypts
+# locally, whether the backend declares a generator at all (a retired one
+# must be absent, sshd's `openssh` may be), and the backend's own location
+# of a file's ciphertext.
 { config, lib, ... }:
 let
   inherit (config.flake.lib) exportAs;
@@ -60,6 +68,36 @@ let
     p:
     prune { inherit (p) description type persist; }
     // lib.optionalAttrs (prune p.display != { }) { display = prune p.display; };
+
+  # A generator as the backend resolved it, projected to the option's fields.
+  resolve = g: {
+    inherit (g)
+      share
+      dependencies
+      validation
+      runtimeInputs
+      script
+      ;
+    prompts = lib.mapAttrs (_: p: {
+      inherit (p)
+        description
+        type
+        persist
+        display
+        ;
+    }) g.prompts;
+    files = lib.mapAttrs (_: f: {
+      inherit (f)
+        secret
+        deploy
+        owner
+        group
+        mode
+        neededFor
+        restartUnits
+        ;
+    }) g.files;
+  };
 
   toBackend =
     s:
@@ -195,6 +233,13 @@ let
               type = lib.types.bool;
               default = false;
               description = "Whether a clan-core service declares this generator, so that the seam only reads it; the reader declares each file it reads.";
+            };
+            resolved = lib.mkOption {
+              type = lib.types.nullOr lib.types.raw;
+              readOnly = true;
+              default = if hasBackend then resolve (backendGenerator name config.provided) else null;
+              defaultText = lib.literalMD "the secret backend's generator, or `null` without one";
+              description = "The generator as the secret backend resolved it, in this option's field names, with the backend's defaults for every field no module set.";
             };
           };
         };

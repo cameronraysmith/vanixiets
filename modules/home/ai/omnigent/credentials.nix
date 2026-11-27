@@ -25,7 +25,7 @@ let
       ) credentials.linearApiKeys
     );
   # The adapter's decisions over a vars-shaped view, `vars.<generator>.<file> = { path; placeholder; }`:
-  # the host supplies Clan generator paths and SOPS placeholders, checks supply synthetic ones.
+  # the host supplies the paths and SOPS placeholders of its `vanixiets.secrets` entries, checks supply synthetic ones.
   credentialPolicy =
     {
       pkgs,
@@ -99,15 +99,20 @@ let
     }:
     let
       selected = sourceSelection worker.credentials;
-      output = source: osConfig.clan.core.vars.generators.${source.generator}.files.${source.file};
+      entry = source: osConfig.vanixiets.secrets.${source.generator};
+      output = source: (entry source).files.${source.file};
+      custody = source: (entry source).resolved.files.${source.file};
+      backendFile =
+        source:
+        (config.flake.lib.secretsBackend.generatorsOf osConfig).${source.generator}.files.${source.file};
       linear = lib.filterAttrs (_: source: source.enable) worker.credentials.linearApiKeys;
       github = lib.filterAttrs (_: source: source.enable) worker.credentials.githubTokens;
       templateName = "omnigent-${worker.user}-linear";
-      secretName = source: "vars/${(output source).rel_dir}/${source.file}";
+      secretName = source: "vars/${(backendFile source).rel_dir}/${source.file}";
       sourceFile =
         source:
         let
-          file = output source;
+          file = backendFile source;
         in
         builtins.path {
           name = lib.strings.sanitizeDerivationName "${file.rel_dir}_${file.name}";
@@ -121,12 +126,8 @@ let
         inherit pkgs home serverUrl;
         credentials = worker.credentials;
         vars = lib.mapAttrs (
-          _: generator:
-          lib.mapAttrs (name: file: {
-            inherit (file) path;
-            placeholder = osConfig.sops.placeholder."vars/${file.rel_dir}/${name}";
-          }) generator.files
-        ) osConfig.clan.core.vars.generators;
+          _: s: lib.mapAttrs (_: f: { inherit (f) path placeholder; }) s.files
+        ) osConfig.vanixiets.secrets;
         linearRendered = osConfig.sops.templates.${templateName}.path;
       };
       policy = derived.policy;
@@ -168,13 +169,13 @@ let
           assertion = lib.all (
             source:
             let
-              file = output source;
+              file = custody source;
             in
             file.secret
             && file.neededFor == "services"
             && file.owner == worker.user
             && file.mode == "0400"
-            && osConfig.clan.core.vars.generators.${source.generator}.share
+            && (entry source).resolved.share
             && (osConfig.sops.secrets.${secretName source}.owner or null) == worker.user
             && (osConfig.sops.secrets.${secretName source}.mode or null) == "0400"
           ) (lib.attrValues selected);
@@ -184,12 +185,12 @@ let
           assertion = lib.all (
             source:
             let
-              file = output source;
+              file = backendFile source;
               secret = osConfig.sops.secrets.${secretName source} or null;
             in
             secret != null
             && file.rel_dir == "shared/${source.generator}"
-            && secret.path == file.path
+            && secret.path == (output source).path
             && toString secret.sopsFile == toString (sourceFile source)
           ) (lib.attrValues selected);
           message = "Omnigent worker ${worker.user}: only the declared Clan vars ciphertext and delivered paths are allowed.";

@@ -11,7 +11,7 @@
       # this file deletes it and its token at ntfy's next start, so rollback
       # reverts magnetite's token-bearing posts first (design Migration Plan).
       # checks.x86_64-linux.ntfy-provisioning judges the rendered lines.
-      clan.core.vars.generators.ntfy-alerter-env = {
+      vanixiets.secrets.ntfy-alerter-env = {
         dependencies = [ "ntfy-alerter" ];
         files.ntfy-env = {
           mode = "0400";
@@ -31,7 +31,7 @@
 
       services.ntfy-sh = {
         enable = true;
-        environmentFile = config.clan.core.vars.generators.ntfy-alerter-env.files.ntfy-env.path;
+        environmentFile = config.vanixiets.secrets.ntfy-alerter-env.files.ntfy-env.path;
         settings = {
           listen-http = "[::1]:2586";
           base-url = "https://ntfy.zt";

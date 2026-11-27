@@ -3,8 +3,8 @@
   flake.modules.nixos.base =
     { config, pkgs, ... }:
     {
-      # Generate initrd SSH host key via clan vars
-      clan.core.vars.generators.initrd-ssh = {
+      # The initrd SSH host key
+      vanixiets.secrets.initrd-ssh = {
         files."id_ed25519".neededFor = "activation";
         files."id_ed25519.pub".secret = false;
         runtimeInputs = [
@@ -22,7 +22,7 @@
         ssh = {
           enable = true;
           port = 2222; # Different from main SSH (22)
-          hostKeys = [ config.clan.core.vars.generators.initrd-ssh.files.id_ed25519.path ];
+          hostKeys = [ config.vanixiets.secrets.initrd-ssh.files.id_ed25519.path ];
           authorizedKeys = config.users.users.root.openssh.authorizedKeys.keys;
         };
       };

@@ -1,0 +1,13 @@
+# Declared drvPath differences of seam-secrets-away-from-clan-vars, delivery steps 2 to 13 as one
+# commit (design D10, "Delivery as built"), from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/02-13-move.txt
+# It supersedes the per-step files 02-*.txt to 13-*.txt. Checks that embed the whole flake source are
+# covered by the base allow-list (modules/apps/drv-diff-base-allow.txt). Every other dumped attribute,
+# every NixOS, darwin and home toplevel and every vmTests attribute included, must keep its drvPath.
+# Measured by evaluation, attribute name to drvPath over checks.{x86_64-linux,aarch64-darwin} and
+# vmTests.{x86_64-linux,aarch64-linux}, from 62984c770321 (main plus the join's unrelated commit) to the
+# working copy's tree (logs/ssv-batch-drvmaps-20261127-183548/): these two differ, beside gitleaks,
+# treefmt and ntfy-tls-verification, which the base allow-list covers.
+
+checks.x86_64-linux.secrets-seam-confinement  changed  # its literal list drops to the fourteen files design D8 exempts (design D9)
+checks.x86_64-linux.eval-users-lib  changed  # home/users/lib.test.nix:26 imports home/users/lib.nix by store path, and the move rewrites its signingKey defaultText through flake.lib.vars.path (design D12)

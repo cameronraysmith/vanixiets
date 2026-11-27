@@ -1,3 +1,4 @@
+# SUPERSEDED by 02-13-move.txt: steps 2 to 13 land as one commit (design D10, "Delivery as built").
 # Declared drvPath differences of seam-secrets-away-from-clan-vars, delivery step 11 (host access and boot, provided openssh and zerotier entries), from
 # the step's parent to its commit:
 #   just drv-diff <parent> <commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/11-host-access-and-boot.txt

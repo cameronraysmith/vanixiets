@@ -24,8 +24,7 @@ in
       homeFor = worker: toString (account worker).home;
       keychains = lib.filterAttrs (_: worker: worker.keychainEnable) workers;
       keychainGenerator = worker: "${worker.user}-keychain";
-      keychainPassword =
-        worker: config.clan.core.vars.generators.${keychainGenerator worker}.files.password.path;
+      keychainPassword = worker: config.vanixiets.secrets.${keychainGenerator worker}.files.password.path;
       keychainHelpers = lib.mapAttrs (
         _: worker:
         let
@@ -229,7 +228,10 @@ in
         '';
     in
     {
-      imports = [ flakeConfig.flake.modules.darwin.omnigent-worker-options ];
+      imports = [
+        flakeConfig.flake.modules.darwin.omnigent-worker-options
+        flakeConfig.flake.modules.darwin.secrets
+      ];
       options.services.omnigent-host.workers = lib.mkOption {
         type = lib.types.attrsOf (
           lib.types.submodule {
@@ -515,28 +517,30 @@ in
             }
           ) enabledWorkers;
         })
-        (lib.optionalAttrs (options ? clan.core.vars) (
+        (lib.mkIf (credentialDeliveries != { }) {
+          vanixiets.secrets = lib.mkMerge (
+            map (delivery: delivery.generators) (lib.attrValues credentialDeliveries)
+            ++ [
+              (lib.mapAttrs' (
+                _: worker:
+                lib.nameValuePair (keychainGenerator worker) {
+                  share = false;
+                  files.password = {
+                    secret = true;
+                    neededFor = "services";
+                    owner = worker.user;
+                    group = primaryGroup worker;
+                    mode = "0400";
+                  };
+                  runtimeInputs = [ pkgs.openssl ];
+                  script = ''openssl rand -hex 32 > "$out/password"'';
+                }
+              ) keychains)
+            ]
+          );
+        })
+        (lib.optionalAttrs (options ? sops.templates) (
           lib.mkIf (credentialDeliveries != { }) {
-            clan.core.vars.generators = lib.mkMerge (
-              map (delivery: delivery.generators) (lib.attrValues credentialDeliveries)
-              ++ [
-                (lib.mapAttrs' (
-                  _: worker:
-                  lib.nameValuePair (keychainGenerator worker) {
-                    share = false;
-                    files.password = {
-                      secret = true;
-                      neededFor = "services";
-                      owner = worker.user;
-                      group = primaryGroup worker;
-                      mode = "0400";
-                    };
-                    runtimeInputs = [ pkgs.openssl ];
-                    script = ''openssl rand -hex 32 > "$out/password"'';
-                  }
-                ) keychains)
-              ]
-            );
             sops.templates = lib.mkMerge (
               map (delivery: delivery.templates) (lib.attrValues credentialDeliveries)
             );

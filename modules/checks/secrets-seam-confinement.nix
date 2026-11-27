@@ -4,19 +4,26 @@
 # included, with a line that is not a comment and names `clan.core.vars`,
 # `vars/shared/` or `vars/per-machine/`. The two seam files,
 # modules/system/secrets.nix (the backend's generators) and modules/lib/vars.nix
-# (the committed layout), are outside both lists. `expected` is a literal list
-# of the files that still name the backend. It is meant only to shrink, as
-# modules move their secrets behind `vanixiets.secrets`, until it holds only
-# the checks and runtime tests that must pin clan itself because they run a
-# generator's script, lay out clan's on-disk vars, or judge the committed
-# vars tree (the plan and each file's reason are in
-# openspec/changes/seam-secrets-away-from-clan-vars/design.md). On failure the
-# build prints each list one file per line and what to do.
+# (the committed layout), are outside both lists. `expected` is the literal
+# list of the files allowed to name the backend, each with its reason: the
+# checks and runtime tests that must pin clan itself because they run a
+# generator's recipe, lay out clan's on-disk vars, judge the translation or
+# the committed vars tree, or hold literal fixtures of clan's paths. Each
+# would have to change if the backend were replaced, so they are named here
+# rather than moved behind the seam (the reasons are also in
+# openspec/changes/seam-secrets-away-from-clan-vars/design.md). Every other
+# module declares and reads secrets through `vanixiets.secrets`. On failure
+# the build prints each list one file per line and what to do.
 #
 # The rule matches text, line by line, so it does not see a read spelt any
 # other way: `inherit (config.clan.core) vars;`, a quoted attribute name such
 # as `clan.core."vars"`, a path built from strings, or any file outside
-# modules/, such as pkgs/by-name/ntfy-send/package.nix.
+# modules/, such as pkgs/by-name/ntfy-send/package.nix. Nor does it see
+# reads through `flake.lib.secretsBackend.generatorsOf`, which returns the
+# backend's whole generator tree of a host; today modules/checks/nix-builders-wiring.nix,
+# modules/home/ai/omnigent/credentials.nix and
+# modules/lib/{commit-signing,fleet-deployer,host-keys,shared-vars-recipients}.nix
+# use it.
 { lib, ... }:
 let
   root = ../.;
@@ -47,72 +54,33 @@ let
     )
   );
   expected = [
+    # literal fixture: a fixture home's delivered key path (:95)
     "modules/checks/commit-signing-key.nix"
+    # literal fixtures of committed vars paths (:152,207)
     "modules/checks/fleet-deployer-obligations.nix"
+    # runs greptimedb-users' recipe (finalScript), and reads otel-cert's key.pem owner and mode from clan (:513)
     "modules/checks/greptimedb-envelope.nix"
+    # literal fixtures: a stub of clan's generator tree for the presence test
     "modules/checks/host-key-obligations.nix"
+    # encrypted files interpolated on purpose (:114)
     "modules/checks/langfuse-query.nix"
-    "modules/checks/nix-builders-wiring.nix"
+    # runs cinnabar's ntfy-alerter and ntfy-alerter-env recipes (finalScript)
     "modules/checks/ntfy-provisioning.nix"
-    "modules/checks/obs-query.nix"
-    "modules/checks/omnigraph-retired-roots.nix"
+    # independent judge of the translation; its fixture stubs clan's option
     "modules/checks/secrets-seam-translation.nix"
+    # independent judge of the committed vars tree
     "modules/checks/sops-correspondence.nix"
-    "modules/clan/services/hermes-agent/flake-module.nix"
-    "modules/clan/services/nix-builders/flake-module.nix"
-    "modules/clan/services/omnigent/flake-module.nix"
-    "modules/clan/services/openclaw/flake-module.nix"
-    "modules/clan/services/otel-collector/service.nix"
-    "modules/clan/services/tincr/flake-module.nix"
-    "modules/darwin/omnigent-host.nix"
-    "modules/darwin/otel-collector-agent.nix"
-    "modules/darwin/ssh-ca-trust.nix"
-    "modules/effects/ironstar/secrets.nix"
-    "modules/effects/vanixiets/secrets.nix"
-    "modules/home/ai/omnigent/credentials.nix"
-    "modules/home/development/vcs-signing.nix"
-    "modules/home/users/lib.nix"
-    "modules/lib/commit-signing.nix"
-    "modules/lib/fleet-deployer.nix"
-    "modules/lib/host-keys.nix"
-    "modules/lib/omnigent-fleet-obligations.nix"
-    "modules/lib/shared-vars-recipients.nix"
-    "modules/machines/nixos/cinnabar/caddy-root-ca.nix"
-    "modules/machines/nixos/cinnabar/caddy-root-check.nix"
-    "modules/machines/nixos/cinnabar/fleet-alert.nix"
-    "modules/machines/nixos/cinnabar/matrix.nix"
-    "modules/machines/nixos/cinnabar/ntfy.nix"
-    "modules/machines/nixos/cinnabar/radicle.nix"
-    "modules/machines/nixos/cinnabar/zt-dns.nix"
-    "modules/machines/nixos/magnetite/default.nix"
-    "modules/machines/nixos/pyrite/disko.nix"
-    "modules/nixos/fleet-alert-server.nix"
-    "modules/nixos/fleet-deployer.nix"
-    "modules/nixos/gitea-mq.nix"
-    "modules/nixos/gitea.nix"
-    "modules/nixos/greptimedb-server.nix"
-    "modules/nixos/kanidm.nix"
-    "modules/nixos/matrix.nix"
-    "modules/nixos/niks3.nix"
-    "modules/nixos/nixbot.nix"
-    "modules/nixos/ntfy-alerter.nix"
-    "modules/nixos/omnigent-host.nix"
-    "modules/nixos/omnigent.nix"
-    "modules/nixos/omnigraph-backup.nix"
-    "modules/nixos/omnigraph-server.nix"
-    "modules/nixos/perses-server.nix"
-    "modules/nixos/postgresql-backup.nix"
-    "modules/nixos/r2-usage.nix"
-    "modules/nixos/renovate.nix"
-    "modules/nixos/sso-gateway.nix"
-    "modules/system/commit-signing-key.nix"
-    "modules/system/initrd-networking.nix"
-    "modules/system/stibnite-session.nix"
+    # lays out clan's on-disk vars for test nodes
     "modules/vm-tests/clan-test-vars-fixture.nix"
+    # runs greptimedb-users' recipe (finalScript)
     "modules/vm-tests/devloop-ingest.nix"
+    # runs greptimedb-users' recipe (finalScript)
     "modules/vm-tests/fleet-ingress.nix"
+    # runs greptimedb-users' recipe (finalScript)
     "modules/vm-tests/greptimedb-oom-order.nix"
+    # runs greptimedb-users' recipe (finalScript)
     "modules/vm-tests/greptimedb-pipeline.nix"
+    # runs greptimedb-users' recipe (finalScript)
     "modules/vm-tests/perses-greptimedb.nix"
   ];
 in

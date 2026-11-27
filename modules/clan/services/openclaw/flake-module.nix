@@ -1,4 +1,7 @@
-{ ... }:
+{ config, ... }:
+let
+  secretsModule = config.flake.modules.nixos.secrets;
+in
 {
   flake.clan.modules.openclaw =
     { ... }:
@@ -96,7 +99,7 @@
 
               matrixBotPasswordGenerator = lib.mkOption {
                 type = lib.types.str;
-                description = "Name of the clan vars generator providing the Matrix bot password";
+                description = "Name of the `vanixiets.secrets` entry that provides the Matrix bot password";
               };
 
               configOverrides = lib.mkOption {
@@ -184,10 +187,10 @@
                 );
 
                 passwordVarPath =
-                  config.clan.core.vars.generators.${settings.matrixBotPasswordGenerator}.files."password".path;
-                gatewayTokenPath = config.clan.core.vars.generators."clawdbot-gateway-token".files."token".path;
-                oauthTokenPath = config.clan.core.vars.generators.clawdbot-claude-oauth.files."token".path;
-                zaiApiKeyPath = config.clan.core.vars.generators."clawdbot-zai-coding-api".files."api-key".path;
+                  config.vanixiets.secrets.${settings.matrixBotPasswordGenerator}.files."password".path;
+                gatewayTokenPath = config.vanixiets.secrets."clawdbot-gateway-token".files."token".path;
+                oauthTokenPath = config.vanixiets.secrets.clawdbot-claude-oauth.files."token".path;
+                zaiApiKeyPath = config.vanixiets.secrets."clawdbot-zai-coding-api".files."api-key".path;
 
                 stateDir = "${userHome}/.openclaw";
 
@@ -231,6 +234,8 @@
                 };
               in
               {
+                imports = [ secretsModule ];
+
                 options.services.openclaw.package = lib.mkOption {
                   type = lib.types.package;
                   default = pkgs.openclaw-gateway;
@@ -242,7 +247,7 @@
                   environment.etc."openclaw/openclaw.json".source = configFile;
                   environment.systemPackages = [ interactiveWrapper ];
 
-                  clan.core.vars.generators."clawdbot-gateway-token" = {
+                  vanixiets.secrets."clawdbot-gateway-token" = {
                     files."token" = {
                       neededFor = "services";
                       owner = settings.serviceUser;
@@ -253,7 +258,7 @@
                     '';
                   };
 
-                  clan.core.vars.generators."clawdbot-claude-oauth" = {
+                  vanixiets.secrets."clawdbot-claude-oauth" = {
                     prompts.token = {
                       description = "Claude Code OAuth token (from 'claude setup-token')";
                       type = "hidden";
@@ -267,7 +272,7 @@
                     '';
                   };
 
-                  clan.core.vars.generators."clawdbot-zai-coding-api" = {
+                  vanixiets.secrets."clawdbot-zai-coding-api" = {
                     prompts.api-key = {
                       description = "Z.AI Coding Plan API key for openclaw";
                       type = "hidden";
@@ -328,7 +333,7 @@
                     };
                   };
 
-                  clan.core.vars.generators."matrix-password-clawd" = {
+                  vanixiets.secrets."matrix-password-clawd" = {
                     files."password" = {
                       neededFor = "services";
                       owner = settings.serviceUser;
@@ -359,8 +364,8 @@
                     ];
                     script =
                       let
-                        tokenFile = config.clan.core.vars.generators."tuwunel-registration-token".files."token".path;
-                        clawdPasswordFile = config.clan.core.vars.generators."matrix-password-clawd".files."password".path;
+                        tokenFile = config.vanixiets.secrets."tuwunel-registration-token".files."token".path;
+                        clawdPasswordFile = config.vanixiets.secrets."matrix-password-clawd".files."password".path;
                       in
                       ''
                         set -euo pipefail

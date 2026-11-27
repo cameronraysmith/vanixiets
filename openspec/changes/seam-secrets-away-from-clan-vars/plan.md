@@ -15,7 +15,7 @@
 ## Global Constraints
 
 - Lands after compose-hosts-from-cohesive-aspects (the prerequisite section below names its two remaining commits). Before step 1, and before each step whose files that change moved, re-read the sections design.md's Migration Plan item 1 lists and update the file names in this plan and in tasks.md. Line numbers below are at `main` `0f98c236fefd` (2026-11-27), where every cited file is identical to the working copy, and will move.
-- Thirteen delivery steps, each one commit in one pull request, rebased onto the previous step's merge. Edits are made in `@` and routed into the step's commit with `jj squash --into <step> --use-destination-message --keep-emptied <paths>`. This repository is a shared jj development join: never `jj new`, `describe` or `commit` on another session's chain.
+- Step 1 is one commit in one pull request (landed as pull request 4472). Steps 2 to 13 land as one commit, accepted on `drv-delta/02-13-move.txt`: every step has the same acceptance, and a half-moved tree does not evaluate while several implementers work in parallel, so the step-order constraints below no longer apply and the per-step allow-lists are superseded. Edits are made in `@`. This repository is a shared jj development join: never `jj new`, `describe` or `commit` on another session's chain.
 - Each step is accepted on one full `just drv-diff <parent> <step commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/<step>.txt` (about 16 minutes). The implementer does not run it: the step's last task returns the exact command. If the diff names an undeclared check, trace it with `nix derivation show`, declare it with its cause, and re-judge with `just drv-diff-rejudge <dir> <allow>`; an undeclared NixOS, darwin or home toplevel or vmTests difference blocks the step.
 - Known drvPath movers in this repository: `checks.x86_64-linux.fleet-alert` changes whenever a `testSizes.checks` entry is added (step 1 adds two); every check that builds or consumes `packages.vanixiets-docs` changes whenever a file under `packages/docs/` changes (only step 13 may edit documents); a test importing `${./x.nix}` changes when `x.nix` changes (design D12 lists those files; the one edited here is `home/users/lib.nix`, in step 10, which moves `checks.x86_64-linux.eval-users-lib`); a new check is declared `class = "medium"; measured = false;`.
 - Every new or edited file passes `treefmt` before its commit is published.
@@ -61,7 +61,7 @@ Found by searching each unarchived change's `tasks.md` and `proposal.md` for the
 | Kind | Name | Defined in |
 |---|---|---|
 | Option (NixOS, darwin) | `vanixiets.secrets.<name>`: writable `share`, `dependencies`, `validation`, `runtimeInputs`, `script`, `prompts.<p>.{description,type,persist}`, `prompts.<p>.display.{group,label,required,helperText}`, `files.<f>.{secret,deploy,owner,group,mode,neededFor,restartUnits}`, `provided` | Task 2 |
-| Option (read-only) | `vanixiets.secrets.<name>.files.<f>.{path,value,exists,placeholder}`, `null` without clan | Task 2 |
+| Option (read-only) | `vanixiets.secrets.<name>.files.<f>.{path,value,exists,placeholder}` and `vanixiets.secrets.<name>.resolved` (the backend's generator in the option's field names, its defaults applied), `null` without clan | Task 2 |
 | Option (home) | `vanixiets.secrets.<name>.files.<f>.{path,placeholder}`, default `{ }` | Task 2 |
 | Module | `flake.modules.{nixos,darwin,homeManager}.secrets`; `flake.modules.darwin.hm-sops-bridge` | Task 2 |
 | Lib | `flake.lib.secretsBackend.generatorsOf : hostConfig -> attrsOf generator` | Task 2 |
@@ -160,17 +160,19 @@ in
 
 ## Tasks 3–13: Steps 2–12, one closed set each (task groups 3–13)
 
+As built, the tasks of steps 2 to 13 below were carried out together and are accepted once (Global Constraints); their per-step deliver tasks are replaced by one.
+
 The same five moves per step; tasks.md names each step's files, generators and checks.
 
 - [ ] **Step 1 (closed set):** `rg -n -e '<gen1>' -e '<gen2>' … modules` and `rg -n 'mkDefault|mkForce|mkOverride|mkMerge|mkIf'` inside each declaration; save the log; every hit is a file of this step or of design D8's set.
-- [ ] **Step 2 (declarations):** in each owning file, replace `clan.core.vars.generators.<name> = { … };` with `vanixiets.secrets.<name> = { … };`, field for field, all definitions of a generator in one edit and in order. A module evaluated without clan elsewhere (fixtures, `vm-tests/postgresql-backup-restore.nix`) adds `imports = [ <class>.secrets ]` and loses its `options ? clan.core.vars` guard.
+- [ ] **Step 2 (declarations):** in each owning file, replace `clan.core.vars.generators.<name> = { … };` with `vanixiets.secrets.<name> = { … };`, field for field, all definitions of a generator in one edit and in order. The generator definitions lose their `options ? clan.core.vars` guards. A module that writes or reads the option imports `flake.modules.<class>.secrets` itself when some configuration evaluates it without the class's base (design D6, import rule): every clan service's NixOS and darwin module, and `nixos/{omnigraph-backup,postgresql-backup,fleet-deployer,omnigent-host}.nix` and `darwin/omnigent-host.nix`; a module that only runs on fleet hosts relies on the base's import.
 - [ ] **Step 3 (readers):** replace `config.clan.core.vars.generators.<name>.files.<f>.path` with `config.vanixiets.secrets.<name>.files.<f>.path` (and `.value`, `.exists`); a read guarded by `or null` becomes a test of the read-only field against `null`; an obligation reads `hostConfig.vanixiets.secrets.<name>`.
-- [ ] **Step 4 (evidence):** evaluate the step's generators' baseline projection on each host that declares them and diff against Task 1 Step 3; run the step's named check builds and mutants; delete the cleared files from the confinement `expected`; build the confinement check.
+- [ ] **Step 4 (evidence):** dump every generator's data on all six NixOS and four darwin hosts (every file field and path, prompts with `display`, the script text, `runtimeInputs` names, the `finalScript` drvPath) and diff against the parent's; this is the only comparison that sees a recipe, because a recipe does not enter a host's toplevel. Run the step's named check builds and mutants; delete the cleared files from the confinement `expected`; build the confinement check.
 - [ ] **Step 5 (deliver):** `treefmt`; squash into the step's commit; return `just drv-diff <parent> <commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/<step>.txt`; after the operator's run, resolve every `may-change` in that file to `changed` or delete it, and re-judge.
 
 Step-specific points:
 - Order: steps 2–12 may be reordered, except that step 10 follows step 9 (design D10).
-- Step 2 (group 3): the recipe mutant of task 3.4 changes `niks3-api-token`'s script and must move magnetite's toplevel.
+- Step 2 (group 3): the recipe mutant of task 3.4 changes `niks3-api-token`'s script; it moves magnetite's generator data (`script`, `finalScript` drvPath) and leaves its toplevel unchanged (`logs/sscv-3-recipe-mutant-20261127-175724.log`).
 - Step 4 (group 5): `ntfy-alerter` has a second definition at `clan/services/otel-collector/service.nix:314` and reads at `:220` and `darwin/otel-collector-agent.nix:319,483`; they move here, in one edit with `nixos/ntfy-alerter.nix:23`, in order.
 - Step 7 (group 8): `langfuse` has two definitions in `clan/services/otel-collector/service.nix` (`:232`, `:353`); the six recipe-running judges stay untouched and task 8.5 checks their drvPaths. `checks/obs-query.nix:28` takes the regulator password's path from magnetite's `vanixiets.secrets.greptimedb-users` and still compares it with `apps/obs-query.sh:46`.
 - Step 9 (group 10): the credential adapter keeps its assertions but compares `osConfig.vanixiets.secrets.<gen>.files.<f>` (path, placeholder, custody fields) with `osConfig.sops.secrets`; `secretName` disappears with `rel_dir`. Update `lib/vars.nix`'s exemption comment.

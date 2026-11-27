@@ -6,8 +6,8 @@
 #   API for every bucket's latest storage sample and the operations since
 #   the billing period began, by bucket and action type, and writes
 #   ./r2-usage/poller.py's series to a record under /var/lib/r2-usage (D2,
-#   D3). It reads its token as a systemd credential from the clan vars
-#   generator cloudflare-analytics (prompted, hidden), an Account Analytics
+#   D3). It reads its token as a systemd credential from the
+#   `vanixiets.secrets` entry cloudflare-analytics (prompted, hidden), an Account Analytics
 #   Read token, and no other unit names it (D5).
 # - r2-usage-publish.service copies the record every minute into the host's
 #   one textfile directory (./node-exporter-textfile.nix) as r2-usage.prom,
@@ -234,7 +234,10 @@ let
   factsOf =
     name: hostConfig:
     let
-      token = hostConfig.clan.core.vars.generators.${generator}.files.token or null;
+      secret = hostConfig.vanixiets.secrets.${generator} or null;
+      # Without the secret backend the entry has no path and no resolved
+      # owner, which reads as no token, as before the seam.
+      token = if secret == null || secret.resolved == null then null else secret.files.token or null;
       names = v: toString (lib.toList v);
       loads =
         s:
@@ -253,14 +256,13 @@ let
         file = "token";
       };
       notifiedUnits = config.flake.lib.observabilityHosts.${name}.notifiedUnits or [ ];
-      tokenOwner = if token == null then "root" else token.owner;
+      tokenOwner = if token == null then "root" else secret.resolved.files.token.owner;
       tokenConsumers = lib.attrNames (lib.filterAttrs (_: loads) hostConfig.systemd.services);
     };
 
   module =
     {
       config,
-      options,
       pkgs,
       ...
     }:
@@ -332,7 +334,7 @@ let
                 Type = "oneshot";
                 ExecStart = "${lib.getExe (poller pkgs)} ${configFile} %d/token ${record}";
                 ExecStartPost = [ "${publish}" ];
-                LoadCredential = [ "token:${config.clan.core.vars.generators.${generator}.files.token.path}" ];
+                LoadCredential = [ "token:${config.vanixiets.secrets.${generator}.files.token.path}" ];
                 MemoryMax = "128M";
               };
             };
@@ -369,8 +371,8 @@ let
               };
             };
           }
-          (lib.optionalAttrs (options ? clan.core.vars) {
-            clan.core.vars.generators.${generator} = {
+          {
+            vanixiets.secrets.${generator} = {
               prompts.api-token = {
                 description = ''
                   Cloudflare API token with the single permission Account >
@@ -399,7 +401,7 @@ let
                 printf '%s' "$token" > "$out/token"
               '';
             };
-          })
+          }
         ]
       );
     };

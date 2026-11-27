@@ -310,7 +310,7 @@ in
       # forcing them again cost about 1.6 GiB of evaluation.
       assertions =
         let
-          usersFiles = config.clan.core.vars.generators.greptimedb-users.files;
+          usersFiles = config.vanixiets.secrets.greptimedb-users.files;
           allowed = {
             users = [ "greptimedb" ];
             admin-password = [ "greptimedb-schema" ];

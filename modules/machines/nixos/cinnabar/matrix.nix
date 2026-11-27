@@ -99,14 +99,12 @@ in
         };
       };
 
-      # DynamicUser cannot read clan-vars paths; relay via systemd credentials
+      # DynamicUser cannot read the secret's path; relay via systemd credentials
       systemd.services.tuwunel.serviceConfig.LoadCredential = [
-        "registration-token:${
-          config.clan.core.vars.generators.tuwunel-registration-token.files."token".path
-        }"
+        "registration-token:${config.vanixiets.secrets.tuwunel-registration-token.files."token".path}"
       ];
 
-      clan.core.vars.generators.tuwunel-registration-token = {
+      vanixiets.secrets.tuwunel-registration-token = {
         files."token".neededFor = "services";
         runtimeInputs = [
           pkgs.coreutils
@@ -117,7 +115,7 @@ in
         '';
       };
 
-      clan.core.vars.generators.matrix-password-cameron = {
+      vanixiets.secrets.matrix-password-cameron = {
         files."password".neededFor = "services";
         runtimeInputs = [
           pkgs.coreutils
@@ -150,14 +148,13 @@ in
         script =
           let
             adminUser = config.users.users.cameron.name;
-            tokenFile = config.clan.core.vars.generators.tuwunel-registration-token.files."token".path;
-            cameronPasswordFile =
-              config.clan.core.vars.generators.matrix-password-cameron.files."password".path;
+            tokenFile = config.vanixiets.secrets.tuwunel-registration-token.files."token".path;
+            cameronPasswordFile = config.vanixiets.secrets.matrix-password-cameron.files."password".path;
             # hermes-agent clan-service instance declares the matrix-password-hermes
-            # generator inside perInstance.nixosModule. When the instance is wired
+            # entry of `vanixiets.secrets` inside perInstance.nixosModule. When the instance is wired
             # (nix-gyy.10), this generator is present and hermes is registered as
             # a sibling user. Until then, the hermes registration line stays inert.
-            hermesGenerator = config.clan.core.vars.generators.matrix-password-hermes or null;
+            hermesGenerator = config.vanixiets.secrets.matrix-password-hermes or null;
             hermesPasswordFile =
               if hermesGenerator != null then hermesGenerator.files."MATRIX_PASSWORD".path else null;
           in

@@ -15,8 +15,8 @@
 #
 # The fragments are plain NixOS modules, flake.modules.nixos.otel-collector-
 # agent and -ingress, so the container test imports them without clan; only
-# the clan roles read clan vars: the agent role's otel-ca and otel-cert
-# generators and the ntfy-alerter token on every host of
+# the clan roles read `vanixiets.secrets`: the agent role's otel-ca and
+# otel-cert entries and the ntfy-alerter token on every host of
 # flake.lib.observabilityHosts, and the ingress role's collector password.
 #
 # This file holds the clan service; agent.nix and ingress.nix hold the two
@@ -175,13 +175,14 @@ in
                 restart =
                   lib.optional collect "opentelemetry-collector.service"
                   ++ lib.optional agentTelemetry "${agentSessionUnit}.service";
-                gens = config.clan.core.vars.generators;
+                gens = config.vanixiets.secrets;
               in
               {
                 # Declared on every agent host, so one vars step covers all six; on a host
                 # that does not collect yet they are uploaded files no unit reads.
                 imports = [
                   nixosModules.ntfy-alerter
+                  nixosModules.secrets
                 ]
                 ++ lib.optional collect nixosModules.otel-collector-agent;
 
@@ -189,7 +190,7 @@ in
                   {
                     # restartUnits only here: clan throws on it on darwin
                     # (clan-core generic-generator.nix:193-208; design D5).
-                    clan.core.vars.generators = lib.mkMerge [
+                    vanixiets.secrets = lib.mkMerge [
                       (otelGenerators { inherit lib pkgs; })
                       {
                         otel-cert.files."key.pem".restartUnits = restart;
@@ -229,7 +230,7 @@ in
                   # Langfuse Cloud's project keys (agent-session-telemetry
                   # design D16), with the unit's restart on a change.
                   (lib.optionalAttrs langfuse {
-                    clan.core.vars.generators.langfuse = lib.mkMerge [
+                    vanixiets.secrets.langfuse = lib.mkMerge [
                       (langfuseGenerator pkgs)
                       {
                         files.public-key.restartUnits = [ "${agentSessionUnit}.service" ];
@@ -274,6 +275,7 @@ in
               {
                 imports = [
                   darwinModules.ntfy-alerter
+                  darwinModules.secrets
                 ]
                 ++ lib.optional collect darwinModules.otel-collector-agent;
 
@@ -299,7 +301,7 @@ in
                       description = "OpenTelemetry collector agent";
                     };
 
-                    clan.core.vars.generators = lib.mkMerge [
+                    vanixiets.secrets = lib.mkMerge [
                       (otelGenerators { inherit lib pkgs; })
                       {
                         otel-cert.files."key.pem" =
@@ -350,7 +352,7 @@ in
                   # password_file; no restartUnits on darwin, the daemon's
                   # LANGFUSE_VAR_SHA256 reloads it instead.
                   (lib.optionalAttrs langfuse {
-                    clan.core.vars.generators.langfuse = lib.mkMerge [
+                    vanixiets.secrets.langfuse = lib.mkMerge [
                       (langfuseGenerator pkgs)
                       {
                         files = lib.genAttrs [ "public-key" "secret-key" ] (_: {
@@ -376,9 +378,12 @@ in
             nixosModule =
               { config, lib, ... }:
               {
-                imports = [ nixosModules.otel-collector-ingress ];
+                imports = [
+                  nixosModules.otel-collector-ingress
+                  nixosModules.secrets
+                ];
                 systemd.services.opentelemetry-collector.serviceConfig.LoadCredential = [
-                  "collector-password:${config.clan.core.vars.generators.greptimedb-users.files.collector-password.path}"
+                  "collector-password:${config.vanixiets.secrets.greptimedb-users.files.collector-password.path}"
                 ];
                 # The hourly budget over the store, read as `regulator`
                 # (design D8); the envelope reads every host's notified units.
@@ -390,7 +395,7 @@ in
                 systemd.services.otel-envelope = {
                   after = [ "greptimedb.service" ];
                   serviceConfig.LoadCredential = [
-                    "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
+                    "regulator-password:${config.vanixiets.secrets.greptimedb-users.files.regulator-password.path}"
                   ];
                 };
                 # otlp/mesh, on the mesh interfaces only. magnetite's

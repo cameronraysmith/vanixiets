@@ -57,6 +57,16 @@ From them are generated the clan user instances' machine lists (`flake.lib.hosts
 A host gains a person's account by adding an attachment, never by writing `home-manager.users` or `hm-sops-bridge.users` in its body.
 Omnigent worker accounts are a separate relation, `flake.fleet.workers.<owner>` (`lib/fleet-workers.nix`), from which the omnigent inventory's host roles, `flake.lib.workerAccountsOn` and the fleet deployer's requesters are generated.
 
+## Secrets
+
+A module declares the secrets it owns and reads the ones it uses through one option, `vanixiets.secrets.<name>` on the NixOS and nix-darwin classes (`system/secrets.nix`), where `<name>` is the generator name: `vanixiets.secrets.<name> = { files.<f> = { owner = …; }; runtimeInputs = …; script = …; }` to declare, `config.vanixiets.secrets.<name>.files.<f>.path` (or `.value`, `.exists`, `.placeholder`) to read.
+The secrets module translates each entry into clan vars with only the fields a module set, so clan's defaults decide the rest, and reads clan's values back; `resolved` is the generator as clan evaluated it, for judges of custody.
+A generator that one of clan's own services declares, such as sshd's `openssh`, is read as a provided entry: `provided = true` and its files by name only.
+`nixos.base` and `darwin.base` import the secrets module; a module also imports it itself when something evaluates it without the base aspect, as clan service modules and the modules runtime tests import directly do.
+Homes see a view of the host's secrets with a file their user owns, `config.vanixiets.secrets.<name>.files.<f>.{path,placeholder}`, set by `nixos/hm-sops-bridge.nix`; a standalone home sees `{ }`.
+Committed public values are read through `flake.lib.vars` (`lib/vars.nix`), and judges that need clan's whole generator tree read `flake.lib.secretsBackend.generatorsOf`.
+`checks.x86_64-linux.secrets-seam-confinement` fails when a module outside these two files names `clan.core.vars` or spells the committed `vars/` layout; its list holds the checks and runtime tests that must pin clan itself, each with its reason.
+
 ## Evaluators
 
 A host's memory decides its many-attribute evaluator, and nothing else does.

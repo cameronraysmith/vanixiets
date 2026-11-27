@@ -193,7 +193,7 @@ let
       isDarwin = config.flake.lib.hosts.${name}.class == "darwin";
       legacy = lib.elem name commitSigningLegacyMachines;
       users = config.flake.users;
-      generators = hostConfig.clan.core.vars.generators;
+      secrets = hostConfig.vanixiets.secrets;
       workers = lib.attrValues (hostConfig.services.omnigent-host.workers or { });
       signing = lib.filter (worker: worker.credentials.signingKey.enable) workers;
       homes = lib.filterAttrs (account: _: users ? ${account}) (hostConfig.home-manager.users or { });
@@ -201,7 +201,12 @@ let
         map (account: lib.nameValuePair (accountOf account) account) (lib.attrNames homes)
       );
       persons = lib.unique (lib.attrNames homeOwner ++ map (worker: accountOf worker.owner) workers);
-      generatorOf = person: generators.${commitSigningGenerator person} or null;
+      generatorOf =
+        person:
+        if secrets ? ${commitSigningGenerator person} then
+          secrets.${commitSigningGenerator person}.resolved
+        else
+          null;
       inherit (hostConfig.vanixiets.commitSigning) program;
       loginKeys = lib.concatMap (user: user.meta.sshKeys) (lib.attrValues users);
       keyPathOf =
@@ -209,7 +214,7 @@ let
         if legacy then
           homes.${account}.sops.secrets.ssh-signing-key.path or null
         else
-          (generatorOf (accountOf account)).files.key.path or null;
+          secrets.${commitSigningGenerator (accountOf account)}.files.key.path or null;
       cases = {
         signingKeyUnauthorized = unauthorized {
           inherit isDarwin hostConfig;
@@ -239,7 +244,10 @@ let
         if legacy then
           {
             legacyNoGenerator =
-              signing == [ ] && !lib.any (lib.hasSuffix "-commit-signing-key") (lib.attrNames generators);
+              signing == [ ]
+              && !lib.any (lib.hasSuffix "-commit-signing-key") (
+                lib.attrNames (config.flake.lib.secretsBackend.generatorsOf hostConfig)
+              );
             legacyUnenrolled = unenrolled name;
           }
         else
@@ -257,7 +265,7 @@ let
                 inherit (worker.credentials) expected;
                 ownerMeta = users.${worker.owner}.meta;
                 inherit loginKeys;
-                generator = generators.${worker.credentials.signingKey.generator};
+                generator = secrets.${worker.credentials.signingKey.generator}.resolved;
                 person = accountOf worker.owner;
               }
             ) signing;

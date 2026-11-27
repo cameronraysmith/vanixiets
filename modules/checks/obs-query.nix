@@ -14,7 +14,7 @@
 #
 # One system: the derivation runs a shell script and a Python stub, and no
 # input to it differs by platform.
-{ lib, ... }:
+{ self, lib, ... }:
 {
   perSystem =
     {
@@ -25,7 +25,9 @@
     }:
     let
       password = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"; # gitleaks:allow
-      passwordPath = "/run/secrets/vars/per-machine/magnetite/greptimedb-users/regulator-password";
+      # Evaluates magnetite's configuration to compare the app's hard-coded path with the path magnetite deploys.
+      passwordPath =
+        self.nixosConfigurations.magnetite.config.vanixiets.secrets.greptimedb-users.files.regulator-password.path;
 
       # Every character class a shell or a form encoding could damage: spaces,
       # `+`, `&`, `=`, `%`, both quotes, command substitution, backticks, `;`,

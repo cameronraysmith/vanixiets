@@ -1,10 +1,10 @@
-# The alerter's ntfy access token, a shared clan vars generator (design D17).
+# The alerter's ntfy access token, a shared `vanixiets.secrets` entry (design D17).
 #
 # Shared, so it is generated once and every machine that imports this module
 # deploys the same token (clan-core nixosModules/clanCore/vars/interface.nix:
 # 90-100); one definition serves the nixos and darwin module classes, because
 # two copies of a shared script can drift. Every fleet-* publisher reads the token by path,
-# config.clan.core.vars.generators.ntfy-alerter.files.token.path, through
+# config.vanixiets.secrets.ntfy-alerter.files.token.path, through
 # LoadCredential or NTFY_TOKEN_FILE, never on a command line.
 #
 # The ntfy server's provisioning file is a separate per-machine generator,
@@ -20,7 +20,7 @@ let
     {
       # `ntfy token generate` prints tk_ plus 29 characters (ntfy 2.28.0
       # cmd/token.go:224-227); printf '%s' writes it without a newline.
-      clan.core.vars.generators.ntfy-alerter = {
+      vanixiets.secrets.ntfy-alerter = {
         share = true;
         files.token.mode = "0400";
         runtimeInputs = [ pkgs.ntfy-sh ];

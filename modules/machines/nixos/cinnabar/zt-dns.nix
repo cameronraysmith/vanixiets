@@ -56,6 +56,11 @@ in
       ...
     }:
     {
+      vanixiets.secrets."zerotier-network-zerotier" = {
+        provided = true;
+        files.network-id = { };
+      };
+
       services.dnsmasq = {
         enable = true;
         resolveLocalQueries = false;
@@ -96,7 +101,7 @@ in
         # pin-controller-ipv4 so the IPv4 pool exists before the member pin.
         "+${pkgs.writeShellScript "push-controller-network-config" ''
           while ! ${pkgs.netcat}/bin/nc -z localhost 9993; do sleep 0.1; done
-          NETWORK_ID="${config.clan.core.vars.generators."zerotier-network-zerotier".files.network-id.value}"
+          NETWORK_ID="${config.vanixiets.secrets."zerotier-network-zerotier".files.network-id.value}"
           AUTH=$(cat /var/lib/zerotier-one/authtoken.secret)
           ${pkgs.curl}/bin/curl -sf \
             -X POST \
@@ -118,7 +123,7 @@ in
             > /dev/null
         ''}"
         "+${pkgs.writeShellScript "pin-controller-ipv4" ''
-          NETWORK_ID="${config.clan.core.vars.generators."zerotier-network-zerotier".files.network-id.value}"
+          NETWORK_ID="${config.vanixiets.secrets."zerotier-network-zerotier".files.network-id.value}"
           MEMBER_ID=$(${pkgs.zerotierone}/bin/zerotier-cli info | ${pkgs.gawk}/bin/awk '{print $3}')
           AUTH=$(cat /var/lib/zerotier-one/authtoken.secret)
           IPV6="${ztAddress}"

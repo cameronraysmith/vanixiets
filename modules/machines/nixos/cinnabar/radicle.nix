@@ -3,8 +3,8 @@
   flake.modules.nixos.radicle-node =
     { config, pkgs, ... }:
     {
-      # Clan vars key generator for radicle node identity
-      clan.core.vars.generators.radicle = {
+      # Key for radicle node identity
+      vanixiets.secrets.radicle = {
         files.ssh-private-key = {
           owner = "radicle";
           neededFor = "services";
@@ -24,8 +24,8 @@
       # Radicle seed node
       services.radicle = {
         enable = true;
-        privateKey = config.clan.core.vars.generators.radicle.files.ssh-private-key.path;
-        publicKey = config.clan.core.vars.generators.radicle.files.ssh-public-key.path;
+        privateKey = config.vanixiets.secrets.radicle.files.ssh-private-key.path;
+        publicKey = config.vanixiets.secrets.radicle.files.ssh-public-key.path;
 
         node = {
           listenAddress = "[::]";

@@ -1,10 +1,10 @@
 # How this fleet runs the fleet alert evaluator (flake.modules.nixos.fleet-alert,
-# which stays free of clan vars so the runtime tests can import it with their
+# which stays free of `vanixiets.secrets` so the runtime tests can import it with their
 # own credentials): its ntfy token and its store password come from the
-# ntfy-alerter and greptimedb-users generators, read through
-# config.clan.core.vars.generators without importing the aspects that define
+# ntfy-alerter and greptimedb-users entries, read through
+# config.vanixiets.secrets without importing the aspects that declare
 # them, so a host that imports this one without them fails evaluation naming
-# the missing generator.
+# the missing secret.
 {
   flake.modules.nixos.fleet-alert-server =
     { config, ... }:
@@ -16,9 +16,8 @@
       # cinnabar holds the server's ntfy-alerter-env.
       services.fleet-alert.evaluator = {
         enable = true;
-        tokenFile = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
-        regulatorPasswordFile =
-          config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path;
+        tokenFile = config.vanixiets.secrets.ntfy-alerter.files.token.path;
+        regulatorPasswordFile = config.vanixiets.secrets.greptimedb-users.files.regulator-password.path;
       };
     };
 }

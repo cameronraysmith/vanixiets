@@ -11,11 +11,21 @@
 # keep their own read primitive (readFile, fileContents, trim, hashFile,
 # readDir) and their path-or-string kind.
 #
-# Exempt, deliberately: the independent judge in
-# modules/checks/sops-correspondence.nix, the literal fixtures of
+# With modules/system/secrets.nix (a host's generators, through
+# `vanixiets.secrets`) this file is the secret seam. Outside the two, only
+# the files in the `expected` list of
+# modules/checks/secrets-seam-confinement.nix spell clan vars or the committed
+# layout, each for the reason given there.
+#
+# Exempt from the committed-layout clause, deliberately: the independent
+# judge in modules/checks/sops-correspondence.nix, the literal fixtures of
 # modules/checks/fleet-deployer-obligations.nix,
-# modules/home/ai/omnigent/credentials.nix (clan's rel_dir) and
-# modules/checks/langfuse-query.nix (encrypted files interpolated on purpose).
+# modules/home/ai/omnigent/credentials.nix (it builds the committed
+# ciphertext's path from the backend's rel_dir on purpose, to check what
+# sops-nix installs) and modules/checks/langfuse-query.nix (encrypted files
+# interpolated on purpose). modules/checks/commit-signing-key.nix spells a
+# delivered key path (/run/secrets/vars/shared/…) in a fixture home, not the
+# committed layout.
 { lib, ... }:
 let
   relPath =

@@ -19,7 +19,7 @@
 #   name; the job prunes to 7 daily, 4 weekly and 6 monthly copies and reads
 #   back a tenth of the repository each night. `restic-omnigraph` is the
 #   job's wrapper for listing and restoring.
-# - The key and the repository password are clan vars generators
+# - The key and the repository password are the `vanixiets.secrets` entries
 #   omnigraph-backup-r2 (prompted, hidden) and omnigraph-backup-restic
 #   (generated). Never regenerate omnigraph-backup-restic: the repository is
 #   readable only with the password it was created under.
@@ -68,7 +68,6 @@ let
   module =
     {
       config,
-      options,
       pkgs,
       ...
     }:
@@ -78,7 +77,7 @@ let
       directory = config.vanixiets.nodeExporter.textfileDirectory;
       record = "${metricsDirectory}/backup.prom";
       published = "${directory}/${writer}.prom";
-      gens = config.clan.core.vars.generators;
+      gens = config.vanixiets.secrets;
       zfs = "${config.boot.zfs.package}/bin/zfs";
       localRoot = localRootOf config.services.omnigraph.storageUri;
       notified = config.services.observability-notify.units or [ ];
@@ -111,9 +110,13 @@ let
         "${lib.getExe job.package}${lib.concatMapStrings (option: " -o ${option}") job.extraOptions}";
     in
     {
-      # Declares the vanixiets.nodeExporter options set below, which the
-      # module system requires even while the backup is off.
-      imports = [ modules.nixos.node-exporter-textfile ];
+      # Declares the vanixiets.nodeExporter options set below and
+      # vanixiets.secrets, which the module system requires even while the
+      # backup is off and on hosts without the NixOS base.
+      imports = [
+        modules.nixos.node-exporter-textfile
+        modules.nixos.secrets
+      ];
 
       options.vanixiets.omnigraphBackup.enable = lib.mkOption {
         type = lib.types.bool;
@@ -239,8 +242,8 @@ let
               environmentFile = lib.mkDefault gens.${generators.r2}.files.env.path;
             };
           }
-          (lib.optionalAttrs (options ? clan.core.vars) {
-            clan.core.vars.generators.${generators.r2} = {
+          {
+            vanixiets.secrets.${generators.r2} = {
               prompts.access-key = {
                 description = ''
                   Cloudflare R2 S3 access key ID of an Account API token with
@@ -274,7 +277,7 @@ let
               '';
             };
 
-            clan.core.vars.generators.${generators.restic} = {
+            vanixiets.secrets.${generators.restic} = {
               files.password = { };
               runtimeInputs = [
                 pkgs.openssl
@@ -284,7 +287,7 @@ let
                 openssl rand -base64 32 | tr -d '\n' > "$out/password"
               '';
             };
-          })
+          }
         ]
       );
     };

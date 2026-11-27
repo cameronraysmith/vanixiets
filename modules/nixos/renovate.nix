@@ -56,7 +56,7 @@ in
     }:
     let
       cfg = config.services.renovate;
-      gen = config.clan.core.vars.generators;
+      gen = config.vanixiets.secrets;
       # GitHub App vanixiets-renovate and its installation on
       # cameronraysmith/vanixiets. Identifiers, not secrets.
       appId = 5795103;
@@ -80,7 +80,7 @@ in
       packageManagerBun = lib.removePrefix "bun@" (lib.importJSON ../../package.json).packageManager;
     in
     {
-      clan.core.vars.generators.renovate-github-app-secret-key = {
+      vanixiets.secrets.renovate-github-app-secret-key = {
         files."key.pem" = { };
         script = ''
           echo "renovate GitHub App private key: populate via clan vars set" >&2

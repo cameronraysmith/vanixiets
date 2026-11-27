@@ -17,17 +17,17 @@
 #
 # Password authentication and shared-secret user provisioning have been
 # removed. The legacy rail consisted of:
-#   - clan.core.vars.generators.synapse-registration-shared-secret
-#   - clan.core.vars.generators.matrix-password-<user> (per-user)
+#   - the synapse-registration-shared-secret generator
+#   - the matrix-password-<user> generators (per-user)
 #   - systemd.services.matrix-synapse-register-users (oneshot)
 #   - services.matrix-synapse.extraConfigFiles entry for the shared secret
 # These were retired in a single deploy together with
 # password_config.enabled = false. Admin recovery for SSO breakage now
 # goes via the synapse admin API
 # (POST /_synapse/admin/v1/reset_password/<user>) which does not depend
-# on the retired clan-vars secrets.
+# on the retired secrets.
 #
-# clan-vars generators are declared inline within this module per the
+# `vanixiets.secrets` entries are declared inline within this module per the
 # gitea.nix four-part dendritic pattern. The coturn
 # generator binds owner to the static service user; the LiveKit
 # keyfile generator omits owner because both LiveKit and lk-jwt-service
@@ -118,7 +118,7 @@
     in
     {
       ############################################################
-      # Part 1: clan-vars generators
+      # Part 1: secrets (`vanixiets.secrets`)
       ############################################################
 
       # LiveKit and lk-jwt-service share this keyfile. Both upstream
@@ -126,7 +126,7 @@
       # LoadCredential into /run/credentials/<unit>/livekit-secrets, so
       # the generator MUST NOT set owner (the dynamic UID does not exist
       # at generator-run time).
-      clan.core.vars.generators.livekit-keyfile = {
+      vanixiets.secrets.livekit-keyfile = {
         files."keyfile" = {
           neededFor = "services";
         };
@@ -144,7 +144,7 @@
 
       # coturn static-auth-secret (TURN REST auth model). coturn runs as
       # the static `turnserver` user so the generator binds owner=turnserver.
-      clan.core.vars.generators.coturn-static-auth-secret = {
+      vanixiets.secrets.coturn-static-auth-secret = {
         files."secret" = {
           neededFor = "services";
           owner = "turnserver";
@@ -214,7 +214,7 @@
           # via the kanidm IdP; password rotation and the shared-secret
           # registration oneshot have been retired. Admin recovery for SSO
           # breakage goes via POST /_synapse/admin/v1/reset_password/<user>,
-          # which does not depend on the retired clan-vars secrets.
+          # which does not depend on the retired secrets.
           password_config = {
             enabled = false;
             # Policy block is retained for defense-in-depth: if a future
@@ -280,8 +280,8 @@
           # OIDC provider wiring — kanidm IdP.
           #
           # The client_secret_path consumes a credential populated by
-          # LoadCredential below from the kanidm-oauth2-synapse clan-vars
-          # generator declared in modules/nixos/kanidm.nix.
+          # LoadCredential below from the kanidm-oauth2-synapse entry of
+          # `vanixiets.secrets` declared in modules/nixos/kanidm.nix.
           #
           # `issuer` is the per-client OIDC discovery URL
           # (https://accounts.../oauth2/openid/<clientId>), NOT the kanidm root.
@@ -329,7 +329,7 @@
       # at unit-start into /run/credentials/matrix-synapse.service/oidc-secret,
       # matching the `client_secret_path` set in oidc_providers above.
       #
-      # The source clan-vars generator (modules/nixos/kanidm.nix) declares
+      # The source `vanixiets.secrets` entry (modules/nixos/kanidm.nix) declares
       # `restartUnits = [ "matrix-synapse.service" ]` so secret rotations
       # automatically trigger a unit restart, defeating the LoadCredential
       # snapshot-staleness invariant (memory reference:
@@ -342,7 +342,7 @@
       # lines 97-103, adapted to the magnetite hostname.
       systemd.services.matrix-synapse = {
         serviceConfig.LoadCredential = [
-          "oidc-secret:${config.clan.core.vars.generators.kanidm-oauth2-synapse.files."secret".path}"
+          "oidc-secret:${config.vanixiets.secrets.kanidm-oauth2-synapse.files."secret".path}"
         ];
         preStart = ''
           while ! ${lib.getExe pkgs.curl} -sL -o/dev/null --fail https://accounts.scientistexperience.net; do
@@ -378,7 +378,7 @@
       services.livekit = {
         enable = true;
         # Same keyfile path as lk-jwt-service below.
-        keyFile = config.clan.core.vars.generators.livekit-keyfile.files."keyfile".path;
+        keyFile = config.vanixiets.secrets.livekit-keyfile.files."keyfile".path;
         # Opens TCP main port (7880 by default) and the UDP RTC range
         # (50000-51000 by default) in the firewall.
         openFirewall = true;
@@ -391,7 +391,7 @@
         # SAME path as services.livekit.keyFile above. The single key
         # pair is shared between the SFU and the JWT issuer; do not
         # generate two keys.
-        keyFile = config.clan.core.vars.generators.livekit-keyfile.files."keyfile".path;
+        keyFile = config.vanixiets.secrets.livekit-keyfile.files."keyfile".path;
       };
 
       # lk-jwt-service 0.9.0 refuses to start without this list, which it
@@ -409,8 +409,7 @@
       services.coturn = {
         enable = true;
         use-auth-secret = true;
-        static-auth-secret-file =
-          config.clan.core.vars.generators.coturn-static-auth-secret.files."secret".path;
+        static-auth-secret-file = config.vanixiets.secrets.coturn-static-auth-secret.files."secret".path;
         realm = domain;
 
         # Relay UDP range 49152-49999 to avoid colliding with LiveKit's

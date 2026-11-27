@@ -19,9 +19,10 @@
 # every argument that is one of the machine's sops secrets or templates
 # (flake.lib.launchdSecretPoll, which says why not wait4path).
 #
-# Identities are clan vars: one shared CA whose private key is never deployed,
-# and one certificate per machine with the machine name as CN and both serverAuth
-# and clientAuth, so a builder presents it as server and a dispatcher as client.
+# Identities are entries of `vanixiets.secrets`: one shared CA whose private
+# key is never deployed, and one certificate per machine with the machine name
+# as CN and both serverAuth and clientAuth, so a builder presents it as server
+# and a dispatcher as client.
 # Builder certificates carry the builder's ZeroTier address and its mesh
 # address from the registry as IP SANs, because dispatchers connect to a
 # literal address rather than through DNS, and name the machine under both
@@ -41,6 +42,10 @@
 { inputs, config, ... }:
 let
   inherit (config.flake.lib) hosts meshInterfaces launchdSecretPoll;
+  secretsModules = {
+    nixos = config.flake.modules.nixos.secrets;
+    darwin = config.flake.modules.darwin.secrets;
+  };
 in
 {
   flake.clan.modules.nix-builders =
@@ -49,7 +54,7 @@ in
       port = 50051;
       clientDir = "/run/nix-grpc-store";
 
-      # The plugin's default client file names, mapped to this machine's vars.
+      # The plugin's default client file names, mapped to this machine's secrets.
       clientFiles = vars: {
         "ca.crt" = vars.nix-grpc-ca.files."ca.crt".path;
         "client.crt" = vars.nix-grpc-cert.files."cert.pem".path;
@@ -66,7 +71,7 @@ in
             "d ${clientDir} 0755 root root - -"
           ]
           ++ lib.mapAttrsToList (name: target: "L+ ${clientDir}/${name} - - - - ${target}") (
-            clientFiles config.clan.core.vars.generators
+            clientFiles config.vanixiets.secrets
           );
         };
 
@@ -82,7 +87,7 @@ in
             + lib.concatStrings (
               lib.mapAttrsToList (name: target: ''
                 ln -sfn ${target} ${clientDir}/${name}
-              '') (clientFiles config.clan.core.vars.generators)
+              '') (clientFiles config.vanixiets.secrets)
             );
             serviceConfig.RunAtLoad = true;
           };
@@ -112,7 +117,7 @@ in
           );
         in
         {
-          clan.core.vars.generators = {
+          vanixiets.secrets = {
             # Shared: every machine of the instance trusts the same CA. The
             # private key stays in the repository's encrypted vars and signs
             # machine certificates at generation time only.
@@ -167,7 +172,7 @@ in
         { roles, machine }:
         { config, ... }:
         let
-          vars = config.clan.core.vars.generators;
+          vars = config.vanixiets.secrets;
         in
         {
           services.nix-grpc-daemon = {
@@ -336,12 +341,14 @@ in
         {
           nixosModule = {
             imports = [
+              secretsModules.nixos
               (identityModule { inherit machine instances; })
             ]
             ++ lib.optional dispatches clientIdentityNixos;
           };
           darwinModule = {
             imports = [
+              secretsModules.darwin
               (identityModule { inherit machine instances; })
             ]
             ++ lib.optional dispatches clientIdentityDarwin;
@@ -364,6 +371,7 @@ in
               {
                 imports = [
                   inputs.nix-grpc-store.nixosModules.server
+                  secretsModules.nixos
                   (mkBuilderModule { inherit roles machine; })
                 ];
                 # Socket activation binds the wildcard at boot, before the mesh
@@ -379,6 +387,7 @@ in
               {
                 imports = [
                   inputs.nix-grpc-store.darwinModules.default
+                  secretsModules.darwin
                   (mkBuilderModule { inherit roles machine; })
                 ];
                 services.nix-grpc-daemon = {

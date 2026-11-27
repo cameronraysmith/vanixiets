@@ -24,7 +24,7 @@
         if osConfig == null then
           null
         else
-          osConfig.clan.core.vars.generators.${commitSigningGenerator (accountOf username)} or null;
+          config.vanixiets.secrets.${commitSigningGenerator (accountOf username)} or null;
       key = config.vcs.signing.keyFile;
       program = lib.getExe (agentFreeSshKeygen pkgs);
       signers = "${config.xdg.configHome}/git/allowed_signers";
@@ -41,12 +41,13 @@
             null
           else
             generated.files.key.path;
-        defaultText = lib.literalExpression "osConfig.clan.core.vars.generators.<person>-commit-signing-key.files.key.path";
+        defaultText = lib.literalExpression "config.vanixiets.secrets.<person>-commit-signing-key.files.key.path";
         description = ''
           Private key file git and jj sign with: the machine's generated
           `<person>-commit-signing-key`, the login key file `ssh-signing-key` on
           a machine in `flake.lib.commitSigningLegacyMachines`, or null in a
-          standalone home, which then configures no signing.
+          standalone home, which then configures no signing. The default is
+          also null when the home's user does not own the key.
         '';
       };
 

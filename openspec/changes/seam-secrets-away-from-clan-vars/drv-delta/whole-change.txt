@@ -9,5 +9,5 @@
 checks.x86_64-linux.secrets-seam-confinement  added  # design D9
 checks.x86_64-linux.secrets-seam-translation  added  # design D11
 checks.x86_64-linux.fleet-alert  changed  # two testSizes.checks entries added in step 1
-# Resolved changed entries of steps 4, 8, 9, 11, 12 and, if documents under
-# packages/docs/ changed, step 13 are copied here before task 15.1 runs.
+# The measured entries of 02-13-move.txt (steps 2 to 13 as one commit):
+checks.x86_64-linux.eval-users-lib  changed  # home/users/lib.test.nix:26 imports home/users/lib.nix by store path, and its signingKey defaultText is rewritten (design D12)

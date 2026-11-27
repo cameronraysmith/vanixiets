@@ -64,10 +64,10 @@
           serverR2Settings = lib.filter (
             name: lib.hasPrefix "AWS_" name || name == "OMNIGRAPH_CLUSTER_LEASE_SECONDS"
           ) (lib.attrNames server.environment);
-          serverReadsR2Credential =
-            lib.elem hostConfig.clan.core.vars.generators.omnigraph-r2.files.env.path
-              (lib.toList (server.serviceConfig.EnvironmentFile or [ ]));
-          keepsR2Generator = hostConfig.clan.core.vars.generators ? omnigraph-r2;
+          serverReadsR2Credential = lib.elem hostConfig.vanixiets.secrets.omnigraph-r2.files.env.path (
+            lib.toList (server.serviceConfig.EnvironmentFile or [ ])
+          );
+          keepsR2Generator = hostConfig.vanixiets.secrets ? omnigraph-r2;
           backupEnabled = hostConfig.vanixiets.omnigraphBackup.enable;
           backupTextfileKept = lib.elem "${backup.writer}.prom" hostConfig.vanixiets.nodeExporter.textfiles;
           localRootUnitsNotified = lib.filter (unit: lib.elem unit units) backup.localRootUnits;

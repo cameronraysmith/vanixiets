@@ -153,7 +153,10 @@ in
         );
     in
     {
-      imports = [ flakeConfig.flake.modules.nixos.omnigent-worker-options ];
+      imports = [
+        flakeConfig.flake.modules.nixos.omnigent-worker-options
+        flakeConfig.flake.modules.nixos.secrets
+      ];
       options.services.omnigent-host = {
         enable = lib.mkEnableOption "the foreground Omnigent host";
         package = lib.mkPackageOption pkgs "omnigent" { };
@@ -460,11 +463,13 @@ in
             ) enabledWorkers)
           ];
         })
-        (lib.optionalAttrs (options ? clan.core.vars) (
+        (lib.mkIf (credentialDeliveries != { }) {
+          vanixiets.secrets = lib.mkMerge (
+            map (delivery: delivery.generators) (lib.attrValues credentialDeliveries)
+          );
+        })
+        (lib.optionalAttrs (options ? sops.templates) (
           lib.mkIf (credentialDeliveries != { }) {
-            clan.core.vars.generators = lib.mkMerge (
-              map (delivery: delivery.generators) (lib.attrValues credentialDeliveries)
-            );
             sops.templates = lib.mkMerge (
               map (delivery: delivery.templates) (lib.attrValues credentialDeliveries)
             );

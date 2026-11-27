@@ -8,8 +8,8 @@
 #
 # The obligation is a module assertion on every NixOS and darwin host, so the
 # nixos-<host> and darwin-<host> checks, which build each toplevel, fail on
-# it, and so does a deploy, before anything is activated. It reads the
-# evaluated generators and the committed vars tree, adding no evaluation.
+# it, and so does a deploy, before anything is activated. It reads the secret
+# backend's generator tree and the committed vars tree, adding no evaluation.
 # checks.x86_64-linux.shared-vars-obligations runs the judge over fixtures.
 # This lives beside the machine configurations rather than in
 # sops-correspondence, which judges the legacy sops tree's public keys and
@@ -39,15 +39,28 @@ let
     inherit missing;
     failures =
       name: hostConfig:
-      map (v: "${name} deploys shared secret ${v} but is not under vars/shared/${v}/machines") (missing {
-        generators = hostConfig.clan.core.vars.generators;
-        isRecipient =
-          gen: file:
-          self.lib.vars.isRecipient {
-            generator = gen;
-            inherit file;
-          } { machine = name; };
-      });
+      map
+        (
+          v:
+          let
+            parts = lib.splitString "/" v;
+          in
+          "${name} deploys shared secret ${v} but is not under ${
+            self.lib.vars.relPath {
+              generator = lib.head parts;
+              file = lib.concatStringsSep "/" (lib.tail parts);
+            }
+          }/machines"
+        )
+        (missing {
+          generators = self.lib.secretsBackend.generatorsOf hostConfig;
+          isRecipient =
+            gen: file:
+            self.lib.vars.isRecipient {
+              generator = gen;
+              inherit file;
+            } { machine = name; };
+        });
   };
 
   assertionsModule =

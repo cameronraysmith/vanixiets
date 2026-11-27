@@ -43,10 +43,10 @@
     let
       listen = "127.0.0.1:8092";
       domain = "mq.scientistexperience.net";
-      gen = config.clan.core.vars.generators;
+      gen = config.vanixiets.secrets;
     in
     {
-      clan.core.vars.generators.gitea-mq-github-app-secret-key = {
+      vanixiets.secrets.gitea-mq-github-app-secret-key = {
         files."key.pem".restartUnits = [ "gitea-mq.service" ];
         script = ''
           echo "gitea-mq GitHub App private key: populate via clan vars set" >&2
@@ -54,7 +54,7 @@
         '';
       };
 
-      clan.core.vars.generators.gitea-mq-github-webhook-secret = {
+      vanixiets.secrets.gitea-mq-github-webhook-secret = {
         files."secret".restartUnits = [ "gitea-mq.service" ];
         runtimeInputs = [ pkgs.openssl ];
         script = ''

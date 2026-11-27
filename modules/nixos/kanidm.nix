@@ -13,7 +13,7 @@
 # for rotation either way. Hostname is a literal FQDN; the package is the 1.12
 # release with secret provisioning.
 #
-# Clan-vars secret generators (admin-password, idm-admin-password, oauth2-synapse)
+# `vanixiets.secrets` entries (admin-password, idm-admin-password, oauth2-synapse)
 # declared inline below; admin passwords are wired into
 # services.kanidm.provision.{admin,idmAdmin}PasswordFile, and the oauth2 secret
 # is bound to services.kanidm.provision.systems.oauth2.synapse.basicSecretFile.
@@ -55,7 +55,7 @@ in
       # at deploy time rather than waiting for the next reboot. Without this,
       # `clan machines update magnetite` would leave the new password on disk
       # while the running kanidm still has the old password in its database.
-      clan.core.vars.generators.kanidm-admin-password = {
+      vanixiets.secrets.kanidm-admin-password = {
         files."password" = {
           secret = true;
           owner = "kanidm";
@@ -74,7 +74,7 @@ in
       # account used by kanidm-provision (kanidm.service ExecStartPost) for
       # declarative entity management (oauth2 systems, groups). restartUnits
       # ensures rotation re-runs provision against the new credential.
-      clan.core.vars.generators.kanidm-idm-admin-password = {
+      vanixiets.secrets.kanidm-idm-admin-password = {
         files."password" = {
           secret = true;
           owner = "kanidm";
@@ -103,7 +103,7 @@ in
       # secret reaches matrix-synapse but kanidm's database still holds the old
       # secret, breaking OAuth2 token exchange with invalid_client. (memory:
       # reference_loadcredential-snapshot-staleness).
-      clan.core.vars.generators.kanidm-oauth2-synapse = {
+      vanixiets.secrets.kanidm-oauth2-synapse = {
         files."secret" = {
           secret = true;
           owner = "kanidm";
@@ -120,7 +120,7 @@ in
         '';
       };
 
-      clan.core.vars.generators.kanidm-oauth2-omnigent = {
+      vanixiets.secrets.kanidm-oauth2-omnigent = {
         files = {
           secret = {
             secret = true;
@@ -154,7 +154,7 @@ in
       # The Perses client secret, read by Kanidm's provisioning and loaded by
       # perses.service as the credential kanidm-client-secret; written
       # without a newline so both read the same value.
-      clan.core.vars.generators.kanidm-oauth2-perses = {
+      vanixiets.secrets.kanidm-oauth2-perses = {
         files.secret = {
           secret = true;
           owner = "kanidm";
@@ -220,10 +220,9 @@ in
           # account is migrated.
           autoRemove = false;
 
-          # Admin / idm_admin passwords from clan-vars generators above.
-          adminPasswordFile = config.clan.core.vars.generators.kanidm-admin-password.files."password".path;
-          idmAdminPasswordFile =
-            config.clan.core.vars.generators.kanidm-idm-admin-password.files."password".path;
+          # Admin / idm_admin passwords from the `vanixiets.secrets` entries above.
+          adminPasswordFile = config.vanixiets.secrets.kanidm-admin-password.files."password".path;
+          idmAdminPasswordFile = config.vanixiets.secrets.kanidm-idm-admin-password.files."password".path;
 
           groups = {
             # Group declared as a stub (members = [ ]) so it exists in entitiesByName for
@@ -277,7 +276,7 @@ in
               "profile"
               "email"
             ];
-            basicSecretFile = config.clan.core.vars.generators.kanidm-oauth2-synapse.files."secret".path;
+            basicSecretFile = config.vanixiets.secrets.kanidm-oauth2-synapse.files."secret".path;
           };
 
           systems.oauth2.omnigent = {
@@ -297,7 +296,7 @@ in
               "profile"
               "email"
             ];
-            basicSecretFile = config.clan.core.vars.generators.kanidm-oauth2-omnigent.files.secret.path;
+            basicSecretFile = config.vanixiets.secrets.kanidm-oauth2-omnigent.files.secret.path;
           };
 
           # The scope map is the group gate: Kanidm refuses an authorization
@@ -318,7 +317,7 @@ in
               "profile"
               "email"
             ];
-            basicSecretFile = config.clan.core.vars.generators.kanidm-oauth2-perses.files.secret.path;
+            basicSecretFile = config.vanixiets.secrets.kanidm-oauth2-perses.files.secret.path;
           };
         };
       };
@@ -364,7 +363,7 @@ in
           Type = "oneshot";
           RemainAfterExit = true;
           LoadCredential = "admin-password:${
-            config.clan.core.vars.generators.kanidm-admin-password.files."password".path
+            config.vanixiets.secrets.kanidm-admin-password.files."password".path
           }";
           RuntimeDirectory = "kanidm-site-branding";
           RuntimeDirectoryMode = "0700";

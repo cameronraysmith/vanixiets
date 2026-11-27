@@ -26,7 +26,7 @@ Moving a feature's secrets behind the secret seam SHALL leave every delivered se
 #### Scenario: A recipe is changed while moving
 
 - **WHEN** a delivery step changes a secret's recipe while moving it
-- **THEN** the configuration of every host that installs that secret differs, and the step is not accepted
+- **THEN** the comparison of every host's secret declarations (each secret's recipe, custody and location, as the secret backend evaluates them) differs for every host that installs that secret, and the step is not accepted; the comparison of host configurations alone does not show it, because a secret's recipe is not part of any host's system
 
 ### Requirement: A home configuration receives its secrets without reading the host's secret backend
 

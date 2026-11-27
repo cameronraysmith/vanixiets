@@ -1,6 +1,6 @@
 # Gitea self-hosted git forge for magnetite
 #
-# Provides clan vars generators for Gitea credentials and configures
+# Declares `vanixiets.secrets` entries for Gitea credentials and configures
 # the Gitea service with GitHub OAuth2 authentication, PostgreSQL database,
 # and nginx reverse proxy.
 # Generators define the credential slots; values are populated via:
@@ -24,7 +24,7 @@ in
     }:
     {
       # GitHub OAuth credentials (populated manually via clan vars set)
-      clan.core.vars.generators.gitea-github-oauth = {
+      vanixiets.secrets.gitea-github-oauth = {
         files."client-id" = {
           owner = "gitea";
         };
@@ -38,7 +38,7 @@ in
       };
 
       # Admin account password (auto-generated, used for initial account creation)
-      clan.core.vars.generators.gitea-admin-password = {
+      vanixiets.secrets.gitea-admin-password = {
         files."password" = {
           owner = "gitea";
         };
@@ -122,9 +122,9 @@ in
       systemd.services.gitea.serviceConfig.ExecStartPost =
         let
           exe = lib.getExe config.services.gitea.package;
-          clientIdFile = config.clan.core.vars.generators.gitea-github-oauth.files."client-id".path;
-          clientSecretFile = config.clan.core.vars.generators.gitea-github-oauth.files."client-secret".path;
-          adminPasswordFile = config.clan.core.vars.generators.gitea-admin-password.files."password".path;
+          clientIdFile = config.vanixiets.secrets.gitea-github-oauth.files."client-id".path;
+          clientSecretFile = config.vanixiets.secrets.gitea-github-oauth.files."client-secret".path;
+          adminPasswordFile = config.vanixiets.secrets.gitea-admin-password.files."password".path;
         in
         lib.mkAfter [
           (pkgs.writeShellScript "gitea-setup" ''

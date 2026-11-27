@@ -26,7 +26,8 @@
         + (if c == "A" then "B" else "A")
         + lib.substring (i + 1) (lib.stringLength pinned) pinned;
       withKey = value: {
-        clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub" = { inherit value; };
+        clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub" = { };
+        vanixiets.secrets.openssh.files."ssh.id_ed25519.pub" = { inherit value; };
       };
       cases = {
         accepted = {
@@ -48,6 +49,14 @@
           name = "not-a-fleet-host";
           hostConfig = withKey oneOff;
           problems = 0;
+        };
+        noPublicFile = {
+          name = "cinnabar";
+          hostConfig = {
+            clan.core.vars.generators.openssh.files = { };
+            vanixiets.secrets.openssh.files."ssh.id_ed25519.pub" = { };
+          };
+          problems = 1;
         };
         noOpensshGenerator = {
           name = "cinnabar";
