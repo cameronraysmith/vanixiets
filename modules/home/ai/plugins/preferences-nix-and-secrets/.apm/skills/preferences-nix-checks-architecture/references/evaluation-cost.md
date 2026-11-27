@@ -12,6 +12,11 @@ Every recorded figure names the evaluator and its version, the host and its memo
 Find the evaluator from the binary the command resolves to (`command -v`, then `readlink -f`) rather than from its name.
 A comparison with a historical figure uses the evaluator that produced that figure; a change of evaluator starts a new baseline.
 
+Choose where to measure before measuring.
+magnetite runs CI, the binary cache, telemetry and OmniGraph, so no evaluation-cost measurement is made there; make it on a host whose evaluator bound leaves headroom for it, inside a scope whose memory is limited, so that a measurement that grows past its estimate is stopped rather than taking the host's services with it.
+On a NixOS host, run a many-attribute evaluation, nix-eval-jobs or iets over a check set or a host set, only as the `nix-eval-jobs` or `nix-eval-jobs-stock` that the host's PATH resolves to: those names take the host evaluation lock and queue behind nixbot, while an evaluator called by its store path, or one built from a flake, takes no lock and runs beside nixbot's evaluation.
+A many-attribute evaluation needs 14 to 18 GiB on magnetite, whose 30 GiB do not hold two, and on 2026-11-27 such a pair reset it.
+
 ## Cost of one attribute
 
 Evaluate the attribute's `drvPath` with the evaluator's statistics enabled:
