@@ -503,8 +503,8 @@
           '';
 
       # disko declares the dataset for installation only; the boot oneshots
-      # enforce greptimedbDataset on the live host. The clause keeps the two
-      # from drifting apart.
+      # enforce flake.lib.zfsBootInvariants' table on the live host. The clause
+      # keeps the two from drifting apart.
       oneshotCommand = unit: magnetite.systemd.services.${unit}.serviceConfig.ExecStart;
 
       view = {

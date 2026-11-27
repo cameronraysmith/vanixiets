@@ -73,13 +73,13 @@
 
 ## Task 5: Commit 4, server aspects and the ZFS table (tasks.md 5.1-5.6)
 
-- [ ] **Step 1:** Run Task 0 again at the rebased parent.
-- [ ] **Step 2:** Create the four `modules/nixos/<svc>-server.nix` (announce); move each block from magnetite's body; for every list the body still also extends (`LoadCredential`, `assertions`, firewall ports), check its order by evaluation against the baseline and add `lib.mkAfter` where the body's definition was last.
-- [ ] **Step 3:** Evaluate the 5.1 projections; equal in order.
-- [ ] **Step 4:** Create `modules/lib/zfs-boot-invariants.nix` (announce) with the fourteen entries copied from magnetite's units at the rebased parent; replace the units with the generator; point `greptimedbDataset` and the envelope variables at the table; in `lib/observability-hosts.nix` replace the fourteen literal `zfs-*` names with the table's, sorted into the list inside `onlyWithLocalRoot`.
-- [ ] **Step 5:** For each unit, `nix eval --raw .#nixosConfigurations.magnetite.config.systemd.units."<unit>.service".unit.drvPath` against the baseline; evaluate `flake.lib.observabilityHosts.magnetite`; evaluate the `r2` override's units.
-- [ ] **Step 6:** `nix build .#checks.x86_64-linux.{greptimedb-envelope,omnigraph-retired-roots,otel-collector-config,nixos-magnetite}`; run the `17G` mutant in the throwaway tree.
-- [ ] **Step 7:** `drv-delta-4.txt` (header only); return the drv-diff command.
+- [x] **Step 1:** Run Task 0 again at the rebased parent. (magnetite's body and `observability-hosts.nix` re-read at main `4c90592e`; the working copy equalled main for both.)
+- [x] **Step 2:** Create the four `modules/nixos/<svc>-server.nix` (announce); move each block from magnetite's body; for every list the body still also extends (`LoadCredential`, `assertions`, firewall ports), check its order by evaluation against the baseline and add `lib.mkAfter` where the body's definition was last. (No `mkAfter` needed: magnetite's toplevel unchanged after each move.)
+- [x] **Step 3:** Evaluate the 5.1 projections; equal in order.
+- [x] **Step 4:** Create `modules/lib/zfs-boot-invariants.nix` (announce) with the fourteen entries copied from magnetite's units at the rebased parent; replace the units with the generator; point `greptimedbDataset` and the envelope variables at the table; in `lib/observability-hosts.nix` replace the fourteen literal `zfs-*` names with the table's, sorted into the list inside `onlyWithLocalRoot`.
+- [x] **Step 5:** For each unit, `nix eval --raw .#nixosConfigurations.magnetite.config.systemd.units."<unit>.service".unit.drvPath` against the baseline; evaluate `flake.lib.observabilityHosts.magnetite`; evaluate the `r2` override's units.
+- [ ] **Step 6:** `nix build .#checks.x86_64-linux.{greptimedb-envelope,omnigraph-retired-roots,otel-collector-config,nixos-magnetite}`; run the `17G` mutant in the throwaway tree. (Mutant done; the four checks' drvPaths equal main's, not built.)
+- [x] **Step 7:** `drv-delta-magnetite-server-aspects.txt` (header only); return the drv-diff command.
 
 ## Task 6: Commit 5, flags deleted (tasks.md 6.1-6.6)
 

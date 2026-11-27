@@ -1,0 +1,21 @@
+# Declared drvPath differences of moving magnetite's service wiring into the
+# omnigraph-server, greptimedb-server, perses-server and fleet-alert-server
+# aspects and generating its ZFS boot oneshots (and its zfs-* notified units)
+# from flake.lib.zfsBootInvariants, from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-magnetite-server-aspects.txt
+# None. Measured against main 4c90592e (main plus only this commit's files):
+# all six NixOS and four darwin toplevels and all twenty homes identical;
+# magnetite's fourteen zfs-* unit derivations, the LoadCredential lists of
+# greptimedb, greptimedb-schema, greptimedb-envelope, devloop-reconcile,
+# perses, omnigraph-server and fleet-alert, services.omnigraph,
+# services.greptimedb, the fleet-alert evaluator, the per-file assertion
+# definitions in merge order, the generator names and
+# flake.lib.observabilityHosts.magnetite (committed store and "r2") equal, and
+# so do ten runtime tests importing the site-neutral modules (devloop-ingest,
+# devloop-ingest-reconcile, fleet-ingress, fleet-ingress-outage,
+# greptimedb-oom-order, greptimedb-pipeline, omnigraph-local-root,
+# omnigraph-seed, omnigraph-state-directory-transitions, perses-greptimedb)
+# and the 21 x86_64-linux checks that read magnetite.
+# No testSizes entry and no packages/docs file changes; checks that embed
+# the whole flake source or every .nix file under modules/ are covered by the
+# base allow-list (modules/apps/drv-diff-base-allow.txt).

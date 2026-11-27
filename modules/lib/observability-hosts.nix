@@ -77,44 +77,36 @@
     lib.mapAttrs (name: row: row // { platform = config.flake.fleet.hosts.${name}.class; }) {
       magnetite =
         agent (
-          onlyWithLocalRoot omnigraphStores.magnetite [
-            "cache-completeness"
-            "devloop-pg-grants"
-            "devloop-reconcile"
-            "fleet-alert"
-            "greptimedb"
-            "greptimedb-envelope"
-            "greptimedb-schema"
-            "otel-agent-session"
-            "otel-agent-session-envelope"
-            "omnigraph-backup-metric"
-            "omnigraph-server"
-            "perses"
-            "postgresql-dump-globals"
-            "postgresqlBackup-gitea"
-            "postgresqlBackup-gitea-mq"
-            "postgresqlBackup-matrix-synapse"
-            "postgresqlBackup-niks3"
-            "postgresqlBackup-nixbot"
-            "postgresqlBackup-omnigent"
-            "r2-usage"
-            "restic-backups-omnigraph"
-            "restic-backups-postgresql"
-            "zfs-assert-root-docker-noautosnap"
-            "zfs-assert-root-greptimedb-noautosnap"
-            "zfs-assert-root-nix-noautosnap"
-            "zfs-assert-root-podman-noautosnap"
-            "zfs-assert-root-postgresql-dumps-noautosnap"
-            "zfs-set-root-docker-quota"
-            "zfs-set-root-greptimedb-quota"
-            "zfs-set-root-greptimedb-reservation"
-            "zfs-set-root-home-noreservation"
-            "zfs-set-root-nix-quota"
-            "zfs-set-root-nixos-reservation"
-            "zfs-set-root-omnigraph-quota"
-            "zfs-set-root-podman-quota"
-            "zfs-set-root-postgresql-dumps-quota"
-          ]
+          onlyWithLocalRoot omnigraphStores.magnetite (
+            [
+              "cache-completeness"
+              "devloop-pg-grants"
+              "devloop-reconcile"
+              "fleet-alert"
+              "greptimedb"
+              "greptimedb-envelope"
+              "greptimedb-schema"
+              "otel-agent-session"
+              "otel-agent-session-envelope"
+              "omnigraph-backup-metric"
+              "omnigraph-server"
+              "perses"
+              "postgresql-dump-globals"
+              "postgresqlBackup-gitea"
+              "postgresqlBackup-gitea-mq"
+              "postgresqlBackup-matrix-synapse"
+              "postgresqlBackup-niks3"
+              "postgresqlBackup-nixbot"
+              "postgresqlBackup-omnigent"
+              "r2-usage"
+              "restic-backups-omnigraph"
+              "restic-backups-postgresql"
+            ]
+            # The boot oneshots of magnetite's ZFS invariants, sorted.
+            ++ lib.sort lib.lessThan (
+              map (invariant: invariant.unit) config.flake.lib.zfsBootInvariants.magnetite
+            )
+          )
         )
         // {
           alwaysOn = true;

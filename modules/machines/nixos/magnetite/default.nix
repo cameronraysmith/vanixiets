@@ -7,10 +7,8 @@ let
   flakeModules = config.flake.modules.nixos;
   inherit (config.flake.lib) workerAccountsOn;
   inherit (config.flake.lib.hosts) magnetite;
-  inherit (config.flake.lib) fleet;
   inherit (config.flake.lib) meshInterfaces;
-  collectorSchema = config.flake.lib.otelCollectorSchema;
-  omnigraphRoots = config.flake.lib.omnigraphClusterRoots;
+  inherit (config.flake.lib) zfsBootInvariants;
 in
 {
   flake.modules.nixos."machines/nixos/magnetite" =
@@ -21,45 +19,9 @@ in
       ...
     }:
     let
-      # The telemetry store's dataset (ADR-007 E7.3; design D5): one source for
-      # the boot oneshots below and for greptimedb-envelope's environment.
-      # disko.nix repeats the values as its install-time declaration, and
-      # checks.x86_64-linux.greptimedb-envelope asserts the two agree.
-      greptimedbDataset = {
-        name = "zroot/root/greptimedb";
-        mountpoint = "/var/lib/greptimedb";
-        quota = "16G";
-        reservation = "12G";
-      };
-
-      # The cookbooks of the pinned omnigraph-cookbooks (the top-level
-      # directories holding a schema.pg and a seed.jsonl), each served as the
-      # example graph `cookbook-<directory>`. Listed here rather than read
-      # from the package, which evaluation could only do by building the
-      # fetch first; checks.x86_64-linux.omnigraph-cookbook-seeds fails when
-      # the pinned package holds a cookbook this list lacks, or lacks one it
-      # names.
-      cookbooks = [
-        "agent-ops"
-        "beads"
-        "company-brain"
-        "dev-graph"
-        "hardware-program"
-        "health-record"
-        "industry-intel"
-        "pharma-intel"
-        "second-brain"
-        "vc-os"
-      ];
-      cookbookGraph = cookbook: "cookbook-${cookbook}";
-
       # Where magnetite's omnigraph root lives (vanixiets.omnigraphRootStore,
-      # declared below): "local" or "r2".
+      # declared by the omnigraph-server aspect): "local" or "r2".
       omnigraphRootStore = config.vanixiets.omnigraphRootStore;
-      omnigraphOnR2 = omnigraphRootStore == "r2";
-      # The account's R2 endpoint, shared by omnigraph's R2 root and the
-      # telemetry store's object storage.
-      r2Endpoint = "https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com";
     in
     {
       imports = [
@@ -102,35 +64,11 @@ in
         effects-vanixiets-secrets
         effects-ironstar-secrets
         shared-reference-tree
-      ])
-      ++ [
-        # An option rather than a `let` value, so that an extendModules
-        # override can evaluate magnetite on the other store
-        # (checks.x86_64-linux.omnigraph-retired-roots).
-        {
-          options.vanixiets.omnigraphRootStore = lib.mkOption {
-            type = lib.types.enum [
-              "local"
-              "r2"
-            ];
-            internal = true;
-            description = ''
-              Where magnetite's omnigraph root lives, under the same root
-              name either way (flake.lib.omnigraphClusterRoots.uriIn):
-              "local" serves it from /var/lib/omnigraph/clusters on this
-              host's disk, "r2" from the `sciexp` bucket with the R2
-              endpoint, region, credentials and cluster lease set. Its
-              value is flake.lib.omnigraphClusterRoots.stores.magnetite,
-              which magnetite's notified units follow too, so that setting
-              is the one to change. The `omnigraph-r2` generator, the
-              retired and rollback roots and their lifecycle rules stay
-              defined under both values, so switching back to "r2" serves
-              the bucket's root as it was left.
-            '';
-          };
-          config.vanixiets.omnigraphRootStore = omnigraphRoots.stores.magnetite;
-        }
-      ];
+        perses-server
+        fleet-alert-server
+        omnigraph-server
+        greptimedb-server
+      ]);
 
       services.shared-reference-tree = {
         enable = true;
@@ -218,155 +156,40 @@ in
         monthly = lib.mkForce 0;
       };
 
-      # Disko's `options."com.sun:auto-snapshot" = "false"` on reproducible-content
-      # datasets (root/nix, root/docker, root/podman; see disko.nix) is honored only
-      # at dataset CREATION time. For already-provisioned hosts, the property is not
-      # re-asserted by `nixos-rebuild switch` or `clan machines update`. These oneshots
-      # make the declared intent a runtime invariant by issuing `zfs set` at boot.
-      # `zfs set` is a no-op when the value already matches, so the units are
-      # idempotent and side-effect-free on repeat boots.
-      systemd.services.zfs-assert-root-nix-noautosnap = {
-        description = "Assert com.sun:auto-snapshot=false on zroot/root/nix";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/nix";
-        };
-      };
-
-      systemd.services.zfs-assert-root-docker-noautosnap = {
-        description = "Assert com.sun:auto-snapshot=false on zroot/root/docker";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/docker";
-        };
-      };
-
-      systemd.services.zfs-assert-root-podman-noautosnap = {
-        description = "Assert com.sun:auto-snapshot=false on zroot/root/podman";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/podman";
-        };
-      };
-
-      # Pool-starvation guardrails (2026-06-10 incident: /nix consumed the
-      # entire 304G pool and wedged every dataset). The quota caps /nix below
-      # pool capacity; the reservation guarantees / writable headroom even
-      # when /nix hits its quota. Mirrored create-time in disko.nix; these
-      # oneshots enforce the values on the already-provisioned host because
-      # disko options apply at dataset creation only.
-      systemd.services.zfs-set-root-nix-quota = {
-        description = "Assert quota=250G on zroot/root/nix";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set quota=250G zroot/root/nix";
-        };
-      };
-
-      # A reservation counts the dataset's own use, so it holds room for /
-      # only by its margin over that use, and / uses over 15G. / is the
-      # dataset whose exhaustion stops the host, and the other datasets'
-      # quotas sum to more than the pool, so only a reservation guarantees
-      # it room.
-      systemd.services.zfs-set-root-nixos-reservation = {
-        description = "Assert reservation=25G on zroot/root/nixos";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=25G zroot/root/nixos";
-        };
-      };
-
-      # /home has no reservation: a reservation guarantees a total that
-      # counts the dataset's own use, /home's use exceeded its former 4G, and
-      # nothing on the host stops when /home cannot grow. A property set on
-      # the installed pool stays until cleared, so this clears it.
-      systemd.services.zfs-set-root-home-noreservation = {
-        description = "Assert reservation=none on zroot/root/home";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=none zroot/root/home";
-        };
-      };
-
-      # The container engines' ZFS storage drivers create a child dataset per
-      # image layer and container under these datasets. The bound is quota,
-      # which counts descendants, not refquota, which would leave the layers
-      # unbounded, so an image or container runaway fills its 20G and not
-      # the pool.
-      systemd.services.zfs-set-root-docker-quota = {
-        description = "Assert quota=20G on zroot/root/docker";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set quota=20G zroot/root/docker";
-        };
-      };
-
-      systemd.services.zfs-set-root-podman-quota = {
-        description = "Assert quota=20G on zroot/root/podman";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set quota=20G zroot/root/podman";
-        };
-      };
-
-      # The telemetry store's disk envelope, enforced at boot because disko
-      # options apply at dataset creation only.
-      systemd.services.zfs-set-root-greptimedb-quota = {
-        description = "Assert quota=${greptimedbDataset.quota} on ${greptimedbDataset.name}";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set quota=${greptimedbDataset.quota} ${greptimedbDataset.name}";
-        };
-      };
-
-      systemd.services.zfs-set-root-greptimedb-reservation = {
-        description = "Assert reservation=${greptimedbDataset.reservation} on ${greptimedbDataset.name}";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set reservation=${greptimedbDataset.reservation} ${greptimedbDataset.name}";
-        };
-      };
-
-      systemd.services.zfs-assert-root-greptimedb-noautosnap = {
-        description = "Assert com.sun:auto-snapshot=false on ${greptimedbDataset.name}";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false ${greptimedbDataset.name}";
-        };
-      };
+      # The ZFS dataset properties magnetite enforces at boot, one oneshot per
+      # entry of flake.lib.zfsBootInvariants.magnetite
+      # (modules/lib/zfs-boot-invariants.nix). Disko's options (disko.nix) are
+      # honored only at dataset CREATION time and are not re-asserted on an
+      # already-provisioned host by `nixos-rebuild switch` or `clan machines
+      # update`; these oneshots make the declared values a runtime invariant
+      # by issuing `zfs set` at boot. `zfs set` is a no-op when the value
+      # already matches, so the units are idempotent and side-effect-free on
+      # repeat boots. An entry's `when` names the condition under which its
+      # dataset exists.
+      systemd.services =
+        let
+          enabled = {
+            postgresqlBackup = config.vanixiets.postgresqlBackup.enable;
+            omnigraphLocalRoot = omnigraphRootStore == "local";
+          };
+        in
+        lib.listToAttrs (
+          map (
+            invariant:
+            lib.nameValuePair invariant.unit (
+              lib.mkIf (invariant.when == null || enabled.${invariant.when}) {
+                description = "Assert ${invariant.property}=${invariant.value} on ${invariant.dataset}";
+                wantedBy = [ "multi-user.target" ];
+                after = [ "zfs-import.target" ];
+                serviceConfig = {
+                  Type = "oneshot";
+                  RemainAfterExit = true;
+                  ExecStart = "${pkgs.zfs}/bin/zfs set ${invariant.property}=${invariant.value} ${invariant.dataset}";
+                };
+              }
+            )
+          ) zfsBootInvariants.magnetite
+        );
 
       # Nightly PostgreSQL backups to R2 (back-up-postgresql-off-host design
       # D16), on with this host's postgresql-backup-r2 and
@@ -379,55 +202,12 @@ in
       # vars in the repository.
       vanixiets.r2Usage.enable = true;
 
-      # The PostgreSQL dumps' dataset (disko.nix, back-up-postgresql-off-host
-      # design D5), enforced at boot because disko options apply at dataset
-      # creation only; present only with the backup on, as is the dataset.
-      systemd.services.zfs-set-root-postgresql-dumps-quota =
-        lib.mkIf config.vanixiets.postgresqlBackup.enable
-          {
-            description = "Assert quota=16G on zroot/root/postgresql-dumps";
-            wantedBy = [ "multi-user.target" ];
-            after = [ "zfs-import.target" ];
-            serviceConfig = {
-              Type = "oneshot";
-              RemainAfterExit = true;
-              ExecStart = "${pkgs.zfs}/bin/zfs set quota=16G zroot/root/postgresql-dumps";
-            };
-          };
-
-      systemd.services.zfs-assert-root-postgresql-dumps-noautosnap =
-        lib.mkIf config.vanixiets.postgresqlBackup.enable
-          {
-            description = "Assert com.sun:auto-snapshot=false on zroot/root/postgresql-dumps";
-            wantedBy = [ "multi-user.target" ];
-            after = [ "zfs-import.target" ];
-            serviceConfig = {
-              Type = "oneshot";
-              RemainAfterExit = true;
-              ExecStart = "${pkgs.zfs}/bin/zfs set com.sun:auto-snapshot=false zroot/root/postgresql-dumps";
-            };
-          };
-
       # Nightly backups of the local omnigraph root to R2 (openspec change
       # serve-omnigraph-from-local-disk), with this host's
       # omnigraph-backup-r2 and omnigraph-backup-restic vars in the
       # repository and the dataset zroot/root/omnigraph created by hand; a
       # root in the bucket has no snapshot to back up.
       vanixiets.omnigraphBackup.enable = omnigraphRootStore == "local";
-
-      # The local omnigraph root's dataset (disko.nix), enforced at boot
-      # because disko options apply at dataset creation only; present only
-      # with the root on the local store, as is the dataset.
-      systemd.services.zfs-set-root-omnigraph-quota = lib.mkIf (omnigraphRootStore == "local") {
-        description = "Assert quota=20G on zroot/root/omnigraph";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "zfs-import.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "${pkgs.zfs}/bin/zfs set quota=20G zroot/root/omnigraph";
-        };
-      };
 
       # Raise nix daemon free-space thresholds for a build host. clan-core and
       # srvos both set 512 MiB / 3 GiB via mkDefault, which is undersized for
@@ -522,352 +302,6 @@ in
       # timeout) never enter the 1d window.
       systemd.tmpfiles.rules = [
         "d /nix/var/nix/builds 0755 root root 1d -"
-      ];
-
-      # Cloudflare R2 S3 credentials scoped to the sciexp bucket, delivered as an
-      # EnvironmentFile. object_store has no shared-credentials-file provider, so
-      # process environment variables are the only source omnigraph resolves.
-      clan.core.vars.generators.omnigraph-r2 = {
-        prompts.access-key = {
-          description = ''
-            Cloudflare R2 S3 access key ID with read and write scope on bucket
-            sciexp. Minted in the Cloudflare dashboard; distinct from the
-            niks3-s3 token, which is scoped to sciexp-nix-cache.
-          '';
-          type = "hidden";
-          persist = true;
-          display = {
-            group = "omnigraph";
-            label = "AWS_ACCESS_KEY_ID";
-          };
-        };
-
-        prompts.secret-key = {
-          description = "Cloudflare R2 S3 secret access key paired with the access key ID above.";
-          type = "hidden";
-          persist = true;
-          display = {
-            group = "omnigraph";
-            label = "AWS_SECRET_ACCESS_KEY";
-          };
-        };
-
-        files.access-key.deploy = false;
-        files.secret-key.deploy = false;
-
-        files."env" = {
-          restartUnits = [ "omnigraph-server.service" ];
-        };
-
-        script = ''
-          {
-            printf 'AWS_ACCESS_KEY_ID=%s\n' "$(cat "$prompts/access-key")"
-            printf 'AWS_SECRET_ACCESS_KEY=%s\n' "$(cat "$prompts/secret-key")"
-          } > "$out/env"
-        '';
-      };
-
-      clan.core.vars.generators.omnigraph-bearer-tokens = {
-        files."tokens.json" = {
-          restartUnits = [ "omnigraph-server.service" ];
-        };
-        runtimeInputs = [
-          pkgs.openssl
-          pkgs.jq
-        ];
-        script = ''
-          jq -n --arg token "$(openssl rand -hex 32)" '{admin: $token}' > "$out/tokens.json"
-        '';
-      };
-
-      # The seed actor's token, in a generator of its own: generating it
-      # leaves omnigraph-bearer-tokens, and so admin's token, as it is. The
-      # server adds it to the tokens file at start
-      # (services.omnigraph.cluster.graphs.<graph>.seed.tokenFile).
-      clan.core.vars.generators.omnigraph-seeder-token = {
-        files."token" = {
-          restartUnits = [ "omnigraph-server.service" ];
-        };
-        runtimeInputs = [ pkgs.openssl ];
-        script = ''
-          printf '%s' "$(openssl rand -hex 32)" > "$out/token"
-        '';
-      };
-
-      # The read-only `monitor` actor's token, in a generator of its own like
-      # the seeder's. omnigraph-probe reads each graph's snapshot as this
-      # actor, which the policies let list the graphs and read them, nothing
-      # more (services.omnigraph.extraBearerTokenFiles).
-      clan.core.vars.generators.omnigraph-monitor-token = {
-        files."token" = {
-          restartUnits = [ "omnigraph-server.service" ];
-        };
-        runtimeInputs = [ pkgs.openssl ];
-        script = ''
-          printf '%s' "$(openssl rand -hex 32)" > "$out/token"
-        '';
-      };
-
-      services.omnigraph = {
-        enable = true;
-
-        # Every cookbook of the pinned omnigraph-cookbooks as an example
-        # graph, on a root created by omnigraph 0.16 and initialized by the
-        # bootstrap unit. Its name records the storage format its graphs are
-        # created at (flake.lib.omnigraphClusterRoots.name), so it follows
-        # createdAtFormat; a fresh copy at the same format to replay the seeds
-        # takes a revision (`revision = 2;` names cookbooks-f17-r2). The
-        # previous root, dev-graph-v10, created by 0.15 at format 16 with one
-        # empty graph `dev`, stays intact as the way back
-        # (flake.lib.omnigraphClusterRoots.rollback). The root lives where
-        # vanixiets.omnigraphRootStore says, under the same name.
-        storageUri = omnigraphRoots.uriIn omnigraphRootStore (
-          omnigraphRoots.name {
-            family = "cookbooks";
-            inherit (config.services.omnigraph.cluster) createdAtFormat;
-          }
-        );
-        # omnigraph 0.16.0 writes storage format 17 (`omnigraph version
-        # --json`, internal_schema.writes). servesFloor is the lowest format
-        # the packaged omnigraph reads, and checks.omnigraph-format-window
-        # holds it to the binary.
-        cluster.createdAtFormat = 17;
-        cluster.servesFloor = 14;
-
-        s3 = lib.mkIf omnigraphOnR2 {
-          endpointUrl = r2Endpoint;
-          region = "auto";
-        };
-
-        # omnigraph-server takes one --bind, and cinnabar's TLS fronts reach
-        # it on both magnetite's ZeroTier and tincr addresses, so it binds the
-        # wildcard; 8090 is opened only on the mesh interfaces below and is
-        # absent from the global allowedTCPPorts, so the firewall keeps it off
-        # the public interface.
-        bindAddress = "::";
-        port = 8090;
-        requireAllGraphs = true;
-        # Clients reach /mcp through cinnabar's omnigraph TLS fronts, and the
-        # server refuses an MCP request whose Host it does not list.
-        extraFlags = [
-          "--mcp-allowed-host"
-          "omnigraph.zt"
-          "--mcp-allowed-host"
-          "omnigraph.${fleet.domain}"
-        ];
-
-        # omnigraph-server stops itself when two thirds of its cluster lock's
-        # lease pass without an acknowledged heartbeat to R2, and requests to
-        # the bucket stall for 8 to 20 s without an error. A 120 s lease
-        # tolerates about 39 s, where the default 30 s tolerates about 9 s; a
-        # successor then waits 180 s instead of 45 s to take over a crashed
-        # server's lock (OMNIGRAPH_CLUSTER_LEASE_SECONDS, omnigraph
-        # docs/user/operations/storage-failures.md).
-        extraEnvironment.OMNIGRAPH_CLUSTER_LEASE_SECONDS = lib.mkIf omnigraphOnR2 "120";
-
-        environmentFile =
-          lib.mkIf omnigraphOnR2
-            config.clan.core.vars.generators.omnigraph-r2.files."env".path;
-        bearerTokensFile =
-          config.clan.core.vars.generators.omnigraph-bearer-tokens.files."tokens.json".path;
-        extraBearerTokenFiles.monitor =
-          config.clan.core.vars.generators.omnigraph-monitor-token.files."token".path;
-
-        cluster = {
-          # One example graph per cookbook, seeded once when the bootstrap
-          # creates a new root, never on an existing one.
-          graphs = lib.listToAttrs (
-            map (
-              cookbook:
-              lib.nameValuePair (cookbookGraph cookbook) {
-                exampleDataOnly = true;
-                seed = {
-                  file = "${pkgs.omnigraph-cookbooks}/${cookbook}/seed.jsonl";
-                  actor = "seeder";
-                  tokenFile = config.clan.core.vars.generators.omnigraph-seeder-token.files."token".path;
-                };
-              }
-            ) cookbooks
-          );
-
-          settings = {
-            metadata.name = "cookbooks";
-            graphs = lib.listToAttrs (
-              map (
-                cookbook:
-                lib.nameValuePair (cookbookGraph cookbook) {
-                  schema = "cookbooks/${cookbook}/schema.pg";
-                  queries = "cookbooks/${cookbook}/queries/";
-                }
-              ) cookbooks
-            );
-            policies = {
-              examples = {
-                file = "policies/examples.policy.yaml";
-                applies_to = map cookbookGraph cookbooks;
-              };
-              server = {
-                file = "policies/server.policy.yaml";
-                applies_to = [ "cluster" ];
-              };
-            };
-          };
-
-          # Each graph's schema and stored queries come from the cookbooks
-          # commit pinned in pkgs/by-name/omnigraph-cookbooks/pin.json. A new
-          # commit changes the rendered configuration only; the cluster takes
-          # it when omnigraph-cluster-apply is run by hand.
-          extraFiles =
-            lib.listToAttrs (
-              lib.concatMap (cookbook: [
-                (lib.nameValuePair "cookbooks/${cookbook}/schema.pg" "${pkgs.omnigraph-cookbooks}/${cookbook}/schema.pg")
-                (lib.nameValuePair "cookbooks/${cookbook}/queries" "${pkgs.omnigraph-cookbooks}/${cookbook}/queries")
-              ]) cookbooks
-            )
-            // {
-              "policies/examples.policy.yaml" = ./omnigraph/examples.policy.yaml;
-              "policies/server.policy.yaml" = ./omnigraph/server.policy.yaml;
-            };
-
-          actor = "magnetite";
-        };
-      };
-
-      # Store accounts for GreptimeDB (ADR-007, ADR-008; design D6). Hex
-      # passwords, because a users line needs exactly one `=` and the store
-      # silently skips a malformed line (design F2); written with printf '%s'
-      # so no file carries a trailing newline into an HTTP basic-auth header.
-      # perses-password is loaded by perses.service, which restarts on its
-      # rotation. users-sha256 is public: the sha256 of 256-bit hex passwords
-      # is not reversible, and R7.4 compares it with
-      # /run/greptimedb/loaded-users.sha256.
-      clan.core.vars.generators.greptimedb-users = {
-        files.users = {
-          owner = "greptimedb";
-          mode = "0400";
-          restartUnits = [ "greptimedb.service" ];
-        };
-        files.admin-password.mode = "0400";
-        files.collector-password = {
-          mode = "0400";
-          restartUnits = [ "opentelemetry-collector.service" ];
-        };
-        files.perses-password = {
-          mode = "0400";
-          restartUnits = [ "perses.service" ];
-        };
-        files.regulator-password.mode = "0400";
-        files.users-sha256.secret = false;
-        runtimeInputs = [ pkgs.openssl ];
-        script = ''
-          admin="$(openssl rand -hex 32)"
-          collector="$(openssl rand -hex 32)"
-          perses="$(openssl rand -hex 32)"
-          regulator="$(openssl rand -hex 32)"
-          printf '%s' "$admin" > "$out/admin-password"
-          printf '%s' "$collector" > "$out/collector-password"
-          printf '%s' "$perses" > "$out/perses-password"
-          printf '%s' "$regulator" > "$out/regulator-password"
-          printf 'admin:rw=%s\ncollector:wo=%s\nperses:ro=%s\nregulator:ro=%s\n' \
-            "$admin" "$collector" "$perses" "$regulator" > "$out/users"
-          sha256sum "$out/users" | cut -d ' ' -f 1 > "$out/users-sha256"
-        '';
-      };
-
-      # Perses signs its session tokens with this key (design D8); 32 bytes,
-      # as Perses requires, and replaced only by regeneration, which restarts
-      # perses.service.
-      clan.core.vars.generators.perses-encryption-key = {
-        files.key = {
-          mode = "0400";
-          restartUnits = [ "perses.service" ];
-        };
-        runtimeInputs = [ pkgs.openssl ];
-        script = ''
-          printf '%s' "$(openssl rand -hex 16)" > "$out/key"
-        '';
-      };
-
-      # The three files flake.modules.nixos.perses reads, each under
-      # /run/credentials/perses.service/.
-      systemd.services.perses.serviceConfig.LoadCredential = [
-        "kanidm-client-secret:${config.clan.core.vars.generators.kanidm-oauth2-perses.files.secret.path}"
-        "encryption-key:${config.clan.core.vars.generators.perses-encryption-key.files.key.path}"
-        "perses-password:${config.clan.core.vars.generators.greptimedb-users.files.perses-password.path}"
-      ];
-
-      # Cloudflare R2 credentials for the store's object data, an Object Read
-      # & Write token on bucket sciexp, delivered as an EnvironmentFile in
-      # GreptimeDB's GREPTIMEDB_STANDALONE__ layered-config form.
-      clan.core.vars.generators.greptimedb-r2 = {
-        prompts.access-key = {
-          description = ''
-            Cloudflare R2 S3 access key ID with Object Read & Write scope on
-            bucket sciexp, for GreptimeDB. Minted in the Cloudflare dashboard;
-            distinct from the omnigraph-r2 and niks3-s3 tokens.
-          '';
-          type = "hidden";
-          persist = true;
-          display = {
-            group = "greptimedb";
-            label = "GREPTIMEDB_STANDALONE__STORAGE__ACCESS_KEY_ID";
-          };
-        };
-
-        prompts.secret-key = {
-          description = "Cloudflare R2 S3 secret access key paired with the access key ID above.";
-          type = "hidden";
-          persist = true;
-          display = {
-            group = "greptimedb";
-            label = "GREPTIMEDB_STANDALONE__STORAGE__SECRET_ACCESS_KEY";
-          };
-        };
-
-        files.access-key.deploy = false;
-        files.secret-key.deploy = false;
-
-        files."env" = {
-          restartUnits = [ "greptimedb.service" ];
-        };
-
-        script = ''
-          {
-            printf 'GREPTIMEDB_STANDALONE__STORAGE__ACCESS_KEY_ID=%s\n' "$(cat "$prompts/access-key")"
-            printf 'GREPTIMEDB_STANDALONE__STORAGE__SECRET_ACCESS_KEY=%s\n' "$(cat "$prompts/secret-key")"
-          } > "$out/env"
-        '';
-      };
-
-      # Telemetry store (design D3 to D7). WAL and caches live on
-      # zroot/root/greptimedb; SSTs go to R2 under one prefix of sciexp, at the
-      # endpoint omnigraph already uses. Credentials arrive by path only.
-      services.greptimedb = {
-        enable = true;
-        # One source with the collector's routing (review F4).
-        inherit (collectorSchema) databases;
-        settings.storage = {
-          type = "S3";
-          bucket = "sciexp";
-          root = "projects/vanixiets/observability/store/";
-          endpoint = r2Endpoint;
-          region = "auto";
-          enable_virtual_host_style = false;
-          disable_ec2_metadata = true;
-          # ADR-007: the object-store read cache is capped at 4 GiB.
-          cache_capacity = "4GiB";
-        };
-      };
-
-      systemd.services.greptimedb.serviceConfig = {
-        LoadCredential = [
-          "users:${config.clan.core.vars.generators.greptimedb-users.files.users.path}"
-        ];
-        EnvironmentFile = config.clan.core.vars.generators.greptimedb-r2.files."env".path;
-      };
-
-      systemd.services.greptimedb-schema.serviceConfig.LoadCredential = [
-        "admin-password:${config.clan.core.vars.generators.greptimedb-users.files.admin-password.path}"
       ];
 
       # R8.2 credential holders (ADR-008; review F5): for each greptimedb-users
@@ -1001,53 +435,6 @@ in
             }
           ]
         );
-
-      # The regulator credential and the host facts greptimedb-envelope checks.
-      # Quota and reservation come from greptimedbDataset, the binding the
-      # zfs-set-root-greptimedb-{quota,reservation} oneshots apply, so R7.3
-      # compares the dataset against the value this host declares.
-      systemd.services.greptimedb-envelope = {
-        serviceConfig.LoadCredential = [
-          "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
-        ];
-        environment =
-          let
-            gibibytes =
-              size:
-              let
-                m = builtins.match "([0-9]+)G" size;
-              in
-              assert lib.assertMsg (
-                m != null
-              ) "greptimedbDataset sizes must be whole gibibytes (\"<n>G\"), got ${size}";
-              toString (lib.toInt (builtins.head m) * 1024 * 1024 * 1024);
-          in
-          {
-            GREPTIMEDB_ENVELOPE_DATASET = greptimedbDataset.name;
-            GREPTIMEDB_ENVELOPE_QUOTA_BYTES = gibibytes greptimedbDataset.quota;
-            GREPTIMEDB_ENVELOPE_RESERVATION_BYTES = gibibytes greptimedbDataset.reservation;
-            GREPTIMEDB_ENVELOPE_USERS_SHA256_FILE = "${config.clan.core.vars.generators.greptimedb-users.files.users-sha256.path
-            }";
-          };
-      };
-
-      # devloop-reconcile's store credential, the third regulator-password
-      # holder (S2 design D11); devloop-collection.nix stays free of clan vars.
-      systemd.services.devloop-reconcile.serviceConfig.LoadCredential = [
-        "regulator-password:${config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path}"
-      ];
-
-      # Fleet alert evaluator (ADR-009; design D3, D12): queries `fleet` as
-      # the regulator account and posts to fleet-alerts with the shared
-      # alerter token, which the failure notifier's template and resolve
-      # hooks use too. magnetite holds only the token side of ntfy-alerter;
-      # cinnabar holds the server's ntfy-alerter-env.
-      services.fleet-alert.evaluator = {
-        enable = true;
-        tokenFile = config.clan.core.vars.generators.ntfy-alerter.files.token.path;
-        regulatorPasswordFile =
-          config.clan.core.vars.generators.greptimedb-users.files.regulator-password.path;
-      };
 
       # nixbot's `8 x 4096` nix-eval-jobs configuration peaks at 31.4 GiB of
       # swap (logs/magnetite-zram-headroom-experiment.md §6.2), above the
