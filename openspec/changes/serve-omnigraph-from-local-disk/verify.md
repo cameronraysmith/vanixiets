@@ -5,7 +5,7 @@
 > corresponding artifact for correction before re-running verify.
 
 **Change**: `serve-omnigraph-from-local-disk` (CAM-127)
-**Verified at**: `2026-11-27 09:20` UTC (first run, against `main` at `d625c64e`); `2026-11-27 10:15` UTC (second run, against the remedies `okoptrow`, `zmmzwqtk`, `utrkprxr` and `tuwmzvxy` at `ddec126c`, over `main` at `30223609`); `2026-11-27 11:00` UTC (third run, against `oxzqzrro`, `xxnlluxk` and `oynqyknx` at `103def5f`, over `main` at `de37dff6`, which now holds the first round's remedies)
+**Verified at**: `2026-11-27 09:20` UTC (first run, against `main` at `d625c64e`); `2026-11-27 10:15` UTC (second run, against the remedies `okoptrow`, `zmmzwqtk`, `utrkprxr` and `tuwmzvxy` at `ddec126c`, over `main` at `30223609`); `2026-11-27 11:00` UTC (third run, against `oxzqzrro`, `xxnlluxk` and `oynqyknx` at `103def5f`, over `main` at `de37dff6`, which now holds the first round's remedies); `2026-11-27 15:40` UTC (fourth check, against `ouusmunq` at `7018377d`, over `main` at `6c362f02`, which holds the second round's remedies and the third run)
 **Verifier**: `openspec-verify-change` (omp)
 
 Prechecks: the delivery commits are on `main`: `2dbb1e25` (`feat(omnigraph): watch the server's readiness and graphs on magnetite`), `7d02f0a5` (`feat(omnigraph): serve a local root with stale-lock recovery and nightly backup`), `72596929` (`fix(omnigraph): refuse lock recovery on unreadable process state or an omnigraph at the lock pid`), `afd978d8` (`feat(magnetite): serve omnigraph from local disk`) and `27ac2fe8` (`docs(omnigraph): record the restore drills and the restore without the host`).
@@ -13,6 +13,32 @@ magnetite runs generation 296 (`system-296-link`), booted 2026-11-27 05:21:38Z a
 The code was read at `d625c64e`: `modules/lib/omnigraph-lock-recovery.nix`, `modules/nixos/omnigraph.nix`, `modules/nixos/omnigraph-backup.nix`, `modules/nixos/omnigraph-probe.nix`, `modules/lib/omnigraph-cluster-roots.nix`, `modules/machines/nixos/magnetite/{default,disko}.nix`, `modules/lib/observability-hosts.nix`, `modules/lib/observability-notify-run.nix`, `modules/clan/services/otel-collector/flake-module.nix`, `modules/nixos/fleet-alert/rules.nix`, `modules/nixos/perses/resources/dashboard-omnigraph.json`, `modules/checks/omnigraph-retired-roots.nix`, `modules/vm-tests/{omnigraph-local-root,perses-greptimedb}.nix` and the runbook `packages/docs/src/content/docs/development/operations/omnigraph.md`.
 No test or runtime test was re-run; `checks.x86_64-linux.omnigraph-retired-roots` at `d625c64e` was substituted from the fleet cache, which nixbot fills (`logs/cam127-verify-retired-roots-20261127T0900Z.log`).
 The evidence is the deploy and drill records (`logs/agent-reports-20261126/DeployMagnetite-{probe,latest,switch}.md`, `OmnigraphRestoreDrill.md`), read-only inspection of magnetite on 2026-11-27 between 09:00 and 09:10Z (`logs/cam127-verify-{host-state,restic-units,front-r2,notices}-20261127T0900Z.log`), the stored series through `nix run .#obs-query`, read-only requests to R2 with magnetite's own credentials, and one evaluation of magnetite with the store forced to `"r2"` (`logs/cam127-verify-wayback-eval-20261127T0900Z.{nix,json}`).
+
+## Fourth check, 2026-11-27 15:40 UTC
+
+A narrow check of `ouusmunq` (`docs(node-exporter-textfile): say when the textfile cleanup runs`), the remedy for the third run's FAIL 7. It changes only comments, the change's artifacts and the runbook, and is not deployed.
+
+**FAIL 7 is closed.** The interface requirement now says the script runs "at boot and on `switch-to-configuration switch` and `test`" (`specs/graph-store-interface/spec.md:59`), and the new scenario `a boot switch that drops a writer` (`:67-70`) holds. Each nixpkgs line the correction cites, read at the locked nixpkgs (`/nix/store/xl9r82h0…-source`), says what is claimed:
+- `switch-to-configuration-ng/src/main.rs:1843-1861`: `switch` and `boot` install the boot loader, and `boot` then exits before anything else.
+- `:2045-2068` and `:2187`: `dry-activate` runs the generation's `dry-activate` and exits.
+- `:2224-2231`: `switch` and `test` wait for the stop jobs, then run `activate`.
+- `nixos/modules/system/activation/activation-script.nix:43-47`: in the dry script, a snippet without `supportsDryActivation` is replaced by a comment.
+- `:112-115`: that option defaults to `false`, and the snippet does not set it.
+- `nixos/modules/system/boot/stage-2-init.sh:137`: stage 2 runs `$systemConfig/activate` before it hands over to systemd, so before any unit starts.
+
+With no activation on a `boot` switch, the running generation's units stay as they were and keep writing their files until the reboot empties `/run`. The new generation's activation at boot then finds nothing to remove. Every other statement of when the cleanup runs agrees: the module comment (`node-exporter-textfile.nix:15-23`), design D3's second note, the proposal's What Changes and the runbook's way-back section. No other text in `modules/`, `packages/docs/` or the change says "every `switch-to-configuration`", except design.md's record of finding 7.
+
+**The runbook's new sentence on a first switch to `"local"` without the dataset is true as written** (`omnigraph.md:28`). Read-only on magnetite at about 15:30Z:
+- the fstab line is `zroot/root/omnigraph /var/lib/omnigraph zfs defaults,zfsutil 0 0`, with no `nofail`;
+- `var-lib-omnigraph.mount` is `RequiredBy` `local-fs.target`;
+- systemd 262's `local-fs.target` has `OnFailure=emergency.target` and `OnFailureJobMode=replace-irreversibly`, and NixOS's drop-in adds only `X-StopOnReconfiguration=true`.
+So a boot without the dataset fails `local-fs.target` and enters emergency mode.
+
+**Nothing else changed a requirement's meaning.** Between `oynqyknx` and `ouusmunq` the three delta specs differ only in `graph-store-interface`'s one sentence and its added scenario. `graph-store` and `world-assumptions` are unchanged. The `world-assumptions` delta, re-diffed against `main` at `6c362f02` (`git ls-remote origin main`), removes nothing of `main`'s: its differences are `disk`'s context, the 24 added rows and the count scenario. A231–A242 are still free: `main` holds 113 numbered assumptions, the highest A332, and no open change adds one in that range. Most open changes also carry a MODIFIED `Grounded vocabulary for behavioral requirements`, `compose-hosts-from-cohesive-aspects` among them, so whichever of them archives later must rebase its block onto `main`'s at that time.
+
+**Tasks**: 36 of 36 ticked (8.1 added by the correction).
+
+**Result**: no checked failure remains. Every requirement of the three delta specs passes against code, witness and, where it applies, the host. Some passes come with the warnings below, which the decision lists.
 
 ## Third run, 2026-11-27 11:00 UTC
 
@@ -461,15 +487,22 @@ The manual checks the change defers are 1.6's rendered view and 5.4's way back; 
 ## Overall Decision
 
 - [ ] (pass) PASS — may proceed to finishing-a-development-branch and archive
-- [ ] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: …
-- [x] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
+- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: the warnings below
+- [ ] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
-First run (09:20): four findings in §4. Second run (10:15): the remedies close all four for what they address (§0), and two new findings fail.
-Third run (11:00): the remedies close FAIL 5 and FAIL 6, every task is ticked, and one checked failure remains.
-- FAIL 7: the requirement `Activation removes every textfile no declared writer writes` says the script runs on every `switch-to-configuration`, which `boot` and `dry-activate` do not do. The behaviour is sound; the sentence is false.
+First run (09:20): four findings in §4. Second run (10:15): the remedies close all four for what they address (§0), and two new findings fail. Third run (11:00): the remedies close FAIL 5 and FAIL 6, and FAIL 7 fails. Fourth check (15:40): `ouusmunq` closes FAIL 7, and no checked failure remains.
 
-Warnings: a signal ends the recovery without a refusal; a first switch to `"local"` without the dataset stops the next boot in emergency mode, which the runbook omits; two `restic unlock` edge cases are unmentioned.
+Warnings not taken up:
+- **A signal ends the recovery without a refusal.** A stop during the start or an OOM kill ends it, and the program traps no signal. Killed between a confirmed `force-unlock` and its post, the lock is gone with no count and no notice.
+- **`restic unlock` keeps a young lock whose pid was reused.** A lock of this host younger than 30 minutes whose pid now belongs to another program is kept, and that program receives SIGHUP.
+- **`restic unlock` skips an unreadable lock.** A lock file R2 holds unreadable is skipped by `unlock` but still refuses the backup.
+
+Observable only after a deploy of the remedies:
+- the first nightly `restic-backups-postgresql` and `restic-backups-omnigraph` runs with `unlock` before `backup`;
+- a refusal and its notice on the host;
+- the activation's cleanup on a real switch to `"r2"`, which has not been run;
+- the lock-recovery tile showing 1.
 
 **Next step**:
 
-Correct the sentence of FAIL 7 (for example, "at boot, and on `switch-to-configuration switch` and `test`") in the requirement, the module comment, D3 and the runbook, then re-run verify. CAM-127 stays In Progress; the proposal is at `review_round: 2` of `max_review_rounds: 3`.
+Proceed to the In Review sub-gates.
