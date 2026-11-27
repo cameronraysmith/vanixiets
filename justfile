@@ -434,20 +434,24 @@ check-ifd systems="x86_64-linux aarch64-linux aarch64-darwin" workers="4" mem="4
 
 # The iets identity oracles, both at one commit (rev defaults to HEAD); any difference fails.
 # 1. Stock nix-eval-jobs against iets attribute by attribute over checks.<system>: same
-#    attribute names, drvPaths, systems and outputs, failing in both or neither. It runs the
-#    host's own two names, nix-eval-jobs (iets) and nix-eval-jobs-stock, so on a locked host
-#    both queue on the evaluation lock; a host without iets refuses.
+#    attribute names, drvPaths, systems and outputs, failing in both or neither. By default
+#    both evaluators are the ones this host's configuration has at rev, built with stock nix,
+#    so an iets bump runs the iets its lock pins; evaluators=path runs the host's deployed
+#    nix-eval-jobs (iets) and nix-eval-jobs-stock from PATH instead. Either way they are the
+#    host's lock-wrapped names on a locked host, so both queue on the evaluation lock; a host
+#    without iets refuses.
 # 2. Stock nix against iets' classic mode (flake.lib.nixClassic) over every host system, every
 #    home activationPackage and this system's default devShell: drvPath and whole .drv
 #    closure, with both evaluation times.
 # Run it on every iets input bump and before widening where iets evaluates.
 # Usage: just eval-identity                          (x86_64-linux and aarch64-darwin)
 #        just eval-identity "aarch64-darwin" <rev> 2
+#        just eval-identity "aarch64-darwin" <rev> 2 path
 [group('nix')]
-eval-identity systems="x86_64-linux aarch64-darwin" rev="" workers="2":
+eval-identity systems="x86_64-linux aarch64-darwin" rev="" workers="2" evaluators="commit":
   #!/usr/bin/env bash
   failed=0
-  nix run --accept-flake-config .#nix-eval-jobs-identity -- {{ if rev == "" { "" } else { "--rev " + rev } }} --workers {{workers}} {{systems}} || failed=1
+  nix run --accept-flake-config .#nix-eval-jobs-identity -- {{ if rev == "" { "" } else { "--rev " + rev } }} --evaluators {{evaluators}} --workers {{workers}} {{systems}} || failed=1
   nix run --accept-flake-config .#nix-classic-identity -- {{ if rev == "" { "" } else { "--rev " + rev } }} || failed=1
   exit "$failed"
 

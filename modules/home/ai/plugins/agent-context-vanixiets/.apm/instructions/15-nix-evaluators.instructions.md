@@ -21,14 +21,16 @@ iets differs from stock in ways an agent meets directly:
 - When one of its workers is killed, by the OOM killer for instance, the whole evaluation fails rather than that worker being replaced. That is why both names are lock-wrapped on every NixOS host that has iets: `nix-eval-jobs: waiting for the host evaluation lock held by …` every 30 seconds is queueing behind nixbot or another user, not a hang, and a second evaluation started beside it only queues too.
 - `--max-memory-size` restarts its workers on Linux and does nothing on macOS, and iets has no garbage collector, so a worker on a Mac grows with everything it evaluates and only the worker count bounds memory.
 
-The lock serialises only the evaluations that go through it, and only the names on PATH take it.
-On a NixOS host, run a many-attribute evaluation (nix-eval-jobs or iets over a check set or a host set) only through the host's `nix-eval-jobs` or `nix-eval-jobs-stock` as PATH resolves them, as `just check-fast` does, never an evaluator called by its store path or one built from a flake, which takes no lock and runs beside nixbot's evaluation.
+The lock serialises only the evaluations that go through it, and only the lock-wrapped names take it: the host's `nix-eval-jobs` and `nix-eval-jobs-stock`, and the same packages `just eval-identity` builds from a commit's host configuration.
+On a NixOS host, run a many-attribute evaluation (nix-eval-jobs or iets over a check set or a host set) only through the host's `nix-eval-jobs` or `nix-eval-jobs-stock` as PATH resolves them, as `just check-fast` does, or through `just eval-identity`, never an unwrapped evaluator called by its store path or built from a flake, which takes no lock and runs beside nixbot's evaluation.
 On magnetite a many-attribute evaluation needs 14 to 18 GiB of the host's 30 GiB, so two at once do not fit: on 2026-11-27 one called by its store path ran beside nixbot's and the host reset.
 
 Plan memory from these peaks, measured on 2026-11-23 with nixbot's arguments: on argentum (8 GiB) at 1 worker, `checks.aarch64-darwin` reached a 4.8 GiB footprint and both systems 12.8 GiB with 5.3 GiB in swap; on stibnite (64 GiB) at 5 workers, 10.2-10.5 GiB and 17.1 GiB, with 2.2-3.8 GiB per worker; on magnetite, user evaluations stop at the 10.1 GiB `MemoryHigh` of `user.slice` and are throttled there.
 The Macs have no evaluation lock, and several agents run at once on them, so their evaluations add up: before starting a many-attribute evaluation on a Mac, check `pgrep -fl 'nix-eval-jobs|iets'` and wait for a running one rather than start a second.
 
-`just eval-identity [systems] [rev] [workers]` is the oracle that keeps iets honest: it runs a host's `nix-eval-jobs-stock` and `nix-eval-jobs` over `checks.<system>` of one commit and fails unless every attribute has the same drvPath, system and outputs.
+`just eval-identity [systems] [rev] [workers] [evaluators]` is the oracle that keeps iets honest: it runs a host's `nix-eval-jobs-stock` and `nix-eval-jobs` over `checks.<system>` of one commit and fails unless every attribute has the same drvPath, system and outputs.
+By default both are the evaluators the host's configuration has at that commit, built with stock Nix, so an `iets` bump is tested with the iets the commit's lock pins rather than the one deployed; `evaluators=path` runs the deployed names on PATH, to check a host as it is.
+The run prints the evaluator store paths and the pinned iets revision.
 It needs a host with iets and queues on the lock where there is one.
 Run it on every bump of the `iets` flake input and on any change to how a host chooses, bounds, locks or wraps its evaluator, and name the result in the change description.
 A difference is a finding: report the attribute and both drvPaths to the operator, and do not pin, exclude or rewrite anything to make the two agree.
