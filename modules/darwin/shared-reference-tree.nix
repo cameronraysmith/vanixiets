@@ -34,6 +34,7 @@ in
       );
       lazygitFile = pkgs.writeText "lazygit.yml" flakeConfig.flake.lib.sharedReferenceTreeLazygitConfig;
       provisionLazygit = "/usr/bin/install -m 0640 -o ${cfg.writer} -g ${cfg.writer} ${lazygitFile} \"$ghqRoot/.lazygit.yml\"";
+      provisionLog = "/usr/bin/install -m 0640 -o ${cfg.writer} -g ${cfg.writer} /dev/null \"$ghqLog\"";
     in
     {
       imports = [ flakeConfig.flake.modules.darwin.shared-reference-tree-options ];
@@ -135,6 +136,13 @@ in
                 daemonLoaded && lib.hasInfix (builtins.unsafeDiscardStringContext provisionLazygit) beforeDaemon;
               message = "shared-reference-tree: ${cfg.root}/.lazygit.yml must be provisioned mode 0640, owned by ${cfg.writer}, turning off lazygit's start-up fetch, before activation loads ${label}.";
             }
+            {
+              assertion =
+                daemonLoaded
+                && lib.hasInfix provisionLog beforeDaemon
+                && lib.hasInfix "/bin/chmod 0640 \"$ghqLog\"" beforeDaemon;
+              message = "shared-reference-tree: ${logDir}/writer.log must be created mode 0640, or set to it, before activation loads ${label}.";
+            }
           ];
 
         # git resolves safe.directory entries and repository paths through
@@ -213,8 +221,24 @@ in
         # .lazygit.yml, rewritten at each activation, which turns off lazygit's
         # start-up fetch for every copy; ghq-shared-migrate counts a root holding
         # only that file as empty.
+        #
+        # launchd creates the writer's log 0644 at its first connection, and
+        # newsyslog gives it mode 640 only when it rotates, so activation creates
+        # it 0640 first and corrects an existing one. A log that is not a regular
+        # file of the writer's with one link is left alone and reported: the
+        # writer owns the directory, and root changing what such an entry points
+        # at would change a file the writer does not own.
         system.activationScripts.launchd.text = lib.mkBefore ''
           /usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} ${logDir}
+          ghqLog=${logDir}/writer.log
+          if [ ! -e "$ghqLog" ] && [ ! -L "$ghqLog" ]; then
+            ${provisionLog}
+          elif [ ! -L "$ghqLog" ] && [ -f "$ghqLog" ] && [ "$(/usr/bin/stat -f '%Su %l' "$ghqLog")" = "${cfg.writer} 1" ]; then
+            /usr/sbin/chown ${cfg.writer}:${cfg.writer} "$ghqLog"
+            /bin/chmod 0640 "$ghqLog"
+          else
+            echo "shared-reference-tree: $ghqLog is not a regular file of ${cfg.writer}'s with one link; leaving its mode" >&2
+          fi
           /usr/bin/install -d -m 0700 -o ${cfg.writer} -g ${cfg.writer} ${lockDir}
           ghqRoot=${lib.escapeShellArg cfg.root}
           if [ -L "$ghqRoot" ] || { [ -e "$ghqRoot" ] && [ ! -d "$ghqRoot" ]; }; then
