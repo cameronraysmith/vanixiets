@@ -23,7 +23,9 @@
 # is what the otel-collector agent role sets once `stores` names it. On
 # each it reads only the values the way between the stores has failed on:
 # the storage URI, omnigraph-server's R2 environment and environment file,
-# the omnigraph-r2 generator, the backup's option, which local-root units
+# the omnigraph-r2 generator, the backup's option, whether the backup's
+# textfile is among the files the textfile directory's activation keeps
+# (vanixiets.nodeExporter.textfiles), which local-root units
 # are notified, and for each notified unit whether it is a service with an
 # ExecStart, as the agent role asserts. It reads none of magnetite's
 # assertions, whose evaluation all of them force, so the rest of the
@@ -67,6 +69,7 @@
               (lib.toList (server.serviceConfig.EnvironmentFile or [ ]));
           keepsR2Generator = hostConfig.clan.core.vars.generators ? omnigraph-r2;
           backupEnabled = hostConfig.vanixiets.omnigraphBackup.enable;
+          backupTextfileKept = lib.elem "${backup.writer}.prom" hostConfig.vanixiets.nodeExporter.textfiles;
           localRootUnitsNotified = lib.filter (unit: lib.elem unit units) backup.localRootUnits;
           notifiedWithoutExecStart = lib.filter (
             unit: !(hostConfig.systemd.services.${unit}.serviceConfig or { } ? ExecStart)
@@ -88,6 +91,7 @@
           serverReadsR2Credential = !local;
           keepsR2Generator = true;
           backupEnabled = local;
+          backupTextfileKept = local;
           localRootUnitsNotified = lib.optionals local backup.localRootUnits;
           notifiedWithoutExecStart = [ ];
         };

@@ -300,6 +300,7 @@ in
       metricsDirectory
       seriesName
       bucket
+      writer
       ;
     # The units that exist only beside a local root, the backup job, its
     # publisher and the dataset's quota oneshot, which a host's row in

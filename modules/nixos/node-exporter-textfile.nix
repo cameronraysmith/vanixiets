@@ -9,6 +9,16 @@
 # module turns on the textfile collector with that directory and has
 # systemd-tmpfiles create it 0755 for node_exporter's user, so it outlives
 # restarts of node_exporter and of every probe.
+# The directory is under /run, which only a reboot empties, and node_exporter
+# exports every `*.prom` file in it whoever wrote it, so a file whose writer
+# a deploy removed would stay exported, and HostProbeStale would fire on its
+# age. The activation script below, which NixOS runs at boot and on every
+# switch-to-configuration, after the units a switch stops have stopped and
+# before it starts the new ones, removes every `*.prom` file in the
+# directory that is not in vanixiets.nodeExporter.textfiles and prints a line
+# for each. A writer's temporary file ends in `.tmp` and is left alone.
+# vmTests.x86_64-linux.omnigraph-local-root plants a file no writer
+# declares, switches, and requires it gone and the declared ones kept.
 # The assertion keeps the directory flag to at most one in node_exporter's
 # rendered ExecStart, whoever adds it; checks.x86_64-linux.node-exporter-textfile
 # shows a second flag failing it. Imported by every NixOS base, and by
@@ -46,7 +56,14 @@ let
         textfileWriters = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
-          description = "The probes writing a textfile into textfileDirectory; naming one turns the textfile collector on.";
+          description = "The probes writing a textfile into textfileDirectory, each into `<name>.prom`; naming one turns the textfile collector on.";
+        };
+        textfiles = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          readOnly = true;
+          default = map (writer: "${writer}.prom") cfg.textfileWriters;
+          defaultText = lib.literalExpression ''map (writer: "''${writer}.prom") config.vanixiets.nodeExporter.textfileWriters'';
+          description = "The files in textfileDirectory that the declared writers write; activation removes every other `*.prom` file there.";
         };
       };
 
@@ -80,6 +97,24 @@ let
             mode = "0755";
           };
         };
+
+        system.activationScripts.node-exporter-textfile.text = ''
+          for textfile in ${lib.escapeShellArg cfg.textfileDirectory}/*.prom; do
+            [ -f "$textfile" ] || continue
+            case ''${textfile##*/} in
+              ${lib.optionalString (cfg.textfiles != [ ]) ''
+                ${lib.concatMapStringsSep " | " lib.escapeShellArg cfg.textfiles}) ;;
+              ''}
+              *)
+                if rm -f -- "$textfile"; then
+                  echo "node-exporter-textfile: removed $textfile, which no writer in vanixiets.nodeExporter.textfileWriters writes"
+                else
+                  echo "node-exporter-textfile: could not remove $textfile, which no writer in vanixiets.nodeExporter.textfileWriters writes" >&2
+                fi
+                ;;
+            esac
+          done
+        '';
       };
     };
 in
