@@ -75,7 +75,6 @@ in
         deploy-record
         dnscrypt-proxy
         enormous-tests
-        hm-sops-bridge
         kvm-declaration
         memory-pressure-guards
         shared-reference-tree

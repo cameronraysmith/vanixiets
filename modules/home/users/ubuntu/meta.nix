@@ -6,9 +6,10 @@
       fullname = "Cameron Smith";
       email = "cameron.ray.smith@gmail.com";
       githubUser = "cameronraysmith";
-      # `hm-sops-bridge` is a NixOS module and this profile never runs under
-      # NixOS: the sandbox receives its age key from the `devin-bootstrap` app
-      # instead, so there is no bridge deployment to name.
+      # `hm-sops-bridge` runs only inside a NixOS or nix-darwin host's
+      # home-manager, and its age-key part only on NixOS; this profile runs
+      # under neither: the sandbox receives its age key from the
+      # `devin-bootstrap` app instead, so there is no bridge deployment to name.
       sopsAgeKeyId = null;
       sshKeys = [ ];
       # The one profile on no clan machine: its key is the home-manager sops

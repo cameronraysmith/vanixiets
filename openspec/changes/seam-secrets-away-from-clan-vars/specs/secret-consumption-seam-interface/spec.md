@@ -6,7 +6,7 @@
 
 **Trust boundary**: the option fixes the shape of a declaration. It does not check that a declared recipe produces the files it names.
 
-**Writable fields**: `share`, `dependencies`, `validation`, `runtimeInputs`, `script` and `prompts.<p>.{description,type,persist}` on the generator; `files.<f>.{secret,deploy,owner,group,mode,neededFor,restartUnits}` on each file; and `provided`, a boolean defaulting to false.
+**Writable fields**: `share`, `dependencies`, `validation`, `runtimeInputs`, `script`, `prompts.<p>.{description,type,persist}` and `prompts.<p>.display.{group,label,required,helperText}` on the generator; `files.<f>.{secret,deploy,owner,group,mode,neededFor,restartUnits}` on each file; and `provided`, a boolean defaulting to false.
 
 **Discharged by**: `nix eval` of `vanixiets.secrets` on every NixOS and darwin host, and of the option's declared fields.
 
@@ -53,22 +53,39 @@ For each entry and each declared file, the secrets module SHALL set the read-onl
 
 ### Requirement: A generator clan's own service declares is read as a provided entry
 
-A module that reads a generator declared by a clan-core service SHALL declare `vanixiets.secrets.<name>.provided = true` for it and read its read-only fields. The secrets module SHALL NOT define that generator. `lib/host-keys.nix` SHALL read `openssh`, and cinnabar's `zt-dns` feature SHALL read `zerotier-network-zerotier`, in this way.
+A module that reads a generator declared by a clan-core service SHALL declare `vanixiets.secrets.<name>.provided = true` for it and read only the read-only fields of its files, and the secrets module SHALL NOT define that generator.
 
-**Trust boundary**: a provided entry assumes the clan service declares the generator, as world assumption `A364 — clan-core's own services declare generators the fleet reads` records; a provided entry clan does not declare fails when read.
+**Readers**: `lib/host-keys.nix` reads `openssh`, and cinnabar's `zt-dns` feature reads `zerotier-network-zerotier`, in this way.
 
-**Discharged by**: the translation judge's provided-entry fixture; `nix eval` of `nixosConfigurations.cinnabar.config.vanixiets.secrets.openssh.files."ssh.id_ed25519.pub".value` equal to `flake.lib.hostKeys.cinnabar`.
+**Trust boundary**: a provided entry assumes the clan service declares the generator, as world assumption `A364 — clan-core's own services declare generators the fleet reads` records.
+
+**Discharged by**: the translation judge's provided-entry fixture, its fixture of a provided entry that sets a writable field, and its fixture of a provided entry whose generator the backend lacks; `nix eval` of `nixosConfigurations.cinnabar.config.vanixiets.secrets.openssh.files."ssh.id_ed25519.pub".value` equal to `flake.lib.hostKeys.cinnabar`.
 
 #### Scenario: The host key through the option
 
 - **WHEN** cinnabar's `vanixiets.secrets.openssh` public value is evaluated
 - **THEN** it equals `flake.lib.hostKeys.cinnabar`, ending in `" \n"`
 
+#### Scenario: A reader declares the files it reads
+
+- **WHEN** a module reads a file `f` of a provided entry
+- **THEN** that module declares the file by name only, as `files.<f> = { }`, and reads only its read-only fields
+
+#### Scenario: A provided entry sets a writable field
+
+- **WHEN** a provided entry sets any writable field on a host where the backend is present
+- **THEN** evaluation fails with a message naming the entry and each field set
+
+#### Scenario: A provided entry whose generator clan lacks
+
+- **WHEN** a module reads a file of a provided entry whose generator clan does not declare
+- **THEN** evaluation fails with a message naming the entry
+
 ### Requirement: Homes see a view of the secrets they own
 
 `flake.modules.homeManager.secrets` SHALL declare a home option `vanixiets.secrets` of `{ files.<f>.{path,placeholder} }` entries, default `{ }`, imported by every home configuration. The bridge modules SHALL set it for every home-manager user of the host. No home module SHALL read `osConfig.clan.core.vars` or `osConfig.sops`.
 
-**Bridge**: `flake.modules.nixos.hm-sops-bridge` and `flake.modules.darwin.hm-sops-bridge`, imported by `nixos.base` and `darwin.base`, set it for each home-manager user `u` to the host's `vanixiets.secrets` entries that have a file whose `owner` is `u`, whether or not `u` is in `hm-sops-bridge.users`.
+**Bridge**: `flake.modules.nixos.hm-sops-bridge` and `flake.modules.darwin.hm-sops-bridge`, each keyed `vanixiets/hm-sops-bridge` through `flake.lib.exportAs` and imported by `nixos.base` and `darwin.base`, add to `home-manager.sharedModules` the home option and a module that sets it, in each home, from that home's `home.username` `u` to the host's `vanixiets.secrets` entries that have a file whose `owner` is `u`, whether or not `u` is in `hm-sops-bridge.users`.
 
 **Trust boundary**: the view carries delivered locations, not contents, and only for files the home's user owns. It says nothing about `clan.core.settings`, which `vcs-signing.nix` still reads for the machine name.
 
@@ -105,9 +122,9 @@ An obligation that reads one host's secret by name SHALL read `hostConfig.vanixi
 
 **Trust boundary**: the check reads source text. It cannot see an attribute path built from strings at evaluation time, and it says nothing about what clan does with what the seam hands it.
 
-**Search**: the sorted `.nix` files under `modules/` (skipping path components that start with `_`) that have a non-comment line naming `clan.core.vars`, or naming `vars/shared/` or `vars/per-machine/` outside `modules/lib/vars.nix`.
+**Search**: the sorted `.nix` files under `modules/`, `_`-prefixed path components included, that have a non-comment line naming `clan.core.vars`, `vars/shared/` or `vars/per-machine/`, excluding the two seam files `modules/system/secrets.nix` and `modules/lib/vars.nix`, which neither the search nor the literal list ever includes. The search matches text: it does not see `inherit (config.clan.core) vars;`, a quoted attribute name, a path built from strings, or a file outside `modules/`.
 
-**Final list**: `modules/system/secrets.nix`; `modules/vm-tests/{fleet-ingress,devloop-ingest,greptimedb-oom-order,greptimedb-pipeline,perses-greptimedb}.nix` and `modules/checks/greptimedb-envelope.nix`, which run a generator's recipe; `modules/vm-tests/clan-test-vars-fixture.nix`; and the committed-layout exemptions `modules/lib/vars.nix` documents.
+**Final list**: `modules/vm-tests/{fleet-ingress,devloop-ingest,greptimedb-oom-order,greptimedb-pipeline,perses-greptimedb}.nix` and `modules/checks/greptimedb-envelope.nix`, which run a generator's recipe; `modules/vm-tests/clan-test-vars-fixture.nix`; `modules/checks/secrets-seam-translation.nix`, an independent judge of the translation whose literal fixture is a stub of clan's generator option; and the committed-layout exemptions `modules/lib/vars.nix` documents.
 
 **Discharged by**: the check building at every step; the mutant below.
 

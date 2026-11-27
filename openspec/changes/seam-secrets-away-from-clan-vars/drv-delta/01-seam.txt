@@ -7,6 +7,6 @@
 # keep its drvPath (design D10, D12). Each may-change entry is resolved to
 # changed or removed before the step merges.
 
-checks.x86_64-linux.secrets-seam-confinement  added  # design D9: the confinement check, its literal list the full list at the parent
+checks.x86_64-linux.secrets-seam-confinement  added  # design D9: the confinement check, its literal list the 67 files the rule finds at this commit
 checks.x86_64-linux.secrets-seam-translation  added  # design D11: the translation judge
 checks.x86_64-linux.fleet-alert  changed  # its fleet-alert-size-rule-clause input renders every testSizes.checks entry; this step adds two

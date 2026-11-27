@@ -24,7 +24,6 @@ in
         base
         home-manager-integration
         deploy-record
-        hm-sops-bridge
         kvm-declaration
         ssh-known-hosts
       ]);

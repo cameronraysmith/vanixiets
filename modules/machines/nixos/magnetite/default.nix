@@ -37,7 +37,6 @@ in
         base
         home-manager-integration
         deploy-record
-        hm-sops-bridge
         kvm-declaration
         magnetite-user-slice-guard
         memory-pressure-guards

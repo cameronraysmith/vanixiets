@@ -60,7 +60,7 @@ Found by searching each unarchived change's `tasks.md` and `proposal.md` for the
 
 | Kind | Name | Defined in |
 |---|---|---|
-| Option (NixOS, darwin) | `vanixiets.secrets.<name>`: writable `share`, `dependencies`, `validation`, `runtimeInputs`, `script`, `prompts.<p>.{description,type,persist}`, `files.<f>.{secret,deploy,owner,group,mode,neededFor,restartUnits}`, `provided` | Task 2 |
+| Option (NixOS, darwin) | `vanixiets.secrets.<name>`: writable `share`, `dependencies`, `validation`, `runtimeInputs`, `script`, `prompts.<p>.{description,type,persist}`, `prompts.<p>.display.{group,label,required,helperText}`, `files.<f>.{secret,deploy,owner,group,mode,neededFor,restartUnits}`, `provided` | Task 2 |
 | Option (read-only) | `vanixiets.secrets.<name>.files.<f>.{path,value,exists,placeholder}`, `null` without clan | Task 2 |
 | Option (home) | `vanixiets.secrets.<name>.files.<f>.{path,placeholder}`, default `{ }` | Task 2 |
 | Module | `flake.modules.{nixos,darwin,homeManager}.secrets`; `flake.modules.darwin.hm-sops-bridge` | Task 2 |
@@ -100,10 +100,10 @@ nix eval --json .#darwinConfigurations --apply '<same lambda>' > logs/sscv-1-dar
 - [ ] **Step 4:** Build the file list:
 
 ```bash
-rg -l --glob '*.nix' --glob '!**/_*' --glob '!modules/lib/vars.nix' -e '^\s*([^#\s].*)?clan\.core\.vars' -e '^\s*([^#\s].*)?vars/(shared|per-machine)/' modules | sort > logs/sscv-1-files-<ts>.txt
+rg -l --glob '*.nix' --glob '!modules/lib/vars.nix' --glob '!modules/system/secrets.nix' -e '^\s*([^#\s].*)?clan\.core\.vars' -e '^\s*([^#\s].*)?vars/(shared|per-machine)/' modules | sort > logs/sscv-1-files-<ts>.txt
 ```
 
-  The optional prefix matters: a pattern requiring a character before `clan.core.vars` misses a line that starts with it, such as `modules/nixos/ntfy-alerter.nix:23`. `modules/lib/vars.nix` is excluded here as the confinement check excludes it (design D9). At `0f98c236fefd` the search returns 66 files. Assign each to a step of design D10 or to design D8's final set; the sorted list is task 2.4's `expected`.
+  The optional prefix matters: a pattern requiring a character before `clan.core.vars` misses a line that starts with it, such as `modules/nixos/ntfy-alerter.nix:23`. The two seam files, `modules/lib/vars.nix` and `modules/system/secrets.nix`, are excluded here as the confinement check excludes them (design D9). At `0f98c236fefd` the search returns 66 files. Assign each to a step of design D10 or to design D8's final set; the sorted list with `modules/checks/secrets-seam-translation.nix` added, 67 files, is task 2.4's `expected`.
 
 ## Task 2: Step 1, the seam with no consumer (tasks 2.1–2.5)
 
@@ -145,16 +145,16 @@ in
   flake.modules.nixos = nixos // { base.imports = [ nixos.secrets ]; };
   flake.modules.darwin = darwin // { base.imports = [ darwin.secrets ]; };
   flake.modules.homeManager = exportSecrets homeModule;
-  flake.lib.secretsBackend.generatorsOf = hostConfig: hostConfig.clan.core.vars.generators or { };
+  flake.lib.secretsBackend.generatorsOf = hostConfig: hostConfig.clan.core.vars.generators;
 }
 ```
 
   A `nullOr` field must never write a definition; check the `toClan` output with the translation judge before anything else.
 - [ ] **Step 2:** Evaluate `vanixiets.secrets` on cinnabar and stibnite; both `{}`.
-- [ ] **Step 3:** Edit `nixos/hm-sops-bridge.nix`: a `view` function (entries with a file whose `owner` is the user, projected to `{ files.<f>.{path,placeholder} }`), `home-manager.sharedModules` and `home-manager.users.<u>.vanixiets.secrets` for every `home-manager.users` name, outside `lib.mkIf (cfg.users != { })` (`:83`); a `flake.modules.darwin.hm-sops-bridge` with only those two; both into the class bases; delete the six per-host `hm-sops-bridge` imports (cinnabar `default.nix:41`, electrum `:28`, galena `:27`, magnetite `:40`, pyrite `:78`, scheelite `:30`). Import `homeManager.secrets` in `home/mk-home.nix`.
+- [ ] **Step 3:** Edit `nixos/hm-sops-bridge.nix`: a `view` function (entries with a file whose `owner` is the user, projected to `{ files.<f>.{path,placeholder} }`), and `home-manager.sharedModules` holding `homeManager.secrets` and a module that sets `vanixiets.secrets = view config.home.username` (a host-level `home-manager.users.<u>` definition over that option's own names recurses; design D5), outside `lib.mkIf (cfg.users != { })` (`:83`); a `flake.modules.darwin.hm-sops-bridge` with only the view; both keyed `vanixiets/hm-sops-bridge` through `flake.lib.exportAs` and imported into the class bases; delete the six per-host `hm-sops-bridge` imports (cinnabar `default.nix:41`, electrum `:28`, galena `:27`, magnetite `:40`, pyrite `:78`, scheelite `:30`). Import `homeManager.secrets` in `home/mk-home.nix`.
 - [ ] **Step 4:** Evaluate the three views of task 2.2; each `{}`.
 - [ ] **Step 5:** Write `modules/checks/secrets-seam-translation.nix` (fixtures of design D11; `lib.evalModules` over `flake.modules.nixos.secrets` plus a stub `options.clan.core.vars.generators = lib.mkOption { type = lib.types.attrsOf (lib.types.submodule { freeformType = lib.types.attrsOf lib.types.anything; }); }`), gated, sized and built as `checks/host-key-obligations.nix` does: `lib.optionalAttrs (system == "x86_64-linux")` (`:59`), the `testSizes.checks` entry (`:60-66`) and the check through `self.lib.mkJudgeCheck` (`:67`). Build it; run the `restartUnits` mutant; record.
-- [ ] **Step 6:** Write `modules/checks/secrets-seam-confinement.nix`: `actual` from `lib.filesystem.listFilesRecursive ../.` filtered to `.nix`, no `/_` component, and a non-comment line matching the two patterns (`lib.splitString "\n"` + `builtins.match`); `expected` the literal list from Task 1 Step 4; `flake.lib.mkStructuralCheck`. Build it; run the mutant of task 2.4.
+- [ ] **Step 6:** Write `modules/checks/secrets-seam-confinement.nix`: `actual` from `lib.filesystem.listFilesRecursive ../.` filtered to `.nix`, no `/_` component, neither seam file, and a non-comment line matching the two patterns (`lib.splitString "\n"` + `builtins.match`); `expected` the literal list from Task 1 Step 4 with the translation judge added; `flake.lib.mkStructuralCheck`. Build it; run the mutant of task 2.4.
 - [ ] **Step 6a:** Measure the import moves (task 2.4a, design D5): the ten toplevel drvPaths and every home's activation drvPath at the parent, with only the secrets module in the base aspects, and with the bridge moved. If the bridge move changes any, put the six per-host `hm-sops-bridge` imports back and keep only the secrets module in the base aspects; declare no host changed.
 - [ ] **Step 7:** `treefmt` the new and edited files; squash into step 1's commit; return `just drv-diff <parent> <commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/01-seam.txt`.
 
@@ -180,7 +180,7 @@ Step-specific points:
 ## Task 14: Step 13, close (tasks 14.1–14.6)
 
 - [ ] **Step 1:** Replace `hostConfig.clan.core.vars.generators` in `lib/shared-vars-recipients.nix:43` and `lib/fleet-deployer.nix:303` with `self.lib.secretsBackend.generatorsOf hostConfig` (or `config.flake.lib…`, as each file already reaches `flake.lib`), and build `lib/shared-vars-recipients.nix:42`'s message path with `flake.lib.vars.relPath` (design D9); diff the baselines, message text included; build the two obligation checks.
-- [ ] **Step 2:** Set the confinement `expected` to the final list (design D8); add `checks/commit-signing-key.nix` to `lib/vars.nix`'s exemption list and name the secrets module as the seam's other half in its header; run the gitea mutant.
+- [ ] **Step 2:** Set the confinement `expected` to the final list (design D8, the translation judge included); add `checks/commit-signing-key.nix` to `lib/vars.nix`'s exemption list and name the secrets module as the seam's other half in its header; run the gitea mutant.
 - [ ] **Step 3:** Close-out search for guards and fallbacks (task 14.4).
 - [ ] **Step 4:** Documents (task 14.5); `prek run --files`.
 - [ ] **Step 5:** `treefmt`; squash; return the step 13 drv-diff command.

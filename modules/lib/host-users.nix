@@ -50,9 +50,8 @@ let
               defaultText = lib.literalExpression ''class == "nixos"'';
               apply =
                 v:
-                assert lib.assertMsg (
-                  !v || host.class == "nixos"
-                ) "${at}.sopsBridge: true on a ${host.class} host, which has no hm-sops-bridge";
+                assert lib.assertMsg (!v || host.class == "nixos")
+                  "${at}.sopsBridge: true on a ${host.class} host, which has no age-key bridge (the darwin hm-sops-bridge module sets only the secrets view)";
                 v;
               description = "Whether the person's personal age key is bridged to the account (hm-sops-bridge).";
             };

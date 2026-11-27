@@ -28,6 +28,7 @@
       # (system/home-manager-integration.nix).
       modules = config.flake.users.${user}.modules ++ [
         config.flake.lib.sourceContextObligations.homeModule
+        config.flake.modules.homeManager.secrets
         { _module.args.flake = config.flake.lib.homeFlake; }
       ];
     };

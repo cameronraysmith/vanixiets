@@ -36,11 +36,43 @@
 # on any secret store. A switch-time race between key delivery and home-manager
 # activation is therefore possible in that mode. It does not exist in ours today.
 #
-# This module has no OpenSpec change and no ADR: its introducing commit 5be53d720 carries
-# a subject line and no body, so this header is the entire design record.
+# The home view: every home-manager user of a host, bridged or not, gets the
+# home option
+# flake.modules.homeManager.secrets (modules/system/secrets.nix) set to the
+# host's `vanixiets.secrets` entries with a file that user owns, projected to
+# each file's delivered `path` and sops `placeholder`, never its contents. The
+# view is set from a shared home module keyed on `home.username`, because a
+# host-level definition of `home-manager.users` derived from that option's own
+# names would recurse. flake.modules.darwin.hm-sops-bridge carries only the
+# view; nixos.base and darwin.base import the two modules.
+#
+# The age-key bridge has no OpenSpec change and no ADR: its introducing commit
+# 5be53d720 carries a subject line and no body, so this header is its entire
+# design record.
 flakeArgs@{ ... }:
-{
-  flake.modules.nixos.hm-sops-bridge =
+let
+  inherit (flakeArgs.config.flake.lib) exportAs;
+
+  homeView =
+    { config, lib, ... }:
+    let
+      hostSecrets = config.vanixiets.secrets;
+      view =
+        user:
+        lib.mapAttrs (_: s: {
+          files = lib.mapAttrs (_: f: { inherit (f) path placeholder; }) (
+            lib.filterAttrs (_: f: f.owner == user) s.files
+          );
+        }) (lib.filterAttrs (_: s: lib.any (f: f.owner == user) (lib.attrValues s.files)) hostSecrets);
+    in
+    {
+      home-manager.sharedModules = [
+        flakeArgs.config.flake.modules.homeManager.secrets
+        ({ config, ... }: { vanixiets.secrets = view config.home.username; })
+      ];
+    };
+
+  bridge =
     {
       config,
       lib,
@@ -74,6 +106,8 @@ flakeArgs@{ ... }:
       );
     in
     {
+      imports = [ homeView ];
+
       options.hm-sops-bridge.users = lib.mkOption {
         type = lib.types.attrsOf userOpts;
         default = { };
@@ -135,4 +169,22 @@ flakeArgs@{ ... }:
         }) cfg.users;
       };
     };
+
+  exportBridge =
+    module:
+    exportAs {
+      key = "hm-sops-bridge";
+      names = [ "hm-sops-bridge" ];
+      inherit module;
+    };
+  nixos = exportBridge bridge;
+  darwin = exportBridge homeView;
+in
+{
+  flake.modules.nixos = nixos // {
+    base.imports = [ nixos.hm-sops-bridge ];
+  };
+  flake.modules.darwin = darwin // {
+    base.imports = [ darwin.hm-sops-bridge ];
+  };
 }
