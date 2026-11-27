@@ -1,0 +1,14 @@
+# Declared drvPath differences of composing hosts from provider and
+# workstation aspects (hetzner-cloud, gcp-cloud, darwin-workstation for
+# argentum, rosegold and blackphos), reading state versions from the registry
+# and writing host facts once, from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-provider-aspects.txt
+# None. Measured against main 3fea6f9b (main plus only this commit's files):
+# all six NixOS and four darwin toplevels and all twenty homes identical, and
+# the per-host stateVersion, zramSwap.memoryPercent, MaxAuthTries, devNodes,
+# grub.enable, 10-uplink, nixbld gid, knownUsers, human users.users fields and
+# documentation options equal. stibnite does not import darwin-workstation
+# (design Open Question 11). No testSizes entry and no packages/docs file
+# changes; checks that embed the whole flake source or every .nix file under
+# modules/ are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt).

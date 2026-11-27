@@ -23,7 +23,7 @@
 | 4 server aspects, ZFS table | 5 | magnetite `default.nix`, `lib/observability-hosts.nix` | after them |
 | 5 flags deleted | 6 | magnetite `default.nix`, `{nixos,darwin,system}/shared-reference-tree.nix` | after them |
 | 6 identity, today's activation order | 7 | no | any time after commit 1 |
-| 6b deploy record last (planned, not started; design Open Question 9) | 7b | no | after 6, before 7; host-changing, deploys the four Macs |
+| 6b deploy record last (design Open Question 9) | 7b | no | after 6, before 7; host-changing, deploys the four Macs |
 | 7 darwin caches | 8 | no | last |
 
 ---
@@ -97,21 +97,21 @@
 - **Step 5:** not done: named import lists change hosts and homes (design D11, Open Question 10).
 - [x] **Step 6:** `drv-delta-module-identity.txt` with no entries; return the drv-diff command.
 
-## Task 7b: Commit 6b, the deploy record last (planned, not started; design D8, Open Question 9)
+## Task 7b: Commit 6b, the deploy record last (design D8, Open Question 9)
 
-- [ ] **Step 1:** Set `activationOrder.deployRecord` above every other `postActivation` contributor (1900); evaluate each Mac's `postActivation.text` and confirm the record's invocation is the last non-comment line before the relink, and that nothing else moved.
-- [ ] **Step 2:** Extend `orderProblems` with the darwin "nothing between record and relink" rule; add `darwinSnippetAfterRecord`; `nix build .#checks.x86_64-linux.deploy-record-order`. No `testSizes` entry changes, so `fleet-alert` is unaffected.
-- [ ] **Step 3:** Mutant on argentum in the throwaway tree (a `lib.mkOrder 2000` snippet): `checks.aarch64-darwin.darwin-argentum` fails evaluation naming `deployRecordObligations`; log it.
-- [ ] **Step 4:** `drv-delta-record-last.txt`: `darwin.{argentum,blackphos,rosegold,stibnite}`, `checks.aarch64-darwin.darwin-{argentum,blackphos,rosegold,stibnite}` and `checks.x86_64-linux.deploy-record-order`, each `changed`; return the drv-diff command.
+- [x] **Step 1:** Set `activationOrder.deployRecord` above every other `postActivation` contributor (1900); evaluate each Mac's `postActivation.text` and confirm the record's invocation is the last non-comment line before the relink, and that nothing else moved.
+- [x] **Step 2:** Extend `orderProblems` with the darwin "nothing between record and relink" rule; add `darwinSnippetAfterRecord`; `nix build .#checks.x86_64-linux.deploy-record-order`. No `testSizes` entry changes, so `fleet-alert` is unaffected.
+- [x] **Step 3:** Mutant on argentum in the throwaway tree (a `lib.mkOrder 2000` snippet): `checks.aarch64-darwin.darwin-argentum` fails evaluation naming `deployRecordObligations`; log it.
+- [x] **Step 4:** `drv-delta-record-last.txt`: `darwin.{argentum,blackphos,rosegold,stibnite}` and `checks.aarch64-darwin.darwin-{argentum,blackphos,rosegold,stibnite}`, each `changed` (`checks.x86_64-linux.deploy-record-order` keeps its drvPath, measured: `judgeCases` returns the derivation unchanged); return the drv-diff command.
 - [ ] **Step 5:** After merge, the operator deploys stibnite, then argentum and rosegold, then blackphos when online, and reads each Mac's activation output and the last line of `/var/log/deploy-record.jsonl`.
 
 ## Task 8: Commit 7, one copy of each darwin cache (tasks.md 8.1-8.6)
 
-- [ ] **Step 1:** Delete `modules/darwin/caches.nix`; fix the comments naming it.
-- [ ] **Step 2:** Evaluate each Mac's `nix.settings` lists; compare with task 1 Step 4 (second copy gone, nothing else).
-- [ ] **Step 3:** Per Mac, `nix run nixpkgs#nix-diff -- $(cat baseline drv) $(nix eval --raw .#darwinConfigurations.<h>.config.system.build.toplevel.drvPath)`; log it.
-- [ ] **Step 4:** Confirm the six NixOS toplevels are unchanged.
-- [ ] **Step 5:** `drv-delta-7.txt`: `darwin.argentum`, `darwin.blackphos`, `darwin.rosegold`, `darwin.stibnite`, `checks.aarch64-darwin.darwin-argentum`, `checks.aarch64-darwin.darwin-blackphos`, `checks.aarch64-darwin.darwin-rosegold`, `checks.aarch64-darwin.darwin-stibnite`, each `changed` with its cause; return the drv-diff command.
+- [x] **Step 1:** Delete `modules/darwin/caches.nix`; fix the comments naming it.
+- [x] **Step 2:** Evaluate each Mac's `nix.settings` lists; compare with task 1 Step 4 (second copy gone, nothing else).
+- [x] **Step 3:** Per Mac, `nix run nixpkgs#nix-diff -- $(cat baseline drv) $(nix eval --raw .#darwinConfigurations.<h>.config.system.build.toplevel.drvPath)`; log it.
+- [x] **Step 4:** Confirm the six NixOS toplevels are unchanged.
+- [ ] **Step 5:** `drv-delta-darwin-caches.txt`: `darwin.argentum`, `darwin.blackphos`, `darwin.rosegold`, `darwin.stibnite`, `checks.aarch64-darwin.darwin-argentum`, `checks.aarch64-darwin.darwin-blackphos`, `checks.aarch64-darwin.darwin-rosegold`, `checks.aarch64-darwin.darwin-stibnite`, each `changed` with its cause; return the drv-diff command.
 - [ ] **Step 6:** Hand the operator the deploy runbook of design Migration Plan step 3 (stibnite, argentum and rosegold, blackphos when online) with the read-back of `/etc/nix/nix.conf` and the alert-topic read.
 
 ## Task 9: Integration (tasks.md 9.1-9.5)

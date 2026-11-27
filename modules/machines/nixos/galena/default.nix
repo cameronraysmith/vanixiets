@@ -12,16 +12,15 @@ in
   flake.modules.nixos."machines/nixos/galena" =
     {
       config,
-      lib,
       ...
     }:
     {
       imports = [
         inputs.srvos.nixosModules.server
-        # NOTE: Do NOT import srvos.hardware-hetzner-cloud (Hetzner-specific)
         inputs.home-manager.nixosModules.home-manager
       ]
       ++ (with flakeModules; [
+        gcp-cloud
         base
         home-manager-integration
         deploy-record
@@ -30,14 +29,11 @@ in
         ssh-known-hosts
       ]);
 
-      # ZFS device node path - more stable for cloud VMs
-      boot.zfs.devNodes = "/dev/disk/by-path";
-
       # Disko disk configuration extracted to disko.nix
       # Auto-merged via import-tree
 
       # Bootloader: UEFI with systemd-boot (GCP defaults to UEFI since April 2020)
-      boot.loader.grub.enable = lib.mkForce false;
+      boot.loader.grub.enable = false;
       boot.loader.systemd-boot.enable = true;
       boot.loader.efi.canTouchEfiVariables = true;
 
@@ -45,9 +41,6 @@ in
       networking.hostName = "galena";
 
       networking.search = [ ];
-
-      # Override state version for new deployment
-      system.stateVersion = "25.05";
 
       # GCP VM with no nested virtualisation, so no /dev/kvm.
       declaredKvm.present = false;
@@ -58,18 +51,9 @@ in
       security.sudo.wheelNeedsPassword = false;
 
       # Networking configuration
-      # Configure networkd for GCP VMs
+      # Configure networkd for GCP VMs; the uplink is gcp-cloud's
       networking.useNetworkd = true;
       networking.useDHCP = false;
-      systemd.network.networks."10-uplink" = {
-        matchConfig.Name = "en* eth*";
-        networkConfig = {
-          DHCP = "yes";
-          IPv6AcceptRA = true;
-        };
-        dhcpV4Config.UseDNS = true;
-        dhcpV6Config.UseDNS = true;
-      };
 
       # Firewall configuration
       networking.firewall = {
@@ -77,10 +61,5 @@ in
         # Allow SSH (configured by srvos.nixosModules.server)
         # Additional ports can be opened as needed
       };
-
-      # SSH daemon configuration
-      # Increase MaxAuthTries to accommodate agent forwarding with many keys
-      # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
-      services.openssh.settings.MaxAuthTries = 20;
     };
 }

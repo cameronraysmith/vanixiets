@@ -29,10 +29,10 @@ in
         ])
         ++ [
           inputs.srvos.nixosModules.server
-          inputs.srvos.nixosModules.hardware-hetzner-cloud
           inputs.home-manager.nixosModules.home-manager
         ]
         ++ (with flakeModules; [
+          hetzner-cloud
           base
           home-manager-integration
           deploy-record
@@ -50,22 +50,16 @@ in
           zt-dns-server
         ]);
 
-      # ZFS device node path - more stable for cloud VMs
-      boot.zfs.devNodes = "/dev/disk/by-path";
-
       # Disko disk configuration extracted to disko.nix
       # Auto-merged via import-tree
 
       # Bootloader: GRUB BIOS mode (CX43 has legacy BIOS only, not UEFI)
-      # srvos hardware-hetzner-cloud handles GRUB BIOS configuration
+      # The hetzner-cloud aspect (srvos's Hetzner hardware module) handles GRUB BIOS configuration
 
       # Hostname configuration
       networking.hostName = "cinnabar";
 
       networking.search = [ ];
-
-      # Override state version for new deployment
-      system.stateVersion = "25.05";
 
       # Hetzner CX43 with no nested virtualisation, so no /dev/kvm.
       declaredKvm.present = false;
@@ -78,29 +72,11 @@ in
       # Allow wheel group sudo without password
       security.sudo.wheelNeedsPassword = false;
 
-      # Networking configuration
-      # srvos hardware-hetzner-cloud sets useNetworkd=true and useDHCP=false
-      # Configure primary interface with DHCP
-      systemd.network.networks."10-uplink" = {
-        matchConfig.Name = "en*";
-        networkConfig = {
-          DHCP = "yes";
-          IPv6AcceptRA = true;
-        };
-        dhcpV4Config.UseDNS = true;
-        dhcpV6Config.UseDNS = true;
-      };
-
       # Firewall configuration
       networking.firewall = {
         enable = true;
         # Allow SSH (configured by srvos.nixosModules.server)
         # Additional ports can be opened as needed
       };
-
-      # SSH daemon configuration
-      # Increase MaxAuthTries to accommodate agent forwarding with many keys
-      # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
-      services.openssh.settings.MaxAuthTries = 20;
     };
 }

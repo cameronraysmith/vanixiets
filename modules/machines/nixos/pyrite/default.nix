@@ -142,12 +142,13 @@ in
       networking.hostName = "pyrite";
       time.timeZone = "America/New_York";
 
-      # Matches the 26.05 installer ISO release this machine is installed from. Never
-      # change after install. This plain assignment overrides clan-core's state-version
-      # module, which sets system.stateVersion at mkDefault priority from the stored var
-      # (clan-core nixosModules/clanCore/state-version/default.nix:18), so the committed
-      # vars/per-machine/pyrite/state-version/version/value does not affect evaluation.
-      system.stateVersion = "26.05";
+      # system.stateVersion is the registry's 26.05 (flake.fleet.hosts.pyrite,
+      # modules/lib/hosts.nix), the installer ISO release this machine was installed
+      # from; never change it after install. nixos.base sets it plainly, overriding
+      # clan-core's state-version module, which sets it at mkDefault priority from the
+      # stored var (clan-core nixosModules/clanCore/state-version/default.nix:18), so
+      # the committed vars/per-machine/pyrite/state-version/version/value does not
+      # affect evaluation.
 
       # Bare metal with /dev/kvm present at mode 0666, the only machine in the
       # fleet that can accelerate a QEMU guest, which is what makes the vmTests
@@ -624,10 +625,6 @@ in
         ];
         ProtectHome = "read-only";
       };
-
-      # Increase MaxAuthTries to accommodate agent forwarding with many keys
-      # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
-      services.openssh.settings.MaxAuthTries = 20;
 
       # Inbound half of the fleet's kvm lane: pyrite is the only machine with
       # /dev/kvm, so it serves kvm-requiring builds (the vmTests outputs) to

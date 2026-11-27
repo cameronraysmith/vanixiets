@@ -64,7 +64,6 @@ in
     {
       imports = [
         inputs.srvos.nixosModules.server
-        inputs.srvos.nixosModules.hardware-hetzner-cloud
         inputs.srvos.nixosModules.mixins-nginx
         inputs.home-manager.nixosModules.home-manager
         inputs.niks3.nixosModules.niks3
@@ -72,6 +71,7 @@ in
         inputs.gitea-mq.nixosModules.default
       ]
       ++ (with flakeModules; [
+        hetzner-cloud
         base
         home-manager-integration
         deploy-record
@@ -137,17 +137,12 @@ in
         participants = [ "cameron" ] ++ workerAccountsOn "magnetite";
       };
 
-      # ZFS device node path - more stable for cloud VMs
-      boot.zfs.devNodes = "/dev/disk/by-path";
-
       # Bootloader: GRUB BIOS mode (CX53 has legacy BIOS only, not UEFI)
-      # srvos hardware-hetzner-cloud handles GRUB BIOS configuration
+      # The hetzner-cloud aspect (srvos's Hetzner hardware module) handles GRUB BIOS configuration
 
       networking.hostName = "magnetite";
 
       networking.search = [ ];
-
-      system.stateVersion = "25.05";
 
       # Hetzner CX53 with no nested virtualisation, so no /dev/kvm.
       declaredKvm.present = false;
@@ -1060,9 +1055,9 @@ in
       # eval that exhausts swap is OOM-killed into a permanent PR failure.
       # 150 % is 45.9 GiB; holding that peak costs ~6.9 GiB of real RAM at the
       # measured 4.55x. Machine-scoped, not fleet-wide: pyrite is a 15 GiB
-      # laptop that livelocked under zram pressure. mkForce because base sets
-      # the percentage as a plain value (modules/system/zram-swap.nix).
-      zramSwap.memoryPercent = lib.mkForce 150;
+      # laptop that livelocked under zram pressure. base sets the fleet default
+      # with lib.mkDefault (modules/system/zram-swap.nix).
+      zramSwap.memoryPercent = 150;
 
       # The 60 default is calibrated for disk swap. Nothing reaches zram
       # without reclaim pressure, and the measured runs used 100, which is also
@@ -1083,17 +1078,6 @@ in
       # settles on cold boot (mirrors modules/machines/nixos/cinnabar/caddy.nix).
       boot.kernel.sysctl."net.ipv6.ip_nonlocal_bind" = 1;
 
-      # srvos hardware-hetzner-cloud sets useNetworkd=true and useDHCP=false; configure primary interface explicitly.
-      systemd.network.networks."10-uplink" = {
-        matchConfig.Name = "en*";
-        networkConfig = {
-          DHCP = "yes";
-          IPv6AcceptRA = true;
-        };
-        dhcpV4Config.UseDNS = true;
-        dhcpV6Config.UseDNS = true;
-      };
-
       # Firewall configuration: dual-zone (public + mesh)
       networking.firewall = {
         enable = true;
@@ -1107,10 +1091,6 @@ in
           allowedTCPPorts = [ 8090 ]; # omnigraph; further ports added by service modules
         });
       };
-
-      # Increase MaxAuthTries to accommodate agent forwarding with many keys
-      # Default is 6, but Bitwarden SSH agent may have 10+ keys loaded
-      services.openssh.settings.MaxAuthTries = 20;
 
       # nix-fast-build --remote opens one ssh connection per build, so a client
       # with N cores offers up to N concurrent pre-auth connections. sshd's

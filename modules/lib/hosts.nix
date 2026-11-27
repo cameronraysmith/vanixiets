@@ -121,7 +121,7 @@ let
               )
               "${where}.stateVersion: ${builtins.toJSON v} does not fit a ${config.class} host (darwin an integer, nixos a release string, android null)";
             v;
-          description = "The host module's state version; not yet read by the host modules.";
+          description = "The host's state version, which nixos.base and darwin.base set as system.stateVersion.";
         };
 
         class = lib.mkOption {

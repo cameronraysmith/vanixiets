@@ -67,6 +67,11 @@ let
                 v;
               description = "The account's uid on a darwin host; null on NixOS, where clan allocates it.";
             };
+            shellAndKeysFromUserService = lib.mkOption {
+              type = types.bool;
+              default = false;
+              description = "Whether the account's clan user service sets its login shell and SSH authorized keys (modules/clan/inventory/services/users/cameron.nix and users/tara.nix do), so the host modules must not set them. A fact about the account: every attachment of one account states the same value (flake.lib.shellAndKeysFromUserService).";
+            };
             extraImports = lib.mkOption {
               # raw, not deferredModule: a deferredModule list wraps each
               # module in a fresh one, losing its key, so a module also
@@ -111,19 +116,26 @@ in
   };
 
   config.flake.fleet.hosts = {
-    cinnabar.users.cameron = { };
-    electrum.users.cameron = { };
+    cinnabar.users.cameron.shellAndKeysFromUserService = true;
+    electrum.users.cameron.shellAndKeysFromUserService = true;
     galena.users = {
-      cameron = { };
-      tara.overrides.programs.agents-md.enable = false;
+      cameron.shellAndKeysFromUserService = true;
+      tara = {
+        shellAndKeysFromUserService = true;
+        overrides.programs.agents-md.enable = false;
+      };
     };
     scheelite.users = {
-      cameron = { };
-      tara.overrides.programs.agents-md.enable = false;
+      cameron.shellAndKeysFromUserService = true;
+      tara = {
+        shellAndKeysFromUserService = true;
+        overrides.programs.agents-md.enable = false;
+      };
     };
-    magnetite.users.cameron = { };
+    magnetite.users.cameron.shellAndKeysFromUserService = true;
     pyrite.users.cameron = {
       primary = true;
+      shellAndKeysFromUserService = true;
       extraImports = with homeModules; [
         niri
         dms
@@ -185,6 +197,7 @@ in
       cameron = {
         admin = true;
         uid = 502;
+        shellAndKeysFromUserService = true;
         overrides.deploysWithoutScreenSession = true;
       };
     };
@@ -197,6 +210,7 @@ in
       cameron = {
         admin = true;
         uid = 502;
+        shellAndKeysFromUserService = true;
         overrides.deploysWithoutScreenSession = true;
       };
     };
@@ -206,4 +220,19 @@ in
   config.flake.lib.hostsOfAccount =
     account:
     lib.attrNames (lib.filterAttrs (_: host: host.users ? ${account}) config.flake.fleet.hosts);
+
+  # Whether `account`'s clan user service sets its login shell and SSH
+  # authorized keys, read from its attachments. The fact is the account's, so
+  # every attachment of the account must state the same value; reading it
+  # fails, naming the hosts on each side, when they disagree.
+  config.flake.lib.shellAndKeysFromUserService =
+    account:
+    let
+      byValue = lib.partition (
+        host: config.flake.fleet.hosts.${host}.users.${account}.shellAndKeysFromUserService
+      ) (config.flake.lib.hostsOfAccount account);
+    in
+    assert lib.assertMsg (byValue.right == [ ] || byValue.wrong == [ ])
+      "flake.fleet.hosts.<host>.users.${account}.shellAndKeysFromUserService: the attachments of ${account} disagree: true on ${lib.concatStringsSep ", " byValue.right}, false on ${lib.concatStringsSep ", " byValue.wrong}";
+    byValue.right != [ ];
 }

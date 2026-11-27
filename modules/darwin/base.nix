@@ -1,3 +1,7 @@
+{ config, ... }:
+let
+  inherit (config.flake.lib) hosts;
+in
 {
   flake.modules.darwin.base =
     {
@@ -44,14 +48,16 @@
       #
       # Plain rather than lib.mkDefault: nix-darwin's modules/misc/ids.nix sets
       # `lib.mkDefault (if stateVersion < 5 then 30000 else 350)`, and every
-      # host here forces stateVersion 4, so a second mkDefault ties with it and
-      # fails evaluation. A host whose nixbld group really is 30000 must say so
-      # with lib.mkForce; a mismatch surfaces as an activation error, not
-      # silently.
+      # host here has stateVersion 4 in the registry, so a second mkDefault
+      # ties with it and fails evaluation. A host whose nixbld group really is
+      # 30000 must say so with lib.mkForce; a mismatch surfaces as an
+      # activation error, not silently.
       ids.gids.nixbld = 350;
 
-      # System state version
-      system.stateVersion = 5;
+      # The host's state version, from its registry record
+      # (flake.fleet.hosts.<host>.stateVersion, modules/lib/hosts.nix): the
+      # version the Mac was first set up with.
+      system.stateVersion = hosts.${config.networking.hostName}.stateVersion;
 
       # Timezone for all darwin machines
       time.timeZone = "America/New_York";
