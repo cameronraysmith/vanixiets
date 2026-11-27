@@ -156,6 +156,7 @@ A run whose backup, prune and check all succeeded writes `vanixiets_omnigraph_ba
 
 Restore from the backup when the dataset's contents are lost or damaged.
 The steps are the ones `vmTests.x86_64-linux.omnigraph-local-root` runs and checks to identical entity counts and stored-query answers, all but the rollback in step 3.
+On 2026-11-27 two restores of the nightly backup `831ae1d2` were rehearsed: these steps in place on magnetite, which brought the graphs back identical with the server down for 37 s, and the restore without the host below, on a Mac, which served the same graphs from a scratch directory.
 On a host that no longer has the dataset, create it first as the switch to local disk does: `sudo zfs create -o mountpoint=/var/lib/omnigraph -o quota=20G zroot/root/omnigraph`.
 
 1. Stop the nightly backup's timer and the server, so that no backup runs over a half-restored dataset; the prune after such a backup keeps one backup a day and would drop that day's good one:
@@ -194,15 +195,48 @@ On a host that no longer has the dataset, create it first as the switch to local
    grep vanixiets_omnigraph_graph_entities /run/node-exporter-textfile/omnigraph.prom
    ```
    The entity counts should equal those stored on the night of the backup, for example from `nix run .#obs-query -- --table promql 'vanixiets_omnigraph_graph_entities{host_name="magnetite"}'`.
-9. Once they do, drop the snapshot of step 3, which otherwise keeps the replaced files' space within the dataset's quota, and start the timer again:
+9. Once they do, drop the snapshot of step 3 and start the timer again:
    ```bash
    sudo zfs destroy zroot/root/omnigraph@pre-restore
    sudo systemctl start restic-backups-omnigraph.timer
    ```
    If they do not, roll back as step 3 says before starting the timer.
+   The replaced files' space stays within the dataset's quota while any snapshot taken before the restore remains, the automatic ones as well as the one of step 3, so dropping that one frees little; it returns as the automatic ones expire, within a week on magnetite, which keeps 4 hourly, 3 daily and 1 weekly snapshot.
 
 To return to a recent state without R2, the dataset's hourly, daily and weekly ZFS snapshots are listed by `zfs list -t snapshot zroot/root/omnigraph`.
-Any copy of a root carries the lock of the server it was taken from, so a copy from one of them needs the same `chown` and unlock; this path is not exercised by a test.
+A copy taken while the server ran carries its lock, so a copy from one of them needs the same `chown` and unlock; this path is not exercised by a test.
+The snapshot of step 3, taken after the server's clean stop, holds no lock.
+
+### Restoring without the host
+
+A copy of the backup can be read and served on any machine holding the repository's clan vars keys, without magnetite and without writing to the bucket.
+Use restic and `omnigraph` at the repository's pins, for example in `nix shell --inputs-from . nixpkgs#restic .#omnigraph`.
+Every restic command takes `--no-lock`, so it writes no lock object to the repository; run nothing but `snapshots`, `ls` and `restore`.
+The credentials go to files only the current user can read, and the restic password reaches restic as a file:
+```bash
+umask 077
+S=$(mktemp -d)
+clan vars get magnetite omnigraph-backup-r2/env > "$S/r2.env"
+clan vars get magnetite omnigraph-backup-restic/password > "$S/restic.pw"
+r() { ( set -a; . "$S/r2.env"; set +a
+  restic -r s3:https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com/sciexp-omnigraph-backup/magnetite \
+    -o s3.bucket-lookup=path -o s3.region=auto \
+    --password-file "$S/restic.pw" --cache-dir "$S/cache" --no-lock "$@" ); }
+r snapshots
+r restore <SNAPSHOT> --target "$S/restore"
+```
+Without a `:<path>` after the id the restore keeps the backed-up path, so the root is under the snapshot directory.
+Clear the serve lock the backup carries, and serve the copy on a loopback port with a tokens file made for it:
+```bash
+export OMNIGRAPH_HOME="$S/home"; mkdir -p "$OMNIGRAPH_HOME"
+ROOT="$S/restore/var/lib/omnigraph/.zfs/snapshot/restic/clusters/cookbooks-f17"
+omnigraph --target "$ROOT" cluster force-unlock "$(jq -r .lock_id "$ROOT/__cluster/lock.json")"
+printf '{"admin":"%s"}' "$(openssl rand -hex 32)" > "$S/tokens.json"
+OMNIGRAPH_SERVER_BEARER_TOKENS_FILE="$S/tokens.json" \
+  omnigraph-server --cluster "$ROOT" --bind 127.0.0.1:18090 --require-all-graphs
+```
+The root's bootstrap marker and its deployment record name `/var/lib/omnigraph/clusters/cookbooks-f17`, but the server serves the copy from wherever it lies.
+Stop the server and remove `$S` when done.
 
 ## Switching back to R2
 
