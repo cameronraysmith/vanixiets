@@ -8,9 +8,15 @@
 # address; electrum's own host file additionally claims magnetite's address, a
 # subnet no peer's copy of electrum's host file grants.
 #
-# The clan test harness generates every machine's tincr-vanixiets var with the
-# service's generator, so the connections prove tincr loads the keys that
-# generator writes.
+# Every machine's tincr-vanixiets var comes from the committed
+# tincr-mesh/clan-vars (flake.lib.clanTestVarsFixture), written by the
+# service's generator and regenerated with
+# `nix run .#regenerate-clan-test-vars -- tincr-mesh`. The connections prove
+# tincr loads keys that generator wrote when the directory was regenerated,
+# not keys this build's generator writes. The generator still runs at build
+# time in clanTest's vars-check and in the fixture's comparison, which fails
+# the build when the committed files no longer match its declared files or
+# the shape of its output.
 #
 # Non-gating, like every vmTest; it requires kvm, so it builds on pyrite.
 { inputs, config, ... }:
@@ -73,7 +79,10 @@ in
       };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         tincr-mesh = nixosLib.runTest {
-          imports = [ inputs.clan-core.modules.nixosTest.clanTest ];
+          imports = [
+            inputs.clan-core.modules.nixosTest.clanTest
+            config.flake.lib.clanTestVarsFixture
+          ];
           hostPkgs = pkgs;
           defaults._module.args.clan-core = inputs.clan-core;
           name = "tincr-mesh";

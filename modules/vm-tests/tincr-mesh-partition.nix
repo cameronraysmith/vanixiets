@@ -14,6 +14,14 @@
 # Without mesh-hosts on pyrite and electrum the names go to the stopped
 # resolvers and the last subtest fails.
 #
+# Every machine's tincr-vanixiets var comes from the committed
+# tincr-mesh-partition/clan-vars (flake.lib.clanTestVarsFixture), regenerated
+# with `nix run .#regenerate-clan-test-vars -- tincr-mesh-partition`; the mesh
+# runs on keys the service's generator wrote then, not in this build. The
+# generator still runs at build time in clanTest's vars-check and in the
+# fixture's comparison, which fails the build when the committed files no
+# longer match its declared files or the shape of its output.
+#
 # Non-gating, like every vmTest; it requires kvm, so it builds on pyrite.
 { inputs, config, ... }:
 let
@@ -60,7 +68,10 @@ in
       };
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         tincr-mesh-partition = nixosLib.runTest {
-          imports = [ inputs.clan-core.modules.nixosTest.clanTest ];
+          imports = [
+            inputs.clan-core.modules.nixosTest.clanTest
+            config.flake.lib.clanTestVarsFixture
+          ];
           hostPkgs = pkgs;
           defaults._module.args.clan-core = inputs.clan-core;
           name = "tincr-mesh-partition";
