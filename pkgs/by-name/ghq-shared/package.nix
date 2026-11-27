@@ -79,7 +79,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   passthru = {
     inherit socket;
-    tests.handler = callPackage ./test-handler.nix { ghq-shared = finalAttrs.finalPackage; };
+    tests.handler = callPackage ./test-handler.nix {
+      ghq-shared = finalAttrs.finalPackage;
+      script = "test_handler.py";
+    };
+    tests.handler-history = callPackage ./test-handler.nix {
+      ghq-shared = finalAttrs.finalPackage;
+      script = "test_handler_history.py";
+    };
     tests.wrapper = callPackage ./test-wrapper.nix { ghq-shared = finalAttrs.finalPackage; };
     tests.acl = callPackage ./test-acl.nix { ghq-shared = finalAttrs.finalPackage; };
   };

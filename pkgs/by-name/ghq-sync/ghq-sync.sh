@@ -49,8 +49,9 @@ Options:
                    `git diff A B` needs A and B. On a host-shared tree the writer
                    already does this for the commits an update, deepen or tag
                    fetch brings into a clone's branches and remote-tracking
-                   branches, but not for a tag commit --tags fetches at depth 1,
-                   which needs --hydrate TAG; readers' git there refuses every
+                   branches, but not for a commit only a tag reaches, as --tags
+                   fetches one at depth 1, which needs --hydrate TAG until a
+                   branch reaches it; readers' git there refuses every
                    transport, so a read needing absent contents fails with
                    "transport '<scheme>' not allowed" and "could not fetch <oid>
                    from promisor remote".
@@ -75,7 +76,8 @@ Options:
   --tags           On a host-shared tree, also fetch the remote's tags; full clones
                    always fetch tags on update, shallow clones fetch absent tags at
                    depth 1 without moving their history boundary, and each such
-                   tag commit stays unhydrated until --hydrate TAG (fetch mode).
+                   tag commit stays unhydrated until --hydrate TAG or until an
+                   update brings in a branch commit that reaches it (fetch mode).
   -j, --jobs N     Bounded concurrency for --deepen/--full/--hydrate (default: 6).
   -n, --dry-run    Print intended actions for --deepen/--full/--hydrate/--all/
                    --seed-zoxide; no mutation.

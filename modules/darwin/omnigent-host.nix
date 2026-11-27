@@ -452,7 +452,7 @@ in
                       || (
                         home.programs.ghq-shared.root == sharing.root
                         && (home.programs.git.settings.safe.bareRepository or null) == "explicit"
-                        && flakeConfig.flake.lib.sharedReferenceTreeRefusesTransport sharing.rootForms home.programs.git
+                        && flakeConfig.flake.lib.sharedReferenceTreeRefusesTransport sharing.rootForms home
                       )
                     )
                     && flakeConfig.flake.lib.sharedReferenceTreeSafeDirectoriesConform {

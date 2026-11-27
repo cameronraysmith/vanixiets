@@ -71,7 +71,7 @@ in
             transportOpen = lib.concatMap (
               user:
               map (gap: "${user}: ${gap}") (
-                flakeConfig.flake.lib.sharedReferenceTreeTransportGaps cfg.rootForms hm.${user}.programs.git
+                flakeConfig.flake.lib.sharedReferenceTreeTransportGaps cfg.rootForms hm.${user}
               )
             ) cfg.participants;
           in

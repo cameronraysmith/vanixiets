@@ -7,7 +7,7 @@ linear_story_state: In Progress
 linear_team: CAM
 last_synced_state: In Progress
 last_synced_at: "2026-11-27T05:05:13Z"
-review_round: 1
+review_round: 2
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:56:11Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-136 created in Todo on team CAM with no project, description seeded from proposal.md; state confirmed by read-only view" }
@@ -61,6 +61,6 @@ None.
 
 ## Impact
 
-- Code: `pkgs/by-name/ghq-shared/ghq-writer-handler.py` and `test_handler.py`; `pkgs/by-name/ghq-shared/ghq-shared-migrate.py`; `pkgs/by-name/ghq-sync/ghq-sync.sh` (usage text); `modules/home/development/repository-acquisition.nix`; `modules/system/shared-reference-tree.nix`, `modules/nixos/shared-reference-tree.nix`, `modules/darwin/shared-reference-tree.nix`; `modules/system/shared-reference-tree.test.nix`; `modules/vm-tests/shared-reference-tree.nix`; `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`; `modules/home/ai/plugins/agent-context-vanixiets/.apm/instructions/30-reference-repositories.instructions.md`.
-- Tests: `checks.*.package-ghq-shared-test-handler` gains eleven cases, four of them, covering seven findings, after verification; `checks.x86_64-linux.eval-shared-reference-tree` is new; `vmTests.x86_64-linux.shared-reference-tree-migration` gains two subtests (about 2 to 3 s of its 33 to 35 s), `shared-reference-tree` one assertion and a reworked hydrate subtest.
+- Code: `pkgs/by-name/ghq-shared/ghq-writer-handler.py`, `handler_fixtures.py`, `test_handler.py`, `test_handler_history.py`, `test-handler.nix` and `package.nix`; `modules/checks/package-tests.nix`; `modules/darwin/omnigent-host.nix`; `pkgs/by-name/ghq-shared/ghq-shared-migrate.py`; `pkgs/by-name/ghq-sync/ghq-sync.sh` (usage text); `modules/home/development/repository-acquisition.nix`; `modules/system/shared-reference-tree.nix`, `modules/nixos/shared-reference-tree.nix`, `modules/darwin/shared-reference-tree.nix`; `modules/system/shared-reference-tree.test.nix`; `modules/vm-tests/shared-reference-tree.nix`; `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`; `modules/home/ai/plugins/agent-context-vanixiets/.apm/instructions/30-reference-repositories.instructions.md`.
+- Tests: the handler's test splits into `checks.*.package-ghq-shared-test-handler` (requests, locks, time limits, failure logging, maintenance) and `checks.*.package-ghq-shared-test-handler-history` (the history fetch's cases, fourteen of them new), sharing `handler_fixtures.py`; `checks.x86_64-linux.eval-shared-reference-tree` is new; `vmTests.x86_64-linux.shared-reference-tree-migration` gains two subtests (about 2 to 3 s of its 33 to 35 s), `shared-reference-tree` one assertion and a reworked hydrate subtest.
 - Hosts: magnetite, pyrite and stibnite, by their usual deploys.

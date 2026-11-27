@@ -11,10 +11,24 @@ in
     { lib, ... }:
     {
       key = "vanixiets/ghq-shared-option";
-      options.programs.ghq-shared.root = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "Host-shared ghq root this account reads but cannot write; null keeps ghq's per-account default.";
+      options.programs.ghq-shared = {
+        root = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Host-shared ghq root this account reads but cannot write; null keeps ghq's per-account default.";
+        };
+        forms = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          internal = true;
+          description = "Every path git may resolve the shared root to, each carrying this account's gitdir: include.";
+        };
+        link = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          internal = true;
+          description = "The link to the shared root in this account's home, a path git may reach every copy by.";
+        };
       };
     };
 
@@ -27,12 +41,7 @@ in
     }:
     let
       root = config.programs.ghq-shared.root;
-      # git matches gitdir: against the repository's resolved path as well, and
-      # on darwin /var resolves to /private/var.
-      rootForms = [
-        root
-      ]
-      ++ lib.optional (pkgs.stdenv.hostPlatform.isDarwin && lib.hasPrefix "/var/" root) "/private${root}";
+      inherit (config.programs.ghq-shared) forms link;
     in
     {
       key = "vanixiets/ghq-home-module";
@@ -46,6 +55,13 @@ in
               message = "programs.ghq-shared.root is delivered through git configuration and requires programs.git.enable.";
             }
           ];
+          # git matches gitdir: against the repository's resolved path as well, and
+          # on darwin /var resolves to /private/var.
+          programs.ghq-shared.forms = [
+            root
+          ]
+          ++ lib.optional (pkgs.stdenv.hostPlatform.isDarwin && lib.hasPrefix "/var/" root) "/private${root}";
+          programs.ghq-shared.link = "${config.home.homeDirectory}/ghq";
           programs.git.settings = {
             ghq.root = root;
             safe.directory = [ "${root}/*" ];
@@ -65,14 +81,14 @@ in
               filter.lfs = lfsPolicy;
               protocol = transportPolicy;
             };
-          }) rootForms;
+          }) forms;
           # Activation rather than home.file: Home Manager refuses to replace an
           # existing ~/ghq directory, which stays until ghq-shared-migrate moves it.
           home.activation.ghqSharedLink = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-            if [ -L "$HOME/ghq" ] || [ ! -e "$HOME/ghq" ]; then
-              run ln -sfn ${lib.escapeShellArg root} "$HOME/ghq"
+            if [ -L ${lib.escapeShellArg link} ] || [ ! -e ${lib.escapeShellArg link} ]; then
+              run ln -sfn ${lib.escapeShellArg root} ${lib.escapeShellArg link}
             else
-              warnEcho "$HOME/ghq is a directory; ghq-shared-migrate moves it into ${root}"
+              warnEcho ${lib.escapeShellArg "${link} is a directory; ghq-shared-migrate moves it into ${root}"}
             fi
           '';
         })

@@ -23,6 +23,7 @@
         ghq-shared = [
           "acl"
           "handler"
+          "handler-history"
           "wrapper"
         ];
         ntfy-send = [
@@ -84,8 +85,17 @@
             package-atomic-test-help.class = "small";
             # nixbot: median 8.5 s, slowest 18 s, all 6 runs 2026-10-21..2026-11-11
             package-ghq-shared-test-acl.class = "small";
-            # nixbot: median 39 s, slowest 75 s, all 6 runs 2026-10-21..2026-11-11
-            package-ghq-shared-test-handler.class = "small";
+            # The handler's test split in two on 2026-11-27, the whole having run
+            # 75 to 151 s on nixbot; no run of either half yet, too few to class
+            # (design D4).
+            package-ghq-shared-test-handler = {
+              class = "small";
+              measured = false;
+            };
+            package-ghq-shared-test-handler-history = {
+              class = "small";
+              measured = false;
+            };
             # nixbot: median 7.8 s, slowest 18 s, all 5 runs 2026-10-21..2026-11-11
             package-ghq-shared-test-wrapper.class = "small";
             # nixbot: 1 run, too few to class (design D4)
@@ -133,8 +143,16 @@
             package-atomic-test-help.class = "small";
             # nixbot: median 65 s, slowest 649 s, 4 runs in 30 days
             package-ghq-shared-test-acl.class = "medium";
-            # nixbot: median 125 s, slowest 256 s, 4 runs in 30 days
-            package-ghq-shared-test-handler.class = "medium";
+            # Split in two on 2026-11-27, the whole having a median of 125 s; no
+            # run of either half yet, too few to class (design D4).
+            package-ghq-shared-test-handler = {
+              class = "medium";
+              measured = false;
+            };
+            package-ghq-shared-test-handler-history = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 48 s, slowest 601 s, 4 runs in 30 days
             package-ghq-shared-test-wrapper.class = "small";
             # nixbot: 2 runs, too few to class (design D4)

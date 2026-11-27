@@ -86,67 +86,155 @@ let
   # lazygit reads .lazygit.yml in every ancestor of a repository; at the shared
   # root this turns off its start-up fetch for every copy.
   lazygitConfig = "git:\n  autoFetch: false\n";
-  # Whether an include's condition can hold for a repository beneath one of
-  # roots. Only a gitdir: or gitdir/i: pattern that is a literal absolute path is
-  # judged, matching when it encloses a root or lies beneath one; any other
-  # condition (a glob, a relative or ~/ pattern, onbranch:, hasconfig:) may hold
-  # beneath the root and counts as matching.
+  # Whether an include's condition can hold for a repository reached by one of
+  # paths: every form of the root and every link into it. git matches a gitdir:
+  # pattern against the path a repository is reached by as well as its resolved
+  # path, so a pattern enclosing a link, the link's own directory and its
+  # ancestors included, holds there. Only a gitdir: or gitdir/i: pattern that is
+  # a literal absolute path, or one under ~/ expanded with home, is judged,
+  # matching when it encloses one of paths or lies beneath one; any other
+  # condition (a glob, a relative pattern, onbranch:, hasconfig:) may hold there.
   includeReachesRoot =
-    roots: include:
+    { paths, home }:
+    include:
     let
       condition = include.condition or null;
       parsed = builtins.match "gitdir(/i)?:(.*)" condition;
       fold = if lib.elemAt parsed 0 == null then lib.id else lib.toLower;
-      pattern = fold (lib.elemAt parsed 1);
-      literal = lib.hasPrefix "/" pattern && builtins.match ".*[*?[].*" pattern == null;
+      written = lib.elemAt parsed 1;
+      expanded =
+        if lib.hasPrefix "~/" written && home != null then
+          "${home}/${lib.removePrefix "~/" written}"
+        else
+          written;
+      pattern = fold expanded;
+      literal = lib.hasPrefix "/" pattern && builtins.match ".*[*?[\\].*" pattern == null;
     in
     condition == null
     || parsed == null
     || !literal
     || lib.any (
-      root: lib.hasPrefix pattern (fold "${root}/") || lib.hasPrefix (fold "${root}/") pattern
-    ) roots;
-  # Why a participant's Home Manager git configuration may let git use a
-  # transport beneath the root, one line each; empty when it refuses every one.
-  # It must have an include under gitdir:<form>/ setting protocol.allow to never
-  # for each form git may resolve the root to, and no protocol.<name>.allow in
-  # its settings, which outranks protocol.allow wherever it is set. An include
-  # with inline contents whose condition can hold beneath the root must set
-  # neither a protocol.<name>.allow nor a protocol.allow other than never, as
-  # Home Manager writes the includes after the settings. An include given only
-  # as a path is read by git, not by evaluation, and is not seen here.
-  transportGaps =
-    roots: git:
+      path: lib.hasPrefix pattern (fold "${path}/") || lib.hasPrefix (fold "${path}/") pattern
+    ) paths;
+  # The settings git reads from one Home Manager git attribute set, as
+  # lib.generators.toGitINI writes it: each leaf at path a.b.….key is the
+  # variable key of the section named by the rest, `[a "b.…"]`, or of a section
+  # written whole as `a "b"`. Section and variable names are compared in lower
+  # case, as git compares them; the subsection keeps its case. A leaf outside
+  # any section, or a section name this cannot split, is unreadable.
+  gitEntries =
+    attrs:
     let
-      named = protocol: lib.attrNames (removeAttrs protocol [ "allow" ]);
+      leaves =
+        path: value:
+        if lib.isAttrs value && !lib.isDerivation value then
+          lib.concatLists (lib.mapAttrsToList (name: leaves (path ++ [ name ])) value)
+        else
+          [ { inherit path value; } ];
+      entry =
+        { path, value }:
+        let
+          sectionName = lib.concatStringsSep "." (lib.init path);
+          quoted = builtins.match ''([^ "]+) "([^"]*)"'' sectionName;
+          dotted = builtins.match "([^.\"]+)\\.([^\"]*)" sectionName;
+          split = if quoted != null then quoted else dotted;
+          values = lib.toList value;
+        in
+        if
+          builtins.length path < 2
+          || (split == null && lib.hasInfix ''"'' sectionName)
+          || lib.any (v: lib.isAttrs v || lib.isList v) values
+        then
+          { unreadable = lib.concatStringsSep "." path; }
+        else
+          {
+            section = lib.toLower (if split == null then sectionName else lib.head split);
+            subsection = if split == null then null else lib.elemAt split 1;
+            key = lib.toLower (lib.last path);
+            inherit values;
+          };
+    in
+    map entry (leaves [ ] attrs);
+  # What in one attribute set of git settings may let git use a transport, each
+  # finding prefixed by where: any protocol.<name>.allow, anything unreadable,
+  # and, unless admitAllow, a protocol.allow other than never.
+  protocolFindings =
+    { where, admitAllow }:
+    attrs:
+    if !lib.isAttrs attrs then
+      [ "${where} has a shape this check cannot read" ]
+    else
+      lib.concatMap (
+        entry:
+        if entry ? unreadable then
+          [ "${where} sets ${entry.unreadable}, which this check cannot read as a git setting" ]
+        else if entry.section != "protocol" || entry.key != "allow" then
+          [ ]
+        else if entry.subsection != null then
+          [ "${where} sets protocol.${entry.subsection}.allow" ]
+        else
+          map (value: "${where} sets protocol.allow to ${toString value}") (
+            lib.filter (value: !admitAllow && toString value != "never") entry.values
+          )
+      ) (gitEntries attrs);
+  # Why a participant's git, as its Home Manager configuration home declares it,
+  # may use a transport beneath the shared root, one line each; empty when it
+  # refuses every one. roots are the forms git may resolve the root to. It must
+  # have an include under gitdir:<form>/ setting protocol.allow to never for each
+  # of them, and no protocol.<name>.allow in its settings (programs.git.iniContent,
+  # and programs.git.settings in either shape Home Manager accepts, one attribute
+  # set or a list of them), which outranks protocol.allow wherever it is set. An
+  # include with inline contents whose condition can hold for a repository
+  # reached by a root form, a form the account's own module declares, or its
+  # ~/ghq link, must set neither a protocol.<name>.allow nor a protocol.allow
+  # other than never, as Home Manager writes the includes after the settings.
+  # An include given only as a path, as an include entry or through include.path
+  # or includeIf in the settings, is read by git, not by evaluation, and is not
+  # seen here.
+  transportGaps =
+    roots: home:
+    let
+      git = home.programs.git;
+      shared = home.programs.ghq-shared or { };
+      reach = {
+        paths = lib.unique (
+          roots ++ shared.forms or [ ] ++ lib.optional ((shared.link or null) != null) shared.link
+        );
+        home = home.home.homeDirectory or null;
+      };
+      settings = git.settings or { };
+      fragments = if builtins.isList settings then settings else [ settings ];
       fromInclude =
         index: include:
-        let
-          protocol = include.contents.protocol or { };
-          name = "include ${toString index} (${
-            if (include.condition or null) == null then "unconditional" else include.condition
-          })";
-        in
-        lib.optionals (includeReachesRoot roots include) (
-          map (key: "${name} sets protocol.${key}.allow") (named protocol)
-          ++ lib.optional (
-            (protocol.allow or "never") != "never"
-          ) "${name} sets protocol.allow to ${toString protocol.allow}"
+        lib.optionals (includeReachesRoot reach include) (
+          protocolFindings {
+            where = "include ${toString index} (${
+              if (include.condition or null) == null then "unconditional" else include.condition
+            })";
+            admitAllow = false;
+          } (include.contents or { })
         );
     in
-    map (form: "no include under gitdir:${form}/ sets protocol.allow to never") (
-      lib.filter (
-        form:
-        !lib.any (
-          include:
-          (include.condition or null) == "gitdir:${form}/"
-          && (include.contents.protocol or null) == transportPolicy
-        ) (git.includes or [ ])
-      ) roots
-    )
-    ++ map (key: "its settings set protocol.${key}.allow") (named (git.settings.protocol or { }))
-    ++ lib.concatLists (lib.imap1 fromInclude (git.includes or [ ]));
-  refusesTransport = roots: git: transportGaps roots git == [ ];
+    lib.unique (
+      map (form: "no include under gitdir:${form}/ sets protocol.allow to never") (
+        lib.filter (
+          form:
+          !lib.any (
+            include:
+            (include.condition or null) == "gitdir:${form}/"
+            && (include.contents.protocol or null) == transportPolicy
+          ) (git.includes or [ ])
+        ) roots
+      )
+      # protocol.allow in the settings is admitted whatever its value: the
+      # includes, written after the settings, set it to never.
+      ++ lib.concatMap (protocolFindings {
+        where = "a settings entry";
+        admitAllow = true;
+      }) ([ (git.iniContent or { }) ] ++ fragments)
+      ++ lib.concatLists (lib.imap1 fromInclude (git.includes or [ ]))
+    );
+  refusesTransport = roots: home: transportGaps roots home == [ ];
 in
 {
   flake.modules.nixos.shared-reference-tree-options = options false;

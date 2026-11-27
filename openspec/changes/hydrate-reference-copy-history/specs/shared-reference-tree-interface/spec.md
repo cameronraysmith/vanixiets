@@ -9,25 +9,44 @@ On a `get` of a clone already present whose `remote.origin.promisor` is true, th
 - **WHEN** a `get` with an update of a blobless clone brings in commits, including merges and a change of default branch
 - **THEN** a participating account's `git --no-lazy-fetch show --stat -p <commit>` succeeds for every commit it brought in, the clone's filter and shallow boundaries are unchanged, and the reply holds `hydrated history: <path> (<N> objects fetched)`
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "An update of a blobless clone makes every commit it brought in readable as a diff with lazy fetching disabled"; `vmTests.x86_64-linux.shared-reference-tree-migration`, subtest "an update makes the commits it brought in readable, and a read the writer did not prepare fails at once".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "An update of a blobless clone makes every commit it brought in readable as a diff with lazy fetching disabled"; `vmTests.x86_64-linux.shared-reference-tree-migration`, subtest "an update makes the commits it brought in readable, and a read the writer did not prepare fails at once".
 
 #### Scenario: An update of a full clone
 
 - **WHEN** a `get` with an update names a clone with no promisor remote, or brings in no commit
 - **THEN** the writer runs no history walk and fetches nothing more than the update did
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "An update of a full clone, or one that brings in nothing, walks no history".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "An update of a full clone, or one that brings in nothing, walks no history".
+
+### Requirement: A request that brings in no commit runs no history walk
+
+When no ref under `refs/heads` or `refs/remotes` reaches, after a request, a commit that no such ref and no shallow boundary reached before it, the request brings in nothing, and the writer SHALL run no history listing and no history fetch for it.
+
+#### Scenario: An update moves refs only to commits the clone held
+
+- **WHEN** upstream force-resets the branch to an ancestor the clone holds, adds a branch at a commit the clone holds, or deletes a branch, and an update of a blobless clone holding the whole history follows each
+- **THEN** each update moves a remote-tracking ref, runs no history listing and no history fetch, its reply holds no history status line, and its exit log line no `history=` token
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A request that brings no commit in walks nothing, lists nothing and fetches nothing".
 
 ### Requirement: Tag commits fetched at depth 1 stay unhydrated
 
-The writer SHALL NOT walk or hydrate a tag's commit: one a `get` with tags fetches at depth 1 is a shallow boundary, whose `git show` diffs against nothing and needs its whole tree, and it stays unhydrated until `ghq-sync --hydrate <tag>`.
+The writer SHALL NOT walk or hydrate a commit that only a tag reaches: one a `get` with tags fetches at depth 1 is a shallow boundary, whose `git show` diffs against nothing and needs its whole tree, and it stays unhydrated until `ghq-sync --hydrate <tag>`.
+Once a commit a request brings into a branch reaches it, it is a branch commit, and the writer SHALL hydrate it like any other.
 
 #### Scenario: A get with tags moves the remote-tracking branch
 
 - **WHEN** a `get` with tags, and no update, of a shallow blobless clone fetches its tracked branch, which upstream has advanced, and a tag on a branch never merged
 - **THEN** every commit the remote-tracking branch gained is readable as a diff, and the tag's commit arrives and stays unhydrated
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A get with tags of a shallow clone fetches its branches first"; `vmTests.x86_64-linux.shared-reference-tree-migration`, subtest "an update makes the commits it brought in readable, and a read the writer did not prepare fails at once" (`git show t-unmerged` after `ghq-sync -u --tags` fails at once).
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A get with tags of a shallow clone fetches its branches first"; `vmTests.x86_64-linux.shared-reference-tree-migration`, subtest "an update makes the commits it brought in readable, and a read the writer did not prepare fails at once" (`git show t-unmerged` after `ghq-sync -u --tags` fails at once).
+
+#### Scenario: Upstream merges a tag's branch
+
+- **WHEN** a `get` with tags fetches at depth 1 a tag on a branch never merged, and upstream then merges that branch and an update brings the merge in
+- **THEN** the tag's commit stays unhydrated after the tag fetch, and after the update it and the merge are readable as diffs
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A commit that only a tag fetched at depth 1 reaches stays unhydrated; once upstream merges its branch, a branch commit the update brings in reaches it".
 
 ### Requirement: The history fetch keeps the clone's partial-clone filter
 
@@ -39,14 +58,14 @@ A promisor clone that records no filter, as a `ghq-sync --full` whose refetch fa
 - **WHEN** an update brings commits into a promisor clone whose `remote.origin.partialclonefilter` is `blob:limit=1`
 - **THEN** every commit it brought in is readable as a diff and the recorded filter is still `blob:limit=1`
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "The history fetch passes the filter the clone records" (first half).
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "The history fetch passes the filter the clone records" (first half).
 
 #### Scenario: A promisor clone records no filter
 
 - **WHEN** an update brings commits into a clone whose `remote.origin.promisor` is true and which has no `remote.origin.partialclonefilter`
 - **THEN** the writer runs no history listing and no history fetch, the clone still has no `remote.origin.partialclonefilter`, the reply holds the `history not hydrated` line naming the missing filter, and the exit log line holds `history=not-hydrated`
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "The history fetch passes the filter the clone records" (second half).
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "The history fetch passes the filter the clone records" (second half).
 
 ### Requirement: A deepen makes every commit it brought in readable as a diff
 
@@ -57,14 +76,14 @@ On a `deepen` of a clone whose `remote.origin.promisor` is true, the writer SHAL
 - **WHEN** a participating account deepens a blobless clone by N commits
 - **THEN** its `git --no-lazy-fetch show --stat -p <commit>` succeeds for every commit the deepen brought in except the new boundary commits, and for the previous boundary commits
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A deepen makes every commit it brought in, but the new deepest, readable as a diff".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A deepen makes every commit it brought in, but the new deepest, readable as a diff".
 
 #### Scenario: A deepen also moves the remote-tracking branch
 
 - **WHEN** a participating account deepens a blobless clone whose upstream has gained commits since its last update, so that `git fetch --deepen` also moves `origin/<branch>`
 - **THEN** every commit `origin/<branch>` gained, and every deepened commit but the new boundary, is readable as a diff
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A deepen also moves the remote-tracking branch to the commits upstream gained since the last update".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A deepen also moves the remote-tracking branch to the commits upstream gained since the last update".
 
 ### Requirement: The writer bounds the history it makes readable
 
@@ -75,25 +94,32 @@ Before fetching any blob for a request, the writer SHALL count the missing blobs
 - **WHEN** a `get` with an update brings in commits whose diffs need more missing blobs than the history limit
 - **THEN** the writer fetches no blob for them, the update's exit status is unchanged, the reply holds the `history not hydrated` line, and the walk stopped once the count passed the limit
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "An update bringing in more missing blobs than the limit fetches none and says so".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "An update bringing in more missing blobs than the limit fetches none and says so".
 
 ### Requirement: A failed history fetch leaves the request's outcome as it was
 
-When reading the clone's refs or shallow boundaries, the walk or the history fetch fails, including when git cannot be started (`OSError`) or outlasts the command timeout, the writer SHALL leave the request's exit status as its other commands set it and report `history hydrate failed: <path> (<reason>)` in one status line, keeping every object it already fetched.
+When anything raises while the writer reads the clone's refs or shallow boundaries before the request's first fetch (the snapshot) or walks and fetches history after it (the walk), whatever the exception, the writer SHALL leave the request's exit status as its other commands set it, run no walk after a failed snapshot, and report `history hydrate failed: <path> (<phase>: <reason>)`, the reason its own failure's message or the exception's type alone, keeping every object it already fetched.
 
 #### Scenario: The remote refuses the history fetch
 
 - **WHEN** the remote serves an update but refuses the fetch of the missing blobs
 - **THEN** the update's exit status is zero, its new commits are checked out, and the reply holds the `history hydrate failed` line
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A history fetch that fails leaves the update's exit status and says so".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A history fetch that fails leaves the update's exit status and says so".
+
+#### Scenario: A ref name is not UTF-8, or a phase raises
+
+- **WHEN** an update meets a packed remote-tracking ref named `refs/remotes/origin/caf\xe9`, or an exception of an arbitrary type raised while reading the refs before the fetch, or while walking after it
+- **THEN** the first update hydrates as any other; each of the others is done, its reply holds `history hydrate failed: <path> (snapshot: <type>)` or `(walk: <type>)` with nothing of the exception's message, and its log holds `history=failed`, no ` reason:` and no traceback
+
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "Nothing in the history phases fails a request".
 
 #### Scenario: git cannot be started for the walk
 
 - **WHEN** starting git for the history listing raises `OSError`
 - **THEN** the update's exit status is zero, the reply holds the `history hydrate failed` line, and the exit log line holds `history=failed` and no ` reason:`
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "The history fetch passes the filter the clone records" (its third clone, "An error starting git in the history walk is the history fetch's failure, not the request's").
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "The history fetch passes the filter the clone records" (its third clone, "An error starting git in the history walk is the history fetch's failure, not the request's").
 
 ### Requirement: The history walk gives git its lists on standard input
 
@@ -104,7 +130,7 @@ The writer SHALL give git every list whose length the clone decides (revisions, 
 - **WHEN** a participating account deepens a blobless clone holding a shallow boundary for each of 200 commits fetched at depth 1, besides its branch's
 - **THEN** the deepen succeeds, every commit it brought in but the new boundary is readable as a diff, no git the writer starts gets one of those boundaries as an argument, and the walk's `git log --stdin` reads all of them on standard input, so their number is bounded by no argument list
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A deepen also moves the remote-tracking branch to the commits upstream gained since the last update" (its boundary and argument assertions).
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A deepen also moves the remote-tracking branch to the commits upstream gained since the last update" (its boundary and argument assertions).
 
 ### Requirement: The writer's exit log line names what the history fetch did
 
@@ -115,21 +141,21 @@ When a request runs the walk that makes its commits readable, the writer SHALL a
 - **WHEN** a `get` with an update of a blobless clone is hydrated, exceeds the history limit, or meets a refused history fetch
 - **THEN** its exit log line holds `history=hydrated:<N>`, `history=not-hydrated` or `history=failed` respectively, and the refused fetch adds no ` reason:`
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, cases "An update of a blobless clone makes every commit it brought in readable as a diff with lazy fetching disabled", "An update bringing in more missing blobs than the limit fetches none and says so" and "A history fetch that fails leaves the update's exit status and says so".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, cases "An update of a blobless clone makes every commit it brought in readable as a diff with lazy fetching disabled", "An update bringing in more missing blobs than the limit fetches none and says so" and "A history fetch that fails leaves the update's exit status and says so".
 
 #### Scenario: A command after the walk outlasts the command timeout
 
 - **WHEN** a `get` with an update and tags of a shallow blobless clone hydrates the commits it brought in, and then its fetch of a tag at depth 1 outlasts `commandTimeout`
 - **THEN** the request exits 124, its reply holds `hydrated history: <path> (<N> objects fetched)`, and its exit log line holds `history=hydrated:<N>` before ` reason: timed out after <n> s running git fetch`
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A command after the history fetch that outlasts the command timeout".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A command after the history fetch that outlasts the command timeout".
 
 #### Scenario: A request runs no history walk
 
 - **WHEN** a `get` with an update names a full clone, or brings in no commit
 - **THEN** its exit log line holds no `history=` token
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "An update of a full clone, or one that brings in nothing, walks no history".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "An update of a full clone, or one that brings in nothing, walks no history".
 
 ### Requirement: A first acquisition fetches nothing more than before
 
@@ -140,12 +166,12 @@ A lazy `get` of a repository absent from the shared root SHALL fetch at depth 1 
 - **WHEN** a lazy `get` names a repository absent from the shared root
 - **THEN** the clone holds one commit, every blob it holds belongs to that commit's tree, and the reply holds no history status line
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "A first lazy acquisition fetches no blob beyond its tip's tree".
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "A first lazy acquisition fetches no blob beyond its tip's tree".
 
 ### Requirement: Participating accounts' git refuses every transport beneath the shared root
 
-Each participating account's git configuration SHALL set `protocol.allow` to `never` under the `gitdir:` conditions that carry the LFS settings, and no `protocol.<name>.allow` key in its settings, so its git fetches nothing beneath the shared root; evaluation SHALL fail otherwise.
-Trust boundary: `-c` or environment overrides, a hand-written `~/.gitconfig`, an include given only as a path outside the Nix evaluation, and programs that read no git configuration, are not covered.
+Each participating account's git configuration SHALL set `protocol.allow` to `never` under the `gitdir:` conditions carrying the LFS settings, and no `protocol.<name>.allow` key in its settings; evaluation SHALL fail otherwise.
+Trust boundary: `-c` or environment overrides, a hand-written `~/.gitconfig`, includes given only as a path (entries, or `include.path` or `includeIf` settings), and programs reading no git configuration.
 
 #### Scenario: A participating account reads content the clone lacks
 
@@ -170,7 +196,7 @@ Witness: the assertions of `modules/nixos/shared-reference-tree.nix`, `modules/d
 
 ### Requirement: Evaluation rejects an include that reopens a transport beneath the shared root
 
-A participating account's Home Manager git configuration SHALL declare no include with inline contents whose condition can hold beneath the shared root (none, a `gitdir:` or `gitdir/i:` path enclosing the root or beneath it, or a condition evaluation cannot rule out, such as a glob or `onbranch:`) that sets a `protocol.<name>.allow` key or a `protocol.allow` other than `never`; evaluation SHALL fail otherwise, naming the account and the include.
+A participating account's Home Manager git configuration SHALL declare no include with inline contents that can apply to a repository reached by a root form or the account's `~/ghq` link, as its module declares them, and sets a `protocol.<name>.allow` key or a `protocol.allow` other than `never`; a `gitdir:` path disjoint from all those paths cannot apply, any other condition can. Evaluation SHALL fail otherwise, naming the account and the include.
 
 #### Scenario: An include that applies beneath the root reopens a transport
 
@@ -179,9 +205,27 @@ A participating account's Home Manager git configuration SHALL declare no includ
 
 Witness: `checks.x86_64-linux.eval-shared-reference-tree` (`modules/system/shared-reference-tree.test.nix`), cases `testUnconditionalIncludeNamedKey`, `testSecondIncludeUnderRoot`, `testBroaderGitdirAllowAlways`, `testNarrowerGitdirNamedKey`, `testGlobGitdirNamedKey`, `testUnrelatedGitdir` and `testPathInclude`; the module assertions name each finding as `<account>: include <n> (<condition>) sets …`.
 
+#### Scenario: An include reaches the tree through the account's link
+
+- **WHEN** a participating account's include under `gitdir:<home>/ghq/`, `gitdir:<home>/` or `gitdir:~/` sets `protocol.file.allow`
+- **THEN** evaluation fails naming the account and the include, and an include under `gitdir:<home>/projects/` or `gitdir:~/projects/` does not fail it
+
+Witness: `checks.x86_64-linux.eval-shared-reference-tree`, cases `testLinkGitdir`, `testHomeGitdir`, `testTildeGitdir`, `testUnrelatedGitdir` and `testUnrelatedTildeGitdir`.
+
+### Requirement: Evaluation reads a participant's git settings in every shape and case
+
+The evaluation check SHALL read `programs.git.settings` as one attribute set or a list of them, `programs.git.iniContent`, and each include's contents, in every way Home Manager writes a section (nested, dotted, or `name "sub"`), comparing section and variable names case-insensitively and subsections exactly, and SHALL count anything it cannot read as a git setting as a fault naming where.
+
+#### Scenario: A participant writes the key in another shape or case
+
+- **WHEN** a participating account sets `Protocol.https.allow` in its settings, `protocol.https.allow` in a list fragment of its settings or in `programs.git.iniContent`, or in an include `PROTOCOL.Allow`, `"protocol.https".allow` or `"protocol \"https\"".allow`, or an include's contents hold `protocol` as a plain value
+- **THEN** evaluation fails naming the account and where each is set, the last as unreadable
+
+Witness: `checks.x86_64-linux.eval-shared-reference-tree`, cases `testSettingsSectionCase`, `testSettingsList`, `testIniContent`, `testIncludeVariableCase`, `testIncludeSectionCase`, `testIncludeDottedSection`, `testIncludeQuotedSection` and `testIncludeUnreadable`.
+
 ### Requirement: lazygit fetches nothing at start-up beneath the shared root
 
-Each sharing host SHALL provision `<shared root>/.lazygit.yml`, a regular file owned by the writer and its group with mode `0640`, setting `git.autoFetch` to `false`; darwin activation SHALL stop with a message when that path is a directory or a link to one.
+Each sharing host SHALL provision `<shared root>/.lazygit.yml`, a regular file owned by the writer and its group with mode `0640`, setting `git.autoFetch` to `false`.
 Migration SHALL leave that file in place, owned by the writer.
 lazygit reads that file after the account's own configuration, so it decides `git.autoFetch` for every copy, and every other key the account sets still applies.
 
@@ -198,6 +242,17 @@ Witness: `vmTests.x86_64-linux.shared-reference-tree-migration`, subtest "lazygi
 - **THEN** lazygit runs no `git fetch`
 
 Witness: the run of lazygit 0.66.3 under a pseudo-terminal with `GIT_TRACE` recorded in `design.md` D7 (a clone three directories below a scratch root, with and without the root file, and with an account configuration setting `git.autoFetch: true`); post-activation inspection on stibnite.
+
+### Requirement: The provisioned .lazygit.yml is never written through a link
+
+Activation SHALL NOT write `<shared root>/.lazygit.yml` through a link or into a directory standing at that name: darwin writes it under a new name in the root and renames it over whatever stands there, stopping with a message at a directory; NixOS's tmpfiles `f+` opens it without following a link and refuses anything but a regular file.
+
+#### Scenario: A link, a directory or a FIFO stands at the name on darwin
+
+- **WHEN** darwin activation provisions `.lazygit.yml` where a link to a file, a link to a directory, a directory or a FIFO stands
+- **THEN** each but the directory is replaced by the provisioned file, mode `0640`, and neither link's target changes; the directory stops activation with a message and nothing is left beside it
+
+Witness: scratch runs of the activation's provisioning script on stibnite (`logs/cam136-r3-darwin-descriptor-steps-scratch-*.log`); `systemd-tmpfiles` 262's `truncate_file` (`src/tmpfiles/tmpfiles.c`: `O_NOFOLLOW` beneath a parent opened by `chase` with `CHASE_SAFE`, then `S_ISREG`) for NixOS.
 
 ### Requirement: Migration keeps the provisioned .lazygit.yml over an administrator's own
 
@@ -219,4 +274,4 @@ After `ghq-sync --hydrate <rev>` and `ghq-sync --hydrate <rev>^<n>` for each par
 - **WHEN** a participating account hydrates a commit the writer did not make readable, and then each of its parents
 - **THEN** `git --no-lazy-fetch show <rev>` fails after the first hydrate alone when a parent's blob is missing, and succeeds after the parents are hydrated
 
-Witness: `pkgs/by-name/ghq-shared/test_handler.py`, case "Hydrating a commit and then each of its parents makes its diff readable, and the commit alone does not" (updates run with `historyLimit` 0, so no range is hydrated).
+Witness: `pkgs/by-name/ghq-shared/test_handler_history.py`, case "Hydrating a commit and then each of its parents makes its diff readable, and the commit alone does not" (updates run with `historyLimit` 0, so no range is hydrated).

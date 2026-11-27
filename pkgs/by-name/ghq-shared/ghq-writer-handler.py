@@ -33,11 +33,14 @@ still under the lock, every missing blob that the diff of each commit the
 request brought into the clone's branches and remote-tracking branches, or below
 a shallow boundary it removed, reads, as `git show` shows a commit, with the
 filter the clone records, unless more than historyLimit are missing or the clone
-records no filter. Tag commits fetched at depth 1 are left as they arrive;
-`ghq-sync --hydrate TAG` makes one readable. One status line says what the
-history fetch did; its failure leaves the request's exit status as its other
-commands set it, and the exit log line adds history=hydrated:<n>,
-history=not-hydrated or history=failed, on every path after the history fetch.
+records no filter. A request that brought no commit in walks nothing. A commit
+only a tag fetched at depth 1 reaches is left as it arrives, until a commit a
+branch gains reaches it; `ghq-sync --hydrate TAG` makes one readable. One status
+line says what the history fetch did. Any exception while reading the clone's
+refs before the request or walking after it is the history fetch's failure:
+the request's exit status stays as its other commands set it, and the exit log
+line adds history=hydrated:<n>, history=not-hydrated or history=failed, on every
+path after the history fetch.
 
 Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group",
 "allowedProtocols", "lockDir" and optionally "lockTimeout", "commandTimeout"
@@ -590,54 +593,82 @@ def boundaries(path):
 
 
 def branch_refs(path, env):
-    """The commit each of the clone's branches and remote-tracking branches names, by ref name."""
-    listed = git(path, {**env, "GIT_NO_LAZY_FETCH": "1"}, "for-each-ref", "--format=%(refname) %(objectname)",
+    """The commit each of the clone's branches and remote-tracking branches names, by ref name, both as bytes.
+
+    A ref name need not be UTF-8, so neither is decoded.
+    """
+    listed = git(path, {**env, "GIT_NO_LAZY_FETCH": "1"}, "for-each-ref", "--format=%(objectname) %(refname)",
                  "refs/heads", "refs/remotes")
     if listed.returncode:
         raise HistoryFailed(f"{label(listed.args)} exited {listed.returncode}", listed.stderr)
-    return dict(line.split(" ", 1) for line in listed.stdout.decode().splitlines() if line)
+    return {ref: oid for oid, _, ref in (line.partition(b" ") for line in listed.stdout.splitlines() if line)}
 
 
-# The errors a history fetch reports as its own failure rather than the request's.
-HISTORY_ERRORS = (HistoryFailed, TimedOut, OSError)
+class Unread:
+    """What history_before keeps when reading the clone's history failed."""
+
+    def __init__(self, failure):
+        self.failure = failure
+
+
+def history_failed(path, phase, failure):
+    """The status line of a history phase that raised failure: the handler's own failures by their message, any
+    other exception by its type alone, whose message may hold anything."""
+    reason = str(failure) if isinstance(failure, (HistoryFailed, TimedOut)) else type(failure).__name__
+    return History("failed", f"history hydrate failed: {path} ({phase}: {reason})\n", getattr(failure, "err", b""))
 
 
 def history_before(path, env):
     """A blobless clone's branch refs and shallow boundaries before a request changes them; None for any other clone.
 
-    An error reading them is returned, for the history fetch to report.
+    Any exception reading them is kept as Unread, for the walk to report: the
+    request goes on without a walk. Exception, not BaseException: SystemExit and
+    KeyboardInterrupt are requests to stop the handler, which the history fetch
+    has no business absorbing.
     """
     try:
         return (branch_refs(path, env), boundaries(path)) if blobless(path, env) else None
-    except HISTORY_ERRORS as failure:
-        return failure
+    except Exception as failure:
+        return Unread(failure)
+
+
+def gains_commits(path, env, revisions):
+    """Whether revisions, given on standard input, name any commit."""
+    listed = git(path, {**env, "GIT_NO_LAZY_FETCH": "1"}, "rev-list", "--max-count=1", "--stdin",
+                 stdin="".join(f"{revision}\n" for revision in revisions).encode())
+    if listed.returncode:
+        raise HistoryFailed(f"{label(listed.args)} exited {listed.returncode}", listed.stderr)
+    return bool(listed.stdout.strip())
 
 
 def walk_history(path, env, config, before):
     """The history fetch of what a request brought into a blobless clone, or None when it brought in nothing.
 
     What it brought in is the commits its branches and remote-tracking branches
-    gained, which no ref reached before, and those from each shallow boundary it
-    removed down to, and excluding, the boundaries now present. Tags are not
-    walked: a tag commit fetched at depth 1 is itself a boundary, and `ghq-sync
-    --hydrate TAG` makes it readable. Never a failure of the request.
+    reach that neither any ref nor any shallow boundary reached before, and those
+    from each shallow boundary it removed down to, and excluding, the boundaries
+    now present. A ref moved to a commit the clone already held, or deleted,
+    brings in nothing. The walked range excludes only what the refs reached
+    before, so a commit that only a tag reached, at depth 1, is walked once a
+    commit a branch gained reaches it; one only a tag reaches is not. Any
+    exception is the history fetch's failure, never the request's.
     """
+    if isinstance(before, Unread):
+        return history_failed(path, "snapshot", before.failure)
     try:
-        if isinstance(before, Exception):
-            raise before
         old_refs, old_boundaries = before
         new_refs, new_boundaries = branch_refs(path, env), boundaries(path)
-        reached = sorted(set(old_refs.values()))
-        gained = sorted({commit for ref, commit in new_refs.items() if old_refs.get(ref) != commit} - set(reached))
-        removed = sorted(old_boundaries - new_boundaries)
+        reached = {oid.decode() for oid in old_refs.values()}
+        moved = {oid.decode() for ref, oid in new_refs.items() if old_refs.get(ref) != oid} - reached
         ranges = []
-        if gained:
-            ranges.append(gained + [f"^{commit}" for commit in reached])
+        if moved and gains_commits(path, env, sorted(moved) + [f"^{c}" for c in sorted(reached | old_boundaries)]):
+            ranges.append(sorted(moved) + [f"^{commit}" for commit in sorted(reached)])
+        removed = sorted(old_boundaries - new_boundaries)
         if removed:
             ranges.append(removed + [f"^{commit}" for commit in sorted(new_boundaries)])
         return hydrate_history(path, env, config, ranges) if ranges else None
-    except HISTORY_ERRORS as failure:
-        return History("failed", f"history hydrate failed: {path} ({failure})\n", getattr(failure, "err", b""))
+    except Exception as failure:
+        return history_failed(path, "walk", failure)
 
 
 def absent(path, env, ids):
