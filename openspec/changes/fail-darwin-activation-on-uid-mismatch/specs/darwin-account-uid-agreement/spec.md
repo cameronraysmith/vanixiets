@@ -29,11 +29,11 @@ A deploy of a nix-darwin host SHALL fail, before it changes anything on the host
 - **WHEN** one host's recorded uid is wrong
 - **THEN** deploys of every other host are unaffected
 
-### Requirement: The operator can learn of a disagreement without changing the host
+### Requirement: The operator can run the comparison before a deploy, and a disagreement stops it before the host changes
 
-The operator SHALL be able to run a deploy check on a nix-darwin host that makes the same uid comparison as a deploy and reports the same failure, while changing nothing on the host. This relies on A373.
+The operator SHALL be able to run a deploy check on a nix-darwin host that makes the same uid comparison as a deploy, before any step that changes the host, and reports the same failure; on a disagreement it stops there with the host unchanged, and on agreement it goes on to activate the new configuration without setting the system profile. This relies on A373.
 
 #### Scenario: A deploy check before the first deploy
 
 - **WHEN** the operator runs a deploy check on a nix-darwin host after this requirement lands and before deploying it
-- **THEN** it reports success if every attached account has its recorded uid, or the same named failure a deploy would report, and the host's running configuration is unchanged either way
+- **THEN** if an attached account has a uid other than its record, it stops with the same named failure a deploy would report, before any step that changes the host; otherwise it exits 0 without an `ok` line, having activated the new configuration without setting the system profile

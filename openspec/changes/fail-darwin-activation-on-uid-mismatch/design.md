@@ -10,14 +10,14 @@ Relevant nix-darwin behaviour (each a world assumption in this change):
 - `activate` runs under `set -e` and runs `preActivation`, then `checks`, then `createRun`, `extraActivation`, `groups`, `users` and the rest (`modules/system/activation-scripts.nix:88-89,114-140`) (A370).
 - `darwin-rebuild switch` sets the system profile, then runs `activate` (`pkgs/nix-tools/darwin-rebuild.sh:218-224`); clan-core deploys darwin with `darwin-rebuild switch` (`clan_lib/machines/update.py:713-725`) (A371).
 - The boot-time `activate-system` daemon relinks `/run/current-system` to the profile and runs `checks`, `etc` and `keyboard`, not `preActivation` (`modules/services/activate-system/default.nix:61-70`) (A372).
-- `darwin-rebuild check` runs `activate` with `checkActivation=1`, which runs `preActivation` and `checks` and exits 0 before any other step (`darwin-rebuild.sh:230-233`, `modules/system/checks.nix:317-324`) (A373).
+- `darwin-rebuild check` must run as root (`darwin-rebuild.sh:149-152`) and runs `activate` with `checkActivation=1` exported (`darwin-rebuild.sh:230-233`), but `activate`'s `#!/usr/bin/env -i` line drops it (`modules/system/activation-scripts.nix:84`), so the exit after `checks` (`modules/system/checks.nix:320-323`) is not taken and every step runs, through linking `/run/current-system`, without setting the system profile; observed on stibnite 2026-11-27 (`logs/stibnite-darwin-rebuild-check-20261127-171145.log`, `logs/stibnite-post-activation-supplement-20261127-171547.log`) (A373).
 - `id -u <name>` prints the account's uid from Directory Services and fails for an absent account; nix-darwin uses the same lookup (A374).
 
 ## Goals / Non-Goals
 
 **Goals:**
 - A Mac's activation fails, before it changes anything on the Mac, when an attached account exists with a uid other than the recorded one, naming every such account and the record to correct.
-- The operator can run the same comparison on a Mac without changing it (`darwin-rebuild check`).
+- The operator can run the same comparison on a Mac (`darwin-rebuild check`): a disagreement stops it before any step that changes the Mac; an agreement goes on to activate the new configuration without setting the system profile.
 - A build check demonstrates the comparison fails on a mutant uid and passes on a match and on an absent account.
 
 **Non-Goals:**
@@ -62,7 +62,7 @@ Relevant nix-darwin behaviour (each a world assumption in this change):
 
 ## Risks / Trade-offs
 
-- [Risk] A record is wrong today, so the first deploy after this change fails on that Mac. → Mitigation: before deploying, the operator runs `darwin-rebuild check --flake .#<host>` (`just darwin-test <host>`) on each Mac; it runs the comparison and changes nothing (A373). A failure there is the finding the change exists to produce.
+- [Risk] A record is wrong today, so the first deploy after this change fails on that Mac. → Mitigation: before deploying, the operator runs `darwin-rebuild check --flake .#<host>` (`just darwin-test <host>`, as root) on each Mac; it runs the comparison at order 600, before the steps that change the Mac, so a disagreement stops it there with the Mac unchanged (A373). A failure there is the finding the change exists to produce. A passing check is itself an activation of the new configuration that does not set the system profile, so a reboot relinks `/run/current-system` to the profile's generation and runs only that generation's `checks`, `etc` and `keyboard` steps (A372).
 - [Risk] The check fails after `darwin-rebuild switch` has set the system profile (A371): the profile is one generation ahead of the running system, and a reboot in that state relinks `/run/current-system` to the unactivated generation and runs its `etc` (A372). → Mitigation: this is nix-darwin's existing behaviour for any failed activation, not new to this change; the runbook says to correct the record and redeploy, or `darwin-rebuild --rollback`, before rebooting.
 - [Risk] Blast radius: a mismatch blocks every activation on that Mac (clan deploy, local switch, check) until corrected; other hosts are unaffected. → Accepted: blocking is the point; the message names the record to fix.
 - [Trade-off] The check runs as root at every activation, one `id` call per attached account (at most two). → Negligible.
@@ -71,8 +71,8 @@ Relevant nix-darwin behaviour (each a world assumption in this change):
 ## Migration Plan
 
 1. Land the change (one commit); `just drv-diff` against `drv-delta.txt` confirms only the declared attributes move.
-2. On each Mac (stibnite, blackphos, argentum, rosegold), the operator runs `darwin-rebuild check --flake .#<host>` and confirms `ok`; any mismatch is fixed in `modules/lib/host-users.nix` first.
-3. The operator deploys each Mac. Each host's behaviour changes only when it is deployed.
+2. On each Mac (stibnite, blackphos, argentum, rosegold), the operator runs `sudo darwin-rebuild check --flake .#<host>`: it exits 0 with no `unexpected uid` line, having run the whole activation without setting the system profile (no `ok` line is printed, A373), or stops naming the mismatch before any step that changes the Mac; any mismatch is fixed in `modules/lib/host-users.nix` first.
+3. The operator deploys each Mac. Each host's behaviour changes when it is deployed, or earlier when its `darwin-rebuild check` passes, which activates the new configuration without setting the system profile.
 4. Rollback: revert the commit and redeploy, or `darwin-rebuild --rollback` on a Mac.
 
 ## Open Questions

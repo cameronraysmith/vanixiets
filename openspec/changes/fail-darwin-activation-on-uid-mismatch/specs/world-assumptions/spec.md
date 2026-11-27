@@ -51,22 +51,22 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a nix-darwin update adds `preActivation` to the boot daemon's script
 - **THEN** this assumption is void; the `darwin-account-uid-agreement-interface` requirement `The comparison runs in pre-activation and fails the activation` loses its discharge for the scenario `A host boots`, because a mismatch would then also stop the boot-time steps
 
-### Requirement: A373 — darwin-rebuild check runs the pre-activation and checks steps and changes nothing else
+### Requirement: A373 — darwin-rebuild check runs the whole activation without setting the system profile
 
-It is true of nix-darwin at the revision this repository locks, independent of what this fleet builds, that `darwin-rebuild check` builds the configuration, does not set the system profile, and runs `activate` with `checkActivation=1`, which runs `preActivation` (its linux-builder removal included) and `checks`, then exits 0 before any later step.
+It is true of nix-darwin at the revision this repository locks, independent of what this fleet builds, that `darwin-rebuild check` runs only as root, builds the configuration, does not set the system profile, and runs `activate`, whose `env -i` line drops the `checkActivation=1` it exports, so every step runs.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: nix-darwin `pkgs/nix-tools/darwin-rebuild.sh:218-233` (only `switch` sets the profile; `check` exports `checkActivation=1`) and `modules/system/checks.nix:317-324` (the exit after the checks), read at the locked revision.
+**Evidence**: nix-darwin `663d8b96` (`nix-darwin_2` in `flake.lock`, the darwin systems' input): `pkgs/nix-tools/darwin-rebuild.sh:149-152` (root only), `:192-202` (the build), `:218-220` (only `switch` sets the profile), `:230-233` (`check` exports `checkActivation=1` and runs `activate`); `modules/system/activation-scripts.nix:84` (`activate` starts `#!/usr/bin/env -i`); `modules/system/checks.nix:320-323` (the exit the variable would select). Observed on stibnite 2026-11-27: after `check` alone, `/run/current-system` pointed at the new closure and a deploy-record entry had been written, with no `ok` line (`logs/stibnite-darwin-rebuild-check-20261127-171145.log`, `logs/stibnite-post-activation-supplement-20261127-171547.log`).
 
 #### Scenario: Read at the source at apply
 
-- **WHEN** the two files are read at the locked revision
-- **THEN** `check` runs `activate` without setting the profile, and `activate` exits 0 after `checks` when `checkActivation` is 1
+- **WHEN** the three files are read at the locked revision
+- **THEN** `check` runs `activate` without setting the profile, and `activate` starts with an empty environment, so `checkActivation` is unset and the exit after `checks` is not taken
 
-#### Scenario: check starts changing the system
+#### Scenario: check changes what it runs
 
-- **WHEN** a nix-darwin update makes `darwin-rebuild check` set the profile or run a step after `checks`
-- **THEN** this assumption is void; the `darwin-account-uid-agreement` requirement `The operator can learn of a disagreement without changing the host` loses its discharge
+- **WHEN** a nix-darwin update makes `darwin-rebuild check` set the profile, skip `preActivation`, or stop after `checks`
+- **THEN** this assumption is void; the `darwin-account-uid-agreement` requirement `The operator can run the comparison before a deploy, and a disagreement stops it before the host changes` loses its discharge
 
 ### Requirement: A374 — macOS reports an account's identifier through id, and fails for an absent account
 
@@ -464,7 +464,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | uid | — | the number by which a host's operating system identifies an account, which that host alone holds and which decides whose files the account owns | shared |
 | recorded uid | — | the uid the repository records for an account a person holds on a nix-darwin host, which every deploy of that host asks the host to give the account | shared |
 | attached account | — | an account a person holds on a host that the repository records together with that person, as distinct from an account a service uses | shared |
-| deploy check | — | a run on a host of the checks a deploy would make before changing anything, which changes nothing on the host | shared |
+| deploy check | — | a run on a host of the checks a deploy would make before changing anything; on a nix-darwin host (`darwin-rebuild check`) a run whose checks pass goes on to activate the new configuration without setting the system profile | shared |
 
 #### Scenario: The terms with two senses are read
 

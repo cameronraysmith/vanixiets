@@ -79,6 +79,8 @@ Evidence for the closed tasks: `logs/fdaum-1-baseline-20261127T175059Z.log`, `lo
 | — removed or inverted | — | mutants a, b fail the mutant-uid case | verified |
 | — fails an absent account | — | mutant c fails the absent case | verified |
 
+Correction (2026-11-27, after stibnite's activation): the row "deploy check without changing the host" assumed `darwin-rebuild check` stops after `checks`. At nix-darwin `663d8b96` `activate`'s `#!/usr/bin/env -i` line (`modules/system/activation-scripts.nix:84`) drops the `checkActivation=1` that `darwin-rebuild.sh:230-233` exports, so no `ok` line is printed; a disagreement stops at the comparison before any step that changes the Mac, and an agreement runs the whole activation without setting the profile (`logs/stibnite-darwin-rebuild-check-20261127-171145.log`, `logs/stibnite-post-activation-supplement-20261127-171547.log`).
+
 ### World assumptions
 
 | Assumption | Evidence | Status |
@@ -88,6 +90,8 @@ Evidence for the closed tasks: `logs/fdaum-1-baseline-20261127T175059Z.log`, `lo
 | A372 boot daemon skips `preActivation` | `fdaum-1-sources` | configured (source reading) |
 | A373 `darwin-rebuild check` | `fdaum-1-sources` | configured (source reading); not run on a Mac (4.2) |
 | A374 `id -u` agrees with Directory Services | nix-darwin's own use of `id -u` | not observed; task 4.4 open |
+
+Correction (2026-11-27): A373 was run on stibnite and contradicted the source reading above; it now states that `check` runs the whole activation without setting the profile (see the correction under the trace table).
 
 ### Rendered `preActivation` order (`darwinConfigurations.<host>.config.system.activationScripts.preActivation.text`, evaluated at verify from the working copy)
 
@@ -107,6 +111,7 @@ A closure diff (`dix diff`, reads only) follows the removal on every host.
 - W3: the check mismatches one account at a time and makes all accounts absent at once; the two-mismatch scenario and a mixed absent/mismatch case are not exercised.
 - W4: `brainstorm.md:33` still says "at default priority"; it records the exploration before D2 moved the comparison to order 600 and is left as history.
 - W5: under `darwin-rebuild check`, `preActivation` also runs nix-darwin's `rm -rf /var/lib/linux-builder` when the comparison passes. The behavioral requirement "The operator can learn of a disagreement without changing the host" ("changing nothing on the host") and the designation `deploy check` ("changes nothing on the host") hold for a failing comparison and for the running configuration, not for that removal. A370 and A373 were corrected at verify to state the removal; the requirement and designation wording is left for a decision.
+  - Correction (2026-11-27): the requirement and the designation are reworded. On the locked nix-darwin a passing `darwin-rebuild check` runs the whole activation without setting the system profile, so they now hold for a disagreement only (design.md, A373).
 
 Corrections made at verify: `tasks.md` 2.1 ("default priority" to order 600) and 2.2 (order includes nix-darwin's own `preActivation` text, with this evaluation as evidence); `plan.md:79` (snippet now `lib.mkOrder 600`) and `plan.md:182` (the review-focus claim that a later `mkBefore` could not precede a change was false); `specs/world-assumptions/spec.md` A370 and A373 (nix-darwin's `preActivation` contains the linux-builder removal).
 
@@ -152,6 +157,8 @@ plan.md has no `[~]` rows. The open operator tasks are listed here because no au
 | The comparison runs in pre-activation and fails the activation | `uidPreflight` at order 600 | A370, A372 | configured |
 | The comparison is shown to fail on a mutant uid | `darwin-uid-preflight` | none | built; mutants killed |
 
+Correction (2026-11-27): "The operator can learn of a disagreement without changing the host" now holds for a disagreement only; on agreement the deploy check activates the new configuration without setting the profile (A373 as corrected). The requirement is renamed "The operator can run the comparison before a deploy, and a disagreement stops it before the host changes".
+
 **8c.** No behavioral requirement names an interface phenomenon. The interface requirements name only machine phenomena (`id -u`, options, the check); the trust boundaries state what they do not cover.
 
 ---
@@ -165,3 +172,5 @@ plan.md has no `[~]` rows. The open operator tasks are listed here because no au
 **Next step**:
 
 Review (In Review). The operator runs `just darwin-test <host>` and then deploys each of stibnite, blackphos, argentum and rosegold, and records `id -u` against `dscl` for each attachment; then archive.
+
+Correction (2026-11-27): `just darwin-test <host>` stops at nix-darwin's root check; the command is `sudo darwin-rebuild check --flake .#<host>` (task 4.2), and a passing run is itself an activation.

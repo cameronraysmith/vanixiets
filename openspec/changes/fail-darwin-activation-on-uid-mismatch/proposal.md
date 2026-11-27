@@ -30,7 +30,7 @@ A darwin host's recorded account uid (`flake.fleet.hosts.<host>.users.<account>.
 - From: a recorded uid that differs from the existing account's uid produces a warning; activation skips the account and succeeds.
 - To: before activation changes anything, each Mac compares the uid of every account attached to it with the recorded uid. Any mismatch stops the activation, naming the host, account, recorded uid, real uid and the record to correct. A missing account is not a mismatch (nix-darwin creates it with the recorded uid).
 - Reason: the wrong record is caught at the first deploy instead of silently leaving an account unmanaged.
-- Impact: an intended derivation change for the four darwin hosts (stibnite, blackphos, argentum, rosegold), which the operator deploys. A Mac whose record is wrong cannot be deployed until the record or account is corrected. `darwin-rebuild check` runs the same comparison without changing the Mac. NixOS hosts and homes are unchanged.
+- Impact: an intended derivation change for the four darwin hosts (stibnite, blackphos, argentum, rosegold), which the operator deploys. A Mac whose record is wrong cannot be deployed until the record or account is corrected. `darwin-rebuild check` runs the same comparison, stopping a disagreement before the Mac is changed; when the uids agree it runs the whole activation without setting the system profile. NixOS hosts and homes are unchanged.
 
 **A check that shows the comparison fails**
 - New medium build check that runs each Mac's rendered comparison with a stand-in for the account lookup: matching uid passes, missing account passes, a mutant uid fails.

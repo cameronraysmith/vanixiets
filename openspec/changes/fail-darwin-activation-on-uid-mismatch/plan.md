@@ -23,7 +23,7 @@
 Read at the locked revisions in task 1.2 and cited in a sources log:
 - nix-darwin `modules/system/activation-scripts.nix:84-140`: `#!/usr/bin/env -i ${stdenv.shell}`, `set -e`, `set -o pipefail`, `PATH` is the activation path (which includes `/usr/bin`), then `preActivation`, `checks`, `createRun`, `extraActivation`, `groups`, `users`, …
 - nix-darwin `modules/users/default.nix:285-288`: the comparison nix-darwin warns on is `u=$(id -u ${name} 2> /dev/null) || true; if [[ -n "$u" && "$u" -ne "${uid}" ]]`. The new comparison uses the same lookup and argument list (`id -u <name>`).
-- nix-darwin `pkgs/nix-tools/darwin-rebuild.sh:218-233` and `modules/system/checks.nix:317-324`: `switch` sets the profile then activates; `check` runs `activate` with `checkActivation=1`, which exits 0 after `checks`.
+- nix-darwin `pkgs/nix-tools/darwin-rebuild.sh:218-233`, `modules/system/checks.nix:317-324` and `modules/system/activation-scripts.nix:84`: `switch` sets the profile then activates; `check` runs `activate` with `checkActivation=1` exported, but `activate`'s `#!/usr/bin/env -i` line drops it, so no `ok` line is printed: a disagreement stops at the comparison before any step that changes the Mac, and an agreement runs the whole activation without setting the profile.
 - nix-darwin `modules/services/activate-system/default.nix:61-70`: the boot daemon runs `checks`, `etc`, `keyboard`, not `preActivation`.
 - `modules/system/deploy-record.nix:207-211`: deploy-record's `preActivation` read is `mkBefore`; the comparison at order 600 follows it and precedes nix-darwin's own default-priority text.
 
@@ -173,7 +173,7 @@ checks.x86_64-linux.fleet-alert  changed  # renders every testSizes.checks entry
 ## Task 4: Integration verification (operator)
 
 - [ ] **Step 1:** Return `just drv-diff <parent> <commit> openspec/changes/fail-darwin-activation-on-uid-mismatch/drv-delta.txt` to the operator.
-- [ ] **Step 2:** The operator runs `just darwin-test <host>` on each Mac; expects `ok`.
+- [ ] **Step 2:** The operator runs `sudo darwin-rebuild check --flake .#<host>` on each Mac; expects exit 0 with no `unexpected uid` line (no `ok` line is printed; a passing check runs the whole activation without setting the profile), or a stop naming the mismatch.
 - [ ] **Step 3:** The operator deploys each Mac; the output has no `unexpected uid` warning; alerts since the deploy started are read and recorded.
 - [ ] **Step 4:** `id -u <account>` and `dscl . -read /Users/<account> UniqueID` agree for each attachment (A374).
 
