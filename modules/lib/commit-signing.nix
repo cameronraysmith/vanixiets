@@ -163,7 +163,12 @@ let
   generatedFor =
     person:
     let
-      dir = ../../vars/shared + "/${commitSigningGenerator person}/key/machines";
+      dir =
+        config.flake.lib.vars.path {
+          generator = commitSigningGenerator person;
+          file = "key";
+        }
+        + "/machines";
     in
     if builtins.pathExists dir then lib.attrNames (builtins.readDir dir) else [ ];
 

@@ -99,8 +99,11 @@ in
               signingKey = lib.mkOption {
                 type = lib.types.nullOr signingKeyLine;
                 default = lib.fileContents (
-                  ../../../vars/shared
-                  + "/${flakeLib.commitSigningGenerator (flakeLib.signingPerson name)}/key.pub/value"
+                  flakeLib.vars.path {
+                    generator = flakeLib.commitSigningGenerator (flakeLib.signingPerson name);
+                    file = "key.pub";
+                  }
+                  + "/value"
                 );
                 defaultText = lib.literalExpression ''lib.fileContents "vars/shared/<person>-commit-signing-key/key.pub/value"'';
                 description = ''

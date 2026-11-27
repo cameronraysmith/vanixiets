@@ -37,6 +37,7 @@
 let
   inherit (config.flake) modules;
   schema = config.flake.lib.otelCollectorSchema;
+  inherit (config.flake.lib) vars;
   inherit (config.flake.lib.nodeExporterTextfile) flag;
 
   host = "magnetite";
@@ -233,7 +234,6 @@ let
   factsOf =
     name: hostConfig:
     let
-      varsDir = "${toString hostConfig.clan.core.settings.directory}/vars/per-machine/${name}";
       token = hostConfig.clan.core.vars.generators.${generator}.files.token or null;
       names = v: toString (lib.toList v);
       loads =
@@ -247,7 +247,11 @@ let
       isHost = name == host;
       enable = hostConfig.vanixiets.r2Usage.enable or false;
       awaiting = lib.elem name awaitingSecrets;
-      secretsGenerated = builtins.pathExists "${varsDir}/${generator}/token/secret";
+      secretsGenerated = vars.exists {
+        machine = name;
+        inherit generator;
+        file = "token";
+      };
       notifiedUnits = config.flake.lib.observabilityHosts.${name}.notifiedUnits or [ ];
       tokenOwner = if token == null then "root" else token.owner;
       tokenConsumers = lib.attrNames (lib.filterAttrs (_: loads) hostConfig.systemd.services);

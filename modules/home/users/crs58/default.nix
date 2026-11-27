@@ -1,8 +1,10 @@
 {
   # OUTER: Flake-parts module signature
+  config,
   ...
 }:
 let
+  inherit (config.flake.lib) vars;
   content =
     {
       # INNER: Home-manager module signature
@@ -91,7 +93,14 @@ let
             };
             transport.tls.ca = {
               mode = "append";
-              file = "${../../../../vars/per-machine/cinnabar/caddy-root-ca/root.crt/value}";
+              file = "${
+                vars.path {
+                  machine = "cinnabar";
+                  generator = "caddy-root-ca";
+                  file = "root.crt";
+                }
+                + "/value"
+              }";
             };
           };
 

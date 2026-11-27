@@ -10,7 +10,7 @@ No module imported by a `nixosConfigurations.<h>` or `darwinConfigurations.<h>` 
 
 #### Scenario: The source search at the change's tip
 
-- **WHEN** the module files under `modules/system`, `modules/nixos`, `modules/darwin`, `modules/home`, `modules/clan` and `modules/machines` are searched for those names
+- **WHEN** the `.nix` files under `modules/system`, `modules/nixos`, `modules/darwin`, `modules/home`, `modules/clan` and `modules/machines` are searched for those names
 - **THEN** no non-comment hit is found
 
 #### Scenario: Mutant restoring one cross-host read
@@ -38,11 +38,11 @@ No module imported by a `nixosConfigurations.<h>` or `darwinConfigurations.<h>` 
 
 ### Requirement: Every reader of the committed vars tree uses one accessor and keeps its read
 
-Every first-party module that reads the committed vars tree, other than the exempt sites named in the scenario below, SHALL do so through `flake.lib.vars`, keeping at each site its read primitive, its trimming and whether it names the file as a path or a string.
+Every first-party module that reads the committed vars tree, other than the exempt sites named in the scenario below, SHALL do so through `flake.lib.vars`, keeping at each site its result value and its read function (`readFile`, `fileContents`, `trim`, `pathExists`, `readDir`, `hashFile`). A site MAY change whether it names the file as a path or a string; the drvPath diff proves that no derivation changes.
 
 **Trust boundary**: one reading of the layout, resting on world assumption `A320 — clan reads a public var's value as the committed file, untrimmed, at a path fixed by machine, generator and file`; it does not guarantee that clan still writes that layout.
 
-**Discharged by**: a source search for `vars/per-machine` and `vars/shared` outside `modules/lib/vars.nix` returning only exempt sites, comments and option documentation; the drvPath diff in `Every output's derivation is unchanged`. Rests on world assumption `A322 — A committed file reads the same through a repository path and through the flake source string`.
+**Discharged by**: a source search for `vars/per-machine` and `vars/shared` outside `modules/lib/vars.nix` returning only exempt sites, comments and option documentation; the drvPath diff in `Every output's derivation is unchanged`, which shows every drvPath unchanged, including at the sites that moved from string to path. Rests on world assumption `A322 — A committed file reads the same through a repository path and through the flake source string`.
 
 #### Scenario: Exempt sites keep their hand-written layout
 
@@ -128,11 +128,11 @@ The drvPath of every `nixosConfigurations.<h>.config.system.build.toplevel`, `da
 #### Scenario: The oracle diff
 
 - **WHEN** `just drv-diff` runs from the parent revision to the tip with this change's `drv-delta.txt`
-- **THEN** it exits 0, and outside the base allow-list the only differences are `checks.x86_64-linux.host-key-obligations` added and `checks.x86_64-linux.fleet-alert` changed
+- **THEN** it exits 0, and outside the base allow-list the only differences are `checks.x86_64-linux.host-key-obligations` added and `checks.x86_64-linux.fleet-alert` and `checks.x86_64-linux.eval-users-lib` changed
 
 #### Scenario: The vm-tests D6 edits keep their derivations
 
-- **WHEN** the same report is read for the seven tests listed `may-change` in `drv-delta.txt`
+- **WHEN** the same report is read for the seven tests defined by the five vm-test files design D6 edits
 - **THEN** none of them is reported as differing, and a reported difference blocks landing until design D8 explains it
 
 ### Requirement: The evaluation saving is measured, not inferred

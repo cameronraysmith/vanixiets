@@ -8,7 +8,7 @@
 - `modules/lib/vars.nix` exports `flake.lib.vars`, the single reading of clan's committed vars layout.
 - `modules/lib/host-keys.nix` builds `flake.lib.hostKeys` from it plus `darwinHostKeys`, and adds an own-host assertion to `nixos.base`.
 - `ssh-known-hosts` and stibnite read committed files instead of other hosts' configurations.
-- The readers elsewhere are rewritten in place, each keeping its read primitive and its path-or-string kind.
+- The readers elsewhere are rewritten in place, each keeping its result value, its read function and its trimming.
 
 **Tech Stack:** flake-parts with import-tree; clan-core vars (`in_repo` public store, clan-core 78d5de23); the NixOS and nix-darwin module systems; `NIX_SHOW_STATS`; the refactor oracle's drvPath dump and diff.
 
@@ -23,7 +23,7 @@
 ## Global Constraints
 
 - One stacked chain, with commits in the order of tasks.md groups 2–6. Each commit evaluates alone. Edits are made in `@` and routed into the chain with `jj squash --into <commit> --keep-emptied <paths>`. Never rebase another session's commits.
-- Acceptance is `just drv-diff <parent> <tip> openspec/changes/stop-reading-other-hosts-configs/drv-delta.txt` (task 7.1), run after rebasing onto the tip of `establish-refactor-oracle`, which this change lands directly after. Outside the oracle's base allow-list, only `checks.x86_64-linux.host-key-obligations` (added) and `checks.x86_64-linux.fleet-alert` (changed, by the new size entry) may differ. A site whose drvPath moves is reverted to its previous path-or-string kind, never accepted as a Δ.
+- Acceptance is `just drv-diff <parent> <tip> openspec/changes/stop-reading-other-hosts-configs/drv-delta.txt` (task 7.1), run after rebasing onto the tip of `establish-refactor-oracle`, which this change lands directly after. Outside the oracle's base allow-list, only `checks.x86_64-linux.host-key-obligations` (added), `checks.x86_64-linux.fleet-alert` (changed, by the new size entry) and `checks.x86_64-linux.eval-users-lib` (changed, because it embeds `home/users/lib.nix`'s source) may differ (design D8). A site whose drvPath moves is reverted to its previous path-or-string kind, never accepted as a Δ.
 - `just eval-identity` is not this change's oracle: it compares stock nix with iets at one revision.
 - Evaluations of x86_64-linux outputs use magnetite's store (`--eval-store auto --store ssh-ng://magnetite.zt`). The stibnite measurements (task 7.2) run on stibnite itself. No system closure is built.
 - The run expected to exceed 5 minutes (task 7.1) is announced first with tasks.md's notice (duration, what it proves that a cheaper run cannot, what waits on it), and does not start until that notice has been given.
@@ -49,7 +49,7 @@
 | Lib | `flake.lib.hostKeys : attrsOf str` (six NixOS names via `vars.public`, plus `darwinHostKeys`) | Task 4 |
 | Lib | `flake.lib.hostKeyObligations.failures : name -> hostConfig -> [ str ]` | Task 4 |
 | Module | `flake.modules.nixos.base.imports = [ hostKeyAssertions ]` | Task 4 |
-| Check | `checks.x86_64-linux.host-key-obligations`, `testSizes.checks.host-key-obligations.class = "small"` | Task 4 |
+| Check | `checks.x86_64-linux.host-key-obligations`, `testSizes.checks.host-key-obligations = { class = "medium"; measured = false; }` | Task 4 |
 
 ---
 
@@ -192,7 +192,7 @@
   - a name not in `hostKeys` (0);
   - no `openssh` generator (0).
 
-  On a misjudged case it fails with `lib.assertMsg`. Gate it on `system == "x86_64-linux"`, and declare `testSizes.checks.host-key-obligations.class = "small"`.
+  On a misjudged case it fails with `lib.assertMsg`. Gate it on `system == "x86_64-linux"`, and declare `testSizes.checks.host-key-obligations = { class = "medium"; measured = false; }`, the repository's form for a check no nixbot run has measured.
 - [ ] **Step 4:** Build the check. Then, in a throwaway tree, make `failures` return `[ ]` and see the check fail. Log both runs.
 - [ ] **Step 5:** List the `nixos.base` importers outside `nixosConfigurations` (`rg -n 'modules.nixos.base' modules/vm-tests modules/checks`) with their machine names, and log them.
 - [ ] **Step 6:** Run the mutant: in a throwaway tree, add `clan.core.vars.generators.openssh.files."ssh.id_ed25519.pub".value = lib.mkForce "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";` to cinnabar. Evaluate cinnabar's toplevel drvPath and expect the assertion. Log it.
@@ -225,7 +225,7 @@
 
 ## Task 7: Integration verification (tasks.md 7.1–7.5)
 
-- [ ] **Step 1:** Give the notice for task 7.1, then run `just drv-diff <parent> <tip> openspec/changes/stop-reading-other-hosts-configs/drv-delta.txt`. Expect exit 0 and, outside the base allow-list, exactly `checks.x86_64-linux.host-key-obligations` added and `checks.x86_64-linux.fleet-alert` changed; no `vmTests` difference.
+- [ ] **Step 1:** Give the notice for task 7.1, then run `just drv-diff <parent> <tip> openspec/changes/stop-reading-other-hosts-configs/drv-delta.txt`. Expect exit 0 and, outside the base allow-list, exactly `checks.x86_64-linux.host-key-obligations` added and `checks.x86_64-linux.fleet-alert` and `checks.x86_64-linux.eval-users-lib` changed; no `vmTests` difference.
 - [ ] **Step 2:** On stibnite, run the A/B/A/B measurement, with a fresh process and a separate stats file per run:
   ```sh
   for rev in A B A B; do

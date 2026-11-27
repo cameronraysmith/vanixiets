@@ -8,7 +8,7 @@
 let
   flakeModules = config.flake.modules.darwin;
   flakeUsers = config.flake.users;
-  inherit (config.flake.lib) hosts;
+  inherit (config.flake.lib) hosts vars;
   # sops-nix requires flake in extraSpecialArgs
   flakeForHomeManager = config.flake // {
     inherit inputs;
@@ -165,12 +165,18 @@ in
       # The session key from magnetite is authorized separately from its build
       # key for independent revocation and rotation. It is broad: it logs in as
       # admin-group crs58, a Nix trusted user, so it has build authority plus
-      # shell access. Its encrypted private half and public value are committed
-      # under vars/per-machine/magnetite/stibnite-agent-session.
+      # shell access. It is read from magnetite's committed public file under
+      # vars/per-machine/magnetite/stibnite-agent-session, not from magnetite's
+      # configuration; checks.x86_64-linux.nix-builders-wiring holds it to
+      # magnetite's generated key.
       services.stibnite-session-host = {
         enable = true;
         keys = [
-          inputs.self.nixosConfigurations.magnetite.config.clan.core.vars.generators.stibnite-agent-session.files."key.pub".value
+          (vars.public {
+            machine = "magnetite";
+            generator = "stibnite-agent-session";
+            file = "key.pub";
+          })
         ];
       };
 

@@ -1,11 +1,20 @@
-{ lib, ... }:
+{ config, lib, ... }:
+let
+  inherit (config.flake.lib) vars;
+in
 {
   flake.modules.darwin.fleet-services-trust =
     { config, lib, ... }:
     let
       cfg = config.services.fleet-services-trust;
       # caddy's root, the public file of cinnabar's clan vars generator caddy-root-ca.
-      caddyCert = ../../vars/per-machine/cinnabar/caddy-root-ca/root.crt/value;
+      caddyCert =
+        vars.path {
+          machine = "cinnabar";
+          generator = "caddy-root-ca";
+          file = "root.crt";
+        }
+        + "/value";
     in
     {
       options.services.fleet-services-trust.enable = lib.mkEnableOption "Caddy internal CA trust for the fleet's services";

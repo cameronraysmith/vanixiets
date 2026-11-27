@@ -89,7 +89,8 @@
             ];
           };
           reference = self.nixosConfigurations.magnetite.config;
-          inherit (reference.services.greptimedb) databases;
+          # flake data; fleetIngress asserts magnetite declares exactly this map
+          inherit (self.lib.otelCollectorSchema) databases;
           usersGenerator = reference.clan.core.vars.generators.greptimedb-users;
           devloop = self.lib.devloopCollection;
           pki = self.lib.otelTestPki pkgs;
@@ -2103,6 +2104,8 @@
           # differ only in their name and their cases.
           fleetIngress =
             name: cases:
+            assert lib.assertMsg (reference.services.greptimedb.databases == databases)
+              "fleet-ingress: magnetite does not declare flake.lib.otelCollectorSchema.databases: magnetite ${builtins.toJSON reference.services.greptimedb.databases}, flake data ${builtins.toJSON databases}";
             pkgs.testers.runNixOSTest {
               inherit name;
               requiredFeatures = {

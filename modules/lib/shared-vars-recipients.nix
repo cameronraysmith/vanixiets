@@ -42,7 +42,11 @@ let
       map (v: "${name} deploys shared secret ${v} but is not under vars/shared/${v}/machines") (missing {
         generators = hostConfig.clan.core.vars.generators;
         isRecipient =
-          gen: file: builtins.pathExists (self + "/vars/shared/${gen}/${file}/machines/${name}");
+          gen: file:
+          self.lib.vars.isRecipient {
+            generator = gen;
+            inherit file;
+          } { machine = name; };
       });
   };
 

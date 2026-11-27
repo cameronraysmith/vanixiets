@@ -93,7 +93,10 @@
         schema = self.lib.otelCollectorSchema;
         hosts = self.lib.observabilityHosts;
         ztAddress = lib.trim (
-          builtins.readFile "${self}/vars/shared/zerotier-ip-magnetite-zerotier/ip/value"
+          self.lib.vars.public {
+            generator = "zerotier-ip-magnetite-zerotier";
+            file = "ip";
+          }
         );
         meshAddress = self.lib.hosts.magnetite.address;
         storeVersion = magnetite.services.greptimedb.package.version;

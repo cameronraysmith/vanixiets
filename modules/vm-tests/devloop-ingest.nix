@@ -80,7 +80,8 @@
             overlays = [ self.overlays.default ];
           };
           reference = self.nixosConfigurations.magnetite.config;
-          inherit (reference.services.greptimedb) databases;
+          # flake data; devloopIngest asserts magnetite declares exactly this map
+          inherit (self.lib.otelCollectorSchema) databases;
           usersGenerator = reference.clan.core.vars.generators.greptimedb-users;
           schema = self.lib.otelCollectorSchema;
           devloop = self.lib.devloopCollection;
@@ -1550,6 +1551,8 @@
           # differ only in their name and their cases.
           devloopIngest =
             name: cases:
+            assert lib.assertMsg (reference.services.greptimedb.databases == databases)
+              "devloop-ingest: magnetite does not declare flake.lib.otelCollectorSchema.databases: magnetite ${builtins.toJSON reference.services.greptimedb.databases}, flake data ${builtins.toJSON databases}";
             pkgs.testers.runNixOSTest {
               inherit name;
               requiredFeatures = {

@@ -9,13 +9,17 @@
 # public vars), for members outside clan, such as phones, that carry them by
 # hand.
 {
-  inputs,
   config,
   lib,
   ...
 }:
 let
-  inherit (config.flake.lib) hosts mesh tincrHostFile;
+  inherit (config.flake.lib)
+    hosts
+    mesh
+    tincrHostFile
+    vars
+    ;
 
   peers = lib.filterAttrs (
     name: host:
@@ -33,7 +37,11 @@ let
 
   peerKey =
     name:
-    builtins.readFile "${inputs.self}/vars/per-machine/${name}/tincr-${mesh.instance}/ed25519_key.pub/value";
+    vars.public {
+      machine = name;
+      generator = "tincr-${mesh.instance}";
+      file = "ed25519_key.pub";
+    };
 in
 {
   flake.lib.meshHostFiles =

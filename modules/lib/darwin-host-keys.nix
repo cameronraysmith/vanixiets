@@ -1,9 +1,10 @@
 # Darwin host SSH keys, as static flake data. macOS manages these keys, so
 # unlike the NixOS hosts' clan-generated keys they are pinned here as literals:
-# modules/system/ssh-known-hosts.nix reads them for known_hosts, and
-# modules/checks/sops-correspondence.nix compares the ssh-to-age image of each
-# host that has a .sops.yaml anchor (blackphos) with that anchor, without
-# evaluating any host configuration.
+# flake.lib.hostKeys (modules/lib/host-keys.nix) merges them with the NixOS
+# hosts' committed keys, and modules/system/ssh-known-hosts.nix reads that for
+# known_hosts; modules/checks/sops-correspondence.nix compares the ssh-to-age
+# image of each host that has a .sops.yaml anchor (blackphos) with that
+# anchor, without evaluating any host configuration.
 # Each value is /etc/ssh/ssh_host_ed25519_key.pub on the host.
 { ... }:
 {

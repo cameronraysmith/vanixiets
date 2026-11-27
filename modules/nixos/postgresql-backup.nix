@@ -48,6 +48,7 @@
 let
   inherit (config.flake) modules;
   schema = config.flake.lib.otelCollectorSchema;
+  inherit (config.flake.lib) vars;
   inherit (config.flake.lib.nodeExporterTextfile) flag;
 
   location = "/var/backup/postgresql-nightly";
@@ -130,29 +131,32 @@ let
         lib.filter (unit: !lib.elem unit notifiedUnits) ([ jobUnit ] ++ units)
       );
 
-  factsOf =
-    name: hostConfig:
-    let
-      varsDir = "${toString hostConfig.clan.core.settings.directory}/vars/per-machine/${name}";
-    in
-    {
-      postgresql = {
-        enable = hostConfig.services.postgresql.enable or false;
-        ensureDatabases = hostConfig.services.postgresql.ensureDatabases or [ ];
-      };
-      enable = hostConfig.vanixiets.postgresqlBackup.enable or false;
-      awaiting = lib.elem name awaitingSecrets;
-      secretsGenerated =
-        builtins.pathExists "${varsDir}/${generators.r2}/env/secret"
-        && builtins.pathExists "${varsDir}/${generators.restic}/password/secret";
-      parked = hostConfig.vanixiets.postgresqlCollation.parkedDatabases or [ ];
-      postgresqlBackup = {
-        inherit (hostConfig.services.postgresqlBackup) databases compression location;
-      };
-      services = hostConfig.systemd.services;
-      restic = hostConfig.services.restic.backups.${jobName} or null;
-      notifiedUnits = config.flake.lib.observabilityHosts.${name}.notifiedUnits or [ ];
+  factsOf = name: hostConfig: {
+    postgresql = {
+      enable = hostConfig.services.postgresql.enable or false;
+      ensureDatabases = hostConfig.services.postgresql.ensureDatabases or [ ];
     };
+    enable = hostConfig.vanixiets.postgresqlBackup.enable or false;
+    awaiting = lib.elem name awaitingSecrets;
+    secretsGenerated =
+      vars.exists {
+        machine = name;
+        generator = generators.r2;
+        file = "env";
+      }
+      && vars.exists {
+        machine = name;
+        generator = generators.restic;
+        file = "password";
+      };
+    parked = hostConfig.vanixiets.postgresqlCollation.parkedDatabases or [ ];
+    postgresqlBackup = {
+      inherit (hostConfig.services.postgresqlBackup) databases compression location;
+    };
+    services = hostConfig.systemd.services;
+    restic = hostConfig.services.restic.backups.${jobName} or null;
+    notifiedUnits = config.flake.lib.observabilityHosts.${name}.notifiedUnits or [ ];
+  };
 
   module =
     {

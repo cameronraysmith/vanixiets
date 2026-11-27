@@ -69,11 +69,12 @@
               config.allowUnfree = true;
               overlays = [ self.overlays.default ];
             };
-            # Databases, TTLs and the users generator are read from the machine
-            # that declares them, so an inventory change cannot drift past this
-            # test silently.
+            # Databases and their TTLs are flake data (flake.lib.otelCollectorSchema),
+            # and the assertion below keeps magnetite, which declares them, from
+            # drifting past this test silently. The users generator is read from
+            # magnetite itself.
             reference = self.nixosConfigurations.magnetite.config;
-            inherit (reference.services.greptimedb) databases;
+            inherit (self.lib.otelCollectorSchema) databases;
             usersGenerator = reference.clan.core.vars.generators.greptimedb-users;
             schema = self.lib.otelCollectorSchema;
             owner = lib.head (lib.attrNames schema.ownerAliases);
@@ -87,6 +88,8 @@
             ];
             pki = self.lib.otelTestPki pkgs;
           in
+          assert lib.assertMsg (reference.services.greptimedb.databases == databases)
+            "greptimedb-pipeline: magnetite does not declare flake.lib.otelCollectorSchema.databases: magnetite ${builtins.toJSON reference.services.greptimedb.databases}, flake data ${builtins.toJSON databases}";
           assert lib.assertMsg (
             databases ? fleet && databases.fleet != changedTtl
           ) "greptimedb-pipeline: magnetite must declare fleet with a TTL other than ${changedTtl}";

@@ -30,9 +30,9 @@ Constraints that bind this change:
 
 **Goals:**
 - No NixOS or darwin configuration reads another host's evaluated configuration.
-- Every `known_hosts` entry and stibnite's authorized session key keep their exact bytes, and every system and home drvPath is unchanged. Among checks, only the added `host-key-obligations` and `fleet-alert` (which renders every check's size entry) differ, apart from the checks that embed the whole flake source, which the refactor oracle's base allow-list covers on every run.
+- Every `known_hosts` entry and stibnite's authorized session key keep their exact bytes, and every system and home drvPath is unchanged. Among checks, only the added `host-key-obligations`, `fleet-alert` (which renders every check's size entry) and `eval-users-lib` (which embeds `home/users/lib.nix`'s source) differ, apart from the checks that embed the whole flake source, which the refactor oracle's base allow-list covers on every run.
 - A NixOS host whose generated host key no longer matches the committed file fails its own build.
-- One accessor, `flake.lib.vars`, holds the vars layout. Every ad-hoc reader in scope uses it and keeps its trimming and its path-or-string kind.
+- One accessor, `flake.lib.vars`, holds the vars layout. Every ad-hoc reader in scope uses it and keeps its result value, its read function and its trimming.
 - The five vm-tests read magnetite's telemetry databases from flake data and still assert that magnetite declares them.
 - The stibnite toplevel saving is measured A/B and recorded.
 
@@ -78,7 +78,7 @@ Constraints that bind this change:
 - **Alternatives considered**: a trimmed `public` (rejected: it would change every `known_hosts` line). A `recipients` export for `commit-signing.nix:166` (rejected: `readDir (vars.path {…} + "/machines")` needs no sixth function). Clan's own `clanLib.getPublicValue` (rejected: it needs a `flake` argument and returns the untrimmed value too, so it adds a dependency on clan's library without removing any layout knowledge from the existence and recipient readers).
 - **Boundary**: vendored versus first-party. clan writes the layout; the accessor is the first-party reading of it, and A320 is the assumption it rests on.
 
-### D5: Migrating each reader keeps its kind and its trimming
+### D5: Migrating each reader keeps its value, its read function and its trimming
 
 | site | today | after |
 |---|---|---|
@@ -95,14 +95,14 @@ Constraints that bind this change:
 | `lib/commit-signing.nix:166` | `../../vars/shared + "/${gen}/key/machines"` | `vars.path { generator = gen; file = "key"; } + "/machines"` |
 | `darwin/otel-collector-agent.nix:451` | `hashFile "sha256" "${self}/vars/shared/langfuse/secret-key/secret"` | `hashFile "sha256" (vars.path { generator = "langfuse"; file = "secret-key"; } + "/secret")` |
 
-- **Choice**: each row keeps its read primitive (`readFile`, `fileContents`, `trim`, `pathExists`, `readDir`, `hashFile`) and its kind, path or string.
-- **Rationale**: drvPath identity is the acceptance test, and the kind decides store paths.
+- **Choice**: each row keeps its result value and its read function (`readFile`, `fileContents`, `trim`, `pathExists`, `readDir`, `hashFile`), so its trimming is unchanged. A row may change how it names the file: `tincr.nix:40`, `checks/otel-collector-{config,darwin}.nix`, `darwin/otel-collector-agent.nix:452`, `nixos/postgresql-backup.nix:142-147` and `nixos/r2-usage.nix:250` move from a `"${self}/…"` string to a path through `flake.lib.vars`, with unchanged results (A322).
+- **Rationale**: drvPath identity is the acceptance test. These readers consume the file's contents or existence during evaluation, so the form that names it does not reach a store path; the drv-diff run proves every drvPath unchanged.
 - **Alternatives considered**: normalising every site to one primitive. That would move drvPaths for no behavioural gain.
 - **Boundary**: source versus delivered. `fleet-services-trust`, `workstation-ca-trust` and `crs58` deliver the file itself into a closure; the rest only read it during evaluation.
 - The two existence readers previously rooted at the host's own `clan.core.settings.directory`, so they assumed that directory is the repository; `vars.exists` makes that explicit (A322 covers the root).
 
 ### D6: Telemetry databases in the vm-tests
-- **Choice**: in each of the five vm-tests, `inherit (reference.services.greptimedb) databases` becomes `inherit (self.lib.otelCollectorSchema) databases`. The test adds `assert lib.assertMsg (reference.services.greptimedb.databases == databases) "<test>: magnetite does not declare flake.lib.otelCollectorSchema.databases"`. `greptimedb-pipeline.nix:72-74`'s comment is reworded. Its existing TTL assertion (`:90-92`) stays.
+- **Choice**: in each of the five vm-tests, `inherit (reference.services.greptimedb) databases` becomes `inherit (self.lib.otelCollectorSchema) databases`. The test adds `assert lib.assertMsg (reference.services.greptimedb.databases == databases) "<test>: magnetite does not declare flake.lib.otelCollectorSchema.databases: magnetite ${builtins.toJSON reference.services.greptimedb.databases}, flake data ${builtins.toJSON databases}"`, so the failure names the mismatch; the message is built only when the assertion fails, so it moves no drvPath. In `fleet-ingress.nix` and `devloop-ingest.nix`, which build two tests each from one function, the assertion sits in that function and both tests carry the file's name. `greptimedb-pipeline.nix:72-74`'s comment is reworded. Its existing TTL assertion (`:90-92`) stays.
 - **Rationale**: the fact now has one declaration outside any host, and each test still fails if magnetite stops consuming it. The value passed to the test nodes is the same attrset, so the test derivations do not change.
 - **Alternatives considered**: dropping the per-test assertion in favour of the ingress role's name check (`otel-collector/flake-module.nix:1098-1102`). Rejected: that compares names only, not TTLs, and the requirement is that each test keeps its own drift guard. Lifting the omnigraph graphs: rejected in brainstorm Q8, because the readers use rendered output that magnetite is meant to supply.
 - **Boundary**: none.
@@ -116,7 +116,9 @@ Constraints that bind this change:
 - **Choice**: after rebasing onto the tip of `establish-refactor-oracle`, run `just drv-diff <parent> <tip> openspec/changes/stop-reading-other-hosts-configs/drv-delta.txt`. The oracle dumps the drvPath of every NixOS and darwin toplevel, every home activation package, every attribute of `checks.{x86_64-linux,aarch64-darwin}` and of `vmTests.{x86_64-linux,aarch64-linux}` at both revisions, applies its own committed base allow-list for checks that embed the whole flake source, and fails on any other difference not in `drv-delta.txt` or any `changed`/`added` entry that did not happen. `drv-delta.txt` declares:
   - `checks.x86_64-linux.host-key-obligations added`, the judge of D2;
   - `checks.x86_64-linux.fleet-alert changed`: its size-rule clause renders every `testSizes.checks` entry and echoes their count, and D2's check adds one entry;
-  - `may-change` for the seven tests defined by the five vm-test files D6 edits: `vmTests.x86_64-linux.{greptimedb-pipeline,fleet-ingress,fleet-ingress-outage,devloop-ingest,devloop-ingest-reconcile,greptimedb-oom-order,perses-greptimedb}`. They are predicted identical (D6 passes the same attrset to the nodes, and task 6.1 holds each driver's drvPath equal); any reported difference among them blocks landing until it is explained here.
+  - `checks.x86_64-linux.eval-users-lib changed`: `modules/home/users/lib.test.nix:26` imports `${./lib.nix}` by store path, so any edit to `lib.nix`, here D5's `signingKey` default reading through `flake.lib.vars.path`, gives it a new source path. No home configuration moves.
+
+  The design first predicted only the first two. The full run from `390f72f0c809` to `bbb7c5ccc978` (909.4 s, `logs/drv-diff-390f72f0c809-bbb7c5ccc978-20261127T033555Z`) failed on one undeclared difference, `eval-users-lib`, explained above and then declared; the re-judgement (`report.20261127T035524Z`) passed with exit 0. The seven tests of the five vm-test files D6 edits were listed `may-change` before the run and were all identical, so they were removed from `drv-delta.txt`; every NixOS, darwin and home toplevel was identical.
 
   No check or vm-test embeds a toplevel this change moves, because none moves.
 
@@ -126,14 +128,14 @@ Constraints that bind this change:
 
 ## Risks / Trade-offs
 
-- [Risk] A string-versus-path change at one site alters a store path, for example `"${self}/…"` becoming a path value that is copied separately. → Mitigation: D5 keeps each site's kind; the drvPath diff names any site that moved, and that site is reverted to its old kind.
+- [Risk] A string-versus-path change at one site alters a store path, for example `"${self}/…"` becoming a path value that is copied separately. → Mitigation: the sites that change form only read the file during evaluation (D5); the drvPath diff names any site whose store path moved, and that site is reverted to its old form.
 - [Risk] `readFile` of a path in the flake source carries a different string context from the evaluated `.value` (A322). → Mitigation: the diff of `known_hosts`-bearing toplevels decides; if it moves, `public` is changed to read through `settings.directory`'s form and re-measured.
 - [Risk] A future clan-core changes the `in_repo` layout or starts trimming. → Mitigation: A320's violation scenario; the own-host obligation fails on all six NixOS hosts at once, rather than `known_hosts` drifting silently.
 - [Risk] The obligation's fixtures pass while the assertion module is not imported. → Mitigation: a mutant in a throwaway tree forces cinnabar's generated public value to another key, leaving the committed file unchanged, and must see `nixos-cinnabar` fail on the assertion.
 - [Risk] A vm-test or fixture node that imports `nixos.base` under the name of a real host, with an `openssh` generator of its own, would fail the obligation. → Mitigation: the obligation keys on `config.clan.core.settings.machine.name`, the same name `sharedVarsObligations` uses. A task lists every `nixos.base` importer outside `nixosConfigurations` whose machine name is in `hostKeys`, and the oracle evaluates every check.
 - [Trade-off] `known_hosts` trusts the committed file without checking the running host. → Accepted. Today's source is equally untethered from the running host; it came from the same file.
 - [Trade-off] The five vm-tests still evaluate magnetite, for the assertion and for `greptimedb-users`, so D6 saves no evaluation. → Accepted. Its value is a single declaration, not cost.
-- [Trade-off] Adding a check attribute adds one key to `checks.x86_64-linux`, which needs a `testSizes` entry (`small`), and that entry moves `checks.x86_64-linux.fleet-alert`'s drvPath. → The task list declares the entry, and `drv-delta.txt` lists `fleet-alert` as `changed`.
+- [Trade-off] Adding a check attribute adds one key to `checks.x86_64-linux`, which needs a `testSizes` entry (`medium` with `measured = false`, the repository's form for a check no nixbot run has measured), and that entry moves `checks.x86_64-linux.fleet-alert`'s drvPath. → The task list declares the entry, and `drv-delta.txt` lists `fleet-alert` as `changed`.
 
 ## Migration Plan
 
@@ -151,4 +153,6 @@ Constraints that bind this change:
 ## Open Questions
 
 1. Should the omnigraph graphs also become `flake.lib` data (brainstorm Q8)? Recommended: no. Their readers test magnetite's rendered output, and the cookbook list is already held to the package by `checks.omnigraph-cookbook-seeds`. A yes adds a data file and five reader edits, with a risk of vm-test drvPath movement through the seed paths.
+   - Answer (operator, 2026-11-26): "no". The vm-tests read magnetite's rendered omnigraph settings, not a list, so lifting the graphs would add a second source without removing a read.
 2. Should the own-host obligation also fail a NixOS host that declares an `openssh` generator but has no `hostKeys` entry, so that a new host cannot be missing from `known_hosts`? Recommended: no. It would fail any vm-test node that imports `nixos.base` with the sshd service. The gap closes without it once type-the-fleet-host-registry derives `nixosKeyHosts` from each host's class, since a new NixOS host then enters `hostKeys` by its record.
+   - Answer (operator, 2026-11-26): "no". Failing a host missing from `hostKeys` belongs with type-the-fleet-host-registry, which derives `nixosKeyHosts` from each host's class.

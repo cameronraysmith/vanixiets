@@ -137,7 +137,7 @@ in
         ];
       };
 
-      # Make flake available to all modules (required by ssh-known-hosts)
+      # Ambient flake argument; its removal is tracked with the poisoned-flake guard in checks/omnigent-workers.nix
       _module.args.flake = inputs.self;
 
       nixpkgs.hostPlatform = "x86_64-linux";

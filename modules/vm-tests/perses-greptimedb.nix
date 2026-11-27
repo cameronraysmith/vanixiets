@@ -60,7 +60,7 @@
               overlays = [ self.overlays.default ];
             };
             reference = self.nixosConfigurations.magnetite.config;
-            inherit (reference.services.greptimedb) databases;
+            inherit (self.lib.otelCollectorSchema) databases;
             usersGenerator = reference.clan.core.vars.generators.greptimedb-users;
             referenceClient = reference.services.kanidm.provision.systems.oauth2.perses;
             schema = self.lib.otelCollectorSchema;
@@ -138,6 +138,8 @@
                   sys.stdout.buffer.write(request.SerializeToString())
                 '';
           in
+          assert lib.assertMsg (reference.services.greptimedb.databases == databases)
+            "perses-greptimedb: magnetite does not declare flake.lib.otelCollectorSchema.databases: magnetite ${builtins.toJSON reference.services.greptimedb.databases}, flake data ${builtins.toJSON databases}";
           # Every provisioned view is query-checked or named with the reason it
           # is not, exactly once, and each name in the two lists is provisioned.
           assert lib.assertMsg (unplaced == [ ] && unprovisioned == [ ] && inBoth == [ ])

@@ -59,7 +59,10 @@
         # Source A of the exporter clause: the address clan's ZeroTier service
         # assigned to magnetite, not the registry the renderer reads.
         ztAddress = lib.trim (
-          builtins.readFile "${self}/vars/shared/zerotier-ip-magnetite-zerotier/ip/value"
+          self.lib.vars.public {
+            generator = "zerotier-ip-magnetite-zerotier";
+            file = "ip";
+          }
         );
         # Compared with their store-path context discarded: lib.hasInfix
         # matches by regular expression, which rejects a string with context.

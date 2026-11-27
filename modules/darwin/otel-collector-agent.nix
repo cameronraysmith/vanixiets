@@ -448,7 +448,13 @@ in
                 OTEL_CERT_SHA256 = builtins.hashString "sha256" gens.otel-cert.files."cert.pem".value;
               }
               // lib.optionalAttrs langfuse {
-                LANGFUSE_VAR_SHA256 = builtins.hashFile "sha256" "${self}/vars/shared/langfuse/secret-key/secret";
+                LANGFUSE_VAR_SHA256 = builtins.hashFile "sha256" (
+                  flakeLib.vars.path {
+                    generator = "langfuse";
+                    file = "secret-key";
+                  }
+                  + "/secret"
+                );
               };
               serviceConfig = {
                 UserName = "_otelagent";

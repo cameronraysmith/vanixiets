@@ -77,6 +77,36 @@ Re-judging a recorded run with `just drv-diff-rejudge` evaluates nothing and tak
 | vmTests.x86_64-linux | 21 | 30.6 | 27.6 |
 | vmTests.aarch64-linux | 3 | 8.8 | 6.5 |
 
+## Measured changes
+
+### stop-reading-other-hosts-configs (CAM-133), 2026-11-27
+
+Before `390f72f0c80986760e941972c553008f00ee459c`, after `bbb7c5ccc978abd186a55b90cf0ab4b67ae3a29d`, on stibnite (Darwin arm64, 65,536 MiB), with the fleet's stock Nix `/nix/store/g2n4lw86lg8xa3kml84hmynm22kla7j5-nix-2.35.6/bin/nix` (Nix 2.35.6), sandbox `false`, no other evaluation running at the start of either measurement.
+The change reads every fleet host key and stibnite's session key from committed files instead of from other hosts' evaluated configurations.
+
+`darwinConfigurations.stibnite.config.system.build.toplevel` (drv), `logs/eval-cost-srohc-7-stats-stibnite-20261127T035106Z.{log,jsonl}`, started 2026-11-27T03:51:06Z:
+
+| run | side | wall s | cpuTime s | gc.totalBytes | nrThunks | envs.number |
+|---|---|---|---|---|---|---|
+| 1 | before | 11.31 | 10.43 | 3,165,612,096 | 24,376,947 | 16,103,638 |
+| 1 | after | 10.85 | 9.51 | 2,744,247,040 | 20,688,021 | 13,047,318 |
+| 2 | before | 11.62 | 10.43 | 3,165,610,176 | 24,376,947 | 16,103,638 |
+| 2 | after | 11.85 | 9.56 | 2,744,246,560 | 20,688,021 | 13,047,318 |
+
+`nixosConfigurations.cinnabar.config.system.build.toplevel` (drv), `logs/eval-cost-srohc-7-stats-cinnabar-20261127T035215Z.{log,jsonl}`, started 2026-11-27T03:52:16Z:
+
+| run | side | wall s | cpuTime s | gc.totalBytes | nrThunks | envs.number |
+|---|---|---|---|---|---|---|
+| 1 | before | 27.85 | 12.46 | 2,679,431,792 | 24,154,692 | 16,859,498 |
+| 1 | after | 27.14 | 11.93 | 2,410,155,728 | 21,336,653 | 14,379,164 |
+| 2 | before | 27.31 | 12.95 | 2,679,439,520 | 24,154,692 | 16,859,498 |
+| 2 | after | 26.82 | 11.07 | 2,410,146,800 | 21,336,653 | 14,379,164 |
+
+stibnite: 3,688,926 fewer thunks (15.1 %), 421,365,056 fewer bytes (13.3 %), CPU 10.43 s to 9.51 and 9.56 s (0.87 to 0.92 s, about 8.6 %).
+cinnabar: 2,818,039 fewer thunks (11.7 %), 269,276,064 fewer bytes (10.1 %), CPU 12.46 and 12.95 s to 11.93 and 11.07 s.
+Thunks and bytes are identical within each side and separate on one round; CPU separates on both rounds for both hosts (stibnite's slowest after run, 9.56 s, is below its fastest before run, 10.43 s; cinnabar's 11.93 s is below 12.46 s).
+The 2026-11-26 reference below put the known-hosts read alone at 3.72 million thunks, 423 MB and 0.98 s over the host-only baseline; the observed stibnite saving is of that size.
+
 ## Reference, not comparable (2026-11-26)
 
 These figures come from single runs on stibnite on 2026-11-26 (`logs/cross-host-eval-cost-<label>-20261126-*.stats.json`, gitignored) and are restated from the den-readiness audit.

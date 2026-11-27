@@ -45,6 +45,7 @@
               overlays = [ self.overlays.default ];
             };
             reference = self.nixosConfigurations.magnetite.config;
+            inherit (self.lib.otelCollectorSchema) databases;
             storeAdj = reference.systemd.services.greptimedb.serviceConfig.OOMScoreAdjust;
             collectorAdj = reference.systemd.services.opentelemetry-collector.serviceConfig.OOMScoreAdjust;
             usersGenerator = reference.clan.core.vars.generators.greptimedb-users;
@@ -74,6 +75,8 @@
                   time.sleep(0.02)
             '';
           in
+          assert lib.assertMsg (reference.services.greptimedb.databases == databases)
+            "greptimedb-oom-order: magnetite does not declare flake.lib.otelCollectorSchema.databases: magnetite ${builtins.toJSON reference.services.greptimedb.databases}, flake data ${builtins.toJSON databases}";
           pkgs.testers.runNixOSTest {
             name = "greptimedb-oom-order";
             requiredFeatures = {
@@ -110,7 +113,7 @@
 
                 services.greptimedb = {
                   enable = true;
-                  inherit (reference.services.greptimedb) databases;
+                  inherit databases;
                 };
                 services.nixEvalLock.enable = true;
                 services.memoryPressureGuards.enable = reference.services.memoryPressureGuards.enable;

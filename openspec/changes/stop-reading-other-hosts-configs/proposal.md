@@ -3,15 +3,17 @@ linear_story_id: CAM-133
 linear_story_identifier: CAM-133
 linear_story_title: "Build each fleet host without evaluating the other hosts"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-133/build-each-fleet-host-without-evaluating-the-other-hosts
-linear_story_state: Todo
+linear_story_state: In Review
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: Todo
-last_synced_at: "2026-11-26T23:02:05Z"
+last_synced_state: In Review
+last_synced_at: "2026-11-27T04:00:29Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:02:05Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-133 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
+  - { at: "2026-11-27T03:23:07Z", transition: "Todo->In Progress", outcome: "posted", note: "First tasks.md checkbox (1.1) ticked; state set by name and confirmed by read-only view; start comment posted" }
+  - { at: "2026-11-27T04:00:29Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md written (PASS WITH WARNINGS); state set by name and confirmed by read-only view; review comment posted" }
 ---
 
 ## Why
@@ -38,7 +40,7 @@ Building any one host's configuration today also evaluates all six NixOS hosts' 
 - To: they read `flake.lib.otelCollectorSchema.databases`, and each still asserts that magnetite declares exactly that map.
 
 **Measured outcome**
-- Every system and home drvPath is unchanged across the change. Among checks, only the new `host-key-obligations` and `fleet-alert` (which renders every check's size entry) change, and the seven vm-tests whose files are edited are expected unchanged; `just drv-diff` with `drv-delta.txt` decides.
+- Every system and home drvPath is unchanged across the change. Among checks, only the new `host-key-obligations`, `fleet-alert` (which renders every check's size entry) and `eval-users-lib` (which embeds `home/users/lib.nix`'s source) change, and the seven vm-tests whose files are edited stay unchanged; `just drv-diff` with `drv-delta.txt` decides.
 - The stibnite toplevel's CPU time, thunks and allocation are measured A/B afterwards and recorded against the baseline above.
 
 **Non-goals**

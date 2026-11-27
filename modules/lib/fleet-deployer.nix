@@ -30,6 +30,7 @@ let
     cloudMachines
     mesh
     ztRecords
+    vars
     ;
   inventory = config.flake.clan.inventory.machines;
 
@@ -96,11 +97,14 @@ let
   rule = reachRule { inherit operators admin; };
   reachOf = requester: lib.filter (name: rule requester hosts.${name}.primaryUser) targets;
 
-  requestKeyFile = owner: ../../vars/shared/omnigent-${owner}-deploy-request/key.pub/value;
+  requestKey = owner: {
+    generator = "omnigent-${owner}-deploy-request";
+    file = "key.pub";
+  };
   requestKeyOf =
     owner:
-    if builtins.pathExists (requestKeyFile owner) then
-      lib.trim (builtins.readFile (requestKeyFile owner))
+    if vars.exists (requestKey owner // { secret = false; }) then
+      lib.trim (vars.public (requestKey owner))
     else
       null;
 
@@ -304,10 +308,10 @@ let
       generators = hostConfig.clan.core.vars.generators or { };
       varPath =
         generator: file:
-        if generators.${generator}.share then
-          "vars/shared/${generator}/${file}"
-        else
-          "vars/per-machine/${name}/${generator}/${file}";
+        vars.relPath {
+          inherit generator file;
+          machine = if generators.${generator}.share then null else name;
+        };
       activation = lib.concatLists (
         lib.mapAttrsToList (
           generator: spec:
