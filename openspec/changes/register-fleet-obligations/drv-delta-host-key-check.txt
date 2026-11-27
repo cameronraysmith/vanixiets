@@ -1,0 +1,11 @@
+# Declared drvPath differences of the host-key-obligations conversion
+# (modules/checks/host-key-obligations.nix moved to flake.lib.mkJudgeCheck),
+# from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/register-fleet-obligations/drv-delta-host-key-check.txt
+# None. mkJudgeCheck builds the same `runCommand "host-key-obligations" { }
+# "touch $out"` the check built by hand, and its assertions leave that
+# derivation unchanged (A332), so checks.x86_64-linux.host-key-obligations
+# keeps its drvPath (evaluated identical against main). The testSizes entry is
+# untouched, so checks.x86_64-linux.fleet-alert keeps its drvPath. Checks that
+# embed the whole flake source or every .nix file under modules/ are covered
+# by the base allow-list (modules/apps/drv-diff-base-allow.txt).

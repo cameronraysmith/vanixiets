@@ -55,9 +55,6 @@
           problems = 0;
         };
       };
-      wrong = lib.filterAttrs (
-        _: case: lib.length (o.failures case.name case.hostConfig) != case.problems
-      ) cases;
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       testSizes.checks = {
@@ -67,10 +64,10 @@
           measured = false;
         };
       };
-      checks.host-key-obligations =
-        assert lib.assertMsg (
-          wrong == { }
-        ) "host-key-obligations: the judge misjudges ${toString (lib.attrNames wrong)}";
-        pkgs.runCommand "host-key-obligations" { } "touch $out";
+      checks.host-key-obligations = self.lib.mkJudgeCheck pkgs {
+        name = "host-key-obligations";
+        judge = case: o.failures case.name case.hostConfig;
+        inherit cases;
+      };
     };
 }
