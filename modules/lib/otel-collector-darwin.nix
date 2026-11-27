@@ -72,7 +72,7 @@ in
       # The process filter's clause sparing one fleet executable.
       spared = n: ''resource.attributes["process.executable.name"] != ${builtins.toJSON n}'';
       # As the NixOS agent's exporters (modules/clan/services/otel-collector/
-      # flake-module.nix ingressExporter), with the sops paths of otel-cert.
+      # agent.nix ingressExporter), with the sops paths of otel-cert.
       ingressExporter = queueSize: {
         endpoint = "https://[${flakeLib.hosts.magnetite.zerotier.address}]:4318";
         tls = {

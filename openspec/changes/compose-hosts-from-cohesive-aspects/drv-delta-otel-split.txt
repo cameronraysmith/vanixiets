@@ -1,0 +1,13 @@
+# Declared drvPath differences of splitting the otel-collector clan service
+# (modules/clan/services/otel-collector/flake-module.nix into _shared.nix,
+# agent.nix, ingress.nix and service.nix), from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-otel-split.txt
+# None. Each new file assigns the output flake-module.nix assigned, with the
+# same options and values; the `forward` connector moves from the agent's
+# `mkIf ingress` into the ingress fragment, which sets `ingress = true` and is
+# imported only beside the agent, so the rendered configuration is unchanged.
+# Every NixOS, darwin and home toplevel, every runtime test and the
+# otel-collector checks were evaluated identical against main. No testSizes
+# entry and no packages/docs file changes. Checks that embed the whole flake
+# source or every .nix file under modules/ are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt).

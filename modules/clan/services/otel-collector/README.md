@@ -4,6 +4,7 @@ This clan service collects fleet metrics into the GreptimeDB telemetry store and
 It has two roles, `agent` and `ingress`, assigned in `modules/clan/inventory/services/otel-collector.nix`: `agent` on every host of `flake.lib.observabilityHosts`, and `ingress` on magnetite alone.
 The roles import the plain NixOS modules `flake.modules.nixos.otel-collector-agent` and `flake.modules.nixos.otel-collector-ingress`, so the container tests import them without clan, and on a darwin host the `agent` role's `darwinModule` imports `flake.modules.darwin.otel-collector-agent` (see "Darwin agents").
 The clan `agent` role reads the `otel-ca`, `otel-cert` and `ntfy-alerter` vars, and the clan `ingress` role reads the `collector-password` and `regulator-password` files of `greptimedb-users`.
+`service.nix` holds the clan service, `agent.nix` and `ingress.nix` the two NixOS fragments (the ingress fragment defines the `forward` connector), and `_shared.nix`, which import-tree skips, the bindings the three share: `collectorCore`, the credential and state paths, and the exporters' `queueBytes`.
 
 The NixOS module runs one collector per host, so both roles' fragments merge into one `services.opentelemetry-collector` and one `opentelemetry-collector.service`.
 Both roles import `collectorCore`, which carries the shared module key `vanixiets#otel-collector-core` so a host holding both roles loads it once.
@@ -254,7 +255,7 @@ Nothing imports `schema.nix` by path; import-tree loads it as a flake-parts modu
 - `agentSession.credentialPatterns`: the credential shapes `transform/agent-session-mask` replaces, by issuer.
 - `agentMetricsBytesPerMinute` (35,840), `agentEventBytesPerMinute` (133,000) and `agentSpanBytesPerMinute` (240,000): one agent-telemetry host's assumed agent output, beside `fleetBytesPerMinute`, until the measurement after deploy replaces them.
 
-To add a database, add `<name> = "<ttl>";` to `databases`, add a `queueBytes.<name>` entry in `flake-module.nix`, and have the producing pipeline set `vanixiets.database = "<name>"`.
+To add a database, add `<name> = "<ttl>";` to `databases`, add a `queueBytes.<name>` entry in `_shared.nix`, and have the producing pipeline set `vanixiets.database = "<name>"`.
 The ingress's queues must still sum to under 640 MiB, the budget of the ingress collector process alone (ADR-003 as amended 2026-11-23); every other collector process's queues stay under 512 MiB.
 The ingress assertion fails if the store would create a different set of databases from the one the ingress routes to.
 
@@ -381,7 +382,7 @@ With `tokenFile` unset the notifier posts anonymously, which ntfy refuses on `fl
 ## Darwin agents
 
 stibnite, rosegold and argentum are the darwin agent hosts; each row sets `platform = "darwin"`, `notifiedUnits` with `otel-envelope` and `smartDevices = [ "disk0" ]`, and stibnite's also sets `agentTelemetry`, `langfuse`, `agentSpanQueueMiB = 256` and `otel-agent-session-envelope` in `notifiedUnits` (`darwin-agent-session-telemetry` design D3, D5, D7). The role sets the darwin `vanixiets.otelCollector.agentTelemetry` and `.langfuse` from the row, so the agent-telemetry home module turns on stibnite's emitters: crs58's, stamped `user.name=cameron` from `flake.userAliases`, and the standalone Omnigent worker's, whose builder sets `agentTelemetry.enable` and its owner as the person (design D10).
-On every darwin row, whatever its `collect`, the agent role's `perInstance.darwinModule` in `flake-module.nix` declares the `_otelcol` account (uid and gid 536, in `users.knownUsers` and `users.knownGroups`, home `/var/empty`, shell `/usr/bin/false`) and the generators `otel-ca`, `otel-cert` and, through `flake.modules.darwin.ntfy-alerter`, `ntfy-alerter`.
+On every darwin row, whatever its `collect`, the agent role's `perInstance.darwinModule` in `service.nix` declares the `_otelcol` account (uid and gid 536, in `users.knownUsers` and `users.knownGroups`, home `/var/empty`, shell `/usr/bin/false`) and the generators `otel-ca`, `otel-cert` and, through `flake.modules.darwin.ntfy-alerter`, `ntfy-alerter`.
 `otel-cert`'s `key.pem` and the `ntfy-alerter` token are owned by `_otelcol` with mode `0400`, and the key has `neededFor = "services"`, so both have their owner before any collector runs.
 `restartUnits` is set only in the NixOS module, because clan-core throws on it on darwin (`clan-core generic-generator.nix:193-208`); instead the `otelcol` plist carries `OTEL_CERT_SHA256`, the sha256 of `otel-cert`'s committed `cert.pem`, so a reissued certificate changes the plist and nix-darwin reloads the job.
 Where `collect` is true the role also imports `flake.modules.darwin.otel-collector-agent` from `modules/darwin/otel-collector-agent.nix`, the fragment that runs collection.
