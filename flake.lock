@@ -360,11 +360,11 @@
     "easykubenix": {
       "flake": false,
       "locked": {
-        "lastModified": 1795548135,
-        "narHash": "sha256-I9lJDifOdZsiRGmiuA0nS/u5lVMOH37XenH0BCjF+Xg=",
+        "lastModified": 1795773446,
+        "narHash": "sha256-02kYfXYmwoAKVgdSqrEzt1z+CJk+WNxMII6+nk/+EpU=",
         "owner": "nixidae",
         "repo": "easykubenix",
-        "rev": "dd4b5c5cd1f5ba24813c1cc854bc61a676ca4a77",
+        "rev": "fca0016770507ed1c008a76062bf9edf7850d305",
         "type": "github"
       },
       "original": {
