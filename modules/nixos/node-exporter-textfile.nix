@@ -49,7 +49,7 @@ let
       row = hosts.${config.networking.hostName} or null;
     in
     {
-      key = "vanixiets#node-exporter-textfile";
+      key = "vanixiets/node-exporter-textfile";
 
       options.vanixiets.nodeExporter = {
         textfileDirectory = lib.mkOption {

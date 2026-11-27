@@ -4,7 +4,7 @@
 # ~/.config/crush/CRUSH.md, and ~/.config/opencode/AGENTS.md (plus pi via
 # programs.pi-coding-agent.context)
 # from shared configuration with references to preference documents
-{ ... }:
+{ config, ... }:
 let
   content =
     { lib, ... }:
@@ -78,6 +78,12 @@ let
     };
 in
 {
-  flake.modules.homeManager.tools = content;
-  flake.modules.homeManager.agent-context = content;
+  flake.modules.homeManager = config.flake.lib.exportAs {
+    key = "agent-context";
+    names = [
+      "tools"
+      "agent-context"
+    ];
+    module = content;
+  };
 }

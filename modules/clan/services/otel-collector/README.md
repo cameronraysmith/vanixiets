@@ -7,7 +7,7 @@ The clan `agent` role reads the `otel-ca`, `otel-cert` and `ntfy-alerter` vars, 
 `service.nix` holds the clan service, `agent.nix` and `ingress.nix` the two NixOS fragments (the ingress fragment defines the `forward` connector), and `_shared.nix`, which import-tree skips, the bindings the three share: `collectorCore`, the credential and state paths, and the exporters' `queueBytes`.
 
 The NixOS module runs one collector per host, so both roles' fragments merge into one `services.opentelemetry-collector` and one `opentelemetry-collector.service`.
-Both roles import `collectorCore`, which carries the shared module key `vanixiets#otel-collector-core` so a host holding both roles loads it once.
+Both roles import `collectorCore`, which carries the shared module key `vanixiets/otel-collector-core` so a host holding both roles loads it once.
 `collectorCore` sets the package to `opentelemetry-collector-contrib`, defines the `memory_limiter` processor (384 MiB) that the agent pipelines and `metrics/ingress` run first, the `file_storage` extension under `/var/lib/opentelemetry-collector/queue`, and the options `vanixiets.otelCollector.ingress`, `caFile`, `smartDevices`, `agentTelemetry` and `envelopeBudget`, and gives the unit `RestartSec = 5s` with `StartLimitIntervalSec = 0`.
 
 ## Agent hosts and the host table
@@ -451,7 +451,7 @@ Without `darwinMemory` the script's text is unchanged, so no NixOS envelope chan
   Confirm a changed receiver by reading its series back from the store.
 - The process scraper must keep `process.pid`, `process.parent_pid`, `process.command`, `process.command_line`, `process.executable.path` and `process.owner` disabled at source; an agent assertion enforces this.
 - The exponential-histogram conversion stays while the store is below 1.3.0; R1.2 fails if it is removed earlier.
-- A host's ZFS and store notices depend on its importing `observability-notify`, through the `agent` role or directly; the module's key `vanixiets#observability-notify` makes a host doing both load it once.
+- A host's ZFS and store notices depend on its importing `observability-notify`, through the `agent` role or directly; the module's key `vanixiets/observability-notify` makes a host doing both load it once.
 - `sqlquery` stores each query's position under a key that contains the query's text (`open-telemetry/opentelemetry-collector-contrib@aaf5045a2:receiver/sqlqueryreceiver/logs_receiver.go:123`, `:276`), so any later change to an export query, such as a column a later slice adds to the allow-list, starts again from `tracking_start_value` and re-sends nixbot's retained history once, about 200,000 attribute rows; the store keeps one row per key, but that day exceeds ADR-004's 100,000 rows.
 - `sqlquery` and `journald` advance their position before delivery (`logs_receiver.go:337-346`; `pkg/stanza/operator/input/journald/input.go:186-189`), so a `memory_limiter` refusal loses journal lines, and nixbot rows older than the five-minute overlap, until a replay; `journald/gitea-mq` sets `retry_on_failure` with no time limit to narrow that loss.
 - `journald/gitea-mq` depends on its `journalctl --boot=all` wrapper: without it, systemd 261's `journalctl --follow` reads only the current boot, so a replay or first start copies only the lines since the last reboot, and `C3` fails.

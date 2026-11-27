@@ -79,7 +79,7 @@ in
       );
     in
     {
-      key = "vanixiets#observability-notify";
+      key = "vanixiets/observability-notify";
 
       options.services.observability-notify = {
         units = lib.mkOption {

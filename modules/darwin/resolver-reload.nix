@@ -21,7 +21,8 @@
 # file contents would skip the touch whenever a previous activation changed
 # the contents but stopped before a touch (an interrupted activation, or any
 # generation activated before this module existed), and a reread costs configd
-# one DNS configuration rebuild. The lines lead postActivation (lib.mkBefore),
+# one DNS configuration rebuild. The lines lead postActivation
+# (flake.lib.activationOrder.resolverReload, lib.mkBefore's priority),
 # which nix-darwin's activation-scripts.nix splices after
 # system.activationScripts.etc, so the links exist and point at the new
 # /etc/static, and no later postActivation snippet failing under set -e can
@@ -34,6 +35,8 @@
 # judge on fixtures.
 { config, lib, ... }:
 let
+  inherit (config.flake.lib) activationOrder;
+
   # The targets of the enabled environment.etc entries under resolver/.
   resolverTargets =
     etc:
@@ -93,7 +96,7 @@ in
       targets = resolverTargets config.environment.etc;
     in
     {
-      system.activationScripts.postActivation.text = lib.mkBefore (
+      system.activationScripts.postActivation.text = lib.mkOrder activationOrder.resolverReload (
         lib.optionalString (targets != [ ]) ''
           # Make configd reread /etc/resolver (modules/darwin/resolver-reload.nix).
           ${lib.concatMapStringsSep "\n" touchLine targets}

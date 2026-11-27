@@ -1,6 +1,6 @@
 { config, lib, ... }:
 let
-  inherit (config.flake.lib) vars;
+  inherit (config.flake.lib) activationOrder vars;
 in
 {
   flake.modules.darwin.fleet-services-trust =
@@ -22,7 +22,7 @@ in
       config = lib.mkIf cfg.enable {
         security.pki.certificateFiles = [ caddyCert ];
 
-        system.activationScripts.postActivation.text = lib.mkAfter ''
+        system.activationScripts.postActivation.text = lib.mkOrder activationOrder.fleetServicesTrust ''
           echo "Adding Caddy cinnabar internal CA to macOS Keychain..."
           CADDY_CERT_PATH="${caddyCert}"
           CADDY_CERT_NAME="Caddy Local Authority - 2026 ECC Root"

@@ -10,6 +10,7 @@ A directory is an aggregate: one user-facing capability, named for what a user g
 A user is composed by listing aggregates in `flake.users.<name>.aggregates` (`users/<name>/meta.nix`); `configurations.nix` and `mk-home.nix` turn that list into one `homeConfigurations` output per declared system, and a host's attachment (`flake.fleet.hosts.<host>.users.<account>`, `modules/lib/host-users.nix`) gives the account a home on that host through the `home-manager-integration` aspect.
 A home's `flake` argument is its own `_module.args.flake`, set by what composes it: `flake.lib.homeFlake` for host and standalone homes, and the omnigent worker aspect's restricted value for worker homes; no `extraSpecialArgs.flake` exists, and a module that needs the flake inside `imports` reads its flake-parts scope (`inputs`, `config.flake`), because `_module.args` cannot be read while imports are collected.
 This is the dendritic pattern from `github:mightyiam/dendritic`: a file is one feature across every configuration that wants it, the path names the feature, and merging by aggregate name replaces import lists.
+A module exported under an aggregate and under its own name (`jq` in `terminal` and as `jq`) is exported with `flake.lib.exportAs` (`modules/lib/export-as.nix`), which gives it the key `vanixiets/<name>`, so a home importing both names applies it once; the key is set on the module itself, because an extra import level would move its definitions in every list option (the module system collects imports breadth-first).
 
 ## Contract
 

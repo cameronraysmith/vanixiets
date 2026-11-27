@@ -35,22 +35,27 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 - **WHEN** a flake-parts update sets a `key` on `flake.modules` values
 - **THEN** this assumption is void; `exportAs`'s keys and the rule that no server aspect imports another are restated, and the `host-composition` requirement `Each host's deployed system is unchanged apart from declared differences` is rechecked by a drvPath diff
 
-### Requirement: A352 — Several definitions of one deferred module are imported in definition order
+### Requirement: A352 — The module system merges definitions in breadth-first import order
 
-It is true of the nixpkgs module system at the locked revision, independent of what this fleet builds, that a `deferredModule` option with several definitions merges to a module importing each definition, wrapped with its file, in definition order, and that a module's own list definitions merge after those of its imports (A344).
+It is true of the nixpkgs module system at the locked revision, independent of what this fleet builds, that a configuration's modules are collected breadth-first over the import tree and that definitions merge in that order, so a definition's place in a list option depends on its import depth as well as on its order among its siblings.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: nixpkgs `lib/types.nix` `deferredModuleWith`'s merge and `lib/modules.nix:278`, read at apply (task 1.5); import-tree supplies definitions in path order.
+**Evidence**: nixpkgs `lib/modules.nix:600-614` (`filterModules` returns `builtins.genericClosure` over the collected tree) and `lib/types.nix` `deferredModuleWith`'s merge, read 2026-11-27.
+
+#### Scenario: Measured on this fleet
+
+- **WHEN** `darwin.base`, `nixos.base` and `homeManager.ai` were rewritten on 2026-11-27 as named import lists in path order, which puts each part one or more import levels deeper
+- **THEN** argentum's system packages and every home importing `ai` changed; a key added by wrapping a module (`{ key; imports = [ m ]; }`) changed the claude-sandbox and ubuntu homes, and the same key set on the module itself changed nothing
 
 #### Scenario: Observed by the drvPath diff
 
 - **WHEN** a commit that moves definitions between a host module and its imports, or turns an aggregate into a named import list, is compared with its parent
-- **THEN** every host and home derivation the commit did not declare is identical
+- **THEN** a host or home derivation changes wherever a moved list definition now sits at a different import depth, and is identical otherwise
 
 #### Scenario: The merge order changes
 
-- **WHEN** a nixpkgs update changes the order in which a deferred module's definitions or a module's imports merge
-- **THEN** this assumption is void; the `host-composition` requirement `Each host's deployed system is unchanged apart from declared differences` loses its discharge until every import list ordered to reproduce a merge is re-derived
+- **WHEN** a nixpkgs update changes the order in which modules are collected or a deferred module's definitions merge
+- **THEN** this assumption is void; the `host-composition` requirement `Each host's deployed system is unchanged apart from declared differences` loses its discharge until every commit relying on today's order is re-measured
 
 ### Requirement: A353 — nix-darwin writes a list nix setting as one space-joined line, keeping duplicates
 

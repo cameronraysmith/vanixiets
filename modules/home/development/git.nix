@@ -1,6 +1,6 @@
 # Git configuration with delta diff and lazygit; signing is set by vcs-signing.nix
 # Note: User-specific values (name, email) should be set in user modules
-{ ... }:
+{ config, ... }:
 let
   content =
     personal:
@@ -167,6 +167,15 @@ let
     };
 in
 {
-  flake.modules.homeManager.development = content true;
-  flake.modules.homeManager.git = content false;
+  flake.modules.homeManager =
+    config.flake.lib.exportAs {
+      key = "git?full=true";
+      names = [ "development" ];
+      module = content true;
+    }
+    // config.flake.lib.exportAs {
+      key = "git?full=false";
+      names = [ "git" ];
+      module = content false;
+    };
 }

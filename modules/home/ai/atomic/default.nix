@@ -135,6 +135,12 @@ let
     };
 in
 {
-  flake.modules.homeManager.ai = content;
-  flake.modules.homeManager.atomic = content;
+  flake.modules.homeManager = config.flake.lib.exportAs {
+    key = "atomic";
+    names = [
+      "ai"
+      "atomic"
+    ];
+    module = content;
+  };
 }

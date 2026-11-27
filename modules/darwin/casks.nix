@@ -2,7 +2,10 @@
 # Provides environment.casks option for installing .app bundles from nix packages
 # Uses marker-based caching to only copy when the store path changes
 # Adapted from mic92/clan-dotfiles darwinModules/casks.nix
-{ ... }:
+{ config, ... }:
+let
+  inherit (config.flake.lib) activationOrder;
+in
 {
   flake.modules.darwin.casks =
     {
@@ -30,7 +33,7 @@
       };
 
       config = lib.mkIf (cfg.casks != [ ]) {
-        system.activationScripts.postActivation.text = lib.mkAfter ''
+        system.activationScripts.postActivation.text = lib.mkOrder activationOrder.casks ''
           echo "setting up /Applications/Nix Casks..." >&2
           targetDir='/Applications/Nix Casks'
           markerDir="$targetDir/.sources"

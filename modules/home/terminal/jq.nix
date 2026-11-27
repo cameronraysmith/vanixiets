@@ -1,12 +1,15 @@
-{ ... }:
-let
-  content =
-    { ... }:
-    {
-      programs.jq.enable = true;
-    };
-in
+{ config, ... }:
 {
-  flake.modules.homeManager.terminal = content;
-  flake.modules.homeManager.jq = content;
+  flake.modules.homeManager = config.flake.lib.exportAs {
+    key = "jq";
+    names = [
+      "terminal"
+      "jq"
+    ];
+    module =
+      { ... }:
+      {
+        programs.jq.enable = true;
+      };
+  };
 }

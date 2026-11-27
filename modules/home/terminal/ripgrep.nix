@@ -1,12 +1,15 @@
-{ ... }:
-let
-  content =
-    { ... }:
-    {
-      programs.ripgrep.enable = true;
-    };
-in
+{ config, ... }:
 {
-  flake.modules.homeManager.terminal = content;
-  flake.modules.homeManager.ripgrep = content;
+  flake.modules.homeManager = config.flake.lib.exportAs {
+    key = "ripgrep";
+    names = [
+      "terminal"
+      "ripgrep"
+    ];
+    module =
+      { ... }:
+      {
+        programs.ripgrep.enable = true;
+      };
+  };
 }

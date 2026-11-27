@@ -3,16 +3,17 @@ linear_story_id: CAM-132
 linear_story_identifier: CAM-132
 linear_story_title: "Compose each fleet host from reusable, named building blocks"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-132/compose-each-fleet-host-from-reusable-named-building-blocks
-linear_story_state: Todo
+linear_story_state: In Progress
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: Todo
-last_synced_at: "2026-11-26T23:01:01Z"
+last_synced_state: In Progress
+last_synced_at: "2026-11-27T15:49:31Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:01:01Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-132 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view" }
   - { at: "2026-11-26T23:21:27Z", transition: "Backlog->Todo", outcome: "posted", note: "bind comment was missing from the creation write; posted now (comment 3d7176b3) after a read-only view showed no comments" }
+  - { at: "2026-11-27T15:49:31Z", transition: "Todo->In Progress", outcome: "posted", note: "fired on the first checked task (1.7); state confirmed In Progress by read-only view; comment 24c52d27" }
 ---
 
 ## Why

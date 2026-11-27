@@ -1,0 +1,16 @@
+# Declared drvPath differences of stating module identity and today's darwin
+# activation order (flake.lib.exportAs keying the seven dual-exported home
+# modules, the three vanixiets# keys respelled vanixiets/, and
+# flake.lib.activationOrder at the values that reproduce today's
+# postActivation order), from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-module-identity.txt
+# None. A key affects only which module the module system keeps of two with
+# one key; the keyed home modules set booleans, and exportAs sets the key on
+# the module itself, so no definition changes import depth. The mkOrder
+# values keep every Mac's postActivation text byte for byte. Every NixOS,
+# darwin and home toplevel, every runtime test, deploy-record-order,
+# darwin-resolver-reload and the four darwin machine checks were evaluated
+# identical against the parent. No testSizes entry and no packages/docs file
+# changes. Checks that embed the whole flake source or every .nix file under
+# modules/ are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt).

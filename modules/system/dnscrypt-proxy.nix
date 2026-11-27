@@ -45,8 +45,10 @@
 #     sudo resolvectl domain wlp2s0 '~.'
 #   Complete portal login, then drop all three again:
 #     sudo resolvectl revert wlp2s0
-{ lib, ... }:
+{ config, lib, ... }:
 let
+  inherit (config.flake.lib) activationOrder;
+
   # DoH stamps with embedded IP addresses (no DNS lookup required).
   # Stamps encode: protocol, IP, hostname, path, flags in base64 sdns:// URI.
   # This bypasses DNS interception for bootstrap - no plaintext DNS needed.
@@ -302,7 +304,7 @@ in
         environment.systemPackages = [ pinDns ];
 
         # Health check: ensure dnscrypt-proxy is responding after activation
-        system.activationScripts.postActivation.text = lib.mkAfter ''
+        system.activationScripts.postActivation.text = lib.mkOrder activationOrder.dnscryptProxy ''
           ${lib.getExe pinDns}
           echo "checking dnscrypt-proxy health..." >&2
           sleep 1  # Give dnscrypt-proxy time to start

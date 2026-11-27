@@ -1,12 +1,15 @@
-{ ... }:
-let
-  content =
-    { ... }:
-    {
-      programs.fd.enable = true;
-    };
-in
+{ config, ... }:
 {
-  flake.modules.homeManager.terminal = content;
-  flake.modules.homeManager.fd = content;
+  flake.modules.homeManager = config.flake.lib.exportAs {
+    key = "fd";
+    names = [
+      "terminal"
+      "fd"
+    ];
+    module =
+      { ... }:
+      {
+        programs.fd.enable = true;
+      };
+  };
 }

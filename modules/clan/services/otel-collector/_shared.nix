@@ -63,7 +63,7 @@ let
   # strip the routing attribute (ADR-003 item 8; envelope 384 MiB under
   # MemoryMax 512M).
   collectorCore = {
-    key = "vanixiets#otel-collector-core";
+    key = "vanixiets/otel-collector-core";
     imports = [
       (
         { lib, pkgs, ... }:

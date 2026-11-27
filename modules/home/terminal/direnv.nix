@@ -83,6 +83,12 @@ let
     };
 in
 {
-  flake.modules.homeManager.terminal = content;
-  flake.modules.homeManager.direnv = content;
+  flake.modules.homeManager = flakeLib.exportAs {
+    key = "direnv";
+    names = [
+      "terminal"
+      "direnv"
+    ];
+    module = content;
+  };
 }

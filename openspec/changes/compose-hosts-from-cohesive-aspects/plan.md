@@ -22,7 +22,8 @@
 | 3 provider/workstation aspects, state versions, host facts | 4 | magnetite `default.nix` | after that session's commits land; rebased onto them |
 | 4 server aspects, ZFS table | 5 | magnetite `default.nix`, `lib/observability-hosts.nix` | after them |
 | 5 flags deleted | 6 | magnetite `default.nix`, `{nixos,darwin,system}/shared-reference-tree.nix` | after them |
-| 6 identity, order, named parts | 7 | no | any time after commit 1 |
+| 6 identity, today's activation order | 7 | no | any time after commit 1 |
+| 6b deploy record last (planned, not started; design Open Question 9) | 7b | no | after 6, before 7; host-changing, deploys the four Macs |
 | 7 darwin caches | 8 | no | last |
 
 ---
@@ -88,14 +89,21 @@
 - [ ] **Step 4:** Content search (task 6.1); compare toplevels and homes with the baseline; build the three checks.
 - [ ] **Step 5:** Evaluate each runtime test's drvPath before and after; write `drv-delta-5.txt` with those that differ as `changed`, each with its cause; return the drv-diff command; after the run, `just drv-diff-rejudge <dir> <allow>` if the allow-list was corrected.
 
-## Task 7: Commit 6, identity, activation order, named parts (tasks.md 7.1-7.6)
+## Task 7: Commit 6, identity and today's activation order (tasks.md 7.1-7.6)
 
-- [ ] **Step 1:** Add `flake.lib.exportAs` (in a `modules/lib/` file, announced); convert the seven files; migrate the three `vanixiets#` keys; evaluate every home's activation drvPath.
-- [ ] **Step 2:** Add `flake.lib.activationOrder` beside `deployRecordObligations`; replace the four `lib.mkAfter`/`lib.mkBefore` with `lib.mkOrder`; evaluate each Mac's `postActivation.text` and `diff` against task 1 Step 3's files (empty).
-- [ ] **Step 3:** Extend `orderProblems` with the darwin "nothing between record and relink" rule; add `darwinSnippetAfterRecord`; `nix build .#checks.x86_64-linux.deploy-record-order`. No `testSizes` entry changes, so `fleet-alert` is unaffected.
-- [ ] **Step 4:** Mutant on argentum in the throwaway tree; log it.
-- [ ] **Step 5:** Convert `darwin.base`, `nixos.base` and `homeManager.ai` contributors to named aspects and the named import lists, in import-tree path order; compare all toplevels and homes; run `just eval-cost` for both systems and compare with task 1 Step 6.
-- [ ] **Step 6:** `drv-delta-6.txt` with `checks.x86_64-linux.deploy-record-order  changed`; return the drv-diff command.
+- [x] **Step 1:** Add `flake.lib.exportAs` (`modules/lib/export-as.nix`, announced), keying the module itself (`lib.setFunctionArgs`), never by a wrapping import level (design Context, "Import depth"); convert the seven files; migrate the three `vanixiets#` keys; evaluate every home's activation drvPath.
+- [x] **Step 2:** Add `flake.lib.activationOrder` beside `deployRecordObligations` at the values that reproduce today's order (resolver 500, record 1501, casks 1502, dnscrypt-proxy 1503, fleet-services-trust 1504; above sops-nix's 1500); replace the five `lib.mkAfter`/`lib.mkBefore` with `lib.mkOrder`; evaluate each Mac's `postActivation.text` and `diff` against task 1 Step 3's files (empty).
+- **Step 3-4:** moved to Task 7b (the record-last rule, its case and mutant change hosts).
+- **Step 5:** not done: named import lists change hosts and homes (design D11, Open Question 10).
+- [x] **Step 6:** `drv-delta-module-identity.txt` with no entries; return the drv-diff command.
+
+## Task 7b: Commit 6b, the deploy record last (planned, not started; design D8, Open Question 9)
+
+- [ ] **Step 1:** Set `activationOrder.deployRecord` above every other `postActivation` contributor (1900); evaluate each Mac's `postActivation.text` and confirm the record's invocation is the last non-comment line before the relink, and that nothing else moved.
+- [ ] **Step 2:** Extend `orderProblems` with the darwin "nothing between record and relink" rule; add `darwinSnippetAfterRecord`; `nix build .#checks.x86_64-linux.deploy-record-order`. No `testSizes` entry changes, so `fleet-alert` is unaffected.
+- [ ] **Step 3:** Mutant on argentum in the throwaway tree (a `lib.mkOrder 2000` snippet): `checks.aarch64-darwin.darwin-argentum` fails evaluation naming `deployRecordObligations`; log it.
+- [ ] **Step 4:** `drv-delta-record-last.txt`: `darwin.{argentum,blackphos,rosegold,stibnite}`, `checks.aarch64-darwin.darwin-{argentum,blackphos,rosegold,stibnite}` and `checks.x86_64-linux.deploy-record-order`, each `changed`; return the drv-diff command.
+- [ ] **Step 5:** After merge, the operator deploys stibnite, then argentum and rosegold, then blackphos when online, and reads each Mac's activation output and the last line of `/var/log/deploy-record.jsonl`.
 
 ## Task 8: Commit 7, one copy of each darwin cache (tasks.md 8.1-8.6)
 
