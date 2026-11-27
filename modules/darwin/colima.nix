@@ -238,8 +238,6 @@
     in
     {
       options.services.colima = {
-        enable = lib.mkEnableOption "Colima container runtime";
-
         runtime = lib.mkOption {
           type = lib.types.enum [
             "docker"
@@ -370,7 +368,7 @@
         };
       };
 
-      config = lib.mkIf cfg.enable {
+      config = {
         # Validate configuration
         assertions = [
           {

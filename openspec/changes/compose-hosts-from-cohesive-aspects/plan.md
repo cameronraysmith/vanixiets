@@ -84,10 +84,10 @@
 ## Task 6: Commit 5, flags deleted (tasks.md 6.1-6.6)
 
 - [ ] **Step 1:** Run Task 0 again at the rebased parent.
-- [ ] **Step 2:** Delete each flag and its `mkIf` in the defining module (`config = lib.mkIf cfg.enable {…}` becomes `config = {…}`); delete the host settings; delete `darwin/profile.nix`; replace the probes.
-- [ ] **Step 3:** Edit the five runtime tests; in `greptimedb-oom-order` import memory-pressure-guards unconditionally and add the assertion on magnetite's `config.services ? memoryPressureGuards`.
-- [ ] **Step 4:** Content search (task 6.1); compare toplevels and homes with the baseline; build the three checks.
-- [ ] **Step 5:** Evaluate each runtime test's drvPath before and after; write `drv-delta-5.txt` with those that differ as `changed`, each with its cause; return the drv-diff command; after the run, `just drv-diff-rejudge <dir> <allow>` if the allow-list was corrected.
+- [x] **Step 2:** Delete each flag and its `mkIf` in the defining module (`config = lib.mkIf cfg.enable {…}` becomes `config = {…}`); delete the host settings; delete `darwin/profile.nix`; replace the probes. (All but shared-reference-tree's, which waits for the other session's files; design D6 "As applied".)
+- [x] **Step 3:** Edit the runtime tests; in `greptimedb-oom-order` import memory-pressure-guards unconditionally and assert magnetite's `systemd.tmpfiles.rules` contain the module's rules (the module has no option left to probe). `perses-greptimedb` is edited too; `shared-reference-tree` waits with its flag.
+- [x] **Step 4:** Content search (task 6.1); compare toplevels and homes with the baseline (equal after each flag). Building the three checks is left to the operator; their drvPaths equal the parent's.
+- [x] **Step 5:** Evaluate each runtime test's drvPath before and after (all equal); write `drv-delta-flag-deletions.txt` (the 28 docs-package checks); return the drv-diff command; after the run, `just drv-diff-rejudge <dir> <allow>` if the allow-list was corrected.
 
 ## Task 7: Commit 6, identity and today's activation order (tasks.md 7.1-7.6)
 

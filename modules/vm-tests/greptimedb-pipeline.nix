@@ -142,7 +142,6 @@
                 ];
 
                 services.greptimedb = {
-                  enable = true;
                   inherit databases;
                   # agent.session_event and its pipeline as magnetite declares
                   # them (agent-session-telemetry design D5).

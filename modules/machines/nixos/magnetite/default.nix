@@ -113,7 +113,6 @@ in
       # protocol by `restrict` and a forced command. The session key is broader:
       # it grants an unrestricted login as admin-group crs58, already a Nix
       # trusted user, with build authority plus shell.
-      services.stibnite-session.enable = true;
 
       # User configuration managed via clan inventory users service (modules/clan/inventory/services/users/cameron.nix).
 
@@ -459,7 +458,6 @@ in
       # collapse into an OOM kill. Rationale: modules/nixos/nix-eval-lock.nix,
       # modules/nixos/memory-pressure-guards.nix.
       services.nixEvalLock.enable = true;
-      services.memoryPressureGuards.enable = true;
 
       # Permit binding magnetite's ZeroTier-assigned IPv6 before zerotierone
       # settles on cold boot (mirrors modules/machines/nixos/cinnabar/caddy.nix).

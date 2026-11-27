@@ -18,13 +18,7 @@
 # sessions 0. An OOMScoreAdjust on sshd.service would become that inherited
 # value and make every ssh session and everything run from it OOM-immune.
 {
-  flake.modules.nixos.memory-pressure-guards =
-    { config, lib, ... }:
-    {
-      options.services.memoryPressureGuards.enable = lib.mkEnableOption "MGLRU thrash protection (lru_gen min_ttl_ms = 1000)";
-
-      config = lib.mkIf config.services.memoryPressureGuards.enable {
-        systemd.tmpfiles.rules = [ "w /sys/kernel/mm/lru_gen/min_ttl_ms - - - - 1000" ];
-      };
-    };
+  flake.modules.nixos.memory-pressure-guards = {
+    systemd.tmpfiles.rules = [ "w /sys/kernel/mm/lru_gen/min_ttl_ms - - - - 1000" ];
+  };
 }

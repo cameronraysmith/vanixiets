@@ -51,6 +51,20 @@
               "greptimedb.service"
               "greptimedb-schema.service"
             ];
+            # The rules of the memory-pressure guards the node imports; the
+            # node takes them only while magnetite carries them too.
+            guardRules =
+              (lib.evalModules {
+                modules = [
+                  self.modules.nixos.memory-pressure-guards
+                  {
+                    options.systemd.tmpfiles.rules = lib.mkOption {
+                      type = lib.types.listOf lib.types.str;
+                    };
+                  }
+                ];
+              }).config.systemd.tmpfiles.rules;
+            magnetiteHasGuards = lib.all (rule: lib.elem rule reference.systemd.tmpfiles.rules) guardRules;
             # Records its pid, waits for the shared gate, then grows by 8 MiB
             # of touched memory every 20 ms until killed, so all three
             # consumers grow at the same rate.
@@ -74,6 +88,8 @@
           in
           assert lib.assertMsg (reference.services.greptimedb.databases == databases)
             "greptimedb-oom-order: magnetite does not declare flake.lib.otelCollectorSchema.databases: magnetite ${builtins.toJSON reference.services.greptimedb.databases}, flake data ${builtins.toJSON databases}";
+          assert lib.assertMsg magnetiteHasGuards
+            "greptimedb-oom-order: magnetite does not import flake.modules.nixos.memory-pressure-guards (its tmpfiles rules ${builtins.toJSON guardRules} are missing), which the test node imports";
           pkgs.testers.runNixOSTest {
             name = "greptimedb-oom-order";
             requiredFeatures = {
@@ -109,11 +125,9 @@
                 ];
 
                 services.greptimedb = {
-                  enable = true;
                   inherit databases;
                 };
                 services.nixEvalLock.enable = true;
-                services.memoryPressureGuards.enable = reference.services.memoryPressureGuards.enable;
 
                 systemd.services.greptimedb-test-vars = {
                   description = "Test credentials from magnetite's greptimedb-users generator";

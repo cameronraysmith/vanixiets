@@ -305,9 +305,7 @@ in
                 ++ lib.optional config.services.gitea.enable (scrape "gitea" "127.0.0.1:3002" { })
                 ++ lib.optional (config.services.niks3.enable or false) (scrape "niks3" "127.0.0.1:5752" { })
                 ++ lib.optional (config.services.nixbot.enable or false) (scrape "nixbot" "127.0.0.1:9180" { })
-                ++ lib.optional (config.services.greptimedb.enable or false) (
-                  scrape "greptimedb" "127.0.0.1:4000" { }
-                )
+                ++ lib.optional (config.services ? greptimedb) (scrape "greptimedb" "127.0.0.1:4000" { })
                 ++ [
                   # The collector's own queue, failure and refusal counters
                   # (design D4; ADR-003 item 26).
@@ -661,8 +659,8 @@ in
               after = [
                 "opentelemetry-collector.service"
               ]
-              ++ lib.optional (config.services.greptimedb.enable or false) "greptimedb-schema.service";
-              wants = lib.optional (config.services.greptimedb.enable or false) "greptimedb-schema.service";
+              ++ lib.optional (config.services ? greptimedb) "greptimedb-schema.service";
+              wants = lib.optional (config.services ? greptimedb) "greptimedb-schema.service";
               startLimitIntervalSec = 0;
               serviceConfig = {
                 ExecStart = "${lib.getExe package} --config=file:${configFile}";

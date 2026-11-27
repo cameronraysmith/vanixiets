@@ -333,7 +333,8 @@ Then attach the user to each host in `modules/lib/host-users.nix` (`flake.fleet.
 
 Every host imports `home-manager-integration` beside home-manager's own module, which stays at machine level because importing it from the user services duplicated catppuccin's imports.
 For each attachment the aspect sets `home-manager.users.<user>` to import the person's `flake.users.<user>.modules`, then the attachment's `extraImports`, then the pair's `overrides`, sets `useGlobalPkgs`, `useUserPackages` and `backupFileExtension`, and gives the home its own `flake` argument (`flake.lib.homeFlake`).
-The order matters: a list option's definitions of equal priority merge in import order, so a list the pair's `overrides` set (stibnite's extra packages, for one) follows the person's own entries.
+The order of list options is not import order: the module system collects modules breadth-first and merges the reversed list, so a module's own list definitions follow only those of the modules it imports directly, and a definition imported one level deeper lands earlier (world assumption A344).
+A list the pair's `overrides` set follows the person's own entries only where it says so: stibnite's extra packages are last because they are written with `lib.mkAfter`.
 No host or service sets `home-manager.extraSpecialArgs.flake`: the aspect asserts it is absent, because a specialArg would shadow each home's own value, including an Omnigent worker's restricted one.
 
 ### Vars generation

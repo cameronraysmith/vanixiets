@@ -382,11 +382,11 @@ sudo incus config edit <container-name>
 
 ## Module options
 
+A host runs Colima by importing `flake.modules.darwin.colima`; there is no `enable` option.
 See `modules/darwin/colima.nix` for all available options:
 
 ```nix
 services.colima = {
-  enable = true;
   runtime = "incus" | "docker" | "containerd";
   profile = "default";
   autoStart = false;

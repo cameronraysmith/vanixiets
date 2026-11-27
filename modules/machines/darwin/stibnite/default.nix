@@ -73,8 +73,6 @@ in
       # crs58 is both admin and primary user on stibnite; system.primaryUser
       # follows the admin attachment (modules/lib/host-users.nix).
 
-      custom.profile.isDesktop = true;
-
       # Nix-managed macOS apps via ditto (modules/darwin/casks.nix)
       environment.casks = [
         pkgs.radicle-desktop
@@ -83,8 +81,6 @@ in
 
       # Base casks from modules/darwin/homebrew.nix; machine-specific additions below
       custom.homebrew = {
-        enable = true;
-
         additionalCasks = [
           "steipete/tap/codexbar"
           "antigravity"
@@ -154,7 +150,6 @@ in
       # configuration; checks.x86_64-linux.nix-builders-wiring holds it to
       # magnetite's generated key.
       services.stibnite-session-host = {
-        enable = true;
         keys = [
           (vars.public {
             machine = "magnetite";
@@ -166,7 +161,6 @@ in
 
       # Colima for OCI container management
       services.colima = {
-        enable = true;
         runtime = "incus";
         profile = "default";
         autoStart = false; # Manual control preferred

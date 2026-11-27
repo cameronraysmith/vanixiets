@@ -188,7 +188,6 @@
                 ];
 
                 services.greptimedb = {
-                  enable = true;
                   inherit databases;
                   tables.devloop = reference.services.greptimedb.tables.devloop;
                 };

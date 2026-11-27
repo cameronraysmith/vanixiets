@@ -1655,7 +1655,6 @@
                   systemd.timers.devloop-reconcile.wantedBy = lib.mkForce [ ];
 
                   services.greptimedb = {
-                    enable = true;
                     inherit databases;
                   };
 

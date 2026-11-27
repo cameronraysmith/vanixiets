@@ -1,0 +1,48 @@
+# Declared drvPath differences of deleting the enable flags that only repeat
+# an import (design D6), from its parent (the magnetite server-aspects commit)
+# to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-flag-deletions.txt
+# Measured against the parent 7cf5441341be plus only this commit's files, one
+# flag at a time (logs/chca-5-drvpaths-20261127-150030.log): all six NixOS and
+# four darwin toplevels, all twenty homes, every x86_64-linux and
+# aarch64-linux vmTests attribute (the edited devloop-ingest, fleet-ingress,
+# greptimedb-pipeline, greptimedb-oom-order and perses-greptimedb included: a
+# runtime test's derivation takes its node configuration, not its file's
+# text) and every other checks.{x86_64-linux,aarch64-darwin} attribute keep
+# their drvPaths. Checks that embed the whole flake source or every .nix file
+# under modules/ are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt).
+
+# Two guides under packages/docs change (the home-manager merge-order
+# correction and the colima option listing), which are source of the docs
+# package; every check that builds or consumes that package changes with it.
+# apps-build changes only through its deploy-docs input, which embeds the
+# package.
+checks.x86_64-linux.agent-skills-index  changed
+checks.x86_64-linux.apps-build  changed
+checks.x86_64-linux.deploy-docs-rehearsal  changed
+checks.x86_64-linux.package-vanixiets-docs  changed
+checks.x86_64-linux.package-vanixiets-docs-payload  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-report  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-linkcheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-typecheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-unit  changed
+checks.aarch64-darwin.apps-build  changed
+checks.aarch64-darwin.package-vanixiets-docs  changed
+checks.aarch64-darwin.package-vanixiets-docs-payload  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-report  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-linkcheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-typecheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-unit  changed

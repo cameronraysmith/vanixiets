@@ -125,7 +125,6 @@ in
       # zroot/root/greptimedb; SSTs go to R2 under one prefix of sciexp, at the
       # endpoint omnigraph already uses. Credentials arrive by path only.
       services.greptimedb = {
-        enable = true;
         # One source with the collector's routing (review F4).
         inherit (collectorSchema) databases;
         settings.storage = {

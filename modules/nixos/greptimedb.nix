@@ -195,7 +195,6 @@ in
     in
     {
       options.services.greptimedb = {
-        enable = lib.mkEnableOption "the GreptimeDB telemetry store";
         package = lib.mkPackageOption pkgs "greptimedb-bin" { };
         settings = lib.mkOption {
           inherit (settingsFormat) type;
@@ -230,7 +229,7 @@ in
         };
       };
 
-      config = lib.mkIf cfg.enable {
+      config = {
         assertions = [
           {
             assertion =

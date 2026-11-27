@@ -109,8 +109,6 @@
     in
     {
       options.services.moshi-hook = {
-        enable = lib.mkEnableOption "the moshi-hook daemon bridging local coding agents to the Moshi app";
-
         package = lib.mkPackageOption pkgs "moshi-hook" { };
 
         pairingTokenFile = lib.mkOption {
@@ -177,109 +175,105 @@
         };
       };
 
-      config = lib.mkMerge [
-        { services.moshi-hook.enable = lib.mkDefault true; }
+      config = {
+        home.packages = [ wrapped ];
 
-        (lib.mkIf cfg.enable {
-          home.packages = [ wrapped ];
+        home.file = {
+          "${localBin}/moshi-hook".source = config.lib.file.mkOutOfStoreSymlink "${wrapped}/bin/moshi-hook";
+          "${localBin}/moshi".source = config.lib.file.mkOutOfStoreSymlink "${wrapped}/bin/moshi";
+        };
+        # `~/.config/moshi/config.toml` is upstream's only control surface for
+        # usage_collection -- there is no `moshi-hook daemon` flag and no
+        # MOSHI_* environment variable for it. Because this module now owns
+        # that file, `moshi-hook set usage-collection` will fail against a
+        # read-only store path; that is accepted, since this repository is
+        # the source of truth for the setting, not the CLI.
+        #
+        # auto_update is pinned off because Nix owns the binary, and the
+        # vendor made self-update the default in 0.4.34.
+        xdg.configFile."moshi/config.toml".text = ''
+          [gateway]
+          usage_collection = ${lib.boolToString cfg.usageCollection}
+          auto_update = "off"
+        '';
 
-          home.file = {
-            "${localBin}/moshi-hook".source = config.lib.file.mkOutOfStoreSymlink "${wrapped}/bin/moshi-hook";
-            "${localBin}/moshi".source = config.lib.file.mkOutOfStoreSymlink "${wrapped}/bin/moshi";
+        launchd.agents.moshi-hook = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
+          enable = true;
+          domain = "user";
+          config = {
+            ProgramArguments = [ (lib.getExe launcher) ];
+            RunAtLoad = true;
+            KeepAlive = true;
+            ProcessType = "Background";
+            StandardOutPath = "${cfg.stateDir}/service.log";
+            StandardErrorPath = "${cfg.stateDir}/service.log";
+            # launchd starts agents with a minimal PATH. The daemon shells out
+            # to tmux, zellij, and herdr to decide whether a session is inside
+            # a multiplexer, and on macOS to scutil to pick up the system HTTP
+            # proxy; none of those are reachable without this.
+            EnvironmentVariables.PATH = lib.concatStringsSep ":" [
+              "${config.home.profileDirectory}/bin"
+              "/usr/bin"
+              "/bin"
+              "/usr/sbin"
+              "/sbin"
+            ];
           };
-          # `~/.config/moshi/config.toml` is upstream's only control surface for
-          # usage_collection -- there is no `moshi-hook daemon` flag and no
-          # MOSHI_* environment variable for it. Because this module now owns
-          # that file, `moshi-hook set usage-collection` will fail against a
-          # read-only store path; that is accepted, since this repository is
-          # the source of truth for the setting, not the CLI.
-          #
-          # auto_update is pinned off because Nix owns the binary, and the
-          # vendor made self-update the default in 0.4.34.
-          xdg.configFile."moshi/config.toml".text = ''
-            [gateway]
-            usage_collection = ${lib.boolToString cfg.usageCollection}
-            auto_update = "off"
-          '';
+        };
 
-          launchd.agents.moshi-hook = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
-            enable = true;
-            domain = "user";
-            config = {
-              ProgramArguments = [ (lib.getExe launcher) ];
-              RunAtLoad = true;
-              KeepAlive = true;
-              ProcessType = "Background";
-              StandardOutPath = "${cfg.stateDir}/service.log";
-              StandardErrorPath = "${cfg.stateDir}/service.log";
-              # launchd starts agents with a minimal PATH. The daemon shells out
-              # to tmux, zellij, and herdr to decide whether a session is inside
-              # a multiplexer, and on macOS to scutil to pick up the system HTTP
-              # proxy; none of those are reachable without this.
-              EnvironmentVariables.PATH = lib.concatStringsSep ":" [
-                "${config.home.profileDirectory}/bin"
-                "/usr/bin"
-                "/bin"
-                "/usr/sbin"
-                "/sbin"
-              ];
-            };
+        # Named to match what upstream's own documentation tells operators to
+        # restart: `systemctl --user restart moshi-hook.service`.
+        #
+        # Bound to the user session, so it runs from first login to last
+        # logout. That covers the case this daemon is for -- an SSH session
+        # running agents -- but a host that should hold its Moshi connection
+        # with nobody logged in needs `users.users.<name>.linger = true`,
+        # which is a NixOS-level setting this module cannot reach from
+        # home-manager.
+        systemd.user.services.moshi-hook = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+          Unit = {
+            Description = "Moshi companion daemon for local coding agents";
+            After = [ "network-online.target" ];
+            Wants = [ "network-online.target" ];
           };
-
-          # Named to match what upstream's own documentation tells operators to
-          # restart: `systemctl --user restart moshi-hook.service`.
-          #
-          # Bound to the user session, so it runs from first login to last
-          # logout. That covers the case this daemon is for -- an SSH session
-          # running agents -- but a host that should hold its Moshi connection
-          # with nobody logged in needs `users.users.<name>.linger = true`,
-          # which is a NixOS-level setting this module cannot reach from
-          # home-manager.
-          systemd.user.services.moshi-hook = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
-            Unit = {
-              Description = "Moshi companion daemon for local coding agents";
-              After = [ "network-online.target" ];
-              Wants = [ "network-online.target" ];
-            };
-            Service = {
-              ExecStart = lib.getExe launcher;
-              Restart = "on-failure";
-              RestartSec = 5;
-              Environment = [ "PATH=${config.home.profileDirectory}/bin:/usr/bin:/bin" ];
-            };
-            Install.WantedBy = [ "default.target" ];
+          Service = {
+            ExecStart = lib.getExe launcher;
+            Restart = "on-failure";
+            RestartSec = 5;
+            Environment = [ "PATH=${config.home.profileDirectory}/bin:/usr/bin:/bin" ];
           };
+          Install.WantedBy = [ "default.target" ];
+        };
 
-          # Agent-hook reconciliation.
-          #
-          # managedConfigs rewrites the claude, codex, devin, and pi configs
-          # wholesale on every activation, dropping the hooks `moshi-hook
-          # install` added; this entry runs after it so moshi re-adds them.
-          # Those agents declare the hook subtrees as externalPaths, which keeps
-          # them out of managedConfigs' dropped-key report. `install` is
-          # additive and idempotent, so a second run leaves each file unchanged.
-          home.activation.moshiHookReconcile =
-            lib.hm.dag.entryBetween
-              [
-                "setupLaunchAgents"
-                "reloadSystemd"
-              ]
-              [
-                "writeBoundary"
-                "linkGeneration"
-                "managedConfigs"
-              ]
-              ''
-                $DRY_RUN_CMD install -d -m 0700 ${lib.escapeShellArg cfg.stateDir}
+        # Agent-hook reconciliation.
+        #
+        # managedConfigs rewrites the claude, codex, devin, and pi configs
+        # wholesale on every activation, dropping the hooks `moshi-hook
+        # install` added; this entry runs after it so moshi re-adds them.
+        # Those agents declare the hook subtrees as externalPaths, which keeps
+        # them out of managedConfigs' dropped-key report. `install` is
+        # additive and idempotent, so a second run leaves each file unchanged.
+        home.activation.moshiHookReconcile =
+          lib.hm.dag.entryBetween
+            [
+              "setupLaunchAgents"
+              "reloadSystemd"
+            ]
+            [
+              "writeBoundary"
+              "linkGeneration"
+              "managedConfigs"
+            ]
+            ''
+              $DRY_RUN_CMD install -d -m 0700 ${lib.escapeShellArg cfg.stateDir}
 
-                # Reported, not swallowed, and not fatal: a malformed config file
-                # belonging to an agent this repository does not manage would otherwise
-                # be able to fail an entire generation switch.
-                if ! $DRY_RUN_CMD ${localBinAbs}/moshi-hook install; then
-                  warnEcho "moshi-hook install failed; agent hooks may be stale. Re-run ${localBinAbs}/moshi-hook install"
-                fi
-              '';
-        })
-      ];
+              # Reported, not swallowed, and not fatal: a malformed config file
+              # belonging to an agent this repository does not manage would otherwise
+              # be able to fail an entire generation switch.
+              if ! $DRY_RUN_CMD ${localBinAbs}/moshi-hook install; then
+                warnEcho "moshi-hook install failed; agent hooks may be stale. Re-run ${localBinAbs}/moshi-hook install"
+              fi
+            '';
+      };
     };
 }

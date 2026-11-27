@@ -2150,7 +2150,6 @@
                   ];
 
                   services.greptimedb = {
-                    enable = true;
                     inherit databases;
                     # The devloop tables and pipelines, so `logs/ingress`
                     # exists and the deploy records have a table.

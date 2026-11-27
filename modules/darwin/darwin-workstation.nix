@@ -67,10 +67,6 @@ in
         # system.primaryUser follows the admin attachment
         # (system/home-manager-integration.nix).
 
-        custom.profile.isDesktop = true;
-
-        custom.homebrew.enable = true;
-
         # Operator claim (modules/darwin/sshd-declaration.nix): a workstation
         # accepts inbound SSH so it can be deployed to from stibnite over zerotier.
         declaredSshd.serving = true;

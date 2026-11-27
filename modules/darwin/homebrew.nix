@@ -94,8 +94,6 @@
       in
       {
         options.custom.homebrew = {
-          enable = lib.mkEnableOption "homebrew package management";
-
           additionalBrews = lib.mkOption {
             type = lib.types.listOf lib.types.str;
             default = [ ];
@@ -121,7 +119,7 @@
           };
         };
 
-        config = lib.mkIf cfg.enable {
+        config = {
           homebrew = {
             enable = true;
 

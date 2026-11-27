@@ -43,8 +43,6 @@ in
     in
     {
       options.services.stibnite-session = {
-        enable = lib.mkEnableOption "interactive ssh access to stibnite under a dedicated keypair";
-
         sshUser = lib.mkOption {
           type = lib.types.str;
           default = "crs58";
@@ -58,19 +56,16 @@ in
         };
       };
 
-      config = lib.mkIf cfg.enable (
-        (mkSessionKeyGenerator pkgs)
-        // {
-          programs.ssh.extraConfig = ''
-            Host ${cfg.hostAlias}
-              HostName ${stibniteZt}
-              User ${cfg.sshUser}
-              IdentityFile ${sshKeyPath}
-              IdentitiesOnly yes
-              HostKeyAlias stibnite.zt
-          '';
-        }
-      );
+      config = (mkSessionKeyGenerator pkgs) // {
+        programs.ssh.extraConfig = ''
+          Host ${cfg.hostAlias}
+            HostName ${stibniteZt}
+            User ${cfg.sshUser}
+            IdentityFile ${sshKeyPath}
+            IdentitiesOnly yes
+            HostKeyAlias stibnite.zt
+        '';
+      };
     };
 
   flake.modules.darwin.stibnite-session-host =
@@ -80,8 +75,6 @@ in
     in
     {
       options.services.stibnite-session-host = {
-        enable = lib.mkEnableOption "the session keys' authorization on stibnite";
-
         user = lib.mkOption {
           type = lib.types.str;
           default = "crs58";
@@ -95,7 +88,7 @@ in
         };
       };
 
-      config = lib.mkIf cfg.enable {
+      config = {
         users.users.${cfg.user}.openssh.authorizedKeys.keys = map trimKey cfg.keys;
       };
     };

@@ -712,7 +712,6 @@ in
       # protection turns a working-set collapse into an OOM kill. Rationale:
       # modules/nixos/nix-eval-lock.nix, modules/nixos/memory-pressure-guards.nix.
       services.nixEvalLock.enable = true;
-      services.memoryPressureGuards.enable = true;
 
       # Cap what the zram pool may hold in RAM. The livelock above is zram
       # holding incompressible pages 1.05:1, so swap-out freed nothing while

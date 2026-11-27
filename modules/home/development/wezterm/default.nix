@@ -21,7 +21,7 @@
           # `${package}/etc/profile.d/wezterm.sh`, so this package exposes only the cask bundle's copy
           # of that script; the CLI comes from /opt/homebrew/bin. Standalone homes keep nixpkgs.
           package =
-            if osConfig != null && (osConfig.custom.homebrew.enable or false) then
+            if osConfig ? custom && osConfig.custom ? homebrew then
               pkgs.runCommand "wezterm-cask-shell-integration" { } ''
                 mkdir -p $out/etc/profile.d
                 ln -s /Applications/WezTerm.app/Contents/Resources/wezterm.sh $out/etc/profile.d/wezterm.sh

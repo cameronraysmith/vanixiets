@@ -53,7 +53,7 @@ in
 
       # The exporters write only to schema.nix's databases, and the store
       # answers 400 for any database its schema job did not create.
-      assertions = lib.optional (config.services.greptimedb.enable or false) {
+      assertions = lib.optional (config.services ? greptimedb) {
         assertion = storeDatabaseNames == databaseNames;
         message = "otel-collector ingress: services.greptimedb.databases creates ${builtins.toJSON storeDatabaseNames}, but flake.lib.otelCollectorSchema.databases routes to ${builtins.toJSON databaseNames}";
       };
@@ -323,7 +323,7 @@ in
         }
         # The store answers 400 for a missing database or table and the
         # exporter drops 400s as permanent, so export waits for the schema job.
-        (lib.mkIf (config.services.greptimedb.enable or false) {
+        (lib.mkIf (config.services ? greptimedb) {
           after = [ "greptimedb-schema.service" ];
           wants = [ "greptimedb-schema.service" ];
         })
