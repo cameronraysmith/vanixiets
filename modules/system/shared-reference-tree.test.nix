@@ -30,7 +30,21 @@
         testFile = pkgs.writeText "shared-reference-tree.tests.nix" ''
           let
             lib = import ${pkgs.path}/lib;
-            gaps = (import ${./shared-reference-tree.nix} { inherit lib; }).flake.lib.sharedReferenceTreeTransportGaps;
+            tree = import ${./shared-reference-tree.nix} { inherit lib; };
+            gaps = tree.flake.lib.sharedReferenceTreeTransportGaps;
+            # The root a host declares, through the NixOS or darwin options module.
+            declaredRoot =
+              platform: root:
+              (lib.evalModules {
+                modules = [
+                  tree.flake.modules.''${platform}.shared-reference-tree-options
+                  { services.shared-reference-tree = { inherit root; }; }
+                ];
+              }).config.services.shared-reference-tree.root;
+            refusedRoot = {
+              type = "ThrownError";
+              msg = "is not of type `absolute path with no trailing slash";
+            };
             roots = [ "/var/lib/ghq" "/private/var/lib/ghq" ];
             refusing = map (form: {
               condition = "gitdir:''${form}/";
@@ -184,6 +198,44 @@
             testMissingForm = {
               expr = participant { declared = lib.take 1 refusing; };
               expected = [ "no include under gitdir:/private/var/lib/ghq/ sets protocol.allow to never" ];
+            };
+            testRootDefault = {
+              expr = map (platform: declaredRoot platform "/var/lib/ghq") [
+                "nixos"
+                "darwin"
+              ];
+              expected = [
+                "/var/lib/ghq"
+                "/var/lib/ghq"
+              ];
+            };
+            testRootDotted = {
+              expr = declaredRoot "nixos" "/srv/.ghq/..x/...";
+              expected = "/srv/.ghq/..x/...";
+            };
+            testRootTrailingSlash = {
+              expr = declaredRoot "darwin" "/var/lib/ghq/";
+              expectedError = refusedRoot;
+            };
+            testRootEmpty = {
+              expr = declaredRoot "nixos" "";
+              expectedError = refusedRoot;
+            };
+            testRootRelative = {
+              expr = declaredRoot "nixos" "var/lib/ghq";
+              expectedError = refusedRoot;
+            };
+            testRootEmptyComponent = {
+              expr = declaredRoot "nixos" "/var//lib/ghq";
+              expectedError = refusedRoot;
+            };
+            testRootDotComponent = {
+              expr = declaredRoot "darwin" "/var/./lib/ghq";
+              expectedError = refusedRoot;
+            };
+            testRootDotDotComponent = {
+              expr = declaredRoot "nixos" "/var/lib/../lib/ghq";
+              expectedError = refusedRoot;
             };
             testNoGit = {
               expr = gaps roots {

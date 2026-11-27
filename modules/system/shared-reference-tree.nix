@@ -4,6 +4,15 @@
 # consume these options.
 { lib, ... }:
 let
+  # The shared root as readers' gitdir: includes and the evaluation check use
+  # it, each appending `/` to the path: git applies an include only when the
+  # pattern spells the path a repository is reached by, so a root with a
+  # trailing slash, an empty, `.` or `..` component, or a relative one never
+  # matches, and an empty root makes the pattern `gitdir:/`, which matches every
+  # repository.
+  rootType = lib.types.strMatching "(/([^/.][^/]*|\\.[^/.][^/]*|\\.\\.[^/]+))+" // {
+    description = "absolute path with no trailing slash and no empty, `.` or `..` component";
+  };
   options =
     isDarwin:
     { ... }:
@@ -21,7 +30,7 @@ let
           description = "System account, and same-named group, that alone owns and writes the shared tree.";
         };
         root = lib.mkOption {
-          type = lib.types.str;
+          type = rootType;
           default = "/var/lib/ghq";
           description = "Shared ghq root.";
         };
