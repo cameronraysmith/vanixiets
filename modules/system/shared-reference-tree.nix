@@ -94,27 +94,34 @@ let
   # a literal absolute path, or one under ~/ expanded with home, is judged,
   # matching when it encloses one of paths or lies beneath one; any other
   # condition (a glob, a relative pattern, onbranch:, hasconfig:) may hold there.
+  # Both sides are compared with ASCII letter case folded, gitdir: as gitdir/i:,
+  # on every platform: darwin's file system ignores case, so a repository is
+  # reached by every spelling of its path. On Linux a pattern differing from one
+  # of paths only in case therefore counts as reaching though it cannot apply.
   includeReachesRoot =
     { paths, home }:
     include:
     let
       condition = include.condition or null;
       parsed = builtins.match "gitdir(/i)?:(.*)" condition;
-      fold = if lib.elemAt parsed 0 == null then lib.id else lib.toLower;
       written = lib.elemAt parsed 1;
       expanded =
         if lib.hasPrefix "~/" written && home != null then
           "${home}/${lib.removePrefix "~/" written}"
         else
           written;
-      pattern = fold expanded;
+      pattern = lib.toLower expanded;
       literal = lib.hasPrefix "/" pattern && builtins.match ".*[*?[\\].*" pattern == null;
     in
     condition == null
     || parsed == null
     || !literal
     || lib.any (
-      path: lib.hasPrefix pattern (fold "${path}/") || lib.hasPrefix (fold "${path}/") pattern
+      path:
+      let
+        under = lib.toLower "${path}/";
+      in
+      lib.hasPrefix pattern under || lib.hasPrefix under pattern
     ) paths;
   # The settings git reads from one Home Manager git attribute set, as
   # lib.generators.toGitINI writes it: each leaf at path a.b.….key is the
@@ -194,7 +201,7 @@ let
   transportGaps =
     roots: home:
     let
-      git = home.programs.git;
+      git = home.programs.git or { };
       shared = home.programs.ghq-shared or { };
       reach = {
         paths = lib.unique (

@@ -7,7 +7,7 @@ linear_story_state: In Progress
 linear_team: CAM
 last_synced_state: In Progress
 last_synced_at: "2026-11-27T05:05:13Z"
-review_round: 2
+review_round: 3
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:56:11Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-136 created in Todo on team CAM with no project, description seeded from proposal.md; state confirmed by read-only view" }

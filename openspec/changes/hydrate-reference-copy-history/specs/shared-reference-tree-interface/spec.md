@@ -189,14 +189,14 @@ Witness: `vmTests.x86_64-linux.shared-reference-tree`, subtest "readers cannot w
 
 #### Scenario: A participant lacks the setting
 
-- **WHEN** a participating account's evaluated git includes lack `protocol.allow = never` for a form of the shared root, or its settings set a `protocol.<name>.allow` key
+- **WHEN** a participating account's evaluated git includes lack `protocol.allow = never` for a form of the shared root, its configuration declares no `programs.git` at all, or its settings set a `protocol.<name>.allow` key
 - **THEN** that host's configuration fails evaluation, naming that account
 
-Witness: the assertions of `modules/nixos/shared-reference-tree.nix`, `modules/darwin/shared-reference-tree.nix` and, for darwin Omnigent workers, `modules/darwin/omnigent-host.nix`, evaluated by the per-machine checks of magnetite, pyrite and stibnite; `checks.x86_64-linux.eval-shared-reference-tree`, cases `testMissingForm` and `testSettingsNamedKey`.
+Witness: the assertions of `modules/nixos/shared-reference-tree.nix`, `modules/darwin/shared-reference-tree.nix` and, for darwin Omnigent workers, `modules/darwin/omnigent-host.nix`, evaluated by the per-machine checks of magnetite, pyrite and stibnite; `checks.x86_64-linux.eval-shared-reference-tree`, cases `testMissingForm`, `testNoGit` and `testSettingsNamedKey`.
 
 ### Requirement: Evaluation rejects an include that reopens a transport beneath the shared root
 
-A participating account's Home Manager git configuration SHALL declare no include with inline contents that can apply to a repository reached by a root form or the account's `~/ghq` link, as its module declares them, and sets a `protocol.<name>.allow` key or a `protocol.allow` other than `never`; a `gitdir:` path disjoint from all those paths cannot apply, any other condition can. Evaluation SHALL fail otherwise, naming the account and the include.
+A participating account's Home Manager git configuration SHALL declare no include with inline contents that can apply to a repository reached by a root form or the account's `~/ghq` link, as its module declares them, and sets a `protocol.<name>.allow` key or a `protocol.allow` other than `never`; a `gitdir:` path disjoint from all those paths, letter case ignored, cannot apply, any other condition can. Evaluation SHALL fail otherwise, naming the account and the include.
 
 #### Scenario: An include that applies beneath the root reopens a transport
 
@@ -211,6 +211,13 @@ Witness: `checks.x86_64-linux.eval-shared-reference-tree` (`modules/system/share
 - **THEN** evaluation fails naming the account and the include, and an include under `gitdir:<home>/projects/` or `gitdir:~/projects/` does not fail it
 
 Witness: `checks.x86_64-linux.eval-shared-reference-tree`, cases `testLinkGitdir`, `testHomeGitdir`, `testTildeGitdir`, `testUnrelatedGitdir` and `testUnrelatedTildeGitdir`.
+
+#### Scenario: An include under a path differing only in letter case reaches the tree
+
+- **WHEN** a participating account whose home directory is `/Users/crs58` adds an include under `gitdir:/Users/crs58/GHQ/`, `gitdir:/USERS/crs58/`, `gitdir:~/GHQ/` or `gitdir:/private/VAR/lib/ghq/` setting `protocol.file.allow`, or one under `gitdir:/Users/crs58/` while its home directory is spelled `/Users/CRS58`, or under `gitdir:/Users/crs58/ghq/` while its module declares the link `/Users/crs58/GHQ`
+- **THEN** evaluation fails naming the account and the include, on every platform, since darwin's file system ignores letter case and git matches the path a repository is reached by (on Linux such an include cannot apply, and still fails evaluation); an include under `gitdir:/USERS/crs58/Projects/` does not fail it
+
+Witness: `checks.x86_64-linux.eval-shared-reference-tree`, cases `testCaseLinkGitdir`, `testCaseHomeGitdir`, `testCaseTildeGitdir`, `testCaseRootGitdir`, `testHomeDirectoryCase`, `testLinkCase` and `testCaseUnrelatedGitdir`.
 
 ### Requirement: Evaluation reads a participant's git settings in every shape and case
 

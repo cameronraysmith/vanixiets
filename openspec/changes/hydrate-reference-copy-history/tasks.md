@@ -1,4 +1,4 @@
-Groups 1 to 3, 5 and 6 are each one delivery commit, in that order; group 4 follows the deploy. Handler tests build as `checks.<system>.package-ghq-shared-test-handler` and `checks.<system>.package-ghq-shared-test-handler-history`, whose classes `modules/checks/package-tests.nix` declares; runtime tests run on pyrite from the commit copied there as a store path. Evidence logs go under `logs/` (git-ignored).
+Groups 1 to 3 and 5 to 7 are each one delivery commit, in that order; group 4 follows the deploy. Handler tests build as `checks.<system>.package-ghq-shared-test-handler` and `checks.<system>.package-ghq-shared-test-handler-history`, whose classes `modules/checks/package-tests.nix` declares; runtime tests run on pyrite from the commit copied there as a store path. Evidence logs go under `logs/` (git-ignored).
 
 ## 1. The writer makes the history it brings in readable
 
@@ -48,3 +48,9 @@ Each remedy's cases are shown failing against `nzvnkwwu`'s code before they pass
 - [x] 6.5 Split the handler test into `test_handler.py` and `test_handler_history.py` sharing `handler_fixtures.py`, each its own check with `measured = false`, the idle-connection case run with a 1 s read timeout. — verify: each check passes on both systems and finishes in 50 s or less on magnetite, twice each under the build lock, alternated (build).
 - [x] 6.6 On darwin, write `.lazygit.yml` under a new name in the root and rename it over whatever stands there, and create an absent writer log through the descriptor step; on NixOS keep the tmpfiles `f+` rule, which follows no link. — verify: scratch runs for a link to a file, a link to a directory, a directory and a FIFO, and stibnite's assertions evaluate with none failing (command).
 - [x] 6.7 Amend the delta specs, design and proposal. — verify: `openspec validate hydrate-reference-copy-history --strict` and `prek` pass (command).
+
+## 7. Remedy of the third verification of 2026-11-27
+
+The remedy's cases are shown failing against `trunk()`'s `modules/system/shared-reference-tree.nix` before they pass; design, "Third verification of 2026-11-27 and its remedy", holds the finding.
+
+- [x] 7.1 In `includeReachesRoot`, compare a `gitdir:` pattern with the root's forms, the link and the expanded home directory with ASCII letter case folded, as for `gitdir/i:`, on every platform; in `transportGaps`, read an absent `programs.git` as empty; amend the delta spec, design and proposal. — verify: nix-unit cases `testCaseLinkGitdir`, `testCaseHomeGitdir`, `testCaseRootGitdir`, `testCaseTildeGitdir`, `testHomeDirectoryCase`, `testLinkCase` and `testNoGit` fail against `trunk()` and pass, `testCaseUnrelatedGitdir` passes on both, `checks.x86_64-linux.eval-shared-reference-tree` and every other changed x86_64-linux check build on magnetite, `config.assertions` of magnetite, pyrite and stibnite evaluate with none failing, and `openspec validate hydrate-reference-copy-history --strict` and `prek` pass (build, command).

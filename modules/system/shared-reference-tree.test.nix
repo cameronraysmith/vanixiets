@@ -4,15 +4,17 @@
 # transport beneath the shared root.
 #
 # The participant is a Home Manager configuration whose ghq-shared module
-# declares both darwin forms of the root and the link /home/someone/ghq, with the
-# two includes repository-acquisition.nix declares, and then one change each.
+# declares both darwin forms of the root and the link <home>/ghq, its home
+# /home/someone unless a case names another, with the two includes
+# repository-acquisition.nix declares, and then one change each.
 # An include whose condition can hold for a repository reached by a root form or
 # by the link must set neither protocol.<name>.allow nor a protocol.allow other
 # than never, in any case of the section and variable names and in every shape
 # Home Manager writes; an include given only as a path, and one under a
-# directory that neither encloses nor lies beneath any of those paths, are not
-# judged. The settings are read as one attribute set, as a list of them, and as
-# programs.git.iniContent.
+# directory that neither encloses nor lies beneath any of those paths, in any
+# letter case of either, are not judged. The settings are read as one attribute
+# set, as a list of them, and as programs.git.iniContent; a configuration with
+# no programs.git lacks every include it must have.
 { config, ... }:
 {
   perSystem =
@@ -37,18 +39,29 @@
                 protocol.allow = "never";
               };
             }) roots;
-            participant = { includes ? [ ], settings ? { }, iniContent ? { }, declared ? refusing }: gaps roots {
-              home.homeDirectory = "/home/someone";
-              programs.ghq-shared = {
-                forms = roots;
-                link = "/home/someone/ghq";
+            participant =
+              {
+                includes ? [ ],
+                settings ? { },
+                iniContent ? { },
+                declared ? refusing,
+                homeDirectory ? "/home/someone",
+                link ? "''${homeDirectory}/ghq",
+              }:
+              gaps roots {
+                home = { inherit homeDirectory; };
+                programs.ghq-shared = {
+                  forms = roots;
+                  inherit link;
+                };
+                programs.git = {
+                  includes = declared ++ includes;
+                  inherit settings iniContent;
+                };
               };
-              programs.git = {
-                includes = declared ++ includes;
-                inherit settings iniContent;
-              };
-            };
             under = condition: contents: { includes = [ { inherit condition contents; } ]; };
+            onDarwin = args: { homeDirectory = "/Users/crs58"; } // args;
+            file = { protocol.file.allow = "always"; };
             https = { protocol.https.allow = "always"; };
           in
           {
@@ -116,6 +129,34 @@
               expr = participant (under "gitdir:~/projects/" https);
               expected = [ ];
             };
+            testCaseLinkGitdir = {
+              expr = participant (onDarwin (under "gitdir:/Users/crs58/GHQ/" file));
+              expected = [ "include 3 (gitdir:/Users/crs58/GHQ/) sets protocol.file.allow" ];
+            };
+            testCaseHomeGitdir = {
+              expr = participant (onDarwin (under "gitdir:/USERS/crs58/" file));
+              expected = [ "include 3 (gitdir:/USERS/crs58/) sets protocol.file.allow" ];
+            };
+            testCaseRootGitdir = {
+              expr = participant (under "gitdir:/private/VAR/lib/ghq/" file);
+              expected = [ "include 3 (gitdir:/private/VAR/lib/ghq/) sets protocol.file.allow" ];
+            };
+            testCaseTildeGitdir = {
+              expr = participant (onDarwin (under "gitdir:~/GHQ/" file));
+              expected = [ "include 3 (gitdir:~/GHQ/) sets protocol.file.allow" ];
+            };
+            testHomeDirectoryCase = {
+              expr = participant ({ homeDirectory = "/Users/CRS58"; } // under "gitdir:/Users/crs58/" file);
+              expected = [ "include 3 (gitdir:/Users/crs58/) sets protocol.file.allow" ];
+            };
+            testLinkCase = {
+              expr = participant (onDarwin { link = "/Users/crs58/GHQ"; } // under "gitdir:/Users/crs58/ghq/" file);
+              expected = [ "include 3 (gitdir:/Users/crs58/ghq/) sets protocol.file.allow" ];
+            };
+            testCaseUnrelatedGitdir = {
+              expr = participant (onDarwin (under "gitdir:/USERS/crs58/Projects/" https));
+              expected = [ ];
+            };
             testIncludeSectionCase = {
               expr = participant { includes = [ { contents.Protocol.https.allow = "always"; } ]; };
               expected = [ "include 3 (unconditional) sets protocol.https.allow" ];
@@ -143,6 +184,13 @@
             testMissingForm = {
               expr = participant { declared = lib.take 1 refusing; };
               expected = [ "no include under gitdir:/private/var/lib/ghq/ sets protocol.allow to never" ];
+            };
+            testNoGit = {
+              expr = gaps roots {
+                home.homeDirectory = "/home/someone";
+                programs = { };
+              };
+              expected = map (form: "no include under gitdir:''${form}/ sets protocol.allow to never") roots;
             };
           }
         '';
