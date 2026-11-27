@@ -116,7 +116,8 @@ Upstream's open numtide/iets#359 lists evaluation differences: in each, iets eit
 
 ## On-demand VM tests
 
-`nixbot.toml` evaluates `checks`, which nixbot scopes to `checks.x86_64-linux` and `checks.aarch64-darwin`, both required; VM tests instead live under `vmTests` and are not part of pull-request coverage.
+`nixbot.toml` evaluates `checks`, which nixbot scopes to `checks.x86_64-linux` and `checks.aarch64-darwin`, both required; VM tests instead live under `vmTests`, and nixbot never runs them.
+Every pull request evaluates each `vmTests.x86_64-linux` test through its `checks.x86_64-linux.vm-test-evaluates-<name>` (`checks/vm-test-evaluates.nix`), a text file holding the test's drvPath whose build builds nothing of the test, so a test that stops evaluating fails the gate; a new runtime test needs a `testSizes.checks` entry for that check in the module's literal set as well as its own `testSizes.vmTests` entry.
 The independent `checks.x86_64-linux.zerotier-mss-clamp` structural check remains gated; it compares zerotier controller and peer role membership with `TCPMSS --set-mss 1300` in each nixosConfiguration's firewall commands.
 The fleet-alerting checks are gated the same way and need no runtime host.
 `checks.x86_64-linux.fleet-alert` runs `promtool` over the PromQL rules rendered by `nixos/fleet-alert/rules.nix`, replays canned PromQL and SQL answers per rule database through a loopback fixture server against the evaluator in `nixos/fleet-alert.nix` with a recording `ntfy-send`, and compares `nixos/fleet-alert/transition.jq` with a Python reference model under a derandomized Hypothesis test.

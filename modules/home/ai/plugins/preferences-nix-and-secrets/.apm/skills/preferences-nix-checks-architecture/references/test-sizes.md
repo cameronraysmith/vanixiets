@@ -115,6 +115,7 @@ A test that no run has measured is declared medium with `measured = false`: a wr
 
 In vanixiets, every check on the gated systems declares its class the same way in `testSizes.checks`, generated names in a literal set beside the code that generates them, and `checks.<system>.test-size-classes` fails the pull-request gate on a check with no entry, an entry naming no attribute, an enormous check, or a large check with no reason (stage 4); on x86_64-linux it also fails on a runtime test of x86_64-linux or aarch64-linux with no entry or an entry naming none.
 It reads key sets and the literal entries only, so it forces no check's derivation.
+In vanixiets, each x86_64-linux runtime test also has an evaluation check on that gate, `checks.x86_64-linux.vm-test-evaluates-<name>`, whose entry `modules/checks/vm-test-evaluates.nix` lists literally, so a new runtime test needs both entries.
 
 In vanixiets, a check's cost over time is judged after the fact by fleet-alert's `CheckOutgrewItsClass` (stage 5), an SQL rule at severity `info`, which posts at low priority and never pages.
 It reads the telemetry store's copy of nixbot's records, this repository's uncached successful runs of at least 1 s in the last 30 days, and posts a check that has at least three of them and a median above its class limit, a check declared `measured = false` that has three of them, with the class they give so its entry can be corrected, or a check with any run above an hour.
