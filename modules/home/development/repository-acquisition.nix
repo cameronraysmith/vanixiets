@@ -2,6 +2,7 @@
 let
   homeModules = config.flake.modules.homeManager;
   lfsPolicy = config.flake.lib.sharedReferenceTreeLfsPolicy;
+  transportPolicy = config.flake.lib.sharedReferenceTreeTransportPolicy;
 in
 {
   # A host that shares one ghq tree (modules/system/shared-reference-tree.nix) sets
@@ -55,10 +56,15 @@ in
           };
           # The shared tree holds LFS pointer files as committed, and this account
           # cannot write the LFS cache an LFS filter would use there, so its git runs
-          # no LFS filter under the root, as the tree's writer does.
+          # no LFS filter under the root, as the tree's writer does. Its git also
+          # refuses every transport there: a read needing content the copy lacks
+          # fails at once rather than starting a fetch into a tree it cannot write.
           programs.git.includes = map (form: {
             condition = "gitdir:${form}/";
-            contents.filter.lfs = lfsPolicy;
+            contents = {
+              filter.lfs = lfsPolicy;
+              protocol = transportPolicy;
+            };
           }) rootForms;
           # Activation rather than home.file: Home Manager refuses to replace an
           # existing ~/ghq directory, which stays until ghq-shared-migrate moves it.

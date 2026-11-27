@@ -600,10 +600,18 @@ if not re.search(rf"^{line} waiting held-by: pid=\d+ verb=get\+update since=\S+Z
 if "file://" in log + impatient["log"]:
     failures.append("log lines must name the repository, not the target or its remote URL")
 
-# ls-remote output that is not "<sha>\t<ref>" is a failed tag fetch, not a crash.
 loader = importlib.machinery.SourceFileLoader("handler", HANDLER)
 handler = types.ModuleType("handler")
 loader.exec_module(handler)
+
+# The writer's git reads no global or system configuration, so the readers'
+# gitdir includes, which refuse every transport beneath the root, never apply to it.
+writer_env = handler.environment({"root": root, "allowedProtocols": ["https"]})
+if (writer_env.get("GIT_CONFIG_GLOBAL") != "/dev/null" or writer_env.get("GIT_CONFIG_NOSYSTEM") != "1"
+        or writer_env.get("HOME") != "/var/empty"):
+    failures.append(f"the writer's git must read no global or system configuration: {writer_env}")
+
+# ls-remote output that is not "<sha>\t<ref>" is a failed tag fetch, not a crash.
 handler.git = lambda path, env, *args, stdin=None: subprocess.CompletedProcess(args, 0, b"garbage\n", b"")
 try:
     results = handler.shallow_tags(shallow, {})

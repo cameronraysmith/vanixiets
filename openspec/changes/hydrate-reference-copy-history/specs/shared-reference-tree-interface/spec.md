@@ -95,22 +95,23 @@ Witness: `vmTests.x86_64-linux.shared-reference-tree-migration`, subtest "an upd
 
 #### Scenario: A participating account fetches directly
 
-- **WHEN** a participating account runs `git fetch` in a clone beneath the shared root, and again with `-c protocol.allow=always`
-- **THEN** the first is refused before any transport starts, and the second is refused by the operating system with a permission error
+- **WHEN** a participating account runs `git fetch` in a clone beneath the shared root, and again with `--no-write-fetch-head`, and runs `git ls-remote origin` and `git remote show origin` there
+- **THEN** the first is refused by the operating system with a permission error on `.git/FETCH_HEAD`, which git opens before it connects, and each of the others is refused before any transport starts with `transport '<scheme>' not allowed`
 
-Witness: `vmTests.x86_64-linux.shared-reference-tree`, subtest "readers cannot write the tree".
+Witness: `vmTests.x86_64-linux.shared-reference-tree`, subtest "readers cannot write the tree" (both fetches); `vmTests.x86_64-linux.shared-reference-tree-migration`, subtest "an update makes the commits it brought in readable, and a read the writer did not prepare fails at once" (`ls-remote` and `remote show`).
 
 #### Scenario: A participant lacks the setting
 
 - **WHEN** a participating account's evaluated git includes lack `protocol.allow = never` for a form of the shared root, or set a `protocol.<name>.allow` key
-- **THEN** that host's configuration fails evaluation
+- **THEN** that host's configuration fails evaluation, naming that account
 
-Witness: the assertions of `modules/nixos/shared-reference-tree.nix` and `modules/darwin/shared-reference-tree.nix`, evaluated by the per-machine checks of magnetite, pyrite and stibnite.
+Witness: the assertions of `modules/nixos/shared-reference-tree.nix`, `modules/darwin/shared-reference-tree.nix` and, for darwin Omnigent workers, `modules/darwin/omnigent-host.nix`, evaluated by the per-machine checks of magnetite, pyrite and stibnite.
 
 ### Requirement: lazygit fetches nothing at start-up beneath the shared root
 
 Each sharing host SHALL provision `<shared root>/.lazygit.yml`, a regular file owned by the writer and its group with mode `0640`, setting `git.autoFetch` to `false`, which lazygit reads for every repository beneath the shared root.
 Migration SHALL leave that file in place, owned by the writer.
+lazygit reads that file after the account's own configuration, so it decides `git.autoFetch` for every copy, and every other key the account's configuration sets still applies.
 
 #### Scenario: A participating account opens lazygit in a clone
 
@@ -118,6 +119,13 @@ Migration SHALL leave that file in place, owned by the writer.
 - **THEN** lazygit runs no `git fetch` and shows no fetch error
 
 Witness: `vmTests.x86_64-linux.shared-reference-tree-migration`, subtest "lazygit's start-up fetch is off beneath the shared root" (the file, its owner, mode and setting); post-activation inspection on stibnite running lazygit under a terminal with `GIT_TRACE`, recorded with the commands run.
+
+#### Scenario: A participating account's own lazygit configuration sets autoFetch
+
+- **WHEN** a participating account whose own lazygit configuration sets `git.autoFetch: true` starts lazygit in a clone beneath the shared root
+- **THEN** lazygit runs no `git fetch`
+
+Witness: the run of lazygit 0.66.3 under a pseudo-terminal with `GIT_TRACE` recorded in `design.md` D7 (a clone three directories below a scratch root, with and without the root file, and with an account configuration setting `git.autoFetch: true`); post-activation inspection on stibnite.
 
 #### Scenario: A tree is migrated into a root holding the file
 

@@ -34,7 +34,7 @@ Decisions tagged `D<n>` are developed in `design.md`; items 1 to 3 of the outlin
 - From: a read needing an absent blob starts an on-demand fetch that fails with a permission error.
 - To: participating accounts' git refuses every transport beneath the shared root (`protocol.allow = never` under the existing `gitdir:` includes), so such a read fails at once with `could not fetch <oid> from promisor remote` (D6).
 - Reason: a clear, immediate failure that names the missing object.
-- Impact: readers' `git fetch`, `git ls-remote origin` and `git remote show origin` inside a copy are refused before any transport.
+- Impact: readers' `git ls-remote origin`, `git remote show origin` and `git fetch --no-write-fetch-head` inside a copy are refused before any transport; a plain `git fetch` is still refused first by the operating system, at `.git/FETCH_HEAD`.
 
 **lazygit**
 - From: lazygit fetches at start-up in a copy and shows the failure.
@@ -55,7 +55,7 @@ None.
 
 - `shared-reference-tree` (stratum: `behavioral`): adds `A refreshed or deepened reference repository shows what each commit it gained changed` and `A read that needs content the reference tree lacks fails at once`.
 - `shared-reference-tree-interface` (stratum: `interface`): adds `An update makes every commit it brought in readable as a diff`, `A deepen makes every commit it brought in readable as a diff`, `The writer bounds the history it makes readable`, `A failed history fetch leaves the request's outcome as it was`, `The writer's exit log line names what the history fetch did`, `A first acquisition fetches nothing more than before`, `Participating accounts' git refuses every transport beneath the shared root`, `lazygit fetches nothing at start-up beneath the shared root` and `A revision's diff is readable once the revision and its parents are hydrated`; every new scenario names its witness. Trust boundary: these hold at the hosts' declared configuration, the writer's handler and Unix permissions; they do not cover an account's own `-c` or environment overrides, programs that read no git configuration, lazygit versions other than the one inspected, or history fetched before the change.
-  `Acquisition is delegated to the writer through a socket-activated entry point` keeps its text: its scenario "A participating account bypasses the wrapper" then holds of `git -c protocol.allow=always fetch` rather than of a plain `git fetch`, which git now refuses first, and its 737 characters exceed the validator's limit for a modified requirement (design, decisions of 2026-11-27, item 5).
+  `Acquisition is delegated to the writer through a socket-activated entry point` keeps its text, and its scenario "A participating account bypasses the wrapper" stays true: a plain `git fetch` opens `.git/FETCH_HEAD` before it connects, so the operating system still refuses it with a permission error (design, decisions of 2026-11-27, item 5).
 
 `world-assumptions` is unchanged: the behavioral requirements use its existing designations (reference repository, reference tree, participating account, writer, acquisition request, commit, history).
 

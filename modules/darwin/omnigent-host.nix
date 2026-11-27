@@ -454,6 +454,7 @@ in
                       || (
                         home.programs.ghq-shared.root == sharing.root
                         && (home.programs.git.settings.safe.bareRepository or null) == "explicit"
+                        && flakeConfig.flake.lib.sharedReferenceTreeRefusesTransport sharing.rootForms home.programs.git
                       )
                     )
                     && flakeConfig.flake.lib.sharedReferenceTreeSafeDirectoriesConform {
@@ -463,7 +464,7 @@ in
                   );
                 message = "Omnigent worker ${name}: a shared-reference-tree participant must read ${
                   config.services.shared-reference-tree.root or "the shared root"
-                } with safe.directory exactly that root's /* and safe.bareRepository explicit, and no worker's safe.directory may be * or enclose it.";
+                } with safe.directory exactly that root's /* and safe.bareRepository explicit, its git refusing every transport there (protocol.allow never under each gitdir: form, no protocol.<name>.allow), and no worker's safe.directory may be * or enclose it.";
               }
             ]) workers
           );

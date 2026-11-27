@@ -78,10 +78,35 @@ let
     smudge = "";
     required = false;
   };
+  # Readers' git refuses every transport beneath the shared root: a read needing
+  # content a copy lacks then fails at once with git's missing-object message
+  # rather than starting an on-demand fetch into a tree it cannot write. The
+  # writer's git reads no global or system configuration, so this never reaches it.
+  transportPolicy.allow = "never";
+  # lazygit reads .lazygit.yml in every ancestor of a repository; at the shared
+  # root this turns off its start-up fetch for every copy.
+  lazygitConfig = "git:\n  autoFetch: false\n";
+  # Whether a participant's Home Manager git configuration refuses every transport
+  # under each form git may resolve the root to, and sets no protocol.<name>.allow,
+  # which outranks protocol.allow wherever it is set.
+  refusesTransport =
+    roots: git:
+    lib.all (
+      form:
+      lib.any (
+        include:
+        (include.condition or null) == "gitdir:${form}/"
+        && (include.contents.protocol or null) == transportPolicy
+      ) (git.includes or [ ])
+    ) roots
+    && lib.attrNames (removeAttrs (git.settings.protocol or { }) [ "allow" ]) == [ ];
 in
 {
   flake.modules.nixos.shared-reference-tree-options = options false;
   flake.modules.darwin.shared-reference-tree-options = options true;
   flake.lib.sharedReferenceTreeSafeDirectoriesConform = safeDirectoriesConform;
   flake.lib.sharedReferenceTreeLfsPolicy = lfsPolicy;
+  flake.lib.sharedReferenceTreeTransportPolicy = transportPolicy;
+  flake.lib.sharedReferenceTreeRefusesTransport = refusesTransport;
+  flake.lib.sharedReferenceTreeLazygitConfig = lazygitConfig;
 }

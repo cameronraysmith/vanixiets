@@ -15,10 +15,13 @@ an ACL, or a hard link to a file outside the tree; the plan lists each one, and
 nothing changes. While a tree moves, it, and the shared root, are closed to
 every account but root, and the writer's socket is stopped.
 
-The first ACCOUNT is the primary: when the shared root is empty and on the same
+The first ACCOUNT is the primary: when the shared root is empty, or holds only
+the .lazygit.yml the host's modules provision there, and is on the same
 filesystem as that account's home, its whole ~/ghq is renamed to the root, an
-O(1) operation. Every other repository is moved in by rename on the same
-filesystem or copied (reflink or clonefile where available) across filesystems.
+O(1) operation; .lazygit.yml waits in the state directory meanwhile and comes
+back with its owner and mode. Every other repository is moved in by rename on
+the same filesystem or copied (reflink or clonefile where available) across
+filesystems.
 Where accounts hold the same repository, the deeper clone is kept. Whatever is
 not moved in stays in ~/ghq.pre-shared-<date>, untouched. Everything moved in
 becomes owned by the writer, gains group read, and loses group write, every
@@ -84,6 +87,9 @@ LFS_POLICY = [
     ("filter.lfs.required", "false"),
 ]
 LFS_POINTER_VERSION = b"version https://git-lfs.github.com/spec/v1\n"
+# Provisioned at the shared root by the host's modules, owned by the writer; a
+# root holding only it counts as empty.
+LAZYGIT = ".lazygit.yml"
 
 
 def say(*parts):
@@ -422,7 +428,8 @@ def inspect(account, path):
 
 
 def plan(accounts, date):
-    root_empty = not os.path.exists(ROOT) or not os.listdir(ROOT)
+    present = os.listdir(ROOT) if os.path.exists(ROOT) else []
+    root_empty = present == [] or (present == [LAZYGIT] and stat.S_ISREG(os.lstat(os.path.join(ROOT, LAZYGIT)).st_mode))
     root_parent_dev = os.stat(os.path.dirname(ROOT)).st_dev
     entries, holders = [], {}
     for index, account in enumerate(accounts):
@@ -607,6 +614,16 @@ def place(source, destination, same_volume, manifest, owner, stop):
     os.rename(made, destination)
 
 
+def move_file(source, destination, manifest):
+    """Move a regular file, recording its owner and mode first; it keeps both."""
+    st = os.lstat(source)
+    manifest.record({"op": "move-file", "src": source, "dst": destination,
+                     "uid": st.st_uid, "gid": st.st_gid, "mode": stat.S_IMODE(st.st_mode)})
+    shutil.move(source, destination)
+    os.chown(destination, st.st_uid, st.st_gid)
+    os.chmod(destination, stat.S_IMODE(st.st_mode))
+
+
 def fix_ownership(path, writer, manifest, sidecar, hold=False):
     """Record every entry's owner and mode, then hand the tree to the writer with masked modes.
 
@@ -664,7 +681,11 @@ def migrate(entry, winners, writer, date):
         if HOOK:
             subprocess.run(HOOK, shell=True, check=True)
     if entry["rename_whole"]:
+        provisioned = os.path.join(ROOT, LAZYGIT)
+        kept = os.path.join(manifest.dir, LAZYGIT)
         with Phase(f"rename {name}"):
+            if os.path.lexists(provisioned):
+                move_file(provisioned, kept, manifest)
             if os.path.isdir(ROOT):
                 manifest.record({"op": "rmdir-root", "path": ROOT})
                 os.rmdir(ROOT)
@@ -682,6 +703,11 @@ def migrate(entry, winners, writer, date):
                     moved.append(rel)
         with Phase(f"ownership {name}"):
             fix_ownership(ROOT, writer, manifest, os.path.join(manifest.dir, "root"), hold=True)
+        if os.path.lexists(kept):
+            if os.path.lexists(provisioned):
+                say(f"{name}: its tree held its own {LAZYGIT}, which stays; the host's activation rewrites it")
+            else:
+                move_file(kept, provisioned, manifest)
     else:
         with Phase(f"{'rename' if entry['same_volume'] else 'copy'} and ownership {name}"):
             for rel, info in entry["repos"].items():
@@ -889,6 +915,12 @@ def undo(step, account, writer):
             os.mkdir(step["path"], 0o750)
             os.chown(step["path"], writer["uid"], writer["gid"])
             os.chmod(step["path"], 0o750)
+    elif op == "move-file":
+        if (os.path.lexists(step["dst"]) and not os.path.lexists(step["src"])
+                and os.path.isdir(os.path.dirname(step["src"])) and not os.path.islink(os.path.dirname(step["src"]))):
+            shutil.move(step["dst"], step["src"])
+            os.chown(step["src"], step["uid"], step["gid"])
+            os.chmod(step["src"], step["mode"])
 
 
 def rollback(names, writer):

@@ -32,6 +32,8 @@ in
           group = cfg.writer;
         }
       );
+      lazygitFile = pkgs.writeText "lazygit.yml" flakeConfig.flake.lib.sharedReferenceTreeLazygitConfig;
+      provisionLazygit = "/usr/bin/install -m 0640 -o ${cfg.writer} -g ${cfg.writer} ${lazygitFile} \"$ghqRoot/.lazygit.yml\"";
     in
     {
       imports = [ flakeConfig.flake.modules.darwin.shared-reference-tree-options ];
@@ -59,6 +61,10 @@ in
                   include.condition == "gitdir:${form}/" && (include.contents.filter.lfs or null) == lfsPolicy
                 ) (hm.${user}.programs.git.includes or [ ])
               ) cfg.rootForms;
+            transportOpen = lib.filter (
+              user:
+              !flakeConfig.flake.lib.sharedReferenceTreeRefusesTransport cfg.rootForms hm.${user}.programs.git
+            ) humanParticipants;
             provision = "/usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} \"$ghqRoot\"";
             # Everything activation runs before it first touches this daemon's plist;
             # without that reference the ordering checks below would hold vacuously.
@@ -93,6 +99,10 @@ in
               message = "shared-reference-tree: every participant's git must run no LFS filter in the shared tree: an include with condition gitdir:<form>/ setting filter.lfs to ${builtins.toJSON lfsPolicy}, for each of ${toString cfg.rootForms}.";
             }
             {
+              assertion = transportOpen == [ ];
+              message = "shared-reference-tree: every participant's git must refuse every transport in the shared tree, with an include with condition gitdir:<form>/ setting protocol.allow to never for each of ${toString cfg.rootForms}, and must set no protocol.<name>.allow; not so for: ${toString transportOpen}.";
+            }
+            {
               assertion = lib.all (
                 user: (hm.${user}.programs.git.settings.safe.bareRepository or null) == "explicit"
               ) humanParticipants;
@@ -119,6 +129,11 @@ in
                 daemonLoaded
                 && lib.hasInfix "/usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} ${dirOf stderrPath}" beforeDaemon;
               message = "shared-reference-tree: the writer daemon's StandardErrorPath must lie in a directory provisioned for ${cfg.writer} before activation loads ${label}.";
+            }
+            {
+              assertion =
+                daemonLoaded && lib.hasInfix (builtins.unsafeDiscardStringContext provisionLazygit) beforeDaemon;
+              message = "shared-reference-tree: ${cfg.root}/.lazygit.yml must be provisioned mode 0640, owned by ${cfg.writer}, turning off lazygit's start-up fetch, before activation loads ${label}.";
             }
           ];
 
@@ -194,7 +209,10 @@ in
         # root-owned, so only an administrator can have put something at the root
         # before the writer existed. An empty directory is taken over; anything
         # else the writer does not already own stops activation rather than
-        # trusting entries another account controls.
+        # trusting entries another account controls. The root then gets
+        # .lazygit.yml, rewritten at each activation, which turns off lazygit's
+        # start-up fetch for every copy; ghq-shared-migrate counts a root holding
+        # only that file as empty.
         system.activationScripts.launchd.text = lib.mkBefore ''
           /usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} ${logDir}
           /usr/bin/install -d -m 0700 -o ${cfg.writer} -g ${cfg.writer} ${lockDir}
@@ -211,6 +229,7 @@ in
             /usr/sbin/chown ${cfg.writer}:${cfg.writer} "$ghqRoot"
             /bin/chmod 0750 "$ghqRoot"
           fi
+          ${provisionLazygit}
         '';
       };
     };

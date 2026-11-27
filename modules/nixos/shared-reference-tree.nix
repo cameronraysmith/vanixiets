@@ -22,6 +22,11 @@ in
           group = cfg.writer;
         }
       );
+      lazygitPath = "${cfg.root}/.lazygit.yml";
+      # tmpfiles reads C-style escapes in the argument; f+ rewrites the file at each run.
+      lazygitRule = "f+ ${lazygitPath} 0640 ${cfg.writer} ${cfg.writer} - ${
+        lib.replaceStrings [ "\n" ] [ "\\n" ] flakeConfig.flake.lib.sharedReferenceTreeLazygitConfig
+      }";
     in
     {
       imports = [ flakeConfig.flake.modules.nixos.shared-reference-tree-options ];
@@ -56,6 +61,17 @@ in
               in
               builtins.length fields > 1 && builtins.elemAt fields 1 == cfg.root
             ) config.systemd.tmpfiles.rules;
+            lazygitRules = lib.filter (
+              rule:
+              let
+                fields = lib.splitString " " rule;
+              in
+              builtins.length fields > 1 && builtins.elemAt fields 1 == lazygitPath
+            ) config.systemd.tmpfiles.rules;
+            transportOpen = lib.filter (
+              user:
+              !flakeConfig.flake.lib.sharedReferenceTreeRefusesTransport cfg.rootForms hm.${user}.programs.git
+            ) cfg.participants;
           in
           [
             {
@@ -83,6 +99,10 @@ in
               message = "shared-reference-tree: every participant's git must run no LFS filter in the shared tree: an include with condition gitdir:<form>/ setting filter.lfs to ${builtins.toJSON lfsPolicy}, for each of ${toString cfg.rootForms}.";
             }
             {
+              assertion = transportOpen == [ ];
+              message = "shared-reference-tree: every participant's git must refuse every transport in the shared tree, with an include with condition gitdir:<form>/ setting protocol.allow to never for each of ${toString cfg.rootForms}, and must set no protocol.<name>.allow; not so for: ${toString transportOpen}.";
+            }
+            {
               assertion = lib.all (
                 user: (hm.${user}.programs.git.settings.safe.bareRepository or null) == "explicit"
               ) cfg.participants;
@@ -97,6 +117,10 @@ in
             {
               assertion = rootRules == [ "d ${cfg.root} 0750 ${cfg.writer} ${cfg.writer} -" ];
               message = "shared-reference-tree: ${cfg.root} must be provisioned exactly once, mode 0750, owned by ${cfg.writer}.";
+            }
+            {
+              assertion = lazygitRules == [ lazygitRule ];
+              message = "shared-reference-tree: ${lazygitPath} must be provisioned exactly once, mode 0640, owned by ${cfg.writer}, turning off lazygit's start-up fetch.";
             }
           ];
 
@@ -115,6 +139,7 @@ in
 
         systemd.tmpfiles.rules = [
           "d ${cfg.root} 0750 ${cfg.writer} ${cfg.writer} -"
+          lazygitRule
           "d ${lockDir} 0700 ${cfg.writer} ${cfg.writer} -"
         ];
 

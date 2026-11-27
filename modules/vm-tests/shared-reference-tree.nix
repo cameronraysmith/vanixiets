@@ -316,7 +316,13 @@
                   machine.fail(as_user(user, f"touch {P}/probe"))
                   machine.fail(as_user(user, f"mkdir {R}/probe"))
                   machine.fail(as_user(user, f"git -C {P} config core.fsmonitor /bin/false"))
-                  machine.fail(as_user(user, f"git -C {P} fetch"))
+                  # A reader's fetch opens FETCH_HEAD before it connects, so the operating
+                  # system refuses it first; one that writes no FETCH_HEAD reaches the
+                  # transport, which the reader's git refuses beneath the root.
+                  out = machine.fail(as_user(user, f"git -C {P} fetch 2>&1"))
+                  assert "permission denied" in out.lower(), out
+                  out = machine.fail(as_user(user, f"git -C {P} fetch --no-write-fetch-head 2>&1"))
+                  assert "not allowed" in out, out
                   machine.fail(as_user(user, f"git -C {P} gc"))
                   assert machine.succeed(as_writer(f"git -C {P} config --get core.fsmonitor || true")).strip() == ""
 
@@ -402,6 +408,64 @@
             machine.succeed(as_user("cameron", f"ghq get -u {URL}"))
             assert "t-side" in machine.succeed(as_writer(f"git -C {P} tag")).split()
 
+        with subtest("an update makes the commits it brought in readable, and a read the writer did not prepare fails at once"):
+            import time
+            machine.succeed(
+                "git init -q --bare -b main /srv/git/fixture/history.git"
+                " && git -C /srv/git/fixture/history.git config uploadpack.allowFilter true"
+                " && git init -q -b main /tmp/history"
+                " && for i in 1 2 3; do echo v$i > /tmp/history/f && echo g$i > /tmp/history/g"
+                " && git -C /tmp/history add f g && git -C /tmp/history -c user.name=t -c user.email=t@t commit -q -m v$i; done"
+                " && git -C /tmp/history push -q /srv/git/fixture/history.git main"
+                " && chown -R git:git /srv/git"
+            )
+            Y = f"{R}/localhost/fixture/history"
+            YURL = "git://localhost/fixture/history"
+            machine.succeed(as_user("cameron", f"ghq-sync {YURL}"))
+            old = machine.succeed(as_writer(f"git -C {Y} rev-parse HEAD")).strip()
+            # Upstream gains a commit, a side branch merged with a resolved conflict, and
+            # a tag on a branch never merged whose f differs from every branch commit's.
+            machine.succeed(
+                "cd /tmp/history && G='git -c user.name=t -c user.email=t@t'"
+                " && echo v4 > f && $G commit -q -am v4"
+                " && $G checkout -q -b side && echo side > g && $G commit -q -am side"
+                " && $G checkout -q main && echo main > g && echo v5 > f && $G commit -q -am v5"
+                " && { $G merge -q --no-ff -m merge side || true; } && echo resolved > g && $G commit -q -am merge"
+                " && $G checkout -q -b unmerged HEAD~3 && echo unmerged > f && $G commit -q -am unmerged"
+                " && $G tag t-unmerged && $G checkout -q main"
+                " && chown -R root:root /srv/git/fixture/history.git"
+                " && $G push -q /srv/git/fixture/history.git main t-unmerged"
+                " && chown -R git:git /srv/git"
+            )
+            out = machine.succeed(as_user("omnigent-cameron", f"ghq get -u {YURL} 2>&1"))
+            assert f"hydrated history: {Y} (" in out, out
+            commits = machine.succeed(as_writer(f"git -C {Y} rev-list {old}..HEAD")).split()
+            assert len(commits) == 4, commits
+            for commit in commits:
+                machine.succeed(as_user("cameron", f"git -C {Y} --no-lazy-fetch show --stat -p {commit} >/dev/null"))
+            # The tag arrives at depth 1, and no hydrate fetches its blob.
+            machine.succeed(as_user("omnigent-cameron", f"ghq-sync -u --tags {YURL}"))
+            started = time.monotonic()
+            status, out = machine.execute(as_user("cameron", f"git -C {Y} show t-unmerged 2>&1"))
+            took = time.monotonic() - started
+            assert status != 0 and "not allowed" in out and "could not fetch" in out, (status, out)
+            assert "permission denied" not in out.lower() and took < 5, (took, out)
+            # The same refusal stops every network read inside a copy.
+            for command in ["ls-remote origin", "remote show origin"]:
+                out = machine.fail(as_user("cameron", f"git -C {Y} {command} 2>&1"))
+                assert "not allowed" in out, (command, out)
+            # The writer's git reads none of the readers' configuration: its hydrate
+            # through the socket still fetches, and the read then succeeds.
+            out = machine.succeed(as_user("cameron", f"ghq-sync --hydrate t-unmerged {Y}"))
+            assert out.startswith(f"hydrated: {Y} "), out
+            machine.succeed(as_user("cameron", f"git -C {Y} show t-unmerged >/dev/null"))
+            assert machine.succeed(f"find {R} ! -user ghq | wc -l").strip() == "0"
+
+        with subtest("lazygit's start-up fetch is off beneath the shared root"):
+            assert machine.succeed(f"stat -c '%U %G %a %F' {R}/.lazygit.yml").strip() == "ghq ghq 640 regular file"
+            for user in readers:
+                assert machine.succeed(as_user(user, f"cat {R}/.lazygit.yml")) == "git:\n  autoFetch: false\n"
+
         migrate = "${nodePkgs.ghq-shared}/bin/ghq-shared-migrate"
         S = "/var/lib/ghq-migration"
         M = f"{R}/localhost/fixture/mig"
@@ -434,6 +498,10 @@
             listing = ("find /home/cameron/ghq /home/omnigent-cameron/ghq"
                        " \\( -type f -printf '%p %u %m %s\\n' \\) -o -printf '%p %u %m\\n' | sort")
             date = machine.succeed("date +%Y%m%d").strip()
+            # The root holds the provisioned .lazygit.yml, which migration keeps in place.
+            outside_lazygit = f"ls -A {R} | grep -cvxF .lazygit.yml || true"
+            lazygit_file = f"stat -c '%U %G %a' {R}/.lazygit.yml && cat {R}/.lazygit.yml"
+            lazygit_kept = "ghq ghq 640\ngit:\n  autoFetch: false\n"
 
             # cameron, an administrator (wheel): a full clone with a hook, an
             # uncommitted change, a local-only commit, a setuid file, and an LFS
@@ -474,7 +542,7 @@
             status, out = machine.execute(f"{migrate} --apply cameron omnigent-cameron 2>&1")
             expect(status != 0 and "omnigent-cameron not an administrator (wheel)" in out and "nothing changed" in out,
                    ("apply moved a non-administrator's tree in place", out))
-            expect(machine.succeed(listing) == before and machine.succeed(f"ls -A {R} | wc -l").strip() == "0"
+            expect(machine.succeed(listing) == before and machine.succeed(outside_lazygit).strip() == "0"
                    and machine.execute(f"test -e {S}/cameron")[0] != 0,
                    "a refused apply changed a tree, the root or the state directory")
             if status == 0:
@@ -498,7 +566,7 @@
             status, out = machine.execute(f"{migrate} --apply cameron 2>&1")
             expect(status != 0 and "could have written" in out and "nothing changed" in out,
                    ("apply moved a tree carrying an ACL", out))
-            expect(machine.succeed(listing) == with_acl and machine.succeed(f"ls -A {R} | wc -l").strip() == "0"
+            expect(machine.succeed(listing) == with_acl and machine.succeed(outside_lazygit).strip() == "0"
                    and machine.execute(f"test -e {S}/cameron")[0] != 0,
                    "apply refused for an ACL changed a tree, the root or the state directory")
             if status == 0:
@@ -522,7 +590,7 @@
             status, out = machine.execute(f"{migrate} --apply cameron 2>&1")
             expect(status != 0 and "could have written" in out and "nothing changed" in out,
                    ("apply moved a tree another account could have written", out))
-            expect(machine.succeed(listing) == exposed and machine.succeed(f"ls -A {R} | wc -l").strip() == "0"
+            expect(machine.succeed(listing) == exposed and machine.succeed(outside_lazygit).strip() == "0"
                    and machine.execute(f"test -e {S}/cameron")[0] != 0,
                    "apply refused for an exposed tree changed a tree, the root or the state directory")
             if status == 0:
@@ -555,6 +623,7 @@
             expect(machine.succeed(f"find {R} -perm -g+w ! -type l | wc -l").strip() == "0", "an entry is group-writable")
             expect(machine.succeed(f"find {R} -perm /o=rwx ! -type l | wc -l").strip() == "0", "an entry grants others access")
             expect(machine.succeed(f"stat -c '%U %a' {S}").strip() == "root 700", "the state directory is not root 700")
+            expect(machine.succeed(lazygit_file) == lazygit_kept, "migration did not keep .lazygit.yml with its owner, mode and content")
             expect(machine.execute(f"test -x {M}/.git/hooks/post-checkout")[0] == 0, "an administrator's tree was changed beyond ownership and modes")
             migrated_status = machine.succeed(as_writer(f"git --no-optional-locks -C {M} status --porcelain"))
             assert "f" in migrated_status
@@ -624,6 +693,7 @@
             expect(machine.execute("test -d /home/omnigent-cameron/ghq && test ! -L /home/omnigent-cameron/ghq")[0] == 0,
                    "rollback did not put back the set-aside tree")
             assert machine.succeed(f"stat -c '%U %a' {R}").strip() == "ghq 750"
+            expect(machine.succeed(lazygit_file) == lazygit_kept, "rollback did not keep .lazygit.yml with its owner, mode and content")
 
             machine.succeed("umount /home/omnigent-cameron")
             machine.succeed("rm -rf /home/cameron/ghq")
