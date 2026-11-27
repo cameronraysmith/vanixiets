@@ -70,7 +70,7 @@
             ];
 
             ui_font_size = 14;
-            ui_font_family = "Zed Sans";
+            ui_font_family = "Zed Plex Sans";
             buffer_font_size = 12;
             buffer_font_family = "MonaspiceNe Nerd Font Mono";
             icon_theme = "Catppuccin Mocha";
@@ -87,7 +87,6 @@
 
             git_panel = {
               dock = "right";
-              sort_by_path = false;
             };
             agent = {
               dock = "right";
@@ -100,7 +99,7 @@
               dock = "left";
             };
             tab_bar = {
-              show = false;
+              show = true;
             };
           };
         };
