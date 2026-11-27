@@ -12,9 +12,9 @@
 # plist changes, as it does when the set of /etc files changes; the profile
 # already names the new system then. So the darwin activation reads the link
 # at its very start, in preActivation, and hands it to the record, which
-# postActivation writes at activationOrder.deployRecord, ahead of the casks,
-# dnscrypt-proxy and fleet-services-trust snippets (see activationOrder).
-# previous_closure is absent when the link does not
+# postActivation writes last, after every other postActivation snippet (see
+# activationOrder), so a snippet that fails under set -e leaves no record of
+# a deploy that did not finish. previous_closure is absent when the link does not
 # exist, as on the first activation of a NixOS boot. Store paths need no JSON
 # escaping, so printf writes the line and no machine needs jq at activation.
 # The host name is a literal fixed at evaluation.
@@ -23,7 +23,8 @@
 # flake.lib.deployRecordObligations, asserted by modules/checks/machines.nix
 # on every NixOS and darwin machine check, fails unless the machine's
 # activation runs it and reads the previous system before anything in the
-# rendered activation relinks /run/current-system;
+# rendered activation relinks /run/current-system, and on darwin unless no
+# command runs between the record and the relink;
 # checks.x86_64-linux.deploy-record-order runs that judge over fixtures.
 { config, lib, ... }:
 let
@@ -95,7 +96,10 @@ let
   activateSystemReload = "org.nixos.activate-system.plist";
 
   # Problems with the order of `text`, the rendered activation script: the
-  # previous system must be read before anything relinks /run/current-system.
+  # previous system must be read before anything relinks /run/current-system,
+  # and on darwin, where nix-darwin splices postActivation immediately before
+  # the relink (its modules/system/activation-scripts.nix), no command may run
+  # between the record and the relink.
   orderProblems =
     {
       name,
@@ -105,13 +109,29 @@ let
     }:
     let
       plain = builtins.unsafeDiscardStringContext text;
+      parts = needle: lib.splitString (builtins.unsafeDiscardStringContext needle) plain;
       # Characters before the first occurrence of `needle`, or null.
       offset =
         needle:
         let
-          parts = lib.splitString (builtins.unsafeDiscardStringContext needle) plain;
+          p = parts needle;
         in
-        if lib.length parts < 2 then null else lib.stringLength (lib.head parts);
+        if lib.length p < 2 then null else lib.stringLength (lib.head p);
+      # The non-blank, non-comment lines between the darwin record and the
+      # relink; none when either is missing or the relink comes first.
+      afterRecord =
+        let
+          record = builtins.unsafeDiscardStringContext (darwinInvocation script);
+          p = parts record;
+          untilRelink =
+            if lib.length p < 2 then [ ] else lib.splitString relink (lib.concatStringsSep record (lib.tail p));
+        in
+        if lib.length untilRelink < 2 then
+          [ ]
+        else
+          lib.filter (line: line != "" && !lib.hasPrefix "#" line) (
+            map lib.trim (lib.splitString "\n" (lib.head untilRelink))
+          );
       before =
         what: first: second:
         let
@@ -140,6 +160,9 @@ let
         ++ lib.optional (
           offset (darwinInvocation script) == null
         ) "${name}'s activation does not run ${script} with ${previousVar}"
+        ++
+          lib.optional (afterRecord != [ ])
+            "${name}: postActivation runs `${lib.head afterRecord}` after the deploy record, before the relink"
       );
 
   deployRecordObligations = {
@@ -173,20 +196,19 @@ let
 
   # The mkOrder priority of each first-party darwin postActivation snippet
   # (types.lines concatenates definitions by ascending priority, equal
-  # priorities in definition order). The values state the order every Mac
-  # renders today: configd's resolver reread first (500, lib.mkBefore's
-  # priority), the host's plain snippets and home-manager's activation at the
-  # default 1000, sops-nix's secret installation at lib.mkAfter's 1500, then
-  # the deploy record, casks, dnscrypt-proxy's health check and
-  # fleet-services-trust's keychain import, which were lib.mkAfter definitions
-  # concatenated in that order. The record is therefore not the last
-  # postActivation text on a Mac.
+  # priorities in definition order): configd's resolver reread first (500,
+  # lib.mkBefore's priority), the host's plain snippets and home-manager's
+  # activation at the default 1000, sops-nix's secret installation at
+  # lib.mkAfter's 1500, then casks, dnscrypt-proxy's health check and
+  # fleet-services-trust's keychain import, and the deploy record last, above
+  # every other contributor, so a later lib.mkAfter snippet still comes before
+  # it. deployRecordObligations fails a Mac on which anything follows it.
   activationOrder = {
     resolverReload = 500;
-    deployRecord = 1501;
     casks = 1502;
     dnscryptProxy = 1503;
     fleetServicesTrust = 1504;
+    deployRecord = 1900;
   };
 in
 {
@@ -214,7 +236,7 @@ in
   # preActivation runs first, before checks, /etc and launchd; mkBefore puts
   # the read ahead of every other preActivation addition. postActivation runs
   # under set -e before the relink; activationOrder.deployRecord places the
-  # record among the other postActivation additions.
+  # record after every other postActivation addition.
   flake.modules.darwin.deploy-record =
     { config, pkgs, ... }:
     {

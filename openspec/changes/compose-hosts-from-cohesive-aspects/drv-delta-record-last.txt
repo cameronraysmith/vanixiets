@@ -1,0 +1,23 @@
+# Declared drvPath differences of moving the darwin deploy record last
+# (flake.lib.activationOrder.deployRecord 1501 -> 1900 and the darwin
+# "nothing between the record and the relink" rule of
+# flake.lib.deployRecordObligations, modules/system/deploy-record.nix), from
+# its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-record-last.txt
+# Each Mac's activation script moves the record's invocation from among the
+# postActivation snippets to the last line before the relink; no other line of
+# any derivation changes (nix derivation show of stibnite's toplevel: only
+# env.activationScript and the output path differ). Every NixOS toplevel,
+# every home and every runtime test was evaluated identical against main.
+# checks.x86_64-linux.deploy-record-order keeps its drvPath: judgeCases
+# evaluates the new darwinSnippetAfterRecord case and returns the check's
+# derivation unchanged (modules/lib/judge-check.nix). No testSizes entry and
+# no packages/docs file changes.
+darwin.argentum changed  # activation script: deploy record moved last
+darwin.blackphos changed  # activation script: deploy record moved last
+darwin.rosegold changed  # activation script: deploy record moved last
+darwin.stibnite changed  # activation script: deploy record moved last
+checks.aarch64-darwin.darwin-argentum changed  # embeds darwin.argentum's toplevel
+checks.aarch64-darwin.darwin-blackphos changed  # embeds darwin.blackphos's toplevel
+checks.aarch64-darwin.darwin-rosegold changed  # embeds darwin.rosegold's toplevel
+checks.aarch64-darwin.darwin-stibnite changed  # embeds darwin.stibnite's toplevel

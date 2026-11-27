@@ -2,11 +2,13 @@
 # flake.lib.deployRecordObligations (modules/system/deploy-record.nix) over
 # literal activation scripts. It accepts a darwin script that reads the
 # previous system before launchd reloads activate-system and before the
+# relink, with only blank and comment lines between the record and the
 # relink, and a NixOS script that runs the record before the relink; it finds
 # exactly one problem in each mutant: a darwin script without the read, one
 # that reads after the activate-system reload (F86: the profile already names
 # the new system), one that reads after the relink, one whose record does not
-# take the read, and a NixOS script whose record runs after the relink.
+# take the read, one with a command between the record and the relink, and a
+# NixOS script whose record runs after the relink.
 # It then runs the record script itself against a stand-in link that already
 # names the new system, as on darwin after the reload: given the earlier read
 # it writes that as previous_closure, given an empty read it writes none, and
@@ -37,7 +39,7 @@
         problems = 1;
       };
       cases = {
-        darwinAccepted = darwin (read + reload + record + relink) // {
+        darwinAccepted = darwin (read + reload + record + "\n  # Make current.\n" + relink) // {
           problems = 0;
         };
         nixosAccepted = {
@@ -49,6 +51,7 @@
         darwinReadAfterReload = darwin (reload + read + record + relink);
         darwinReadAfterRelink = darwin (relink + read + reload + record);
         darwinRecordWithoutRead = darwin (read + reload + "${script} \"$systemConfig\"\n" + relink);
+        darwinSnippetAfterRecord = darwin (read + reload + record + "echo late\n" + relink);
         nixosRecordAfterRelink = {
           isDarwin = false;
           text = relink + "${script} \"$systemConfig\"\n";
