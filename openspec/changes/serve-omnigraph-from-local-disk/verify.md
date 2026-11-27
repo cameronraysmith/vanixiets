@@ -5,7 +5,7 @@
 > corresponding artifact for correction before re-running verify.
 
 **Change**: `serve-omnigraph-from-local-disk` (CAM-127)
-**Verified at**: `2026-11-27 09:20` UTC (first run, against `main` at `d625c64e`); `2026-11-27 10:15` UTC (second run, against the remedies `okoptrow`, `zmmzwqtk`, `utrkprxr` and `tuwmzvxy` at `ddec126c`, over `main` at `30223609`)
+**Verified at**: `2026-11-27 09:20` UTC (first run, against `main` at `d625c64e`); `2026-11-27 10:15` UTC (second run, against the remedies `okoptrow`, `zmmzwqtk`, `utrkprxr` and `tuwmzvxy` at `ddec126c`, over `main` at `30223609`); `2026-11-27 11:00` UTC (third run, against `oxzqzrro`, `xxnlluxk` and `oynqyknx` at `103def5f`, over `main` at `de37dff6`, which now holds the first round's remedies)
 **Verifier**: `openspec-verify-change` (omp)
 
 Prechecks: the delivery commits are on `main`: `2dbb1e25` (`feat(omnigraph): watch the server's readiness and graphs on magnetite`), `7d02f0a5` (`feat(omnigraph): serve a local root with stale-lock recovery and nightly backup`), `72596929` (`fix(omnigraph): refuse lock recovery on unreadable process state or an omnigraph at the lock pid`), `afd978d8` (`feat(magnetite): serve omnigraph from local disk`) and `27ac2fe8` (`docs(omnigraph): record the restore drills and the restore without the host`).
@@ -13,6 +13,92 @@ magnetite runs generation 296 (`system-296-link`), booted 2026-11-27 05:21:38Z a
 The code was read at `d625c64e`: `modules/lib/omnigraph-lock-recovery.nix`, `modules/nixos/omnigraph.nix`, `modules/nixos/omnigraph-backup.nix`, `modules/nixos/omnigraph-probe.nix`, `modules/lib/omnigraph-cluster-roots.nix`, `modules/machines/nixos/magnetite/{default,disko}.nix`, `modules/lib/observability-hosts.nix`, `modules/lib/observability-notify-run.nix`, `modules/clan/services/otel-collector/flake-module.nix`, `modules/nixos/fleet-alert/rules.nix`, `modules/nixos/perses/resources/dashboard-omnigraph.json`, `modules/checks/omnigraph-retired-roots.nix`, `modules/vm-tests/{omnigraph-local-root,perses-greptimedb}.nix` and the runbook `packages/docs/src/content/docs/development/operations/omnigraph.md`.
 No test or runtime test was re-run; `checks.x86_64-linux.omnigraph-retired-roots` at `d625c64e` was substituted from the fleet cache, which nixbot fills (`logs/cam127-verify-retired-roots-20261127T0900Z.log`).
 The evidence is the deploy and drill records (`logs/agent-reports-20261126/DeployMagnetite-{probe,latest,switch}.md`, `OmnigraphRestoreDrill.md`), read-only inspection of magnetite on 2026-11-27 between 09:00 and 09:10Z (`logs/cam127-verify-{host-state,restic-units,front-r2,notices}-20261127T0900Z.log`), the stored series through `nix run .#obs-query`, read-only requests to R2 with magnetite's own credentials, and one evaluation of magnetite with the store forced to `"r2"` (`logs/cam127-verify-wayback-eval-20261127T0900Z.{nix,json}`).
+
+## Third run, 2026-11-27 11:00 UTC
+
+The second run (§0) failed two checks. Three changes remedy them, not yet on `main`: `oxzqzrro` (`fix(node-exporter-textfile): remove at activation every textfile no declared writer writes`), `xxnlluxk` (`fix(omnigraph): end the lock recovery only by its refusal, a recovery or nothing to do`) and `oynqyknx` (`docs(openspec): amend serving omnigraph from local disk after the second verification`, `review_round: 2`).
+The code and artifacts were read at `oynqyknx` (`103def5f`). Since then `oynqyknx` became `af752334`, which differs only in `tasks.md` (7.5 ticked). Nothing of it is deployed: at 10:52Z magnetite was still on generation 296 with the counter at 1 and no notice but heartbeats since 10:09Z, and `/run/node-exporter-textfile` held exactly the six declared files `magnetite-memory-budget.prom`, `omnigraph-backup.prom`, `omnigraph.prom`, `postgresql-backup.prom`, `r2-usage.prom` and `zpool.prom`.
+Run here, all passing:
+- `checks.x86_64-linux.omnigraph-retired-roots`, `checks.x86_64-linux.omnigraph-lock-recovery-rehearsal` and `checks.x86_64-linux.node-exporter-textfile` at `103def5f` (`logs/cam127-third-{omnigraph-retired-roots,omnigraph-lock-recovery-rehearsal,node-exporter-textfile}-20261127.log`);
+- the recovery program built from `flake.lib.omnigraphLockRecovery` at `103def5f` over stubs of `omnigraph` and `ntfy-send` and a scratch process table (`logs/cam127-third-recovery-stubs-20261127T1200Z.log`);
+- one evaluation of magnetite at `103def5f` (its `/var/lib/omnigraph` mount options and `vanixiets.nodeExporter.textfiles`);
+- `switch-to-configuration-ng` read at the pinned nixpkgs (`/nix/store/xl9r82h0…-source/pkgs/by-name/sw/switch-to-configuration-ng/src/main.rs`).
+
+The runtime tests were not re-run; their runs on these changes are `logs/cam127-r2fix-*-green-20261127-05*.log`.
+Task 7.5's build log (`logs/cam127-r2fix-changed-checks-build-20261127-054808.log`, exit 0 in 240 s) built the derivations of its list (`…-changed-checks-list-20261127-054104.log`). For `nixos-magnetite`, `omnigraph-retired-roots`, `omnigraph-lock-recovery-rehearsal` and `treefmt` those differ from the head's, because the stack was re-split and `tasks.md` changed after the list. So the head's 25 output paths were evaluated and looked up on magnetite read-only: 23 are present there (`logs/cam127-third-head-checks-presence-20261127.log`). The other two, `treefmt` and `gitleaks`, depend on the whole source tree; they were built here at the head and pass (`logs/cam127-third-{treefmt,gitleaks}-20261127.log`). Every changed check at `af752334` is built, and 7.5 holds.
+
+### Checked failures of the third run
+
+- [x] **FAIL 7, the textfile cleanup's requirement claims a run it does not get** (`specs/graph-store-interface/spec.md:57-59`, "an activation script that, at boot and on every `switch-to-configuration`, removes …").
+  At the pinned nixpkgs, `switch-to-configuration boot` installs the boot loader and exits before activation (`main.rs:1859-1861`, `if *action == Action::Boot { std::process::exit(0); }`). `dry-activate` runs only the snippets that declare dry-activation support, and this one does not. So the script runs at boot and on `switch` and `test` only.
+  Failing scenario: `switch-to-configuration boot` into a generation that drops a writer leaves that writer's file in `/run/node-exporter-textfile` until the reboot. The reboot then empties `/run` and runs the script, so no alert follows. The behavioural requirement this discharges holds; the interface sentence is false as written.
+  The module's comment (`node-exporter-textfile.nix:12-17`), design D3's second note and the runbook's way-back section repeat it.
+
+FAIL 5 and FAIL 6 are closed; FAIL 7 is the one checked failure left.
+
+### FAIL 5 and FAIL 6, against `103def5f`
+
+| Second-run finding | Remedy | Closed? |
+|---|---|---|
+| 5, the backup's textfile left after a switch to `"r2"` | `vanixiets.nodeExporter.textfiles` and the activation script (`modules/nixos/node-exporter-textfile.nix`), `omnigraph-backup` among the writers only on `"local"`; the check reads `omnigraph-backup.prom` among the kept files only on `"local"` | closed. A switch removes the file before the new units start, and the last stored samples do not fire either rule (below) |
+| 6, an unindexable `cluster status` answer ended the program with exit 5 | the status guard (`jq -se` on exactly one object with a string or null `lock_id`), the PATH check and the `ERR` trap under `errtrace` (`modules/lib/omnigraph-lock-recovery.nix`) | closed. Over the stub, `not json`, `[1]`, `{"lock_id":5}`, two objects, an empty answer and an object with trailing text each exit 1 with one post and `lock.json` kept |
+
+### Trying to break the textfile cleanup
+
+- **When it runs.** NixOS's stage 2 runs the activation script at boot, before units start. `switch-to-configuration` runs it for `switch` and `test`, after the units it stops have stopped (`main.rs`, the stop jobs waited on, then `activate`) and before it starts or restarts any. It does not run for `boot` (FAIL 7) or `dry-activate`.
+- **The writers.** `rg` over `modules/` finds six NixOS textfile writers. Each writes exactly `<writer>.prom` and declares itself in `textfileWriters` under the same condition as its units: `omnigraph` (`omnigraph-probe.nix:286`, `:295`), `omnigraph-backup` (`omnigraph-backup.nix:80`, `:201`), `postgresql-backup` (`postgresql-backup.nix:173`, `:303`), `r2-usage` (`r2-usage.nix:272`, `:325`), `magnetite-memory-budget` (`magnetite-memory-budget.nix:82`, `:92`) and `zpool` (`zpool-probe.nix:183`, `:193`, both `mkIf active`). The only other writer of textfiles, the darwin `otel-host-probe` (`launchd.prom`, `smartctl.prom`), writes to `/var/lib/prometheus-node-exporter/textfile` on darwin, where this NixOS module is not imported. No clan service, Omnigent worker or script writes into `/run/node-exporter-textfile`. The PostgreSQL collation series moved to the collector's receiver.
+- **Races.** A declared writer's `*.prom` matches the case's kept names and is never removed. Its temporary file (`<name>.prom.tmp`, or `.<name>.prom.tmp` for the memory budget) does not match `*.prom`, so a rename landing between the listing and the removal can only replace a kept file. An undeclared file is removed whatever its writer does, and no undeclared writer exists. A unit whose writer the new generation drops is stopped before the script runs.
+- **Edge cases.** An absent directory leaves the glob unexpanded, `[ -f ]` fails, and nothing is removed. A host with no declared writer still runs the script and removes any `*.prom` there; node_exporter's textfile collector is off on such a host. A `.tmp` left by a killed writer stays and is never exported.
+- **What an alert still reads after a switch to `"r2"`.**
+  - fleet-alert sends instant queries to the store's PromQL API (`fleet-alert.nix:141`). The last samples of `vanixiets_omnigraph_backup_last_success_timestamp_seconds` and of `node_textfile_mtime_seconds{file=".../omnigraph-backup.prom"}` stay visible for the store's lookback, [INFERENCE] GreptimeDB's default of 5 minutes, and then stop.
+  - `OmnigraphBackupStale` needs its stamp to be 36 h old for 10 minutes, and the last stamp is at most a night old.
+  - `HostProbeStale` (`time() - node_textfile_mtime_seconds > 300`, `for = "10m"`) can hold for at most the last minute or so of the lookback, and never for 10 minutes. So the last samples fire neither rule.
+  - The pool probe's `vanixiets_zfs_dataset_*{dataset="zroot/root/omnigraph"}` keep coming, because the dataset stays mounted with its 20G quota. They are live readings, and `ZfsDatasetQuotaFilling` fires on them only above 85 %.
+  - The probe's dataset and recovery series leave `omnigraph.prom` at its next run, since it rewrites the whole file and writes them only on a local root.
+  - `/var/lib/omnigraph-metrics/lock-recoveries` stays on disk and nothing exports it on `"r2"`.
+
+### Trying to break the recovery
+
+Over the stub (`logs/cam127-third-recovery-stubs-20261127T1200Z.log`):
+- A failing `mktemp -d` (`TMPDIR=/nonexistent`) exits 1 with one post, ``the step `OMNIGRAPH_HOME=$(mktemp -d)` (line 189) failed with exit status 1``, whether or not the post succeeds. `$BASH_COMMAND` is the unexpanded source text, so no value reaches the notice through it.
+- A counter whose directory is a file exits 0 and logs `the lock-recovery counter … could not be written`. Its low-priority notice ends in that sentence.
+- A writer whose command line ends in `--data /tmp/seed.jsonl --token s3cr3t` is posted as `(pid 4242, omnigraph)`. Its arguments appear only in the journal line `pid 4242 runs …: …`.
+- `/…/x/../root`, `/…/root/__cluster/..` and `--target=/…//w/./root/` are counted. `/…/root/..` (the parent) and the relative `relative/../root` are not, as the scenario says.
+
+Bash leaves `ERR` and `errexit` off inside `if`, `while` and `!` conditions and in all but the last command of `&&`/`||` lists. Every command in those positions here is a guard whose failure the program reads: the status and unlock calls, `readlink`, `awk` on `status`, `date`, `id -u`, `command -v`, and the counter write after the unlock. The functions called from conditions, `scan_processes`, `read_process` and `writer_owned`, refuse through `refuse`, which calls `exit` and so works in any context. `writeShellApplication` sets `pipefail`, and a pipeline element inherits the trap through `errtrace`. A failure inside a command substitution exits that subshell with its status (`on_error` checks `BASHPID`), and the assignment's failure then refuses in the main shell once. `refuse` and the unconfirmed-unlock branch disarm the trap and `errexit` before posting; `post` swallows its own failure; both end in `exit 1`. No unbound variable was found on any path. `${kept[*]}` on an empty array is defined under `nounset` in bash 5.3.
+
+The mutants are each rejected for their own reason:
+- `statusUnguarded` restores the unguarded `jq -r` with the trap still armed. A bad answer then refuses through the trap or as an id mismatch, with another reason, and the row `status-answers` requires the status reason.
+- `errTrapRemoved` turns the trap off, so a failing `mktemp` ends the program through `errexit` with no reason. The row `later-step-fails` requires the reason naming `mktemp -d`.
+
+### Warnings of the third run
+
+- A signal ends the recovery without a refusal: a `systemctl stop omnigraph-server` during the start, or an OOM kill. The program traps no signal. Killed between a confirmed `force-unlock` and the post, the lock is gone with no count and no notice. `The recovery ends only by nothing to do, a recovery or a refusal` (`graph-store-interface/spec.md:227`) and its behavioural counterpart (`graph-store/spec.md:114`) cover failures of the program's own steps; an outside kill is no such failure. Say so in the requirement, or trap `TERM`.
+- A first switch of a host to `"local"` without its dataset: the runbook says the mount and every omnigraph unit fail at the switch. `fileSystems."/var/lib/omnigraph"` has options `defaults,zfsutil` and no `nofail`, so the next boot fails `local-fs.target` and stops in emergency mode, which the runbook does not say. `stores` names only magnetite, which has the dataset.
+- The `restic unlock` wording in both runbooks and D5 now matches restic 0.20.0 (`lock_file.go:244-277`, `lock.go:34`, `RemoveStaleLocks`). Two cases remain unmentioned. A lock of this host younger than 30 minutes whose pid now belongs to another program is kept, and that program gets SIGHUP. A lock R2 stored unreadable is skipped by `unlock` but still refuses the backup.
+
+### The amendment's requirements, against code and witness
+
+| Requirement (new or amended) | Result |
+|---|---|
+| `graph-store`: One setting switches the storage location (deploy without a reboot, `:40`, `:49`) | PASS: the cleanup removes the file at the switch; the check holds `omnigraph-backup.prom` out of the kept files on `"r2"`; the runtime test's switch leg removes a planted file. A real switch to `"r2"` has not been run |
+| `graph-store`: A recovery that cannot be counted is still announced (`:71`) | PASS (stub, rehearsal row `counter-unwritable`) |
+| `graph-store`: The graph store refuses … (amended) | PASS |
+| `graph-store`: Every other end of the clearing step is a refusal (`:114`) | PASS for answers and failing steps (stub, rehearsal); warning on signals |
+| `graph-store`: A failure notice carries no record, token or argument (`:125`) | PASS (stub, rehearsal's `expect_journal_only` rows) |
+| `graph-store-interface`: A check reads magnetite on both stores (textfile added) | PASS (check at `103def5f`) |
+| `graph-store-interface`: Activation removes every textfile no declared writer writes (`:57`) | FAIL 7 for "every `switch-to-configuration`"; otherwise PASS: `textfiles` evaluates to the six files on magnetite, every writer writes only its own file, and the scenario is held by the runtime test's switch leg |
+| `graph-store-interface`: a running direct writer (exit 1, pid and executable name) | PASS |
+| `graph-store-interface`: the process scan (`..`, links not followed) | PASS |
+| `graph-store-interface`: The recovery ends only by nothing to do, a recovery or a refusal (`:227`) | PASS for every answer and missing program tried; warning on signals |
+| `graph-store-interface`: An unforeseen failure in the recovery is refused once (`:242`) | PASS |
+| `graph-store-interface`: A recovery that cannot be counted is still announced (`:260`) | PASS |
+| `graph-store-interface`: A refusal is announced (amended) | PASS |
+| `graph-store-interface`: A refusal's message carries no record, token or argument (`:283`) | PASS |
+| `graph-store-interface`: A rehearsal holds the recovery's verdicts (new scenario) | PASS (check at `103def5f`, mutants rejected) |
+| `world-assumptions`: Grounded vocabulary | PASS. Re-diffed at 10:50Z against `origin/main` `de37dff6`, whose `openspec/specs/world-assumptions/spec.md` equals the local trunk's: the delta removes nothing. Its differences are `disk`'s context, the 24 added rows and the count scenario. A231–A242 are still free (113 numbered on `main`, highest A332, none in the range or in another open change) |
+
+Every other requirement keeps its result from the second run.
 
 ## 0. Second run, 2026-11-27 10:15 UTC
 
@@ -85,7 +171,7 @@ Every other requirement keeps its first-run result (§4).
 
 ### Task 1.6
 
-Recorded from the orchestrator as an observation made through a signed-in Perses session, not seen by this verifier: the view at https://obs.scientistexperience.net/projects/fleet/dashboards/omnigraph rendered on 2026-11-26 about 22:15Z (first layout; all 44 queries answered 200; every panel had data) and on 2026-11-27 about 03:55Z after `083caaa5` and `3d1f2ff2`: stat tiles "serving" and "reading"; "Graphs by state" 10 served and 10 ready; "Start to ready" stepping from about 3 minutes on R2 to about 2 s; entities per graph 457, 48, 169, 341, 449, 817, 295, 313, 349, 667; the table showing manifest 2 and format 17 for all ten; dataset quota used about 0.12%; used 26 MiB against 20 GiB; local snapshots; backup age; lock recoveries 0; server memory.
+Recorded as observations made through a signed-in Perses session, not repeated in this verification: the view at https://obs.scientistexperience.net/projects/fleet/dashboards/omnigraph rendered on 2026-11-26 about 22:15Z (first layout; all 44 queries answered 200; every panel had data) and on 2026-11-27 about 03:55Z after `083caaa5` and `3d1f2ff2`: stat tiles "serving" and "reading"; "Graphs by state" 10 served and 10 ready; "Start to ready" stepping from about 3 minutes on R2 to about 2 s; entities per graph 457, 48, 169, 341, 449, 817, 295, 313, 349, 667; the table showing manifest 2 and format 17 for all ten; dataset quota used about 0.12%; used 26 MiB against 20 GiB; local snapshots; backup age; lock recoveries 0; server memory.
 That meets 1.6's remaining clause, "the dashboard shows magnetite"; 1.6 is ticked. The lock-recovery tile has not been looked at since the counter became 1 at the reset (stored series 1 since 05:23Z).
 
 ### What a deploy of the remedies changes
@@ -115,9 +201,9 @@ Second run, at 10:12Z: 84 items, 81 passed, the same three failing; `openspec va
 
 ## 2. Task Completion (`tasks.md`)
 
-- [x] All `- [ ]` have been changed to `- [x]` (second run)
+- [x] All `- [ ]` have been changed to `- [x]` (third run)
 
-First run: 24 of 26; 1.6 and 5.4 stayed open. Second run: 1.6 is ticked on the observation in §0, and 5.4 was closed by the amendment's 6.3, which also added 6.1 to 6.4, all ticked; 30 of 30.
+First run: 24 of 26; 1.6 and 5.4 stayed open. Second run: 1.6 is ticked on the observation in §0, and 5.4 was closed by the amendment's 6.3, which also added 6.1 to 6.4, all ticked; 30 of 30. Third run: the amendment added group 7, all ticked; 35 of 35 (7.5's evidence as re-established above).
 
 | Task | Evidence checked | Missing |
 |---|---|---|
@@ -379,10 +465,11 @@ The manual checks the change defers are 1.6's rendered view and 5.4's way back; 
 - [x] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
 First run (09:20): four findings in §4. Second run (10:15): the remedies close all four for what they address (§0), and two new findings fail.
-FAIL 5: a switch to R2 by the one setting leaves the backup's textfile on the host, so `HostProbeStale` and later `OmnigraphBackupStale` fire.
-FAIL 6: a `cluster status` answer the program cannot index ends it with exit 5, no reason and no notice.
-Warnings: `unlock`'s "never removes a running restic's lock" holds only while clocks agree within 30 minutes and every running restic keeps refreshing; the notice carries command lines and the record's fields; `..` is not normalised; a failed counter write after an unlock posts nothing; a host's first switch to `"local"` needs the dataset and the vars first, and nothing says which is missing.
+Third run (11:00): the remedies close FAIL 5 and FAIL 6, every task is ticked, and one checked failure remains.
+- FAIL 7: the requirement `Activation removes every textfile no declared writer writes` says the script runs on every `switch-to-configuration`, which `boot` and `dry-activate` do not do. The behaviour is sound; the sentence is false.
+
+Warnings: a signal ends the recovery without a refusal; a first switch to `"local"` without the dataset stops the next boot in emergency mode, which the runbook omits; two `restic unlock` edge cases are unmentioned.
 
 **Next step**:
 
-Correct the code, runbook or spec for FAIL 5 and FAIL 6, then re-run verify; CAM-127 stays In Progress (`review_round: 1`).
+Correct the sentence of FAIL 7 (for example, "at boot, and on `switch-to-configuration switch` and `test`") in the requirement, the module comment, D3 and the runbook, then re-run verify. CAM-127 stays In Progress; the proposal is at `review_round: 2` of `max_review_rounds: 3`.
