@@ -259,13 +259,76 @@ Stale files met in copies, left in place: `objects/pack/tmp_pack_*` in `NousRese
 
 ---
 
+## 10. The remedies of the deployed-host checks, verified 2026-11-27 19:45 UTC
+
+### Scope
+
+Three commits on `rkwnzurm` (`103a0427`), none on `main` or deployed: `af1ce8a3` (`kyslswpu`, `fix(ghq-shared): hydrate merges as rename detection reads them, and what a failed request left behind`: `ghq-writer-handler.py` and `test_handler_history.py`), `874fd667` (`nnroxlut`, `fix(shared-reference-tree): refuse a root git's gitdir: include cannot match`: `modules/system/shared-reference-tree.nix` and its `.test.nix`) and `c6b26e76` (`mxrlykml`, `docs(hydrate-reference-copy-history): record the deployed-host checks and their remedies`: design, delta specs, proposal, tasks, `ghq-sync`'s usage text, the skill and the agent-context fragment).
+Only what these commits add or amend is checked; §4 and §9 are not repeated.
+
+### Method
+
+Each added or amended requirement and scenario was read against the code path at `af1ce8a3`, and the doubtful ones were tried in scratch repositories under `/tmp` with git 2.56.0 on stibnite (aarch64-darwin), lazy fetching off:
+
+- Merge reads: 6 built histories (a directory renamed on the branch side with a gitlink and a symbolic link on that side, an evil merge that adds, deletes, renames and resurrects paths, a merge of unrelated histories, a merge whose second parent the clone already held, an octopus whose third parent alone holds a deleted file and a rename, a path that is a directory on one side and a file on the other) and 60 random histories built with `git commit-tree` (adds, edits, deletions, renames, directory renames, copies, symbolic links, gitlinks, merges of up to four parents, some naming an older commit, arbitrary resolutions, unrelated roots), each fetched into a blobless `--no-checkout` clone of a `file://` upstream; the handler's own `missing_blobs` named the blobs for the range `new refs ^old refs`, exactly those were fetched, and every commit of the range was read by `git show`, lazygit 0.66.3's command (`ShowCmdObj`, `pkg/commands/git_commands/commit.go:243`, with `AddCommonDiffArgs`: `git -c diff.noprefix=false -c diff.srcPrefix=a/ -c diff.dstPrefix=b/ show --no-ext-diff --unified=3 --find-renames=50% --submodule --color=always --stat --decorate -p <c> --`), lazygit's commit-files listing (`git diff --submodule --no-ext-diff --name-status -z --find-renames=50% <c>^ <c>`), `git show --stat`, `git show -c`, and the excepted forms; a rerun of the built histories and the first 25 random ones added lazygit's command under `-c diff.renames=copies` (`logs/cam136-r5verify-merge-reads-fuzz-20261127-193657.log`, script `logs/cam136-r5verify-merge-reads-fuzz.py`).
+- Mutants: `test_handler_history.py` at `c6b26e76` run directly against the built handler (`/nix/store/ghxrsv0s…-ghq-shared-0.1.0`, the source of `af1ce8a3` with its three paths substituted; 25 s, `every history case behaved`) and against nine single-line mutants of it (`logs/cam136-r5verify-handler-mutations-20261127-193657.log`).
+- Two scenarios the suite lacks, run against the handler, `trunk()`'s handler and two mutants (`logs/cam136-r5verify-extra-scenarios-20261127-193657.log`, script `logs/cam136-r5verify-extra-scenarios.py`).
+- The record's parser and writer called directly: a non-UTF-8 ref name round trip, empty, truncated and garbage records, a directory at the name, and 50,000 refs.
+- The root type's pattern through `builtins.match`, and a `gitdir:` include under a root spelled with `[1]` (`logs/cam136-r5verify-root-type-glob-20261127-193657.log`).
+
+Read only, not run: the red-run logs under `logs/cam136-r4-*`, the host-root and changed-check evaluations, the rehearsal on the nixpkgs copy, and the magnetite timings.
+
+### Requirements
+
+| Requirement or scenario | Evidence | Result |
+|---|---|---|
+| An update makes the merges it brought in readable with rename detection (interface spec, line 21) | `MERGE_SIDES` (`ghq-writer-handler.py:103-104`), `merge_sides` (`:753-759`), listed after both log listings under one count (`:808-810`); 1,691 commits in 66 histories: no failure under `git show`, lazygit's command, its commit-files listing, `--stat` or `-c`; with `trunk()`'s handler the same 1,691 give 41 unreadable by `git show` and by lazygit, so the experiment detects the fault | PASS |
+| Its exceptions (`-C`, `--find-copies-harder`, `diff.renames = copies`, `-B`; on a merge `-m`, `--diff-merges=separate`, `--remerge-diff`) | in the rerun's 714 commits, `-C`, `-B` and `-c diff.renames=copies` failed on merges only (16, 15, 16), `--find-copies-harder` on 45 single-parent commits and 34 merges; lazygit's command under `-c diff.renames=copies` never failed, its `--find-renames=50%` setting rename detection whatever the reader's `diff.renames`; no Home Manager module in this repository sets `diff.renames`, so only an account's unmanaged configuration could turn copies on, and then plain `git show` of some merges fails as the exception says | PASS |
+| `git show`'s combined diff and modified paths against a later parent | the `--cc` listing names every parent's blob of each path that differs from all parents; a path modified against the second parent but equal to the first is not in the combined diff, so nothing unlisted is read (no reader failed above) | PASS |
+| A merge's other sides take the count past the limit (line 111) | `within` (`:793-800`) stops at the first batch over the limit, for the listings and the merge sides alike; the test's limit-3 clone says `more than 3 blobs missing` and limit 4 hydrates all four (`test_handler_history.py:509`); mutants dropping the merge sides or keeping only the second parent fail these three clones | PASS |
+| The writer keeps a record of what its last complete history walk saw (line 118) | `read_record`/`write_record` (`:635-668`): staged as `ghq-writer-hydrated.new`, flushed, `fsync`ed and `os.replace`d, so a kill leaves the old record or the new; a leftover `.new` is truncated by the next write and read by nothing; written before the first fetch when absent (`:686-689`), rewritten after a walk that did not raise only when refs or boundaries differ (`:737-739`); a non-UTF-8 ref name round-trips; refs cannot hold spaces or newlines; mutants that always rewrite, or rewrite before the fetch, fail the suite. The advance after a walk that ended `not hydrated` is untested (W2) | PASS WITH WARNING |
+| The writer hydrates what an earlier request fetched and left unhydrated (line 130) and its three scenarios; A refresh that stopped after fetching is made readable by the next (behavioral spec, line 43) | `walk_history` takes its old side from the record (`:722-736`); a record naming an absent commit drops it after one `cat-file` that runs only when a ref moved or a boundary went (`:728-731`); mutants that ignore the record, skip the early write or skip the absent-commit filter each fail the matching cases. `--hydrate` and `promote` run `ghq-sync` alone (`:1010-1011`) and neither read nor advance the record; `--hydrate` moves no ref, and a promote that succeeds unsets `remote.origin.promisor`, after which no walk runs. Two requests for one copy are serialised by the per-repository lock taken before `run_get`/`run_deepen` (`:998-1009`) | PASS |
+| A request that brings in no commit runs no history walk, as amended (line 33): no boundary present when the request began | `old_boundaries = recorded_boundaries \| start` (`:723`); the mutant without `\| start` passes the whole suite, while in the extra scenario (a tag fetched at depth 1 after the walk, then `origin/master` moved onto that commit) the handler walks nothing and the mutant reports `hydrated:1` (W1) | PASS WITH WARNING |
+| Nothing in the history phases fails a request | every new step is inside `history_before`'s or `walk_history`'s `except Exception`; an empty record reads as no refs (the walk then takes every reachable commit, bounded by the limit); a truncated or garbage record raises `HistoryFailed`, a directory `IsADirectoryError`, both reported as `history hydrate failed: <path> (snapshot: …)` with the request's status unchanged; only the writer can write `.git` (mode 0750), and neither a reader nor a fetched repository's content can place a file there | PASS |
+| Cost on a request that brings nothing in | the snapshot now reads the record instead of running `for-each-ref`; the walk still runs one `for-each-ref`; 50,000 refs: a 3.95 MB record written in 0.009 s and parsed in 0.019 s | PASS |
+| The shared root is declared as a path a gitdir: include can match (line 253) | `rootType` (`shared-reference-tree.nix:13`) refuses the six forms and `/`, and accepts the default and `/srv/.ghq/..x/...`; it also accepts `*`, `?`, `[`, `\` and a newline in a component, and git never applies `gitdir:<root>/` beneath a root spelled `…/ghq[1]` (W3) | PASS WITH WARNING |
+| `programs.ghq-shared.root` keeps `nullOr str` | each participant's value must equal the typed system option: `modules/nixos/shared-reference-tree.nix:113-117` (every participant), `modules/darwin/shared-reference-tree.nix:161-165` (human participants), `modules/darwin/omnigent-host.nix:453` (Omnigent workers, whose value the module sets at `:159`); a non-participant cannot read the root | PASS |
+| Hosts and runtime-test nodes evaluate | read from `logs/cam136-r4-host-roots-eval-20261127-140547.log` (magnetite, pyrite and stibnite at `/var/lib/ghq`; the other hosts lack the option) and `logs/cam136-r4-magnetite-changed-set-20261127-140544.log` (21 `vm-test-evaluates-*`, none failing); not re-run | PASS |
+| The words: design, both delta specs, proposal, tasks 8.1-8.5 and the note under 4.1, the skill (`SKILL.md:40-44`), the fragment (line 12), `ghq-sync`'s usage text (`ghq-sync.sh:48-58`) | each matches the code; the fragment's and usage text's "next update or deepen" is narrower than the code, which also walks at a `get` with tags; the recipe `ghq-sync --hydrate <rev>` then `--hydrate <rev>^<n>` passes `check_revision` (`REVISION` admits `^N`), and `hydrate_one` fetches every missing object of that commit's tree, which holds every blob rename detection reads on that side | PASS |
+
+### Tests
+
+Every new case fails against `trunk()`'s handler in `logs/cam136-r4-handler-darwin-red-green-20261127-140422.log`, each with its own message; the record cases fail there for want of a record at all, so the mutants above were run to show each case fails for its own cause: dropping the merge sides (3 cases), keeping only the second parent (3), ignoring the record (5), skipping the early write (5), always rewriting (1), rewriting before the fetch (2) and skipping the absent-commit filter (1).
+Two mutants pass the suite: without the start boundaries (W1) and advancing the record only after a hydrate (W2).
+The request half's check ran 47.4 and 47.3 s on magnetite against 46.9 s in §4, of its 60 s; `test_handler.py` is unchanged and the handler adds one small file read per request, so these commits did not measurably add to it. The history half ran 21.0 and 21.7 s there and 25 s here, run directly.
+
+### Warnings
+
+- **W1**: the amended clause "no boundary present when the request began" has no test that fails without it. A regression would walk, from a commit a depth-1 tag fetch left as a boundary, every blob of its tree as if it were a root commit. Remedy: a case in which a `get` with tags fetches a tag at depth 1, upstream moves `master` onto that commit, and the next update's reply holds no history line (its fast-forward fails before and after these commits, while `origin/master` moves).
+- **W2**: "a new file SHALL be renamed over it" after a walk ending `history not hydrated` has no test. A regression would walk the over-limit range again at every later request, and hydrate it once some later bound admits it. Remedy: one more update of the limit-3 clone that brings nothing in, its reply without a history line.
+- **W3**: the root type admits glob characters, so design item 3's "refuses at evaluation each form a `gitdir:` include cannot use" overstates: a root such as `/srv/ghq[1]` evaluates and its include never applies. No host declares one. Remedy: leave `*`, `?`, `[`, `\` and control characters out of the component classes, with a nix-unit case.
+
+Seen in passing, outside these commits: in the extra scenario's first part the update fails (`fatal: Not possible to fast-forward, aborting.`, reply exit 1) with `trunk()`'s handler and with this one alike, because the tag commit `master` fast-forwards onto is a depth-1 boundary.
+
+### Verdict
+
+PASS WITH WARNINGS: no requirement these commits add or amend is unmet, and no defect a reader or an ordinary upstream can trigger was found; W1 and W2 are untested clauses whose code is right, W3 an overstatement about exotic roots.
+
+### Still to check on deployed hosts
+
+- Task 4.1 as its note says, after the activation that delivers these commits: `ghq-sync -u` of nixpkgs, every commit it brings in read by `git --no-lazy-fetch show` without `--no-renames`, lazygit on one of its merges with no `git fetch` in the trace, and `.git/ghq-writer-hydrated` owned by the writer, mode 0640.
+- The 96 merges §9 found unreadable stay so until `ghq-sync --hydrate <rev>` and `--hydrate <rev>^<n>` for each parent.
+- The history check's class from its first uncached nixbot runs.
+
+---
+
 ## Overall Decision
 
 - [ ] (pass) PASS — may proceed to finishing-a-development-branch and archive
-- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: "brings in" is defined by refs; the request-half handler check ran 46.9 s of its 60 s limit; a darwin activation killed mid-write leaves `.lazygit.yml.<hex>` in the root; a root or home declared with a trailing slash would defeat the include, though none is; tasks 4.1 and 4.2 stay open until the deploy
+- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: "brings in" is defined by refs; the request-half handler check ran 47.4 s of its 60 s limit; a darwin activation killed mid-write leaves `.lazygit.yml.<hex>` in the root; a home declared with a trailing slash, or a root with glob characters, would defeat the include, though none is; two amended clauses have no test that fails without them (§10, W1 and W2); tasks 4.1 and 4.2 stay open until the deploy
 - [ ] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
-Every finding of the first, second and third runs is closed, and every requirement holds against `c6aeb3cb`.
+Every finding of the first, second and third runs is closed, and every requirement holds against `c6aeb3cb`; §10 finds the remedies of the deployed-host checks (`af1ce8a3`, `874fd667`, `c6b26e76`) meeting every requirement they add or amend.
 No checked FAIL remains.
 Tasks 4.1 and 4.2 remain open.
 
