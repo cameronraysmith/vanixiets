@@ -34,6 +34,17 @@ Switching a host back to the bucket SHALL serve the graph data the bucket held w
 - **WHEN** magnetite's configuration is evaluated with either setting
 - **THEN** the graph store is configured with exactly one storage location
 
+### Requirement: One setting switches the storage location
+
+The one setting that chooses a host's storage location SHALL be the only change that switches it: what exists only for one location, its graph backup and the failure notices and alerts about it included, SHALL follow that setting.
+
+**Discharged by**: `graph-store-interface` requirements `One value switches the store, and the local-root units follow it` and `A check reads magnetite on both stores`.
+
+#### Scenario: the setting is the only change
+
+- **WHEN** magnetite's setting is changed to the bucket and nothing else is changed
+- **THEN** magnetite's whole configuration evaluates, no graph backup of the disk is configured, and no failure notice or overdue-backup alert expects one
+
 ### Requirement: The graph store recovers from its own crash without a person
 
 When the graph store's previous run ended in a crash and left its stale writer claim behind, the graph store's next start SHALL clear that claim by itself and serve the same graph data, provided no direct writer is running against that graph data, the claim was made by the graph store itself, and the claim's writer is gone or the claim was made before the current boot.
@@ -54,8 +65,9 @@ Each such recovery SHALL be counted, and SHALL send a recovery notice to the ope
 ### Requirement: The graph store refuses to clear a writer claim it cannot prove stale
 
 The graph store's start SHALL leave a writer claim in place and fail visibly, telling the operator why and the manual step that clears it, whenever it cannot show the claim is stale.
+The operator SHALL receive that reason and manual step in a failure notice, without the claim's own content; a failure notice that cannot be sent SHALL change nothing else about the refusal.
 
-**Discharged by**: `graph-store-interface` requirements `The server's start clears a stale serve lock` and `A rehearsal holds the recovery's verdicts`; relies on A232.
+**Discharged by**: `graph-store-interface` requirements `The server's start clears a stale serve lock`, `A refusal is announced` and `A rehearsal holds the recovery's verdicts`; relies on A232.
 
 #### Scenario: a direct writer is running
 
@@ -98,6 +110,17 @@ A graph backup SHALL be made only from a local snapshot, never by copying the gr
 
 - **WHEN** a configuration would back the graph data up by copying it file by file from the live location
 - **THEN** it is refused before deploy
+
+### Requirement: An interrupted night does not stop later graph backups
+
+A night's run cut short at any point SHALL NOT stop a later night's graph backup.
+
+**Discharged by**: `graph-store-interface` requirement `The backup job removes stale repository locks before it backs up`; relies on A234 and A235.
+
+#### Scenario: a night after an interrupted run
+
+- **WHEN** magnetite loses power while the night's run is removing old graph backups or reading a sample back
+- **THEN** the next night's run stores a new graph backup without the operator
 
 ### Requirement: Graph data can be restored to identical answers
 

@@ -18,17 +18,41 @@ Outside them lie: OmniGraph's lock record and `force-unlock` (A232), ZFS snapsho
 ### Requirement: The root store setting yields the root's location
 
 `flake.lib.omnigraphClusterRoots` SHALL provide `localDirectory = "/var/lib/omnigraph/clusters"` and `uriIn`, mapping `"local"` and a root name to `"<localDirectory>/<root>"`, `"r2"` and a root name to `uri <root>`, and rejecting any other store.
-magnetite's module SHALL declare the internal option `vanixiets.omnigraphRootStore` (`"local"` or `"r2"`) and derive `services.omnigraph.storageUri` from it with `uriIn`.
+magnetite's module SHALL declare the internal option `vanixiets.omnigraphRootStore` (`"local"` or `"r2"`), set it from `stores.magnetite`, and derive `services.omnigraph.storageUri` from it with `uriIn`.
 
 #### Scenario: magnetite on its disk
 
-- **WHEN** magnetite's configuration is evaluated with `vanixiets.omnigraphRootStore = "local"`, as `checks.x86_64-linux.omnigraph-retired-roots` does through `extendModules`
+- **WHEN** magnetite's configuration is evaluated with `stores.magnetite = "local"`
 - **THEN** `services.omnigraph.storageUri` is `/var/lib/omnigraph/clusters/cookbooks-f17`
 
 #### Scenario: magnetite on R2
 
-- **WHEN** magnetite's configuration is evaluated with `vanixiets.omnigraphRootStore = "r2"`
+- **WHEN** magnetite's configuration is evaluated with `stores.magnetite = "r2"`
 - **THEN** `services.omnigraph.storageUri` is `s3://sciexp/omnigraph/clusters/cookbooks-f17`, as before this change
+
+### Requirement: One value switches the store, and the local-root units follow it
+
+`flake.lib.omnigraphClusterRoots.stores` SHALL hold each serving host's store, and on magnetite `vanixiets.omnigraphBackup.enable` SHALL be whether `stores.magnetite` is `"local"`.
+`flake.lib.observabilityHostsFor` SHALL build the host table for given stores, `flake.lib.observabilityHosts` SHALL be it for `stores`, and a row SHALL list `flake.lib.omnigraphBackup.localRootUnits` among its `notifiedUnits` only while its host's store is `"local"`.
+
+#### Scenario: on the disk
+
+- **WHEN** magnetite is evaluated with `stores.magnetite = "local"`
+- **THEN** the backup is on, and `restic-backups-omnigraph`, `omnigraph-backup-metric` and `zfs-set-root-omnigraph-quota` are notified and defined
+
+#### Scenario: the way back
+
+- **WHEN** magnetite is evaluated with `stores.magnetite = "r2"` and no other change
+- **THEN** the backup is off, none of those three units is notified, every notified unit is a service with an `ExecStart`, and `system.build.toplevel` evaluates
+
+### Requirement: A check reads magnetite on both stores
+
+`checks.x86_64-linux.omnigraph-retired-roots` SHALL evaluate magnetite on its committed store and, through `extendModules` with the option and the notified units set as `stores` naming the other store would set them, on the other, and hold on each the storage URI, the server's R2 environment and environment file, the `omnigraph-r2` generator, the backup option, the notified local-root units, and that every notified unit has an `ExecStart`.
+
+#### Scenario: the check runs
+
+- **WHEN** `nix build .#checks.x86_64-linux.omnigraph-retired-roots` runs
+- **THEN** it passes, and over a row that lists the local-root units on either store it fails naming the units on `"r2"`
 
 ### Requirement: R2 settings apply only to an R2 root
 
@@ -51,7 +75,7 @@ With `vanixiets.omnigraphRootStore = "local"`, magnetite's `disko.devices.zpool.
 #### Scenario: on R2
 
 - **WHEN** magnetite's configuration is evaluated with `"r2"`
-- **THEN** neither the dataset nor `zfs-set-root-omnigraph-quota` exists
+- **THEN** neither the dataset nor `zfs-set-root-omnigraph-quota` exists, and magnetite's `notifiedUnits` name neither it nor the backup's units
 
 ### Requirement: The bootstrap creates and seeds the local root
 
@@ -118,7 +142,7 @@ For a local `storageUri`, evaluation SHALL fail when `services.omnigraph.optimiz
 ### Requirement: The server's start clears a stale serve lock
 
 For a local `storageUri`, `omnigraph-server`'s first `ExecStartPre` SHALL be `+` and the program `flake.lib.omnigraphLockRecovery` builds for the root, in no other unit and absent for an `s3://` root; its `omnigraph` calls SHALL run as `omnigraph`.
-It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios below; otherwise it SHALL leave `<root>/__cluster/lock.json` unchanged, print the reason and the manual command, and exit non-zero.
+It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios below; otherwise it SHALL leave `<root>/__cluster/lock.json` unchanged, print the reason and the manual command, announce them as `A refusal is announced` says, and exit 1.
 
 #### Scenario: no lock
 
@@ -172,7 +196,7 @@ It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios bel
 
 #### Scenario: the process scan
 
-- **WHEN** a process whose executable is named `omnigraph` or `omnigraph-server`, and lies under `/nix/store/*-omnigraph-*/bin/` from any version or runs as root or `omnigraph`, has an argument naming the root as `/var/lib/omnigraph/…`
+- **WHEN** a process whose executable is named `omnigraph` or `omnigraph-server`, and lies under `/nix/store/*-omnigraph-*/bin/` from any version or runs as root or `omnigraph`, has an argument naming the root as `/var/lib/omnigraph/…`, compared with the root after collapsing runs of slashes, dropping `.` segments and a trailing slash on both, so that `/var/lib/omnigraph//clusters/cookbooks-f17/` and `file:///var/lib/omnigraph/clusters/cookbooks-f17` name it too
 - **THEN** the program refuses, whatever the record says
 
 #### Scenario: another user's executable named omnigraph
@@ -194,15 +218,33 @@ After a successful `force-unlock`, the program SHALL add one to the integer in `
 - **WHEN** the program clears one lock on a host whose counter file holds 2
 - **THEN** the file holds 3 and one low-priority message naming the `lock_id` is posted
 
+### Requirement: A refusal is announced
+
+Every refusal, and a `force-unlock` that does not report `"unlocked": true`, SHALL post one message at default priority to the `fleet-alerts` topic through `ntfy-send` with `services.observability-notify.tokenFile`, titled `omnigraph lock not recovered on <host>`, carrying the printed reason and manual command and no line of `lock.json`; a post that fails or does not finish in 30 s SHALL be logged and SHALL NOT change the exit status 1.
+
+#### Scenario: a refusal's notice
+
+- **WHEN** the program refuses for any reason of `The server's start clears a stale serve lock`
+- **THEN** it posts exactly one such message and exits 1, whether the post succeeds or fails
+
+#### Scenario: nothing to do
+
+- **WHEN** the program runs and `lock.json` is absent
+- **THEN** it posts nothing
+
 ### Requirement: A rehearsal holds the recovery's verdicts
 
-`checks.x86_64-linux.omnigraph-lock-recovery-rehearsal`, class `small`, SHALL run the program built by `flake.lib.omnigraphLockRecovery` against a stub `omnigraph`, a scripted process table and boot time, and a fresh lock directory per row, asserting for each scenario of `The server's start clears a stale serve lock` the exit status, the stub's argv log, the counter and the lock file.
-It SHALL hold one record written by the packaged `omnigraph-server`, so a changed record shape fails it.
+`checks.x86_64-linux.omnigraph-lock-recovery-rehearsal`, class `small`, SHALL run the program from `flake.lib.omnigraphLockRecovery` against stubs of `omnigraph` and `ntfy-send`, a scripted process table and boot time, and a fresh lock directory per row, asserting for each scenario of `The server's start clears a stale serve lock` and `A refusal is announced` the exit status, the stubs' logs, the counter and the lock file.
 
 #### Scenario: the check runs
 
 - **WHEN** `nix build .#checks.x86_64-linux.omnigraph-lock-recovery-rehearsal` runs
-- **THEN** every row passes; a mutant that skips the process scan fails the running-writer row, one that accepts any boot time fails the unreadable-boot-time rows, and one that lets the boot time excuse an omnigraph server at the lock's pid fails the clock-step row
+- **THEN** every row passes, the rows where a writer or the configured root spells the root with doubled slashes, a `.` segment, a trailing slash or a `file://` prefix and the row where the refusal's post fails included; a mutant that skips the process scan fails the running-writer row, one that accepts any boot time fails the unreadable-boot-time rows, and one that lets the boot time excuse an omnigraph server at the lock's pid fails the clock-step row
+
+#### Scenario: the packaged record
+
+- **WHEN** a release of the packaged omnigraph changes the record `omnigraph-server` leaves when killed
+- **THEN** the check's row over a record written by the packaged `omnigraph-server` fails
 
 ### Requirement: The backup job copies a ZFS snapshot to its R2 repository
 
@@ -227,6 +269,15 @@ With `vanixiets.omnigraphBackup.enable`, `services.restic.backups.omnigraph` SHA
 
 - **WHEN** a configuration sets `paths` to `/var/lib/omnigraph/clusters` or turns the backup on with an `s3://` root
 - **THEN** evaluation fails
+
+### Requirement: The backup job removes stale repository locks before it backs up
+
+The first `ExecStart` of `restic-backups-omnigraph`, and of `restic-backups-postgresql` in `modules/nixos/postgresql-backup.nix`, SHALL be `restic unlock`, before `restic backup`, so that an exclusive lock that a prune or check left when its run was cut short does not stop the backup; `unlock` removes only locks older than 30 minutes or taken on the same host by a process that is gone (restic 0.20.0, `internal/repository/lock_file.go`).
+
+#### Scenario: a stale exclusive lock
+
+- **WHEN** a `restic prune` against the repository is killed while it holds its exclusive lock, and the job then runs
+- **THEN** the job removes that lock, backs up and leaves no lock
 
 ### Requirement: The backup job runs nightly and catches up a missed night
 
@@ -331,12 +382,17 @@ With the `monitor` token, the probe SHALL publish `vanixiets_omnigraph_graph_rea
 #### Scenario: refusal while a direct writer holds the root
 
 - **WHEN** a direct `omnigraph` writer holds the root and the server is started
-- **THEN** the start fails with the reason and `lock.json` is unchanged
+- **THEN** the start fails with the reason, the refusal's message is attempted, and `lock.json` is unchanged
 
 #### Scenario: backup and restore
 
 - **WHEN** a backup to a local restic repository is taken, the dataset emptied, the backup restored with `restic-omnigraph restore`, its files given to `omnigraph` with `chown -R`, and its lock removed with `omnigraph-cluster force-unlock`
 - **THEN** the server serves the same entity counts and stored-query answer, and every probe series is present
+
+#### Scenario: a prune killed while holding its lock
+
+- **WHEN** a `restic prune` is killed with SIGKILL after writing its exclusive lock to the local repository, and the backup job is started
+- **THEN** the job succeeds, the repository holds one more snapshot, and no lock remains
 
 #### Scenario: a reboot
 

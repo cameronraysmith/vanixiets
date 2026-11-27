@@ -322,6 +322,34 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | Claude user | — | a person who has added the marketplace in a Claude app and installs plugin groups from it | world-only |
 | skills CLI | — | the `skills` command-line program (vercel-labs/skills, run as `npx skills`), which clones a repository by its forge name and installs the individual skills it finds there | world-only |
 | skills CLI user | — | a person who lists or installs skills from this repository with the skills CLI | world-only |
+| evaluator | Nix | the program that computes the derivations a commit's declarations describe: stock Nix, or an alternative implementation such as iets answering to the same command name | shared |
+| home configuration | — | the declared settings from which one user's environment on one platform is built and activated, separately from any host's configuration | shared |
+| check | — | a test the build service builds for a pull request whose inputs it depends on, publishing its outcome as a check run | shared |
+| refactor | — | a change to the repository whose author states that it alters no host's configuration, home configuration, check or runtime test, or only those it names as declared differences | shared |
+| declared difference | — | a host's configuration, home configuration, check or runtime test that a refactor names, with its reason, before it is accepted, as one it changes, adds or removes, either certainly or possibly | shared |
+| base commit | — | the commit a refactor starts from, against which its effect is judged | shared |
+| candidate commit | — | the commit that carries a refactor's edits | shared |
+| comparison | refactor | setting the derivations of every host's configuration, home configuration, check and runtime test at a refactor's base commit beside those at its candidate commit | shared |
+| evaluation cost | — | the processor time, memory and work an evaluator spends computing one derivation, or the names of a set of them, from a commit's declarations | shared |
+| cost measurement | — | one computation, by a fresh evaluator process, whose evaluation cost is recorded together with the evaluator, host and other work running at the time | shared |
+| baseline | evaluation cost | the cost measurements of an unchanged commit, kept in the repository, against which a later claim about evaluation cost is compared | shared |
+| fleet member | — | an apparatus enrolled by name in the fleet's overlay network and recorded in the host registry: a host, or a phone | shared |
+| phone | — | a fleet member a person carries that runs no configuration this fleet builds | world-only |
+| host kind | — | whether a fleet member is a NixOS host, a nix-darwin host or a phone, which decides how it is built and reached | shared |
+| system | — | the processor architecture and operating system pair a host's configuration is built for, such as x86_64-linux or aarch64-darwin | shared |
+| host registry | — | the one record per fleet member, kept in the repository, of its name, system and the other facts about it | shared |
+| host fact | — | one property of a fleet member that the host registry records, such as its system, its memory or the account it is deployed as | shared |
+| derived fact | — | a host fact computed from other host facts rather than written down | shared |
+| fleet pin | — | the literal list of hosts and their kinds kept in the repository apart from the host registry, against which the registry's derived kinds are compared | shared |
+| checked host | — | a host whose configuration the fleet's per-host checks evaluate before a change merges | shared |
+| enrolled host | — | a host whose name a machine has taken, holding a machine key the fleet's secret store recognises | shared |
+| cloud server | — | a rented virtual server at a cloud provider on which a host runs, which exists or not by the operator's decision | world-only |
+| cloud machine type | — | a provider's named size of cloud server, which fixes its processors and memory | world-only |
+| service role | — | the part a service gives one host or device, such as controller, peer, server or agent, which decides what that member does for the service | shared |
+| role membership | — | the set of hosts that play one service role | shared |
+| inventory tag | — | a label the operator gives hosts to select them as a group, both for a service role and for deploying several hosts in one command | shared |
+| externally joined member | — | a fleet member that joins the overlay network with its own client rather than through the fleet's configuration, today the nix-darwin hosts and the phones | shared |
+| state version | — | the release a host's stateful defaults were first set from, fixed when the host is installed and not changed afterwards | shared |
 | graph store | — | the program on a host that keeps the fleet's graphs and answers queries and changes to them over the network, OmniGraph on magnetite | shared |
 | graph | — | one named body of entities and their relations that the graph store keeps and answers questions about | shared |
 | example graph | — | a graph whose content is example data recreated from its published seed, so its loss costs no one's work | world-only |
@@ -350,7 +378,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-seven terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, `closure`, and `disk`, of which `probe`, `release`, `credential` and `writer` carry three and every other term two
+- **THEN** twenty-seven terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, `closure`, and `disk`, of which `probe`, `release`, `credential`, `evaluator` and `writer` carry three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 
