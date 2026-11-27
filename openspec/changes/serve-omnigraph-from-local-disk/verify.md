@@ -5,14 +5,97 @@
 > corresponding artifact for correction before re-running verify.
 
 **Change**: `serve-omnigraph-from-local-disk` (CAM-127)
-**Verified at**: `2026-11-27 09:20` UTC
-**Verifier**: `openspec-verify-change` (omp), against `main` at `d625c64e`
+**Verified at**: `2026-11-27 09:20` UTC (first run, against `main` at `d625c64e`); `2026-11-27 10:15` UTC (second run, against the remedies `okoptrow`, `zmmzwqtk`, `utrkprxr` and `tuwmzvxy` at `ddec126c`, over `main` at `30223609`)
+**Verifier**: `openspec-verify-change` (omp)
 
 Prechecks: the delivery commits are on `main`: `2dbb1e25` (`feat(omnigraph): watch the server's readiness and graphs on magnetite`), `7d02f0a5` (`feat(omnigraph): serve a local root with stale-lock recovery and nightly backup`), `72596929` (`fix(omnigraph): refuse lock recovery on unreadable process state or an omnigraph at the lock pid`), `afd978d8` (`feat(magnetite): serve omnigraph from local disk`) and `27ac2fe8` (`docs(omnigraph): record the restore drills and the restore without the host`).
 magnetite runs generation 296 (`system-296-link`), booted 2026-11-27 05:21:38Z after a reset without a shutdown at about 05:20:30Z.
 The code was read at `d625c64e`: `modules/lib/omnigraph-lock-recovery.nix`, `modules/nixos/omnigraph.nix`, `modules/nixos/omnigraph-backup.nix`, `modules/nixos/omnigraph-probe.nix`, `modules/lib/omnigraph-cluster-roots.nix`, `modules/machines/nixos/magnetite/{default,disko}.nix`, `modules/lib/observability-hosts.nix`, `modules/lib/observability-notify-run.nix`, `modules/clan/services/otel-collector/flake-module.nix`, `modules/nixos/fleet-alert/rules.nix`, `modules/nixos/perses/resources/dashboard-omnigraph.json`, `modules/checks/omnigraph-retired-roots.nix`, `modules/vm-tests/{omnigraph-local-root,perses-greptimedb}.nix` and the runbook `packages/docs/src/content/docs/development/operations/omnigraph.md`.
 No test or runtime test was re-run; `checks.x86_64-linux.omnigraph-retired-roots` at `d625c64e` was substituted from the fleet cache, which nixbot fills (`logs/cam127-verify-retired-roots-20261127T0900Z.log`).
 The evidence is the deploy and drill records (`logs/agent-reports-20261126/DeployMagnetite-{probe,latest,switch}.md`, `OmnigraphRestoreDrill.md`), read-only inspection of magnetite on 2026-11-27 between 09:00 and 09:10Z (`logs/cam127-verify-{host-state,restic-units,front-r2,notices}-20261127T0900Z.log`), the stored series through `nix run .#obs-query`, read-only requests to R2 with magnetite's own credentials, and one evaluation of magnetite with the store forced to `"r2"` (`logs/cam127-verify-wayback-eval-20261127T0900Z.{nix,json}`).
+
+## 0. Second run, 2026-11-27 10:15 UTC
+
+The first run (§1 to §8 below, kept as written at 09:20) failed four checks.
+Four changes not yet on `main` remedy them: `okoptrow` (`fix(omnigraph-backup): remove stale restic locks before each backup`), `zmmzwqtk` (`fix(omnigraph): post a notice when the lock recovery refuses, naming the reason`), `utrkprxr` (`fix(magnetite): switch the omnigraph root store with one setting`) and `tuwmzvxy` (`docs(openspec): amend serving omnigraph from local disk after verification`).
+The code and artifacts were read at `tuwmzvxy` (`ddec126c`). None of it is deployed: magnetite still runs generation 296 (read at 10:09Z: no new boot, no notice but heartbeats since 09:05Z, no backup run since 03:40Z, counter 1, no `@restic`, no restic lock, `systemctl --failed` empty).
+Run here: `checks.x86_64-linux.omnigraph-retired-roots` and `checks.x86_64-linux.omnigraph-lock-recovery-rehearsal` at `ddec126c` (both pass, built on magnetite as a remote builder, `logs/cam127-reverify-{omnigraph-retired-roots,omnigraph-lock-recovery-rehearsal}-20261127.log`); one evaluation of the whole flake with `stores.magnetite = "r2"` and nothing else changed, from a scratch copy of `ddec126c` (`logs/cam127-reverify-r2-only-setting-20261127T1010Z.{nix,json}`); the recovery program built from `flake.lib.omnigraphLockRecovery` at `ddec126c` over stubs of `omnigraph` and `ntfy-send` and a scratch process table (`logs/cam127-reverify-recovery-stubs-20261127T1010Z.{nix,log}`); restic's lock code read at tag `v0.20.0`. The runtime tests were not re-run; their runs on the remedies are `logs/cam127-fix-final-*-20261127-04*.log`.
+
+### Findings of the second run
+
+- [x] **FAIL 5, switching to R2 leaves the backup's textfile behind, and two alerts fire on it** (`specs/graph-store/spec.md:37`, requirement `One setting switches the storage location`: what exists only for one location, "the failure notices and alerts about it included, SHALL follow that setting"; scenario `the setting is the only change` `:43`; the runbook, `omnigraph.md:260-261`, "nothing else needs editing … `OmnigraphBackupStale` no longer expects magnetite").
+  With `"r2"` the backup's units are gone, but nothing removes `/run/node-exporter-textfile/omnigraph-backup.prom` (`modules/nixos/omnigraph-backup.nix:80`): `modules/nixos/node-exporter-textfile.nix` only creates the directory, and `/run` is emptied only by a reboot.
+  Failing scenario: magnetite is deployed with `stores.magnetite = "r2"` and nothing else, without a reboot. node_exporter keeps exporting the last stamp and its file's mtime; `omnigraph-backup-metric` no longer rewrites the file, so `HostProbeStale` (`time() - node_textfile_mtime_seconds > 300`, for 10 m, `rules.nix:379-385`) fires for `file="/run/node-exporter-textfile/omnigraph-backup.prom"` about 15 minutes after the switch, and `OmnigraphBackupStale`, whose expression reads the series whatever its presence selector expects, fires about 36 h after the last local backup. Both persist until someone deletes the file or the host reboots.
+  The evaluation does follow the setting (below), and `checks.x86_64-linux.omnigraph-retired-roots` cannot see a file left on a host.
+
+- [x] **FAIL 6, a `cluster status` answer that is not a JSON object ends the recovery unannounced, with exit 5** (`specs/graph-store-interface/spec.md:145`, "otherwise it SHALL leave `lock.json` unchanged, print the reason and the manual command, announce them …, and exit 1"; `:221`, `A refusal is announced`, "Every refusal … SHALL post one message").
+  `reported=$(jq -r '.lock_id // "none"' <<<"$status")` (`modules/lib/omnigraph-lock-recovery.nix:253`) runs under `errexit` outside any guard, so when `omnigraph cluster status --json` exits 0 with output `jq` cannot index (not JSON, or an array), the program exits with `jq`'s status before it refuses.
+  Failing scenario, run over the stub: a held serve lock and a `cluster status` printing `not json` (or `[1]`) give exit 5, stderr `jq: parse error: Invalid numeric literal at line 1, column 4` (or `Cannot index array with string "lock_id"`), no `left … in place` line, no manual step and no post; `lock.json` is kept (`logs/cam127-reverify-recovery-stubs-20261127T1010Z.log`). The start fails and `FAILED omnigraph-server.service` still posts, so the server does not come up silently, but the reason and the manual step are not delivered. The rehearsal has no such row. The path predates the remedies; the first run missed it.
+
+### The first run's failures, against `ddec126c`
+
+| First-run finding | Remedy | Closed? |
+|---|---|---|
+| 1, the way back did not evaluate | `stores.magnetite` (`modules/lib/omnigraph-cluster-roots.nix:102-104`) sets magnetite's option (`modules/machines/nixos/magnetite/default.nix`) and the backup (`enable = omnigraphRootStore == "local"`); `observabilityHostsFor` drops `omnigraphBackup.localRootUnits` from the row on `"r2"` (`modules/lib/observability-hosts.nix:56`); the check evaluates both stores | closed for evaluation; FAIL 5 is what the switch still leaves on the host |
+| 2, an interrupted prune or check stopped every later backup | `restic unlock` as the first `ExecStart` (`omnigraph-backup.nix:198`, `postgresql-backup.nix:300`; evaluated: `unlock`, `backup`, `unlock`, `forget --prune …`, `check …` on both jobs) | closed |
+| 3, the notice did not name the writer | `post` and `refuse` (`omnigraph-lock-recovery.nix:112-127`) post the reason and manual step, titled `omnigraph lock not recovered on <host>` | closed for every path through `refuse` and the unconfirmed unlock; FAIL 6 is a path around it |
+| 4, the vocabulary requirement was an old copy | the delta now carries `main`'s requirement | closed (re-diffed at 10:10Z, below) |
+
+### Trying to break each remedy
+
+**(a) Unlock first.** At restic `v0.20.0`, `stale()` (`internal/repository/lock_file.go:249-277`) is true when the lock's time is more than `staleLockTimeout` (30 min, `:244`) old, or when the lock's hostname is this host's and `processExists` fails; `processExists` (`lock_file_unix.go`) sends SIGHUP to the pid, which every restic ignores; a running restic rewrites its lock every 5 min (`lock.go:34`). `RemoveStaleLocks` skips a lock it cannot load (`lock.go`), and `checkForOtherLocks` refuses an append lock beside any exclusive one (`lock_file.go:186`).
+- The two jobs never share a repository: `…/sciexp-omnigraph-backup/magnetite` and `…/sciexp-postgresql-backup/magnetite` (evaluated). Within one job systemd never runs two instances of the oneshot.
+- A failing `unlock` stops the unit before `backup`: the `ExecStart` lines run in order and the first failure ends the job (failure notice, cleanup destroys `@restic`). An unreachable repository already fails the pre-start's `cat config`. What is new is that a transient error at `unlock` now costs the night's backup, where it used to come after it.
+- `unlock` can remove the lock of a restic that is still running, against the runbook's "never" (`omnigraph.md:146`) and design D5's "cannot" (`design.md:95`); the spec's wording (`graph-store-interface/spec.md:273`) is accurate. Ways: a running restic whose lock has not been rewritten for 30 min (suspended, or cut off from R2 that long); a restic on another host whose clock is more than 30 min behind magnetite's; magnetite's clock stepped more than 30 min forward. The repository's other users are the operator's `restic-omnigraph` on magnetite and, off the host, the runbook's commands, which all take `--no-lock`. So it needs an operator running a locking restic (a `prune`, say) at 03:30 under one of those conditions. Recorded as a warning.
+- A lock of this host younger than 30 minutes whose pid now belongs to another program is kept, and that program receives SIGHUP. This only matters for a manual run within 30 minutes of an interrupted one; the nightly run comes a day later. A lock R2 stored unreadable would be skipped by `unlock` and still refuse the backup; R2 writes objects whole, and restic ignores empty lock files.
+- `restic-backups-postgresql` gets the same order and is covered by the same reading; it has no runtime case of its own (design.md, "Verification findings and remedies").
+
+**(b) The refusal notice.** Over the stub (`logs/cam127-reverify-recovery-stubs-20261127T1010Z.log`): no lock, exit 0, nothing posted; an id mismatch with `ntfy-send` failing, exit 1, one post attempted, `the refusal notice was not posted`, lock kept; a direct `apply` writer's lock, exit 1, one post; `force-unlock` answering `{"unlocked": false}`, exit 1, one post carrying the manual `force-unlock` and not the command's output; writers naming the root as `…//root`, `…/./root/` and `file:///…/root`, exit 1, one post. The rehearsal at `ddec126c` passes with its mutants rejected. The added post for an unconfirmed unlock is now specified (`A refusal is announced`, `graph-store-interface/spec.md:221`) and behaves as specified.
+- Every exit through `refuse` posts. Exits that bypass it: FAIL 6; `mktemp` or the `chown` of its directory failing; and, after a confirmed unlock, a failed counter write, which exits 1 with neither notice, though the lock is already gone and the next start serves (warning).
+- The message carries no line of `lock.json` (it never reads the file into the message), so the interface's wording holds. It does carry the record's `lock_id`, `operation`, `pid` and `created_at` (validated shapes), which the behavioral wording "without the claim's own content" (`graph-store/spec.md:68`) contradicts if read literally (warning: name the fields the notice may carry).
+- It also carries a process's whole command line in rows 2, 3 and 10 (`holder="pid $entry: ${args[*]}"`, `:201`), now on an ntfy topic as well as in the journal. omnigraph 0.16.0's `omnigraph`, `omnigraph cluster` and `omnigraph-server` take no secret as an argument (their `--help`), but row 2's "executable … cannot be read" names any process. So "never a token" holds only as far as no such process carries one in its arguments (warning).
+- A post that fails or times out (30 s) changes neither the verdict nor exit 1. Each refused start in the restart loop posts once (up to `StartLimitBurst` 5), as the runbook says.
+- The normalisation does not resolve `..`: a writer naming the root as `/var/lib/omnigraph/clusters/x/../cookbooks-f17` is not counted (exit 0 over the stub). The amended scenario names only slashes, `.` segments and a trailing slash, so this is outside it (warning).
+
+**(c) The way back.** Evaluated from a scratch copy of `ddec126c` with only `stores.magnetite = "r2"` changed (`logs/cam127-reverify-r2-only-setting-20261127T1010Z.json`):
+- `vanixiets.omnigraphRootStore` is `"r2"` and `storageUri` is `s3://sciexp/omnigraph/clusters/cookbooks-f17`. The backup is off. None of the three local-root units is defined, none is in magnetite's `services.observability-notify.units`, in `flake.lib.observabilityHosts.magnetite`, or in the envelope's `envelopeBudget.notifiedUnits.magnetite`. `SystemdUnitFailed`'s exclusion names none of them. `OmnigraphBackupStale`'s presence expects no host, while `OmnigraphNotServing`'s still expects magnetite. The only omnigraph timer left is `omnigraph-probe`. `system.build.toplevel` evaluates (`/nix/store/d7k2jnxd…-nixos-system-magnetite-…drv`).
+- Every reader of the host table reads `flake.lib.observabilityHosts`, which follows `stores`: the agent role's notified units (`otel-collector/flake-module.nix:1556`), the envelope (`:1724`), the fleet-alert rules (`fleet-alert.nix:618`, `rules.nix:75`), `node-exporter-textfile.nix:21`, and the checks.
+- The check's other-store evaluation overrides only `vanixiets.omnigraphRootStore` and `services.observability-notify.units` (`omnigraph-retired-roots.nix:50`). On that evaluation magnetite's envelope and fleet-alert rules still read the committed table, and none of magnetite's assertions but the notified-unit `ExecStart` rule is read. The requirement `A check reads magnetite on both stores` says exactly this, and design.md's new limit points to the one toplevel evaluation for the rest. The check cannot see a value read from the table elsewhere, an assertion, or anything on the host (FAIL 5).
+- The Perses view has no per-store panel. Its backup-age panel keeps showing the left-over stamp's age until the file goes. The runbook's section says "that one value" and is wrong only in FAIL 5's respect.
+- The reverse direction, `"r2"` to `"local"`: for magnetite now, the dataset is still mounted and the `omnigraph-backup-r2` and `omnigraph-backup-restic` vars are committed, so the one value suffices. For a host that never served locally, two things come first, and nothing at evaluation says either is missing: the hand-made dataset (disko declares it only for a reinstall; without it, the `/var/lib/omnigraph` mount fails and with it every unit carrying `RequiresMountsFor`) and the two generators' vars (`clan machines update` would prompt for the R2 keys). `stores` names only magnetite today (warning).
+
+**(d) The vocabulary delta.** Re-diffed at 10:10Z against `main` at `30223609` (`git ls-remote origin main` gives the same commit). The delta's `Grounded vocabulary for behavioral requirements` differs from `main`'s only by the context `cloud session` on `disk`'s existing row, the 24 added rows, and the count scenario. That scenario now reads twenty-seven terms, with `probe`, `release`, `credential`, `evaluator` and `writer` carrying three; counting the delta's rows gives the same 27 terms and the same five. It removes nothing of `main`'s. A231 to A242 remain free: `main` holds 113 numbered assumptions, the highest A332, none in A231–A242, and no other open change adds one.
+
+### The amendment's requirements, against code and witness
+
+| Requirement (new or split) | Result |
+|---|---|
+| `graph-store`: One setting switches the storage location | FAIL (FAIL 5); the evaluation part holds |
+| `graph-store`: An interrupted night does not stop later graph backups | PASS by code and `omnigraph-local-root`'s new subtest (a `prune` killed holding its exclusive lock; the next run backs up and leaves no lock, `logs/cam127-fix-final-omnigraph-local-root-20261127-044714.log`); not yet on the host |
+| `graph-store`: The graph store refuses … (added sentence: the notice carries the reason and manual step) | PASS for every refusal through `refuse`; FAIL 6 for the unguarded path; warning on "without the claim's own content" |
+| `graph-store-interface`: One value switches the store, and the local-root units follow it | PASS: both scenarios, evaluated |
+| `graph-store-interface`: A check reads magnetite on both stores | PASS: the check passes at `ddec126c`; its red run over the old row is `logs/cam127-fix-wayback-red-20261127-043236.log` |
+| `graph-store-interface`: A refusal is announced | FAIL (FAIL 6); every other refusal, the unconfirmed unlock, the nothing-to-do path and the failed post behave as written |
+| `graph-store-interface`: The backup job removes stale repository locks before it backs up | PASS: evaluated order on both jobs; the scenario held by the runtime test |
+| `graph-store-interface`: A rehearsal holds the recovery's verdicts (split: `the packaged record`) | PASS: the check passes, rows for the spelled roots and the failing post included |
+| `graph-store-interface`: The server's start clears a stale serve lock (amended `exit 1`, the normalised scan) | PASS except FAIL 6 |
+| `world-assumptions`: Grounded vocabulary (rebased) | PASS |
+
+Every other requirement keeps its first-run result (§4).
+
+### Task 1.6
+
+Recorded from the orchestrator as an observation made through a signed-in Perses session, not seen by this verifier: the view at https://obs.scientistexperience.net/projects/fleet/dashboards/omnigraph rendered on 2026-11-26 about 22:15Z (first layout; all 44 queries answered 200; every panel had data) and on 2026-11-27 about 03:55Z after `083caaa5` and `3d1f2ff2`: stat tiles "serving" and "reading"; "Graphs by state" 10 served and 10 ready; "Start to ready" stepping from about 3 minutes on R2 to about 2 s; entities per graph 457, 48, 169, 341, 449, 817, 295, 313, 349, 667; the table showing manifest 2 and format 17 for all ten; dataset quota used about 0.12%; used 26 MiB against 20 GiB; local snapshots; backup age; lock recoveries 0; server memory.
+That meets 1.6's remaining clause, "the dashboard shows magnetite"; 1.6 is ticked. The lock-recovery tile has not been looked at since the counter became 1 at the reset (stored series 1 since 05:23Z).
+
+### What a deploy of the remedies changes
+
+Not deployed. On magnetite with `"local"`, the row, the backup and the alert rules evaluate as today; the unit files that change are `omnigraph-server.service` (the recovery program's new store path), `restic-backups-omnigraph.service` and `restic-backups-postgresql.service` (`unlock` first) (`logs/cam127-fix-magnetite-unit-diff-20261127-045108.log`).
+[INFERENCE] the switch restarts `omnigraph-server` (a clean stop, a start of a few seconds with no lock to judge); the restic units carry `X-RestartIfChanged=false` and are only replaced.
+To look at after it:
+- the first nightly runs: `restic-backups-postgresql` at about 02:30Z and `restic-backups-omnigraph` at about 03:30Z, whose journals should show `unlock` before `backup`, then success and an advanced stamp;
+- a refusal has never happened on the host, so the first refusal notice, its title and body on `fleet-alerts`, is unobserved outside the VM and the rehearsal;
+- the lock-recovery tile showing 1.
 
 ---
 
@@ -26,23 +109,24 @@ openspec validate serve-omnigraph-from-local-disk --strict: valid
 ```
 
 None of the three failures is this change: `compose-hosts-from-cohesive-aspects`, `stand-up-gitea-mq-on-magnetite` and `stand-up-nixbot-on-magnetite`.
+Second run, at 10:12Z: 84 items, 81 passed, the same three failing; `openspec validate serve-omnigraph-from-local-disk --strict` is valid.
 
 ---
 
 ## 2. Task Completion (`tasks.md`)
 
-- [ ] All `- [ ]` have been changed to `- [x]`
+- [x] All `- [ ]` have been changed to `- [x]` (second run)
 
-24 of 26; 1.6 and 5.4 stay open.
+First run: 24 of 26; 1.6 and 5.4 stayed open. Second run: 1.6 is ticked on the observation in §0, and 5.4 was closed by the amendment's 6.3, which also added 6.1 to 6.4, all ticked; 30 of 30.
 
 | Task | Evidence checked | Missing |
 |---|---|---|
-| 1.6 probe deploy | `DeployMagnetite-probe.md` (generation 291): `omnigraph.prom` had ready 1 and 10/10/0/0; `obs-query` returned `vanixiets_omnigraph_ready{host_name="magnetite"}` 1; ntfy from 05:23:53 to 05:42:59Z held 19 heartbeats and nothing else; fleet-alert's state held argentum's two pending `HostProbeStale` (a sleeping Mac) and the standing `R2CostProjected` | the dashboard as rendered: the API needs a signed-in session and no record shows the view |
+| 1.6 probe deploy | `DeployMagnetite-probe.md` (generation 291): `omnigraph.prom` had ready 1 and 10/10/0/0; `obs-query` returned `vanixiets_omnigraph_ready{host_name="magnetite"}` 1; ntfy from 05:23:53 to 05:42:59Z held 19 heartbeats and nothing else; fleet-alert's state held argentum's two pending `HostProbeStale` (a sleeping Mac) and the standing `R2CostProjected` | first run: the dashboard as rendered; second run: supplied by the observation in §0 |
 | 2.8 static user deploy | `DeployMagnetite-latest.md` (generation 292): no recovery `ExecStartPre`, `User=omnigraph`, ready 1 with 10 graphs, the journal line `Found pre-existing private StateDirectory= directory /var/lib/private/omnigraph, migrating to /var/lib/omnigraph.` at 07:44:21Z, a plain `/var/lib/omnigraph` owned `65534:65534` and no `/var/lib/private/omnigraph`; the server's one restart is the switch's; from 07:43:06 to 07:58:22Z nothing but 15 heartbeats was posted; stored ready was 0 from 07:45:00 to 07:47:45, under the rule's 5 minutes | the last 4 minutes of the 15-minute window the deploy brief set |
 | 3.3 backup token and vars | `vars/per-machine/magnetite/omnigraph-backup-r2/env/secret` and `omnigraph-backup-restic/password/secret` exist; with that token magnetite lists `sciexp-omnigraph-backup` (200) and is refused `sciexp` and `sciexp-postgresql-backup` (403) | the token's scope as the dashboard shows it |
 | 5.1 switch | see "The switch" below | the stored query ran from magnetite, not pyrite |
 | 5.2 storage | see "Storage and snapshots" below | none |
-| 5.4 way back | see finding 1 and "The way back" below | the configuration does not evaluate |
+| 5.4 way back | see finding 1 and "The way back" below | first run: the configuration did not evaluate; second run: evaluates (§0), FAIL 5 aside |
 | 5.5 conditionals | see "Conditionals on the store" below | none |
 
 ### The switch (5.1)
@@ -140,7 +224,7 @@ A231 to A242 are free: `openspec/specs/world-assumptions/spec.md` on `main` (113
 
 ## 4. Design / Specs Coherence Spot Check
 
-### Findings
+### Findings (first run, 2026-11-27 09:20 UTC; see §0 for what closed each)
 
 - [x] **FAIL 1, the way back to R2 does not evaluate** (`specs/graph-store/spec.md:20`, scenarios `switching back to the bucket` `:27` and `only one location is served` `:32`; the runbook, `omnigraph.md:252`; design D3, `design.md:65`, "Switching back is one value").
   magnetite's `notifiedUnits` name `omnigraph-backup-metric`, `restic-backups-omnigraph` and `zfs-set-root-omnigraph-quota` whatever the store (`modules/lib/observability-hosts.nix:77`, `:88`, `:101`, added by `afd978d8`), and the agent role asserts that every notified unit is a service with an `ExecStart` (`modules/clan/services/otel-collector/flake-module.nix:358-366`, from `cdd4e49e`, 2026-10-29).
@@ -294,9 +378,11 @@ The manual checks the change defers are 1.6's rendered view and 5.4's way back; 
 - [ ] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: …
 - [x] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
-Four findings in §4: the way back to R2 does not evaluate (1); a backup interrupted during prune or check blocks every later one until a hand `unlock` (2); the failure notice of a refused start does not name the writer (3); the modified vocabulary requirement would drop 28 rows `main` has added (4).
-Tasks 1.6 and 5.4 remain open.
+First run (09:20): four findings in §4. Second run (10:15): the remedies close all four for what they address (§0), and two new findings fail.
+FAIL 5: a switch to R2 by the one setting leaves the backup's textfile on the host, so `HostProbeStale` and later `OmnigraphBackupStale` fire.
+FAIL 6: a `cluster status` answer the program cannot index ends it with exit 5, no reason and no notice.
+Warnings: `unlock`'s "never removes a running restic's lock" holds only while clocks agree within 30 minutes and every running restic keeps refreshing; the notice carries command lines and the record's fields; `..` is not normalised; a failed counter write after an unlock posts nothing; a host's first switch to `"local"` needs the dataset and the vars first, and nothing says which is missing.
 
 **Next step**:
 
-Correct the code, runbook or spec for each finding, then re-run verify; CAM-127 stays In Progress.
+Correct the code, runbook or spec for FAIL 5 and FAIL 6, then re-run verify; CAM-127 stays In Progress (`review_round: 1`).
