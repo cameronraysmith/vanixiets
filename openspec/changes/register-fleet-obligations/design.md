@@ -98,7 +98,7 @@ Constraints carried from earlier decisions and not reopened here:
   - Nine runtime-test modules (`devloop-ingest`, `fleet-deployer`, `fleet-ingress`, `greptimedb-oom-order`, `greptimedb-pipeline`, `omnigent-worker-isolation`, `omnigraph-local-root`, `omnigraph-seed`, `omnigraph-state-directory-transitions`) and `checks/omnigent-workers.nix` take `fleetPkgs` from their `perSystem` arguments and replace the local import with it. Every use of `nodePkgs` keeps its name, as a `let` alias `nodePkgs = fleetPkgs;`, so the test bodies are not edited. `fleet-ingress`, whose import added its own `ntfy-send` overlay after the flake's, binds `nodePkgs = fleetPkgs.appendOverlays [ <that overlay> ]`, the same overlays in the same order.
   - `omnigent-worker-isolation`'s import keyed on `pkgs.stdenv.hostPlatform.system`, which equals the perSystem `system` for both of its systems.
   - `checks/devin-worker.nix` replaces `probePkgs` with an attribute set built once in its `let`, `fleetPkgsBySystem = lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (s: withSystem s ({ fleetPkgs, ... }: fleetPkgs));`, read as `fleetPkgsBySystem.${system}`. Its check is `checks.x86_64-linux.devin-worker-structural`.
-  - `vm-tests/shared-reference-tree.nix` and `vm-tests/perses-greptimedb.nix` are held by another change in flight; they keep their own nixpkgs in this commit and move to `fleetPkgs` the same way once it lands (task 4.4). Nothing in this commit depends on them.
+  - `vm-tests/shared-reference-tree.nix` and `vm-tests/perses-greptimedb.nix` are held by another change in flight; they keep their own nixpkgs in this commit, and moving them the same way is `finish-fleet-package-set-and-budget-typing`'s work. Nothing in this commit depends on them.
 - **Rationale**: a lazy attribute set is evaluated once per key, so each system's instance is shared by every home the check evaluates. Before, `probePkgs` built a new instance per call. `fleetPkgs` has the same overlay (`config.flake.overlays.default`, the value `self.overlays.default` names) and adds `allowUnfree` where it was missing, plus `permittedInsecurePackages`. In the locked nixpkgs those keys decide only whether evaluating a marked package throws (A330). Boundary: vendored-versus-first-party. nixpkgs and the NixOS test framework are used through their public `import`/`node.pkgs` interfaces and are not patched.
 - **Declared drvPath effect**: none. Evaluated against the parent, every runtime test the nine modules define, both `omnigent-workers` check sets and `devin-worker-structural` keep their drvPaths, as A330 predicts (tasks 4.1-4.3), so `drv-delta.txt` names no `vmTests` attribute. A difference the oracle finds there is a violation of A330 and is explained before the change lands.
 - **Alternatives considered**: (a) the perSystem `pkgs`. It lacks `flake.overlays.default` (`base-defaults.nix`). (b) a `withSystem` call inside each `evalHome` call. Flake-parts memoises `withSystem` per system, but a single `let` binding makes the sharing visible in the file and does not depend on that memoisation.
@@ -113,7 +113,7 @@ Constraints carried from earlier decisions and not reopened here:
 
 - **Choice**: `type = lib.types.nullOr (lib.types.submodule { options = { storeUrl = mkOption { type = str; }; notifiedUnits = mkOption { type = attrsOf (listOf str); }; databases = mkOption { type = attrsOf str; }; }; });`, with the description unchanged apart from dropping the inline shape.
 - **Rationale**: both writers set exactly these three. The merged value has the same attributes and values, so `otelEnvelope`'s rendered script is unchanged and magnetite's toplevel and `vmTests.x86_64-linux.fleet-ingress` keep their derivations. A writer that misspells a field now fails evaluation. Boundary: first-party option on a vendored service. Only the first-party option type changes.
-- **Sequencing**: `modules/clan/services/otel-collector/**` is held by another change in flight, so this decision is applied after that change lands (tasks 6.1, 6.2), in the file that then holds the option. This change's commit leaves the option as it is; nothing else in it depends on the type.
+- **Sequencing**: `modules/clan/services/otel-collector/**` is held by another change in flight, so this decision is applied after that change lands, by `finish-fleet-package-set-and-budget-typing`. This change's commit leaves the option as it is; nothing else in it depends on the type.
 - **Alternatives considered**: `attrsOf anything` with an assertion. It is weaker, and the error arrives later.
 
 ### D8: a validator for `observabilityHosts`, run in an existing check
@@ -131,11 +131,10 @@ Constraints carried from earlier decisions and not reopened here:
 ### D9: spec deltas
 
 - **Choice**:
-  - MODIFIED `database-backup-interface` "A host's backup set is pinned by a fleet obligation": the judge is registered as `fleetObligations.postgresqlBackupObligations`, so it is asserted on every `nixos-<host>` and `darwin-<host>` check. The scenarios are unchanged.
-  - ADDED three `fleet-ingress-interface` requirements: D7's and D8's.
+  - ADDED two `fleet-ingress-interface` requirements: D8's. D7's requirement moved to `finish-fleet-package-set-and-budget-typing`.
   - New `fleet-obligation-registry-interface` (D1–D4) and `fleet-package-set-interface` (D5, D6).
   - `world-assumptions` A330–A332.
-- **Archive order**: `database-backup-interface` is not yet in `openspec/specs/`; it arrives when `back-up-postgresql-off-host` archives. This change archives after that one, or its MODIFIED delta has nothing to apply to. D7's requirement is discharged only once tasks 6.1 and 6.2 are done, D5's for the two held runtime tests once task 4.4 is, and D3's for `host-key-obligations` once task 3.5 is; the change archives after all three, or after the open tasks are split off into a change of their own.
+- **Archive order**: none. The MODIFIED `database-backup-interface` delta this change first carried was dropped on 2026-11-27; `back-up-postgresql-off-host` names the registered judge in its own delta. D7's requirement and the runtime-test half of D5's moved to `finish-fleet-package-set-and-budget-typing`, which archives after this change.
 - **Not modified**: `devloop-collection-interface` and `commit-signing-key-interface` say "`modules/checks/machines.nix` SHALL assert", which stays true. `delegate-fleet-deploys`'s design D15 (`design.md:154`) named `withFleetObligations`; this commit rewrites that sentence to name the `fleetObligations.fleetDeployer` registration and the fold in `machines.nix` (task 7.3 tells its owner). The fleet-deploy-delegation-interface scenario ("its `darwin-<host>` machine check fails evaluation naming the problem") still holds.
 
 ### D10: the oracle and the cost points
@@ -150,7 +149,7 @@ Constraints carried from earlier decisions and not reopened here:
 ## Spec and feature alignment
 
 This table is the pre-apply spec-and-feature alignment record.
-It carries one row per requirement in this change's five delta specs, with the capability's stratum tag from the proposal and the modality that witnesses the requirement.
+It carries one row per requirement in this change's four delta specs, with the capability's stratum tag from the proposal and the modality that witnesses the requirement.
 
 No row routes to a Gherkin scenario, so this change lays out no `.feature` file.
 The repository has no BDD runner (no pytest-bdd, cucumber or behave dependency, and no `.feature` file in the tree), so a laid-out scenario would be an unbound surface nothing executes.
@@ -165,12 +164,11 @@ Where a scenario has no task that observes it, the row says so rather than namin
 | Every machine check asserts every judge registered for its class | `fleet-obligation-registry-interface` | interface | build gate (darwin-only throwing mutant; drvPath comparison) | `checks.x86_64-linux.nixos-<host>`, `checks.aarch64-darwin.darwin-<host>` | tasks 2.3, 2.4, 7.1 |
 | A failing machine check names each unmet judge | `fleet-obligation-registry-interface` | interface | build gate (cinnabar harmonia mutant) | `checks.x86_64-linux.nixos-cinnabar` | task 2.4 |
 | A judge-over-fixtures check reports each wrong case | `fleet-obligation-registry-interface` | interface | build gate (wrong-count mutant) | `checks.x86_64-linux.harmonia-gc-obligations` (and every `mkJudgeCheck`/`judgeCases` user) | tasks 3.3, 6.3 |
-| Every count-judged fixture check is built by one constructor | `fleet-obligation-registry-interface` | interface | build gate (drvPath comparison) and content search | the ten migrated checks and `otel-collector-config` | tasks 3.1, 3.2, 6.3, 7.1; not met for `host-key-obligations` until task 3.5 |
+| Every count-judged fixture check is built by one constructor | `fleet-obligation-registry-interface` | interface | build gate (drvPath comparison) and content search | the ten migrated checks, `otel-collector-config` and `host-key-obligations` | tasks 3.1, 3.2, 3.5, 6.3, 7.1 |
 | A check module states its system condition once | `fleet-obligation-registry-interface` | interface | build gate (drvPath comparison) | `checks.{x86_64-linux,aarch64-darwin}.test-size-classes` | task 3.4 |
-| Runtime tests and fixture checks evaluate against the fleet package set | `fleet-package-set-interface` | interface | build gate (drvPath comparison) and content search | the `vmTests` the nine modules define, `omnigent-workers`' checks, `devin-worker-structural` | tasks 4.1-4.4, 7.1; discharged for `shared-reference-tree` and `perses-greptimedb` only by 4.4 |
+| Fixture checks evaluate against the fleet package set | `fleet-package-set-interface` | interface | build gate (drvPath comparison) and content search | `omnigent-workers`' checks, `devin-worker-structural` | tasks 4.2, 4.3, 7.1; the nine runtime-test modules (task 4.1) are covered by `finish-fleet-package-set-and-budget-typing`'s requirement |
 | The channels overlay offers no patched channel | `fleet-package-set-interface` | interface | content search and build gate (`just docs-build`, drvPath comparison) | `checks.*.package-vanixiets-docs*` build the amended pages | tasks 5.1, 5.2, 7.1 |
-| A host's backup set is pinned by a fleet obligation | `database-backup-interface` | interface | build gate (`postgresql-backup-obligations`; deletion mutant) | `checks.x86_64-linux.postgresql-backup-obligations`, every machine check | tasks 2.2, 2.4 (deletion shown on `harmoniaGcObligations`), 3.2, 7.2; the scenario "a database is added without a backup" has no mutant run here |
-| The envelope budget has a declared shape | `fleet-ingress-interface` | interface | build gate (`extendModules` mutant; drvPath comparison) | `checks.x86_64-linux.nixos-magnetite`, `vmTests.x86_64-linux.fleet-ingress` | tasks 6.1, 6.2 (waiting on the change holding the otel-collector service) |
+| (moved) The envelope budget has a declared shape; the backup-set judge's registration | — | — | — | — | moved to `finish-fleet-package-set-and-budget-typing`; the backup requirement is stated by `back-up-postgresql-off-host` |
 | Each observability host row conforms to one schema | `fleet-ingress-interface` | interface | build gate (`judgeCases` cases) | `checks.x86_64-linux.otel-collector-config` | task 6.3 |
 | The observability host row schema has nine typed fields | `fleet-ingress-interface` | interface | build gate (one mutant row per rule) | `checks.x86_64-linux.otel-collector-config` | task 6.3 |
 | A330 | `world-assumptions` | world | monitoring (violation scenario) | the oracle over `vmTests` and the moved checks | tasks 4.1-4.3, 7.1 |
@@ -190,7 +188,7 @@ Where a scenario has no task that observes it, the row says so rather than namin
 
 N/A for deployment: no host's derivation changes, and no host deploys for this change.
 
-The change lands as one commit on `main` (D10), accepted on one `just drv-diff` run with `drv-delta.txt`. Tasks 4.4, 6.1 and 6.2 follow, once the change holding their files has landed, as a second commit with its own oracle run. Rollback is a revert of the commit; nothing outside the repository holds state.
+The change lands as one commit on `main` (D10), accepted on one `just drv-diff` run with `drv-delta.txt`. The held runtime tests and the budget typing follow in `finish-fleet-package-set-and-budget-typing`, with its own oracle run. Rollback is a revert of the commit; nothing outside the repository holds state.
 
 ## Open Questions
 

@@ -86,8 +86,8 @@ The operator, who reviews thirteen pull requests and deploys nothing (no host ch
   - The bridge file gains `flake.modules.darwin.hm-sops-bridge` with the view part only (darwin homes take their age key from `~/.config/sops/age/keys.txt`, `hm-sops-bridge.nix:11-13`), imported into `darwin.base`. The NixOS module is imported into `nixos.base` so every NixOS home gets the view.
   - A standalone home imports `homeManager.secrets` and sees `{ }`, as it sees `osConfig == null` today.
   - The view's first reader is `vcs-signing.nix` (D10 step 10). The omnigent credential adapter is host-side (Context) and reads `osConfig.vanixiets.secrets`, not the view.
-- **Rationale**: the operator settled that homes receive secrets through the bridge. The bridge is NixOS-only and per-user today, and stibnite, argentum and rosegold homes read their signing key from the host, so the view needs a darwin export and must cover every home user. Filtering by owner gives a home only what it can open. Boundary: source-versus-delivered; the view carries paths, never contents.
-- **Alternatives considered**: (a) homes read `osConfig.vanixiets.secrets`. Smaller, but homes keep reading the host's configuration. (b) the view set by the secrets module instead of the bridge. Equivalent, but it overrides the operator's settled placement; offered as open question 1.
+- **Rationale**: homes receive secrets through the bridge, beside the age key it already propagates. The bridge is NixOS-only and per-user today, and stibnite, argentum and rosegold homes read their signing key from the host, so the bridge gains a darwin export carrying only the view, and the view is set for every home user rather than only those in `hm-sops-bridge.users`. Filtering by owner gives a home only what it can open. Boundary: source-versus-delivered; the view carries paths, never contents.
+- **Alternatives considered**: (a) homes read `osConfig.vanixiets.secrets`. Smaller, but homes keep reading the host's configuration. (b) the view set by the secrets module, leaving the bridge as it is. Equivalent in effect, but it splits home secret delivery between two modules, the bridge for the age key and the secrets module for paths.
 
 ### D6: clan inventory services declare and read through the seam
 
@@ -112,8 +112,8 @@ The operator, who reviews thirteen pull requests and deploys nothing (no host ch
 ### D9: one confinement check, a shrinking allow-list from the first step
 
 - **Choice**: `checks.x86_64-linux.secrets-seam-confinement`, built with `flake.lib.mkStructuralCheck`. `actual` is the sorted list of `.nix` files under `modules/` (skipping path components starting with `_`, as import-tree does) that have a non-comment line containing `clan.core.vars`, or containing `vars/shared/` or `vars/per-machine/` outside `modules/lib/vars.nix`; `expected` is a literal list. Step 1 sets it to the full list at that revision; each step deletes the files it clears; step 13 leaves the D8 set and `lib/vars.nix`'s documented exemptions. Declared `class = "medium"; measured = false;`.
-- **Rationale**: answers proposal question 5. A ratchet catches a new direct reader in any intervening change. Because `mkStructuralCheck` embeds only the two JSON lists, its drvPath changes exactly when a step clears a file, which every step declares. The `vars/` clause is how `flake.lib.vars` sits behind the seam: no other module spells the committed layout. Boundary: source-only. It reads text and cannot see an attribute path built from strings (`clan.core.${"vars"}`).
-- **Alternatives considered**: no check until step 13. The long tail would carry no guard.
+- **Rationale**: answers proposal question 5. A ratchet catches a new direct reader in any intervening change. Because `mkStructuralCheck` embeds only the two JSON lists, its drvPath changes exactly when a step clears a file, which every step declares. The `vars/` clause is how `flake.lib.vars` sits behind the seam: `flake.lib.vars` and `flake.lib.hostKeys` keep their names and their readers, `lib/vars.nix` is the seam's committed-store half, no other module spells the committed layout, and `hostKeys`' obligation reads the option (D4). Boundary: source-only. It reads text and cannot see an attribute path built from strings (`clan.core.${"vars"}`).
+- **Alternatives considered**: (a) no check until step 13. The long tail would carry no guard. (b) re-export `flake.lib.vars` and `flake.lib.hostKeys` under a `flake.lib.secrets` namespace. It edits about fifteen readers for no change in behaviour.
 
 ### D10: thirteen pull requests, one closed set of secrets each
 
@@ -136,8 +136,8 @@ The operator, who reviews thirteen pull requests and deploys nothing (no host ch
   | 13 | `13-close.txt` | `lib/{shared-vars-recipients,fleet-deployer}.nix` through `secretsBackend`; the full confinement rule; documents |
 
 - **Why each is independently shippable**: a step changes only option plumbing for a closed set: no secret it moves is read or written by a file it leaves untouched (the cross-reads listed in Context are grouped accordingly), and the secrets it does not move stay on direct clan definitions, which the seam leaves alone. So any prefix of the steps is a consistent tree, and reverting the last merged step restores its parent. Each step's drv-diff proves every toplevel and runtime test unchanged on its own.
-- **Rationale**: the operator settled one feature per step. A "feature" here is a closed set under cross-reads; step 11 groups seven small owners that share no secrets with any other step and are each one or two generators, to keep the count of 16-minute diffs at thirteen.
-- **Alternatives considered**: one pull request. It is one diff, but a 45-file move fails or passes as a whole and cannot be bisected.
+- **Rationale**: the operator settled one feature per step. A "feature" here is a closed set under cross-reads; step 11 groups seven small owners that share no secrets with any other step and are each one or two generators, to keep the count of 16-minute diffs at thirteen. The steps stay as listed, about three and a half hours of diffs in total, because each smaller step is a smaller bisection unit and a smaller review.
+- **Alternatives considered**: (a) one pull request. It is one diff, but a 45-file move fails or passes as a whole and cannot be bisected. (b) fold steps 6 and 12 into neighbours to make eleven. It saves two diffs, about half an hour, at the cost of two larger unrelated steps.
 
 ### D11: a translation judge pins the field mapping
 
@@ -204,14 +204,14 @@ One row per requirement in this change's three delta specs. No row routes to a G
 | A360-A364 | `world-assumptions` | world | monitoring (violation scenarios) | A360 by the operator at each change's close-out; A361 by 1.1's re-read and 10.2's credential assertions; A362 by 2.5's drv-diff; A363 by every step's drv-diff; A364 by 1.1's re-read and 12.4, 12.6 |
 | Grounded vocabulary for behavioral requirements | `world-assumptions` | world | capability text | specs text |
 
-## Open Questions
+## Resolved Questions
 
-Each needs the operator; each has a recommended answer.
+Seven questions were raised during design. Each is resolved as follows and folded into the decision it names.
 
-1. **Darwin homes and the bridge.** `hm-sops-bridge` is NixOS-only and per-user, but stibnite, argentum and rosegold homes read their commit signing key from the host. Recommended: D5, a darwin export of the bridge carrying only the view, and the view set for every home user. Alternative: the view set by the secrets module, leaving the bridge as it is.
-2. **The whole-tree backend function.** D7's `flake.lib.secretsBackend.generatorsOf` is a second reader of clan beside the option, in the same file. Recommended: accept it, because the two obligations judge clan's own custody. Alternative: move both obligations into the secrets module.
-3. **Clan inventory services.** Recommended: D6, they go through the seam like any feature, with setting names unchanged. Alternative: exempt `modules/clan/**`.
-4. **Judges that run the recipe.** Recommended: D8, the six `finalScript` readers and `clan-test-vars-fixture.nix` stay named clan readers. Alternative: expose `finalScript` through the option.
-5. **Thirteen pull requests.** Recommended: D10 as listed, about three and a half hours of diffs in total. Alternative: fold steps 6 and 12 into neighbours to make eleven.
-6. **What "flake.lib.vars and flake.lib.hostKeys go behind the seam" means.** Recommended: both keep their names and readers; `lib/vars.nix` is the seam's committed-store half, the confinement rule's second clause forbids spelling the committed layout outside it, and `hostKeys`' obligation reads the option (D4). Alternative: re-export them under a `flake.lib.secrets` namespace, which edits about fifteen readers for no change in behaviour.
-7. **vcs-signing's machine-name read.** Recommended: out of scope (Non-Goals); host identity in homes belongs to a later den change.
+1. **Darwin homes and the bridge.** A darwin export of `hm-sops-bridge` carries only the read view, and the view is set for every home user (D5). Reason: stibnite, argentum and rosegold homes read their commit signing key from the host, and the NixOS bridge is per-user; keeping the view in the bridge keeps home secret delivery in one module.
+2. **The whole-tree backend function.** `flake.lib.secretsBackend.generatorsOf` is accepted as a second reader of clan beside the option, in the same seam file (D7). Reason: `sharedVarsObligations` and the deployer's local secrets judge clan's own custody, including generators clan's services declare, so they need the backend's whole tree; both readers stay in one file.
+3. **Clan inventory services.** They declare and read through the seam like any feature, and the settings `openrouterApiKeyGenerator` and `matrixBotPasswordGenerator` keep their names (D6). Reason: their secrets are fleet secrets that survive a backend swap, and renaming the settings would edit inventory instances for no change in value.
+4. **Judges that run the recipe.** The six `finalScript` readers and `vm-tests/clan-test-vars-fixture.nix` stay named clan readers in the confinement rule's final list (D8). Reason: they pin clan's own generator so a test cannot drift from production, and exposing `finalScript` would put clan's execution model into the interface.
+5. **Thirteen pull requests.** The thirteen steps are delivered as listed (D10). Reason: each step is a closed set under cross-reads with its own drv-diff, so each merge is a small, bisectable unit.
+6. **`flake.lib.vars` and `flake.lib.hostKeys`.** Both keep their names and their readers; `lib/vars.nix` is the seam's committed-store half, and the confinement rule's second clause forbids spelling the committed vars layout anywhere else (D4, D9). Reason: a re-export under a new namespace edits about fifteen readers for no change in behaviour.
+7. **vcs-signing's machine-name read.** Out of scope (Non-Goals). Reason: `clan.core.settings.machine.name` is host identity, not a secret, and host identity in homes belongs to a later den change.

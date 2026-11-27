@@ -170,7 +170,7 @@ While its backup is on, magnetite's disko configuration SHALL declare `zroot/roo
 
 ### Requirement: A host's backup set is pinned by a fleet obligation
 
-`flake.lib.postgresqlBackupObligations.failures name hostConfig` SHALL be asserted in `withFleetObligations` on every `nixos-<host>` and `darwin-<host>` check. It SHALL return `[ ]` for a host without PostgreSQL. For a host with PostgreSQL it SHALL return one message for each of:
+`flake.lib.postgresqlBackupObligations.failures name hostConfig` SHALL be registered as `fleetObligations.postgresqlBackupObligations`, which `modules/checks/machines.nix` folds into every `nixos-<host>` and `darwin-<host>` check. It SHALL return `[ ]` for a host without PostgreSQL. For a host with PostgreSQL it SHALL return one message for each of:
 - the backup being off while the host is not in `flake.lib.postgresqlBackup.awaitingSecrets`;
 - the backup being on while the host is still in that list;
 - the backup being on without both generators' deployed files in the repository;

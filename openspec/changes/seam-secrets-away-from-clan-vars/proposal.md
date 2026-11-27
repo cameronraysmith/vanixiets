@@ -27,28 +27,28 @@ Every feature that needs a secret declares and reads clan's vars generators dire
 
 **Secrets in homes**
 - From: home modules read `osConfig.clan.core.vars.generators` and clan's sops secret naming.
-- To: `hm-sops-bridge` propagates a read-only home view of the secrets a home uses, next to the age key it already propagates; a standalone home sees no view, as it sees `osConfig == null` today.
+- To: `hm-sops-bridge` propagates a read-only home view of the secrets a home's user owns, next to the age key it already propagates, on NixOS hosts and, through a darwin export carrying only the view, on nix-darwin hosts, for every home user; a standalone home sees no view, as it sees `osConfig == null` today.
 - Impact: non-breaking for both bridged and standalone homes.
 
 **Delivery**
-- The secrets module lands first with no consumer. Then one feature moves per step, its declaration and all its readers together, each step proven by a before/after diff showing no change to any NixOS, nix-darwin or home toplevel or any check. A rule that no module outside the two seam files names `clan.core.vars` arrives in the last step.
+- The secrets module lands first with no consumer. Then thirteen pull requests move one closed set of secrets each, its declarations and all its readers together, each step proven by a before/after diff showing no change to any NixOS, nix-darwin or home toplevel or any check outside the step's declared differences. A rule that no module outside the two seam files names `clan.core.vars`, except the named tests and checks that run a generator's recipe, shrinks with every step and reaches its final list in the last step.
 - Preserved in every step: generator names, file names, scripts and prompts, owner, group, mode, `neededFor`, `restartUnits`, `share`, `validation` and dependencies. Five VM tests and `checks/greptimedb-envelope.nix` run magnetite's real `greptimedb-users` generator, so changing any of these changes what they test.
 
-**Non-goals**: replacing clan; renaming any generator or moving anything under `vars/`; changing who can decrypt any secret; reading committed public vars values, which stop-reading-other-hosts-configs owns.
+**Non-goals**: replacing clan; renaming any generator or moving anything under `vars/`; changing who can decrypt any secret; reading committed public vars values, which stop-reading-other-hosts-configs owns (`flake.lib.vars` and `flake.lib.hostKeys` keep their names and readers); host identity in homes, such as `vcs-signing.nix`'s machine-name read.
 
 **Depends on** (lands last in the den-ready-fleet order)
 - establish-refactor-oracle: the before/after drvPath diff (`just drv-diff`) that proves each step unchanged.
 - stop-reading-other-hosts-configs: the committed-vars accessor `modules/lib/vars.nix`, the second of the two files clan is confined to, and `modules/lib/host-keys.nix`. It migrates the committed-path reads `lib/commit-signing.nix:166` and `lib/shared-vars-recipients.nix:45` to the accessor. It leaves the generator-tree reads `lib/commit-signing.nix:191`, `lib/shared-vars-recipients.nix:43,55` and `host-keys.nix`'s own-host `openssh` comparison, which this change moves behind the seam.
 - compose-hosts-from-cohesive-aspects: lands immediately before this change, because both edit magnetite's and cinnabar's feature files; this change rebases onto it and re-runs `just drv-diff`.
 
-**Open design questions** (to settle in design, after the dependencies land)
-1. Should the option mirror clan's generator schema field for field, or cover only what this fleet uses and pass the rest through? A pass-through puts clan back into feature files.
-2. Are the clan inventory services under `modules/clan/services/` on clan's side of the seam? At least `hermes-agent` and `openclaw`, which take generator names as settings, should name a secret instead.
-3. Should the VM tests and `greptimedb-envelope` read `greptimedb-users` through the seam, which then has to expose the generation script, or stay declared clan readers that pin clan's own generator?
-4. Is the `options ? clan.core.vars` guard in `darwin/omnigent-host.nix:519` still needed once every nix-darwin host has the option?
-5. Before the last step, should a shrinking allow list of files still naming `clan.core.vars` be enforced, or nothing until the full rule can pass?
-6. Which feature moves first? Recommended: niks3 → nixbot or kanidm → matrix (a single cross-feature read each); `greptimedb-users` only after question 3.
-7. Do the obligation readers in `lib/` (`commit-signing.nix:191`, `shared-vars-recipients.nix:43,55`, `host-keys.nix`'s `openssh` comparison) read the seam's read-only view of the host they check, or move into the secrets module?
+**Design questions** (settled in design.md)
+1. Should the option mirror clan's generator schema field for field, or cover only what this fleet uses and pass the rest through? Settled: only the fields the fleet uses, no pass-through (D2).
+2. Are the clan inventory services under `modules/clan/services/` on clan's side of the seam? Settled: no; they declare and read through the seam like any feature, and their generator-name settings keep their names (D6).
+3. Should the VM tests and `greptimedb-envelope` read `greptimedb-users` through the seam, which then has to expose the generation script, or stay declared clan readers that pin clan's own generator? Settled: they stay named clan readers, with `clan-test-vars-fixture.nix` (D8).
+4. Is the `options ? clan.core.vars` guard in `darwin/omnigent-host.nix:519` still needed once every nix-darwin host has the option? Settled: yes, for clan-free fixtures, once, in the secrets module (D3).
+5. Before the last step, should a shrinking allow list of files still naming `clan.core.vars` be enforced, or nothing until the full rule can pass? Settled: a shrinking allow list from the first step (D9).
+6. Which feature moves first? Settled: build cache and CI (niks3, nixbot) after the seam; `greptimedb-users` in the telemetry-store step (D10).
+7. Do the obligation readers in `lib/` read the seam's read-only view of the host they check, or move into the secrets module? Settled: per-name readers read the option; the two whole-tree obligations read `flake.lib.secretsBackend.generatorsOf`, a second clan reader in the seam file (D7).
 
 ## Capabilities
 
@@ -63,6 +63,6 @@ Every feature that needs a secret declares and reads clan's vars generators dire
 
 ## Impact
 
-- Code: a new secrets module for the NixOS and nix-darwin classes; `modules/nixos/hm-sops-bridge.nix`; over the steps, about 45 of the 55 files that name `clan.core.vars`, among them `nixos/{niks3,nixbot,kanidm,matrix}.nix`, `darwin/{ssh-ca-trust,omnigent-host}.nix`, `home/development/vcs-signing.nix`, `home/ai/omnigent/credentials.nix`, `lib/{commit-signing,shared-vars-recipients,host-keys}.nix` and the clan services under `clan/services/`; a new structural check.
+- Code: a new secrets module for the NixOS and nix-darwin classes; `modules/nixos/hm-sops-bridge.nix`, which gains a darwin export; over thirteen pull requests, about 45 of the 55 files that name `clan.core.vars`, among them `nixos/{niks3,nixbot,kanidm,matrix}.nix`, `darwin/{ssh-ca-trust,omnigent-host}.nix`, `home/development/vcs-signing.nix`, `home/ai/omnigent/credentials.nix`, `lib/{commit-signing,shared-vars-recipients,host-keys}.nix` and the clan services under `clan/services/`; a new structural check.
 - Hosts: every NixOS and nix-darwin host evaluates the new option; no built system changes.
 - Existing seam reused: `nixos/fleet-deployer.nix:148-151` (`notifyTokenFile`) already hides `ntfy-alerter` behind an option and becomes a reader of the new one.

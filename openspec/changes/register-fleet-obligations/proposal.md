@@ -38,7 +38,7 @@ The machine checks enforce twelve fleet-wide rules about host configuration, and
 
 **Tests use the fleet's package set**
 - From: eleven runtime tests and two fixture checks build their own nixpkgs.
-- To: each reads the fleet's per-system package set; the devin-worker check shares one per system. Two of the runtime tests, held by another change in flight, follow once it lands.
+- To: each reads the fleet's per-system package set; the devin-worker check shares one per system. Two of the runtime tests, held by another change in flight, follow in `finish-fleet-package-set-and-budget-typing`.
 - Impact: evaluated against the parent, no runtime-test or check derivation changes.
 
 **Unused patched channel removed**
@@ -47,7 +47,7 @@ The machine checks enforce twelve fleet-wide rules about host configuration, and
 
 **Two configuration shapes declared**
 - From: the collector's envelope budget is an untyped attribute set; the observability host table has no schema.
-- To: the budget is a typed record of its three fields, applied once the change holding the collector service lands; a validator checks the host table's rows inside an existing check.
+- To: a validator checks the host table's rows inside an existing check. Typing the budget as a record of its three fields moved to `finish-fleet-package-set-and-budget-typing`, which waits on the change holding the collector service.
 
 **Non-goals**: renaming judges or the machine-check attributes; changing what any judge enforces; giving deferred scheelite a machine check; deriving any literal check oracle; touching the poisoned `flake` argument in the omnigent-workers check; the nixidy package set; the `nixpkgs` and `unstable` channels.
 
@@ -63,8 +63,7 @@ The machine checks enforce twelve fleet-wide rules about host configuration, and
 
 ### Modified Capabilities
 
-- `database-backup-interface` (stratum: interface): "A host's backup set is pinned by a fleet obligation" names the registry entry instead of `withFleetObligations`. This applies once `back-up-postgresql-off-host` has archived that spec into the corpus.
-- `fleet-ingress-interface` (stratum: interface): three ADDED requirements. The envelope budget has a declared three-field shape, and the observability host table's rows conform to one validated nine-field schema. Trust boundary: the validator runs in a check, not on read, so a row that breaks it fails the gate but still evaluates for its readers.
+- `fleet-ingress-interface` (stratum: interface): two ADDED requirements: the observability host table's rows conform to one validated nine-field schema. Trust boundary: the validator runs in a check, not on read, so a row that breaks it fails the gate but still evaluates for its readers.
 - `world-assumptions` (stratum: world): A330–A332. In the locked nixpkgs, `allowUnfree` and `permittedInsecurePackages` decide only whether evaluation throws. An overlay attribute nothing reads is never evaluated, so its import-from-derivation is never built. An evaluation-time assertion leaves the asserted derivation unchanged.
 
 No capability is behavioral. The change moves wiring and tightens shapes, and every requirement a fleet user can observe stays as it is.
@@ -73,6 +72,6 @@ No capability is behavioral. The change moves wiring and tightens shapes, and ev
 
 - Code: `modules/checks/machines.nix`; new `modules/lib/fleet-obligations.nix` and `modules/lib/judge-check.nix`; the twelve judge files named in design.md; 26 check modules (system conditions), nine of them also moved to the judge constructor with `r2-usage` as the tenth; nine `modules/vm-tests/*.nix` now and two after the change holding them lands; `checks/{omnigent-workers,devin-worker}.nix`; `nixpkgs/overlays/channels.nix`; `lib/mk-eval-check.nix` (header); `lib/observability-hosts.nix` and `checks/otel-collector-config.nix`; later, the otel-collector service's option type.
 - Docs: ADR-0017 amendment; `architecture/architecture.md`, `concepts/architecture-overview.md`, `reference/repository-structure.md`, `requirements/functional-hierarchy.md`, `requirements/usage-model.md`, `guides/handling-broken-packages.md`; `modules/README.md` where it describes machine-check wiring. The checks built from the docs site change with its source (`drv-delta.txt`).
-- Depends on: `establish-refactor-oracle` (`just drv-diff`, including `vmTests`), `type-the-fleet-host-registry` (its parent). Its MODIFIED delta also requires `back-up-postgresql-off-host` to archive first.
+- Depends on: `establish-refactor-oracle` (`just drv-diff`, including `vmTests`), `type-the-fleet-host-registry` (its parent).
 - Overlaps: the change in flight that holds `vm-tests/{shared-reference-tree,perses-greptimedb}.nix`, `checks/{fleet-alert,test-sizes}.nix` and the otel-collector service; `compose-hosts-from-cohesive-aspects` (`deploy-record-order.nix`, the otel-collector split); `declare-host-user-relations-once` (`omnigent-workers.nix`); see design.md.
 - Hosts: none deploys for this change. No host's derivation changes.

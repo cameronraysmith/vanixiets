@@ -15,7 +15,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: nixpkgs makes either key affect a derivation
 
 - **WHEN** a nixpkgs update makes `allowUnfree` or `permittedInsecurePackages` change a derivation's attributes (for example by selecting a different source or build flag), which the cross-revision identity oracle shows as a difference in a `vmTests` or check attribute whose only change is its package set
-- **THEN** this assumption is void; the `fleet-package-set-interface` requirement "Runtime tests and fixture checks evaluate against the fleet package set" loses its claim that checks keep their derivations, and each differing attribute is re-examined
+- **THEN** this assumption is void; every `fleet-package-set-interface` requirement that names A330 loses its claim that the attributes moved to the fleet package set keep their derivations, and each differing attribute is re-examined
 
 ### Requirement: A331 — An attribute nothing reads is never evaluated, so an import of a derivation's output bound to it is never built
 

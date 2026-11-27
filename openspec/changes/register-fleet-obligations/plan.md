@@ -8,7 +8,7 @@
 
 **Tech Stack:** flake-parts with import-tree; the NixOS module system (`lib.types.submodule`, `functionTo`); nixpkgs `import`, `appendOverlays` and the NixOS test framework's `node.pkgs`; `just drv-diff` and `just eval-cost` from `establish-refactor-oracle`.
 
-**Spec:** `openspec/changes/register-fleet-obligations/`: `design.md` (D1–D10, alignment table), `specs/` (`fleet-obligation-registry-interface`, `fleet-package-set-interface`, `database-backup-interface`, `fleet-ingress-interface`, `world-assumptions` A330–A332), `tasks.md`, `drv-delta.txt`, `brainstorm.md`, `proposal.md`.
+**Spec:** `openspec/changes/register-fleet-obligations/`: `design.md` (D1–D10, alignment table), `specs/` (`fleet-obligation-registry-interface`, `fleet-package-set-interface`, `fleet-ingress-interface`, `world-assumptions` A330–A332), `tasks.md`, `drv-delta.txt`, `brainstorm.md`, `proposal.md`.
 
 ## Global Constraints
 
@@ -38,7 +38,6 @@
 | Lib | `flake.lib.judgeCases : { name; judge; cases : attrsOf { problems : int; judge ? fn; … }; assertions ? [ { assertion : bool; message : str; } ]; } -> drv -> drv` | `modules/lib/judge-check.nix` |
 | Lib | `flake.lib.mkJudgeCheck : pkgs -> args -> drv` = `judgeCases args (pkgs.runCommand args.name { } "touch $out")` | `modules/lib/judge-check.nix` |
 | Lib | `flake.lib.observabilityHostProblems : attrsOf row -> [ str ]` | `modules/lib/observability-hosts.nix` |
-| Option type (after 6.1) | `vanixiets.otelCollector.envelopeBudget : nullOr { storeUrl : str; notifiedUnits : attrsOf (listOf str); databases : attrsOf str; }` | the file holding the option once the collector change lands |
 
 ## Steps
 
@@ -50,5 +49,5 @@
 - [ ] **Step 6 (task 6.3):** add `observabilityHostProblems` and wrap `otel-collector-config`'s derivation in `judgeCases`.
 - [ ] **Step 7 (tasks 1.2–6.3 evidence):** evaluate the same attributes at the working copy (`logs/rfo-head-drvpaths-<ts>.json`); the only difference is `package-vanixiets-docs`. Run the mutants of 2.4, 3.3 and 6.3 in throwaway trees (`logs/rfo-mutants-<ts>.log`).
 - [ ] **Step 8 (tasks 2.5, 4.5, 7.1):** after the orchestrator commits: `just eval-cost` on the three cost points, then `just drv-diff <parent> <commit> openspec/changes/register-fleet-obligations/drv-delta.txt`.
-- [ ] **Step 9 (tasks 4.4, 6.1, 6.2):** once the change holding those files lands, move the two runtime tests to `fleetPkgs` and type `envelopeBudget`, with the `storeURL` mutant, as a second commit with its own oracle run.
-- [ ] **Step 10 (tasks 7.2, 7.3):** archive order and the `delegate-fleet-deploys` note.
+- [ ] **Step 9:** tasks 4.4, 6.1 and 6.2 moved to `finish-fleet-package-set-and-budget-typing`.
+- [ ] **Step 10 (task 7.3):** the `delegate-fleet-deploys` note; task 7.2 was dropped.
