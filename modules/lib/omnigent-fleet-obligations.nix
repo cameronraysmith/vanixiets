@@ -176,7 +176,7 @@ let
   cases =
     machine: hostConfig:
     let
-      isDarwin = lib.hasSuffix "-darwin" config.flake.lib.machineSystems.${machine};
+      isDarwin = config.flake.lib.hosts.${machine}.class == "darwin";
       owners = expectedOwners.${machine};
       workers = hostConfig.services.omnigent-host.workers;
       declaredOwners = lib.filter (owner: workers ? ${owner}) owners;

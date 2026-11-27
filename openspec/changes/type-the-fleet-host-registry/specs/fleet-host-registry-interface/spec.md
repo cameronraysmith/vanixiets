@@ -175,16 +175,16 @@ The cinnabar controller's `allowedIps` SHALL be the `zerotier.address` of every 
 #### Scenario: Only the declared derivations change
 
 - **WHEN** `just drv-diff <parent> <tip> openspec/changes/type-the-fleet-host-registry/drv-delta.txt` runs
-- **THEN** it exits 0: `nixos.cinnabar`, `checks.x86_64-linux.nixos-cinnabar`, `checks.x86_64-linux.eval-fleet-topology` and `checks.x86_64-linux.fleet-topology-fresh` changed, `checks.x86_64-linux.eval-inventory-members` was added, and no other dumped attribute differs outside the oracle's base allow-list
+- **THEN** it exits 0: `nixos.cinnabar`, `checks.x86_64-linux.nixos-cinnabar`, `checks.x86_64-linux.eval-fleet-topology`, `checks.x86_64-linux.fleet-topology-fresh` and `checks.x86_64-linux.fleet-alert` changed, every check that builds or consumes the docs package changed on each system it is declared for, `checks.x86_64-linux.eval-inventory-members` was added, and no other dumped attribute differs outside the oracle's base allow-list
 
 ### Requirement: The machine-check asserts are kept
 
-Every assert in `modules/checks/machines.nix` SHALL be kept, including the `machineSystems`-names and `clan.machines`-names asserts against the inventory, whose literal entries are written independently of `flake.fleet.hosts`. The observability `platform`-vs-`machineClass` assert SHALL be removed, because both of its sides read the record's `class`.
+Every assert in `modules/checks/machines.nix` SHALL be kept, including the `machineSystems`-names and `clan.machines`-names asserts, which catch a literal inventory entry that has no record; a record with no inventory entry SHALL be caught by the `readDir` directory assert. The observability `platform`-vs-`machineClass` assert SHALL be removed, because both of its sides read the record's `class`.
 
 #### Scenario: A record without an inventory entry is caught
 
 - **WHEN** a throwaway tree adds a NixOS record with no inventory entry and evaluates `checks.x86_64-linux`
-- **THEN** evaluation fails with the `machineSystems`-names assert's message
+- **THEN** evaluation fails with the directory assert's message, because clan-core has added the record's name to the inventory as a `nixos` machine that has no `modules/machines/nixos/<name>/` directory
 
 #### Scenario: The directory assert still catches a missing directory
 
@@ -195,10 +195,10 @@ Every assert in `modules/checks/machines.nix` SHALL be kept, including the `mach
 
 The flake-shape golden pin `checks.x86_64-linux.structure-fleet` SHALL stay a literal map from host to inventory `machineClass`, never derived from `flake.fleet.hosts`.
 
-#### Scenario: The golden pin still catches a flipped class
+#### Scenario: A flipped class is caught before the golden pin compares
 
 - **WHEN** a throwaway tree changes one host's `system` from `x86_64-linux` to `aarch64-darwin` and `structure-fleet` is built
-- **THEN** the check fails, naming the host
+- **THEN** evaluation fails with the directory assert's message, because the machine-check asserts guard the whole `checks` set and the host's directory is no longer among those of its class; the golden pin stays a literal, so it would still name the host if the directories were moved with the class
 
 ### Requirement: Trust boundary of the host registry interface
 

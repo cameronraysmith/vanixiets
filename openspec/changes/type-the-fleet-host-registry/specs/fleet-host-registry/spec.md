@@ -106,7 +106,7 @@ The overlay network's controller SHALL authorise exactly the externally joined m
 
 ### Requirement: A host dropped or reclassified everywhere at once is still caught
 
-The fleet pin SHALL be kept as literal data, independent of the host registry. Every host's kind as the registry derives it SHALL be compared with the fleet pin, so that a host removed from the registry, or whose kind changes, is reported even though every table derived from the registry agrees with it.
+The fleet pin SHALL be kept as literal data, independent of the host registry. Every host's kind as the registry derives it SHALL be compared with the fleet pin and with the per-kind configuration directories, so that a host removed from the registry, or whose kind changes, is reported even though every table derived from the registry agrees with it.
 
 #### Scenario: A host disappears from the registry
 
@@ -116,4 +116,4 @@ The fleet pin SHALL be kept as literal data, independent of the host registry. E
 #### Scenario: A host's kind flips
 
 - **WHEN** a host's system is changed so that its derived kind differs
-- **THEN** the comparison with the fleet pin fails and names the host
+- **THEN** the fleet's checks fail to evaluate, because the host's configuration directory no longer matches the hosts of its kind; this comparison runs before the fleet pin's

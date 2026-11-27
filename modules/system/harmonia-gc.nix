@@ -76,7 +76,7 @@ let
     inherit bound logPath problems;
     failures =
       name: hostConfig:
-      if lib.hasSuffix "-darwin" config.flake.lib.machineSystems.${name} then
+      if config.flake.lib.hosts.${name}.class == "darwin" then
         problems {
           platform = "darwin";
           service = hostConfig.launchd.daemons.harmonia-gc.serviceConfig;

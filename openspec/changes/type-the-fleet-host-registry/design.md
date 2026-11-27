@@ -34,7 +34,7 @@ The operator, who edits host facts and deploys. The checks that read the record'
 **Goals:**
 - One typed record per fleet host, `flake.fleet.hosts.<name>`, holding every per-host fact the registry holds today, plus `system`, `checked` and `stateVersion`.
 - Every per-host value now written in a second place is derived from the record instead.
-- Every NixOS, darwin and home configuration, every gated check and every runtime test keeps its drvPath, except the ones the change's `drv-delta.txt` declares: cinnabar's system and machine check (D8), the fleet-topology evaluation check whose tested source file this change edits, the fleet-topology freshness check whose committed files the tag rename changes (D12), and the resolver's new evaluation check (D10). `just drv-diff` proves it.
+- Every NixOS, darwin and home configuration, every gated check and every runtime test keeps its drvPath, except the ones the change's `drv-delta.txt` declares: cinnabar's system and machine check (D8), the fleet-topology evaluation check whose tested source file this change edits, the fleet-topology freshness check whose committed files the tag rename changes (D12), every check that builds or consumes the docs package, whose source holds the same `fleet.json` (D12), the fleet alert check, which lists every check's size class, and the resolver's new evaluation check (D10). `just drv-diff` proves it.
 - Every kept assert is still seen failing on a mutant after the change.
 
 **Non-Goals:**
@@ -86,13 +86,13 @@ The operator, who edits host facts and deploys. The checks that read the record'
   - Kept, unchanged: every assert in `checks/machines.nix:100-123`. That is `machineSystems` names = inventory names (`:100-102`), inventory = `nixosConfigurations` / `darwinConfigurations` names (`:103-108`), `clan.machines` names = inventory names (`:109-111`), the `modules/machines/<class>/` directory asserts (`:112-117`), and the omnigent expected-owners and fleet-deployer asserts (`:118-123`). `checks/structure/flake-shape.nix` relies on them, and its golden pin stays a literal over the inventory's `machineClass`.
   - Removed as a tautology: the collector `platform` = `machineClass` assert (`otel-collector.nix:14-34`). Both of its sides now read the record's `class`.
   - Moved into the option: the `hosts.nix:196-205` cross-table asserts. `primaryUser` and `memory` become fields of the same record, so the name-coverage asserts have nothing to compare. The rule that `nixClassic` requires a `primaryUser` stays as a `throw` on `nixClassic`'s read.
-- **Rationale**: the inventory keeps its own literal entries (D3: per-host `tags` and `description`, keyed by name), so its name set is still written independently of the record. After this change `machineSystems` and `clan.machines` are computed from the record, so the two name asserts compare the record's hosts with a system against the inventory's literal entries. They catch a host added to one and not the other, and are not tautologies. Only an assert whose two sides come from one source cannot fail; the collector assert is the one such case. The golden pin is the one record kept independent of both, so it catches a host dropped from the record and inventory together, or a class flipped by a wrong `system`. It is also the oracle a den migration will be measured against (`flake-shape.nix:1-12`). Boundary: source-only.
-- **Alternatives considered**: (a) delete the two name asserts as tautologies. Rejected: the inventory's names are not derived from the record, so the asserts still guard a real disagreement, and `flake-shape.nix:3-5` relies on them. (b) Replace them with one "record names with a system = inventory names" assert. It would carry the same coverage under a new message for no gain. (c) Derive the golden pin from the record. That would make it check the record against itself.
+- **Rationale**: the inventory keeps its own literal entries (D3: per-host `tags` and `description`, keyed by name), but its name set is not independent of the record: clan-core adds every `flake.clan.machines` name to the inventory (`modules/clan/module.nix:151` at the locked revision 78d5de23, `inventory.machines = mapAttrs (_: _: { }) config.machines`, with `machineClass` defaulting to `nixos`). Since `clan.machines` is now generated from the record, a record with a system and no literal inventory entry still appears in the inventory, so the `machineSystems`-names and `clan.machines`-names asserts pass for it. They still catch a literal inventory entry with no record, which clan does not add to `clan.machines`. What catches a record without its inventory entry, and a NixOS host whose `system` is flipped to darwin, is the `readDir` directory assert: the record's class no longer matches the `modules/machines/<class>/` directories. The machine-check asserts guard the whole `checks` set, so that assert fires before the golden pin's own comparison runs (mutants, `logs/thr-3-mutants-20261127-054718.log`). The golden pin stays the one record kept independent of the registry, of the inventory and of the directories, so it catches a host dropped from all of them together. It is also the oracle a den migration will be measured against (`flake-shape.nix:1-12`). Boundary: source-only.
+- **Alternatives considered**: (a) delete the two name asserts as tautologies. Rejected: a literal inventory entry with no record is not added to `clan.machines`, so the asserts still guard that disagreement, and `flake-shape.nix:3-5` relies on them. (b) Replace them with one "record names with a system = inventory names" assert. It would carry the same coverage under a new message for no gain. (c) Derive the golden pin from the record. That would make it check the record against itself.
 
 ### D5: lifecycle and cloud facts are separate fields, never one enum
 
 - **Choice**:
-  - `checked : bool` (default true; scheelite false) replaces `deferred` in `checks/machines.nix` and its use in the omnigent owners assert.
+  - `checked : bool` (default true; scheelite false) replaces `deferred` in `checks/machines.nix` and its use in the omnigent owners assert. The darwin machine-check filter is gated on `checked` too, so both classes select their machine checks by the same field; every darwin host is checked, so no check name changes.
   - `enrolled` is read-only: `builtins.pathExists (self + "/sops/machines/${name}")`. It is false for blackphos and the phones. tincr's peer filter becomes `host.class != "android" && host.enrolled`, and the literal `name != "blackphos"` goes.
   - `cloud` is read-only: `null`, or `{ provider; type; enabled; }` read from `flake.lib.cloudMachines.<provider>.<name>`. The type is `serverType` on Hetzner and `machineType` on GCP.
   - `lib/fleet-deployer.nix`'s `enabledOf` reads `hosts.${name}.cloud.enabled` (true when `cloud` is null) instead of merging the two provider tables itself.
@@ -102,7 +102,7 @@ The operator, who edits host facts and deploys. The checks that read the record'
 
 ### D6: a cloud host's memory comes from its machine type
 
-- **Choice**: `flake.lib.cloudMachineMemoryGiB = { cx43 = 16; ccx23 = 16; cx53 = 32; "e2-standard-8" = 32; "n1-standard-8" = 30; }`. The read-only `memoryGiB` is:
+- **Choice**: `flake.lib.cloudMachineMemoryGiB = { cx43 = 16; ccx23 = 16; cx53 = 32; "e2-standard-8" = 32; "n1-standard-8" = 30; }`, defined in `modules/lib/cloud-machines.nix` beside the `flake.lib.cloudMachines` table, so that a resize edits the type and sees its memory in one file. The read-only `memoryGiB` is:
   - for a cloud host, the table at `cloud.type`, with a `throw` naming the type if absent;
   - otherwise, the declared `memory`, kept positive or `"unknown"` for a host that runs Nix and null for a phone.
 
@@ -139,9 +139,12 @@ The operator, who edits host facts and deploys. The checks that read the record'
   - `checks.x86_64-linux.nixos-cinnabar changed`, the machine check that returns cinnabar's toplevel. No other check or runtime test embeds that toplevel: the others read single option values of it, which do not include the controller's script;
   - `checks.x86_64-linux.eval-fleet-topology changed`. Its test imports `lib/fleet-topology.nix` by store path (`fleet-topology.test.nix:26`), so editing `membersOf` (D7) changes the check's source even though its results stay equal;
   - `checks.x86_64-linux.fleet-topology-fresh changed` (D12). It embeds the committed `packages/docs/diagrams/topology/` directory, and stibnite's tag rename changes `fleet.json`;
+  - `checks.x86_64-linux.fleet-alert changed`. Its `fleet-alert-size-rule-clause` input renders every `testSizes.checks` entry, and `eval-inventory-members` adds one;
+  - on both systems, the twelve `package-vanixiets-docs*` checks, and `apps-build`; on `x86_64-linux`, also `agent-skills-index` and `deploy-docs-rehearsal`, all `changed` (D12). `packages/docs/diagrams/topology/fleet.json` is source of the docs package, so every check that builds or consumes the package changes with the tag rename. `apps-build` changes only through its `deploy-docs` input, which embeds the package; the derivation of the edited `omnigent-worker-login` app is unchanged;
   - `checks.x86_64-linux.eval-inventory-members added` (D7).
 
-  Checks that embed the whole flake source change on every commit and are covered by the oracle's own base allow-list, not by this file. Each of the first three commits runs the recipe with no change-specific allow-list and must pass; the fourth and the merged head run it with `drv-delta.txt`.
+  Checks that embed the whole flake source change on every commit and are covered by the oracle's own base allow-list, not by this file. The change lands as one commit, and the recipe runs once over it, from the parent to the change's tip, with `drv-delta.txt`; the merged head is checked the same way. Each task group keeps its own evidence by evaluation: the projections recorded at the parent revision and compared after the group's edits.
+- **Outcome at the commit**: the run from `07e3f1affe2d` to `66c5a7768fc5` (978.0 s, `logs/drv-diff-07e3f1affe2d-66c5a7768fc5-20261127T055715Z`) first failed on 29 differences the file did not yet declare: the 24 docs-package checks, `agent-skills-index`, `deploy-docs-rehearsal`, `apps-build` on both systems and `fleet-alert`. Each was traced with `nix derivation show` to the causes above, and declared. The re-judgement of the same dumps against the amended file passes (`report.20261127T061438Z` in that directory): among the system and runtime-test attributes only `nixos.cinnabar` changed; the other five NixOS, the four darwin and the twenty home configurations and all twenty-four vmTests are identical.
 - **Rationale**: `just eval-identity` compares stock and iets at one revision (`justfile:435-450`) and cannot show that a cross-revision refactor is neutral. The allow-list takes exact attribute paths, so every affected attribute is named and reviewed with the change.
 
 ### D11: stop-reading-other-hosts-configs' NixOS key-host list is derived from class
@@ -168,15 +171,51 @@ The operator, who edits host facts and deploys. The checks that read the record'
 ## Migration Plan
 
 1. Land establish-refactor-oracle, then stop-reading-other-hosts-configs; this change's parent is the latter's tip. After rebasing onto it, re-run `just drv-diff` from the new parent.
-2. Land this change as one pull request in four commits, each evaluating alone, with `just drv-diff` run after each:
-   - the option and alias;
-   - derived system, class, `clan.machines` and the NixOS key-host list;
-   - lifecycle, cloud and memory;
-   - the resolver, `allowedIps` and stibnite's tag rename.
-
-   The first three must show no drvPath difference outside the oracle's base allow-list; the fourth shows exactly the entries of `drv-delta.txt`.
+2. Land this change as one pull request of one commit: the four task groups (the option and alias; derived system, class, `clan.machines` and the NixOS key-host list; lifecycle, cloud and memory; the resolver, `allowedIps` and stibnite's tag rename) are not separately shippable, and a drvPath diff costs about 15 minutes. The commit's `just drv-diff <parent> <tip> openspec/changes/type-the-fleet-host-registry/drv-delta.txt` shows exactly the entries of `drv-delta.txt`.
 3. After merge, deploy cinnabar (`clan machines update cinnabar`). Then read every post on the fleet alert and failure topics since the deploy began, and confirm from cinnabar that the controller's allowed member list holds the six addresses. No other host's configuration changes, so no other deploy is needed. A host deployed later for unrelated reasons picks up nothing new.
 4. Rollback: revert the pull request and redeploy cinnabar. No state is migrated.
+
+## Gate 1 modality verdicts
+
+This table is the pre-apply spec-and-feature alignment record.
+It carries one row per requirement in this change's three delta specs, with the capability's stratum tag from the proposal and the modality that witnesses the requirement.
+
+No row routes to a Gherkin scenario, so this change lays out no `.feature` file.
+The repository has no BDD runner (no pytest-bdd, cucumber or behave dependency, and no `.feature` file in the tree), so a laid-out scenario would be an unbound surface nothing executes.
+Every observable this change asserts is a value of the evaluated flake, a drvPath, or the controller's state on cinnabar after its deploy, which `nix eval`, the flake checks and their mutants, `just drv-diff`, and a read on cinnabar witness.
+No row routes to an executable-specification modality (`est-property`, `est-contract`, `est-symbolic`): the resolver's five-case evaluation check is an example-based build gate, not a ∀-quantified property, so no EST artifact is laid out.
+Where a scenario has no task that observes it, the row says so rather than naming a witness.
+The operator approved this table, and with it the pre-apply alignment sub-gate, on 2026-11-27.
+
+| Requirement | Capability | Stratum | Modality | Witness |
+|---|---|---|---|---|
+| Each fact about a fleet host is recorded once | `fleet-host-registry` | behavioral | build gate (`nix eval` projections against the baseline) and content search | tasks 1.2, 2.1-2.3, 3.1-3.4, 3.6, 8.2, 8.3; the scenario "A host's system is changed" is witnessed by the 3.8 flip mutant, not by a real system change |
+| A fleet member that runs no configuration is never treated as a host that builds one | `fleet-host-registry` | behavioral | build gate (`nix eval`) | tasks 3.1, 3.3, 5.3 |
+| Lifecycle facts about a host are independent of each other | `fleet-host-registry` | behavioral | build gate (`nix eval` of check names, tincr peers, deployer targets) | tasks 4.1, 4.3-4.5; the scenarios "A cloud server is turned off" and "A host is deferred from checks" are witnessed by electrum (server off, checked) and scheelite (unchecked, enrolled) as they stand, not by an edit |
+| A cloud host's memory follows from its cloud machine type | `fleet-host-registry` | behavioral | build gate (`nix eval`, `cx99` mutant) | task 4.2; the scenario "A cloud server is resized" to a known type has no witnessing task beyond the derivation itself |
+| A host whose memory cannot be read is reported, never silently classified | `fleet-host-registry` | behavioral | build gate (`nix-eval-jobs-iets` check, `memory = 0` mutant under `tryEval`) | tasks 2.4, 4.6 |
+| Membership in a service role is decided by one rule | `fleet-host-registry` | behavioral | build gate (`eval-inventory-members` fixture check and its `all` mutant; reader checks) | tasks 5.1, 5.2 |
+| The overlay network controller admits exactly the externally joined members | `fleet-host-registry` | behavioral | build gate (`nix eval`) and smoke (read on cinnabar after deploy) | tasks 5.3, 7.1, 7.2; the scenario "A laptop joins the fleet" has no witnessing task, since no host is added |
+| A host dropped or reclassified everywhere at once is still caught | `fleet-host-registry` | behavioral | build gate (`readDir` directory assert, `structure-fleet` golden pin, mutants) | tasks 3.7, 3.8; the flip mutant is caught by the directory assert before the golden pin compares (D4); the scenario "A host disappears from the registry" has no mutant run |
+| flake.fleet.hosts holds one typed entry per fleet member | `fleet-host-registry-interface` | interface | build gate (`nix eval`, module types) | tasks 2.1, 2.4 |
+| The submodule sets the read-only fields of each entry | `fleet-host-registry-interface` | interface | build gate (`nix eval`) | tasks 2.2, 4.1 |
+| A field that contradicts the host's class fails when read | `fleet-host-registry-interface` | interface | build gate (mutants under `nix eval` and `tryEval`) | task 2.4 |
+| flake.lib.hosts is a read-only alias of flake.fleet.hosts | `fleet-host-registry-interface` | interface | build gate (JSON projection diff) | tasks 2.3, 8.2 |
+| Per-host values are derived from flake.fleet.hosts | `fleet-host-registry-interface` | interface | build gate (`nix eval`) and content search | tasks 3.1-3.3, 3.5, 3.6 |
+| Host kind is read from class | `fleet-host-registry-interface` | interface | content search and build gate (`network-target-obligations`) | tasks 3.2, 3.4 |
+| Machine checks are selected by checked | `fleet-host-registry-interface` | interface | build gate (`nix eval` of check names) | task 4.3 |
+| tincr peers are selected by class and enrolment | `fleet-host-registry-interface` | interface | build gate (`nix eval`) | task 4.4 |
+| The deployer reads cloud state from the record | `fleet-host-registry-interface` | interface | build gate (`nix eval`, `fleet-deployer-obligations`) | task 4.5 |
+| Cloud memory is read from a machine-type table | `fleet-host-registry-interface` | interface | build gate (`nix eval`, `nix-eval-jobs-iets`) | tasks 4.2, 4.6 |
+| flake.lib.inventoryMembers resolves role membership from the declared inventory | `fleet-host-registry-interface` | interface | build gate (`eval-inventory-members`) | task 5.1 |
+| Every role-membership reader uses the resolver | `fleet-host-registry-interface` | interface | build gate (topology, clamp and controller checks; app evaluation) | tasks 5.2, 5.4 |
+| An inventory tag has one meaning across hosts | `fleet-host-registry-interface` | interface | build gate (`nix eval`) and content search | task 5.4 |
+| The ZeroTier controller's allowedIps is derived from class | `fleet-host-registry-interface` | interface | build gate (`nix eval`, `just drv-diff` with `drv-delta.txt`) | tasks 5.3, 5.5, 8.1 |
+| The machine-check asserts are kept | `fleet-host-registry-interface` | interface | build gate (mutants) and content search | tasks 3.7, 3.8 |
+| The golden pin stays a literal | `fleet-host-registry-interface` | interface | content search (literal pin kept) and build gate (flip mutant, caught by the directory assert first) | tasks 3.7, 3.8 |
+| Trust boundary of the host registry interface | `fleet-host-registry-interface` | interface | capability text | specs text; the scenario "A registry fact is wrong about the machine" is witnessed only by A303's monitor |
+| A300-A305 | `world-assumptions` | world | monitoring (violation scenarios) | A300 by 7.2; A301 by 2.4 and 4.6; A302 by 5.1's citation of clan-core's resolver; A303 by review at each server resize; A304 by 4.1; A305 by 5.5's drv-diff |
+| Grounded vocabulary for behavioral requirements | `world-assumptions` | world | capability text | specs text |
 
 ## Resolved Questions
 

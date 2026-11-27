@@ -56,8 +56,6 @@ in
       # (flake.lib.hosts.<name>.targetHost, the single source).
       clan.core.networking.targetHost = hosts.blackphos.targetHost;
 
-      nixpkgs.hostPlatform = "aarch64-darwin";
-
       # System state version (matching vanixiets configuration)
       # Override base.nix which sets stateVersion = 5
       system.stateVersion = lib.mkForce 4;

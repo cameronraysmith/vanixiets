@@ -190,7 +190,7 @@ let
   failures =
     name: hostConfig:
     let
-      isDarwin = lib.hasSuffix "-darwin" config.flake.lib.machineSystems.${name};
+      isDarwin = config.flake.lib.hosts.${name}.class == "darwin";
       legacy = lib.elem name commitSigningLegacyMachines;
       users = config.flake.users;
       generators = hostConfig.clan.core.vars.generators;

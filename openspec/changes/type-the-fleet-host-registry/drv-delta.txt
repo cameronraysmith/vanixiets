@@ -1,12 +1,47 @@
 # Declared drvPath differences of type-the-fleet-host-registry, from its parent
-# (the tip of stop-reading-other-hosts-configs) to its tip:
+# (main after stop-reading-other-hosts-configs) to its tip:
 #   just drv-diff <parent> <tip> openspec/changes/type-the-fleet-host-registry/drv-delta.txt
-# Checks that embed the whole flake source are covered by establish-refactor-oracle's
-# base allow-list, which every run applies, and are not repeated here.
-# Every other dumped attribute must keep its drvPath (design D10).
+# Checks that embed the whole flake source are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt), which every run applies, and are not
+# repeated here. Every other dumped attribute must keep its drvPath (design D10).
 
 nixos.cinnabar  changed  # ZeroTier controller allowedIps now in registry name order (design D8); same six addresses
 checks.x86_64-linux.nixos-cinnabar  changed  # the machine check returns cinnabar's toplevel (modules/checks/machines.nix)
 checks.x86_64-linux.eval-fleet-topology  changed  # its test file imports ${./fleet-topology.nix} by store path, and task 5.2 edits that file (membersOf -> inventoryMembersIn)
 checks.x86_64-linux.fleet-topology-fresh  changed  # it embeds the committed topology directory, and fleet.json changes with stibnite's tag rename controller -> deployer-workstation (design D12, task 5.4)
 checks.x86_64-linux.eval-inventory-members  added  # the resolver's evaluation check (task 5.1)
+checks.x86_64-linux.fleet-alert  changed  # its fleet-alert-size-rule-clause input renders every testSizes.checks entry; eval-inventory-members adds one
+
+# packages/docs/diagrams/topology/fleet.json is part of the docs package source,
+# and it changes with stibnite's tag rename (design D12). Every check that builds
+# or consumes that package changes with it. apps-build changes only through its
+# deploy-docs input, which embeds the package; the derivation of the edited
+# omnigent-worker-login app is unchanged.
+checks.x86_64-linux.agent-skills-index  changed
+checks.x86_64-linux.apps-build  changed
+checks.x86_64-linux.deploy-docs-rehearsal  changed
+checks.x86_64-linux.package-vanixiets-docs  changed
+checks.x86_64-linux.package-vanixiets-docs-payload  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-report  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-linkcheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-typecheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-unit  changed
+checks.aarch64-darwin.apps-build  changed
+checks.aarch64-darwin.package-vanixiets-docs  changed
+checks.aarch64-darwin.package-vanixiets-docs-payload  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-report  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-linkcheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-typecheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-unit  changed

@@ -3,7 +3,7 @@
 # delegate-fleet-deploys, design D1-D13).
 #
 # Targets are derived, never listed: every NixOS or darwin inventory machine
-# that is enabled (flake.lib.cloudMachines' `enabled` for a cloud machine,
+# that is enabled (flake.fleet.hosts.<name>.cloud.enabled for a cloud machine,
 # present in the inventory otherwise), minus the operator's workstations
 # stibnite and blackphos. Re-enabling a cloud machine makes it a target with
 # no edit here.
@@ -27,7 +27,6 @@
 let
   inherit (config.flake.lib)
     hosts
-    cloudMachines
     mesh
     ztRecords
     vars
@@ -60,8 +59,7 @@ let
     ssh = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAnu4jxBMb1qSCgURz/E7mqrQvakcuuand4ZWFby+eGR fleet-deployer@cinnabar";
   };
 
-  cloud = cloudMachines.hetzner // cloudMachines.gcp;
-  enabledOf = name: if cloud ? ${name} then cloud.${name}.enabled else true;
+  enabledOf = name: hosts.${name}.cloud == null || hosts.${name}.cloud.enabled;
 
   classOf = name: inventory.${name}.machineClass;
   isTarget =

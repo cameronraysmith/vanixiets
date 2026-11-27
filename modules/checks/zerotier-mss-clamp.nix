@@ -17,19 +17,11 @@
     let
       instance = self.clan.inventory.instances.zerotier;
       machines = self.clan.inventory.machines;
-      roleMembers =
-        role:
-        lib.attrNames (role.machines or { })
-        ++ lib.attrNames (
-          lib.filterAttrs (
-            _: machine: lib.any (tag: (role.tags or { }) ? ${tag}) (machine.tags or [ ])
-          ) machines
-        );
       members = lib.filter (name: (machines.${name}.machineClass or "nixos") == "nixos") (
         lib.unique (
-          lib.concatMap roleMembers [
-            instance.roles.controller
-            instance.roles.peer
+          lib.concatMap (self.lib.inventoryMembers instance) [
+            "controller"
+            "peer"
           ]
         )
       );

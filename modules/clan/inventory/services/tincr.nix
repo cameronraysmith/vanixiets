@@ -1,6 +1,8 @@
 # The fleet's tincr mesh, beside ZeroTier until the cutover: every NixOS and
-# darwin member of the registry is a peer, except blackphos (below), and
-# members with public endpoints are dialled at them. The instance name is
+# darwin member of the registry that is enrolled with clan (its machine key is
+# committed under sops/machines) is a peer, so a reserved name with no machine,
+# such as blackphos, is left out until a machine takes it; members with public
+# endpoints are dialled at them. The instance name is
 # flake.lib.mesh.instance, which names the network, the key generator and the
 # interfaces.
 #
@@ -21,12 +23,7 @@ let
     vars
     ;
 
-  peers = lib.filterAttrs (
-    name: host:
-    host.class != "android"
-    # blackphos: reserved name with no machine; enrolled when a machine takes the name.
-    && name != "blackphos"
-  ) hosts;
+  peers = lib.filterAttrs (_: host: host.class != "android" && host.enrolled) hosts;
 
   # Phones, keyed by registry name, each with the Ed25519 public key tincapp
   # generated when it joined by invitation.

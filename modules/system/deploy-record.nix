@@ -145,7 +145,7 @@ let
     failures =
       name: hostConfig:
       let
-        isDarwin = lib.hasSuffix "-darwin" config.flake.lib.machineSystems.${name};
+        isDarwin = config.flake.lib.hosts.${name}.class == "darwin";
         script = hostConfig.vanixiets.deployRecord.script or null;
         # The activation script the platform assembles from every snippet:
         # nixpkgs' activation-script.nix adds `script` in the option's apply,

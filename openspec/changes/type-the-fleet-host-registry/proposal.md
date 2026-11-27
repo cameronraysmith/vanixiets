@@ -3,15 +3,17 @@ linear_story_id: CAM-134
 linear_story_identifier: CAM-134
 linear_story_title: "Record each fleet host once, as one typed record"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-134/record-each-fleet-host-once-as-one-typed-record
-linear_story_state: Todo
+linear_story_state: In Review
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: Todo
-last_synced_at: "2026-11-26T23:02:17Z"
+last_synced_state: In Review
+last_synced_at: "2026-11-27T06:20:11Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:02:17Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-134 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
+  - { at: "2026-11-27T05:44:22Z", transition: "Todo->In Progress", outcome: "posted", note: "first tasks.md checkbox (1.2 baseline) checked; state confirmed In Progress by read-only view" }
+  - { at: "2026-11-27T06:20:11Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md written (PASS WITH WARNINGS); state confirmed In Review by read-only view; comment posted" }
 ---
 
 ## Why
@@ -36,12 +38,12 @@ Each fleet host's facts are spread across six hand-kept tables, and its kind is 
 **One role-membership rule**
 - From: four readers resolve clan role membership in three different ways, and two of them miss members added by tag.
 - To: one resolver over the declared inventory, used by all four. The ZeroTier controller's list of external members is derived from class (darwin or phone) instead of written out.
-- Impact: the controller's list changes order, so cinnabar's configuration and machine check change and cinnabar is redeployed once; the operator accepted this reorder on 2026-11-26 rather than keep a hand-ordered list that restates the set. The members are the same six. The fleet-topology evaluation check also changes, because it copies the source file this change edits, and the resolver gains a new evaluation check.
+- Impact: the controller's list changes order, so cinnabar's configuration and machine check change and cinnabar is redeployed once; the operator accepted this reorder on 2026-11-26 rather than keep a hand-ordered list that restates the set. The members are the same six. The fleet-topology evaluation check also changes, because it copies the source file this change edits, and the resolver gains a new evaluation check, which the fleet alert check's list of check sizes gains too.
 
 **One meaning per inventory tag**
 - From: the inventory tag `controller` means the ZeroTier controller on cinnabar and the operator's deployment workstation on stibnite, so `clan machines update --tags controller` reaches both a NixOS server and a darwin workstation.
 - To: stibnite's tag becomes `deployer-workstation`, as the operator decided on 2026-11-26. `--tags controller` then selects only cinnabar. No clan role reads either tag.
-- Impact: the committed fleet map (`fleet.json`) is regenerated, so `fleet-topology-fresh` changes. An operator who types `--tags controller` to deploy stibnite must now type `--tags deployer-workstation`. No host configuration changes.
+- Impact: the committed fleet map (`fleet.json`) is regenerated, so `fleet-topology-fresh` changes, and so does every check that builds or consumes the docs package, whose source holds the map. An operator who types `--tags controller` to deploy stibnite must now type `--tags deployer-workstation`. No host configuration changes.
 
 **Non-goals**: the host↔user relation record, generating clan user instances, and making host modules read the new `stateVersion` field (later changes build on this record); retyping the collector table beyond its platform field; moving terraform's cloud table into the record; per-machine-directory contributions to the record.
 
