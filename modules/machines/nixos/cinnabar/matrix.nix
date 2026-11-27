@@ -52,7 +52,7 @@ in
       '';
     };
 
-  flake.modules.nixos."machines/nixos/cinnabar" =
+  flake.modules.nixos.matrix-server =
     {
       config,
       pkgs,

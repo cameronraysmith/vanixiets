@@ -4,7 +4,7 @@
 # fleet-deadman among cinnabar's notified units from
 # flake.lib.observabilityHosts.
 {
-  flake.modules.nixos."machines/nixos/cinnabar" =
+  flake.modules.nixos.fleet-alert-deadman =
     {
       config,
       lib,

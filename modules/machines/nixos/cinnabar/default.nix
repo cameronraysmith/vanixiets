@@ -17,23 +17,38 @@ in
       ...
     }:
     {
-      imports = [
-        inputs.srvos.nixosModules.server
-        inputs.srvos.nixosModules.hardware-hetzner-cloud
-        inputs.home-manager.nixosModules.home-manager
-      ]
-      ++ (with flakeModules; [
-        base
-        home-manager-integration
-        deploy-record
-        fleet-alert
-        fleet-deployer
-        hm-sops-bridge
-        kvm-declaration
-        ntfy-alerter
-        observability-notify
-        ssh-known-hosts
-      ]);
+      # cinnabar's features, each under its own key in this directory, sit
+      # where import-tree's file order placed them when they were sibling
+      # definitions of this module: the three caddy files before this body's
+      # imports, the rest after them.
+      imports =
+        (with flakeModules; [
+          caddy-root-ca
+          caddy-root-check
+          caddy
+        ])
+        ++ [
+          inputs.srvos.nixosModules.server
+          inputs.srvos.nixosModules.hardware-hetzner-cloud
+          inputs.home-manager.nixosModules.home-manager
+        ]
+        ++ (with flakeModules; [
+          base
+          home-manager-integration
+          deploy-record
+          fleet-alert
+          fleet-deployer
+          hm-sops-bridge
+          kvm-declaration
+          ntfy-alerter
+          observability-notify
+          ssh-known-hosts
+          fleet-alert-deadman
+          matrix-server
+          ntfy-server
+          radicle-node
+          zt-dns-server
+        ]);
 
       # ZFS device node path - more stable for cloud VMs
       boot.zfs.devNodes = "/dev/disk/by-path";

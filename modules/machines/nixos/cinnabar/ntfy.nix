@@ -1,6 +1,6 @@
 { ... }:
 {
-  flake.modules.nixos."machines/nixos/cinnabar" =
+  flake.modules.nixos.ntfy-server =
     { config, pkgs, ... }:
     {
       # ntfy's provisioning of the alerter user and its token (design D5,

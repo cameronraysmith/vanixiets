@@ -4,7 +4,7 @@ let
   inherit (hosts) cinnabar magnetite;
 in
 {
-  flake.modules.nixos."machines/nixos/cinnabar" =
+  flake.modules.nixos.caddy =
     {
       config,
       lib,

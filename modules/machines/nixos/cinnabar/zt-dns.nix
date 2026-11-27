@@ -48,7 +48,7 @@ in
       "pyrite"
     ];
 
-  flake.modules.nixos."machines/nixos/cinnabar" =
+  flake.modules.nixos.zt-dns-server =
     {
       config,
       lib,

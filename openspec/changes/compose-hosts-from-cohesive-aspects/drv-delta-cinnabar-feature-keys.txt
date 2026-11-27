@@ -1,0 +1,6 @@
+# Giving cinnabar's feature files their own flake.modules.nixos keys
+# (caddy, caddy-root-ca, caddy-root-check, fleet-alert-deadman,
+# matrix-server, ntfy-server, radicle-node, zt-dns-server) and importing
+# them from cinnabar's default.nix in import-tree's former order is
+# source-only: no toplevel, home, check or vmTests drvPath changes beyond
+# the base allow-list. No entries.

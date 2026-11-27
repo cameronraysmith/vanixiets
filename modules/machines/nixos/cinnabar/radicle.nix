@@ -1,6 +1,6 @@
 { ... }:
 {
-  flake.modules.nixos."machines/nixos/cinnabar" =
+  flake.modules.nixos.radicle-node =
     { config, pkgs, ... }:
     {
       # Clan vars key generator for radicle node identity

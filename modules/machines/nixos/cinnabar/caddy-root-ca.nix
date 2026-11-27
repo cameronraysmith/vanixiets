@@ -10,7 +10,7 @@ let
   caddyLocalRoot = config.flake.modules.nixos.caddy-local-root;
 in
 {
-  flake.modules.nixos."machines/nixos/cinnabar" =
+  flake.modules.nixos.caddy-root-ca =
     { config, ... }:
     let
       files = config.clan.core.vars.generators.caddy-root-ca.files;

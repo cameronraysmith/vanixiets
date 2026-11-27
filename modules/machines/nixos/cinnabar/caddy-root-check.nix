@@ -8,7 +8,7 @@ let
   flakeLib = config.flake.lib;
 in
 {
-  flake.modules.nixos."machines/nixos/cinnabar" =
+  flake.modules.nixos.caddy-root-check =
     {
       config,
       lib,
