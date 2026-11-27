@@ -8,3 +8,4 @@
 # changed or removed before the step merges.
 
 checks.x86_64-linux.secrets-seam-confinement  changed  # the step clears its files from the literal list and from the search result (design D9)
+checks.x86_64-linux.eval-users-lib  changed  # home/users/lib.test.nix:26 imports home/users/lib.nix by store path, and the step rewrites its signingKey defaultText through flake.lib.vars.path (design D12)
