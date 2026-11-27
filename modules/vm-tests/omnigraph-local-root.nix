@@ -394,9 +394,11 @@
                     writer = machine.succeed("systemctl show -P MainPID held-writer.service").strip()
                     machine.fail("systemctl reset-failed omnigraph-server.service && systemctl restart omnigraph-server.service")
                     journal = server_journal()
-                    refusal = f"an omnigraph process has the root open (pid {writer}: "
+                    refusal = f"an omnigraph process has the root open (pid {writer}, omnigraph)"
                     assert refusal in journal, journal
-                    print(journal[journal.index(refusal) - 60:][:400])
+                    detail = [l for l in journal.splitlines() if l.startswith(f"omnigraph-lock-recovery: pid {writer} runs ")]
+                    assert detail and all("--target ${root} --graph cookbook-beads load" in l for l in detail), journal
+                    print(journal[journal.index(refusal) - 60:][:600])
                     # The refusal notice is attempted; this VM reaches no ntfy server.
                     assert "omnigraph-lock-recovery: the refusal notice was not posted" in journal, journal
                     machine.succeed("sha256sum --check --status /tmp/lock.sha256")

@@ -7,8 +7,9 @@
 # root /var/lib/omnigraph/clusters/cookbooks-f17 and
 # its __cluster/lock.json, and the counter under /var/lib/omnigraph-metrics.
 # The program is built with a stub `omnigraph`, which logs its arguments,
-# answers `cluster status --json` with the lock file's lock_id (or the row's)
-# and removes the lock on `cluster force-unlock`; with a stub ntfy-send,
+# answers `cluster status --json` with the lock file's lock_id (or the row's,
+# or the row's raw answer) and removes the lock on `cluster force-unlock`;
+# with a stub ntfy-send,
 # which logs its arguments and NTFY_TOKEN_FILE; and with a scripted process
 # table, a directory of `<pid>/exe` links, `<pid>/cmdline` files and
 # `<pid>/status` files holding the owner's uids, and a `stat` holding
@@ -16,16 +17,22 @@
 # asserts the exit status, the stub's argument log, the lock file
 # (unchanged, byte for byte, or removed), the counter, the notices posted
 # and, for a refusal, the reason printed and the one notice carrying that
-# reason and the manual step and nothing of the lock file's content.
+# reason and the manual step and nothing of the lock file's content or of
+# any process's arguments, which only the journal gets.
 #
 # There is one row per scenario of the requirement `The server's start
 # clears a stale serve lock` (openspec change serve-omnigraph-from-local-disk,
 # graph-store-interface), and rows for an unconfirmed unlock, a failed
 # recovery notice, a failed refusal notice, a counter that already holds a
-# count, the processes the scan counts as writers, and a writer or a
-# configured root that spells the root with a doubled slash, a `.` segment
-# or a trailing slash. The row `packaged-record` runs the packaged omnigraph
-# instead: it applies a one-graph cluster to the root,
+# count, a counter that cannot be written, the processes the scan counts as
+# writers, a writer or a configured root that spells the root with a
+# doubled slash, a `.` or `..` segment or a trailing slash, a `cluster
+# status` answer that is not one JSON object with a string or null lock_id
+# (not JSON, an array, a number lock_id, nothing), jq missing from the
+# program's PATH, and a step that fails where the program has no guard of
+# its own (its working directory cannot be made). The row `packaged-record`
+# runs the packaged omnigraph instead: it applies a one-graph cluster to the
+# root,
 # starts omnigraph-server, kills it with SIGKILL, and requires the record it
 # left to have exactly the fields the program reads, the program built with
 # the packaged omnigraph and the real /proc to clear it, and the server to
@@ -36,7 +43,10 @@
 # under it; btimeUnchecked accepts any boot time, and the rows btime-missing
 # and stat-unreadable must fail; omnigraphAtPidExcused lets the boot time
 # excuse an omnigraph server at the lock's pid, and the row
-# stepped-clock-server must fail.
+# stepped-clock-server must fail; statusUnguarded reads `cluster status`
+# without its guard, and the row status-answers must fail; errTrapRemoved
+# drops the trap on unexpected failures, and the row later-step-fails must
+# fail.
 { self, lib, ... }:
 {
   perSystem =
@@ -64,7 +74,9 @@
           case "$*" in
             *" cluster status --json")
               [ -z "''${STUB_STATUS_FAIL:-}" ] || exit 1
-              if [ -n "''${STUB_STATUS_LOCK:-}" ]; then
+              if [ -n "''${STUB_STATUS_RAW+set}" ]; then
+                printf '%s' "$STUB_STATUS_RAW"
+              elif [ -n "''${STUB_STATUS_LOCK:-}" ]; then
                 jq -n --arg id "$STUB_STATUS_LOCK" '{lock_id: $id}'
               else
                 jq '{lock_id}' "$target/__cluster/lock.json"
@@ -108,6 +120,13 @@
       spelledRootProgram =
         recoveryAt "/var/lib/omnigraph//clusters/./cookbooks-f17/" stubOmnigraph
           procDir;
+      # The program with jq taken out of the PATH it sets.
+      jqMissingProgram = pkgs.runCommand "omnigraph-lock-recovery-without-jq" { } ''
+        mkdir -p "$out/bin"
+        cp ${lib.getExe program} "$out/bin/omnigraph-lock-recovery"
+        chmod +w "$out/bin/omnigraph-lock-recovery"
+        substituteInPlace "$out/bin/omnigraph-lock-recovery" --replace-fail ${lib.escapeShellArg "${lib.getBin pkgs.jq}/bin:"} ""
+      '';
 
       mutants = {
         scanSkipped = {
@@ -130,6 +149,16 @@
           from = ''if [ "$pid_program" = omnigraph ] || [ "$pid_program" = omnigraph-server ]; then'';
           to = "if false; then";
           rows = [ "stepped-clock-server" ];
+        };
+        statusUnguarded = {
+          from = ''if ! reported=$(jq -ser "$status_filter" <<<"$status" 2>/dev/null); then'';
+          to = ''reported=$(jq -r '.lock_id // "none"' <<<"$status"); if false; then'';
+          rows = [ "status-answers" ];
+        };
+        errTrapRemoved = {
+          from = ''trap 'on_error "$?" "$LINENO" "$BASH_COMMAND"' ERR'';
+          to = "true";
+          rows = [ "later-step-fails" ];
         };
       };
       mutantProgram =
@@ -221,7 +250,7 @@
               printf 'cpu  1 2 3 4\nbtime %s\nprocesses 9\n' ${toString bootBefore} >"$dir/proc/stat"
               : >"$dir/log/omnigraph"
               : >"$dir/log/ntfy"
-              unset STUB_STATUS_LOCK STUB_STATUS_FAIL STUB_UNLOCK_REFUSED NTFY_FAIL
+              unset STUB_STATUS_LOCK STUB_STATUS_FAIL STUB_STATUS_RAW STUB_UNLOCK_REFUSED NTFY_FAIL ROW_TMPDIR ROW_PATH
             }
             boot_at() { # <btime>
               printf 'cpu  1 2 3 4\nbtime %s\nprocesses 9\n' "$1" >"$dir/proc/stat"
@@ -251,7 +280,8 @@
               set +e
               STUB_LOG=/run/log/omnigraph NTFY_LOG=/run/log/ntfy \
                 bwrap --unshare-all --die-with-parent \
-                  --proc /proc --dev /dev --tmpfs /tmp --setenv TMPDIR /tmp \
+                  --proc /proc --dev /dev --tmpfs /tmp --setenv TMPDIR "''${ROW_TMPDIR:-/tmp}" \
+                  --setenv PATH "''${ROW_PATH:-$PATH}" \
                   --ro-bind /nix/store /nix/store \
                   --ro-bind ${passwd} /etc/passwd \
                   --bind "$dir/var-lib" /var/lib \
@@ -267,7 +297,7 @@
               if [ "$1" = 0 ]; then
                 [ "$code" = 0 ] || { cat "$dir/err" >&2; fail "exit $code, expected 0"; }
               else
-                [ "$code" != 0 ] || fail "exit 0, expected a refusal"
+                [ "$code" = 1 ] || { cat "$dir/err" >&2; fail "exit $code, expected a refusal's 1"; }
               fi
             }
             expect_calls() { # <argument lines...>
@@ -301,8 +331,15 @@
               grep -qF -- "$1" "$dir/err" || fail "the reason does not name '$1': $(cat "$dir/err")"
               grep -qF -- "$1" "$dir/log/ntfy" || fail "the notice does not name '$1': $(cat "$dir/log/ntfy")"
             }
+            expect_journal_only() { # <fixed string>: printed, never posted
+              grep -qF -- "$1" "$dir/err" || fail "the journal does not name '$1': $(cat "$dir/err")"
+              if grep -qF -- "$1" "$dir/log/ntfy"; then
+                fail "the notice carries '$1': $(cat "$dir/log/ntfy")"
+              fi
+            }
             # One notice, to fleet-alerts with the alerter token, carrying the
-            # printed reason and manual step and none of lock.json's content.
+            # printed reason and manual step, none of lock.json's content and
+            # none of a process's arguments.
             expect_refusal_notice() {
               local reason manual
               expect_notices 1
@@ -315,6 +352,9 @@
               grep -qF -- "$manual" "$dir/log/ntfy" || fail "the refusal notice lacks the manual step '$manual': $(cat "$dir/log/ntfy")"
               if grep -qE '"lock_id"|lock_id=' "$dir/log/ntfy"; then
                 fail "the refusal notice carries lock.json's content: $(cat "$dir/log/ntfy")"
+              fi
+              if grep -qE -- '--target |--data |--bind |--cluster |seed\.jsonl|sleep 600' "$dir/log/ntfy"; then
+                fail "the refusal notice carries a process's arguments: $(cat "$dir/log/ntfy")"
               fi
             }
             refused_untouched() {
@@ -353,7 +393,8 @@
               run_program
               refused_untouched
               expect_calls
-              expect_reason "pid 77: omnigraph --target ${root} load"
+              expect_reason "an omnigraph process has the root open (pid 77, omnigraph)"
+              expect_journal_only "pid 77 runs ${omnigraphExe}: omnigraph --target ${root} load --data /tmp/seed.jsonl"
             }
             row_running_server() {
               start_row running-server
@@ -362,7 +403,8 @@
               run_program
               refused_untouched
               expect_calls
-              expect_reason "pid 91: omnigraph-server --cluster ${root}"
+              expect_reason "an omnigraph process has the root open (pid 91, omnigraph-server)"
+              expect_journal_only "pid 91 runs ${serverExe}: omnigraph-server --cluster ${root} --bind"
             }
             row_unrelated_processes() {
               start_row unrelated-processes
@@ -371,6 +413,7 @@
               process 13 ${toString otherUid} /run/current-system/sw/bin/ls ls ${root}
               process 14 ${toString omnigraphUid} ${omnigraphExe} omnigraph version
               process 15 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target /var/lib/omnigraph//clusters/cookbooks-f17-r2/ cluster status
+              process 16 ${toString omnigraphUid} ${omnigraphExe} omnigraph --target /var/lib/omnigraph/clusters/cookbooks-f17/../cookbooks-f17-r2 cluster status
               kernel_thread 2
               run_program
               expect_code 0
@@ -424,6 +467,53 @@
               refused_untouched
               expect_calls "$status_call"
             }
+            # A `cluster status` that exits 0 with an answer the program
+            # cannot read as one JSON object with a string or null lock_id.
+            status_answer() { # <name> <raw answer>
+              start_row "status-$1"
+              serve_lock
+              export STUB_STATUS_RAW="$2"
+              run_program
+              refused_untouched
+              expect_calls "$status_call"
+              expect_reason "omnigraph cluster status --json did not answer with one JSON object whose lock_id is a string or null"
+            }
+            row_status_answers() {
+              status_answer not-json 'not json'
+              status_answer array '[1]'
+              status_answer number-lock-id '{"lock_id":5}'
+              status_answer two-objects '{"lock_id":null}{"lock_id":null}'
+              status_answer empty ""
+            }
+            row_jq_missing() {
+              start_row jq-missing
+              serve_lock
+              export ROW_PATH=/var/empty
+              program=${lib.getExe' jqMissingProgram "omnigraph-lock-recovery"}
+              run_program
+              refused_untouched
+              expect_calls
+              expect_reason "jq is not on the PATH of omnigraph-lock-recovery"
+            }
+            # A step the program has no guard for fails (its working
+            # directory for omnigraph cannot be made): the trap refuses,
+            # naming the step, and exits 1 whether or not the notice posts.
+            row_later_step_fails() {
+              start_row later-step-fails
+              serve_lock
+              export ROW_TMPDIR=/nonexistent
+              run_program
+              refused_untouched
+              expect_calls
+              expect_reason "mktemp -d"
+              expect_reason "failed with exit status 1"
+              start_row later-step-fails-notice-fails
+              serve_lock
+              export ROW_TMPDIR=/nonexistent NTFY_FAIL=1
+              run_program
+              refused_untouched
+              grep -qF 'omnigraph-lock-recovery: the refusal notice was not posted' "$dir/err" || fail "the failed post is not logged: $(cat "$dir/err")"
+            }
             unreadable() { # <name> <record>
               start_row "unreadable-$1"
               write_lock "$2"
@@ -470,6 +560,22 @@
               expect_counter 1
               expect_notices 1
             }
+            # A counter that cannot be written after a confirmed unlock: the
+            # recovery notice still posts, the journal says so, and the
+            # start goes on.
+            row_counter_unwritable() {
+              start_row counter-unwritable
+              serve_lock
+              : >"$dir/var-lib/omnigraph-metrics"
+              run_program
+              expect_code 0
+              expect_calls "$status_call" "$unlock_call"
+              expect_lock_cleared
+              expect_notices 1
+              grep -qF 'fleet-alerts -H Priority: low' "$dir/log/ntfy" || fail "the notice is not a low-priority fleet-alerts post: $(cat "$dir/log/ntfy")"
+              grep -qF 'cleared the stale serve lock ${lockId}' "$dir/log/ntfy" || fail "the notice does not say the lock was cleared: $(cat "$dir/log/ntfy")"
+              grep -qF 'could not be written' "$dir/err" || fail "the journal does not say the counter could not be written: $(cat "$dir/err")"
+            }
 
             # Process state the program cannot read makes it refuse rather
             # than count as no process.
@@ -491,7 +597,8 @@
               run_program
               refused_untouched
               expect_calls
-              expect_reason "the executable of pid 78 (omnigraph --target ${root} load"
+              expect_reason "the executable of pid 78 cannot be read"
+              expect_journal_only "pid 78's command line: omnigraph --target ${root} load --data /tmp/seed.jsonl"
             }
             row_owner_unreadable() {
               start_row owner-unreadable
@@ -501,7 +608,8 @@
               run_program
               refused_untouched
               expect_calls
-              expect_reason "the owner of pid 79 (omnigraph --target ${root} status) cannot be read"
+              expect_reason "the owner of pid 79 (omnigraph) cannot be read"
+              expect_journal_only "pid 79 runs /home/mallory/omnigraph: omnigraph --target ${root} status"
             }
             row_btime_missing() {
               start_row btime-missing
@@ -535,7 +643,8 @@
               run_program
               refused_untouched
               expect_calls "$status_call"
-              expect_reason "pid 4242, which lock ${lockId} names, is running ${serverExe} (omnigraph-server --target cookbooks"
+              expect_reason "pid 4242, which lock ${lockId} names, is running omnigraph-server, so"
+              expect_journal_only "pid 4242 runs ${serverExe}: omnigraph-server --target cookbooks --bind"
             }
 
             # Which processes the scan counts as writers of the root.
@@ -556,7 +665,8 @@
               run_program
               refused_untouched
               expect_calls
-              expect_reason "pid 56: omnigraph --target ${root} load"
+              expect_reason "an omnigraph process has the root open (pid 56, omnigraph)"
+              expect_journal_only "pid 56 runs $3: omnigraph --target ${root} load --data /tmp/seed.jsonl"
             }
             row_counted_writers() {
               counted_writer store-binary-other-user ${toString otherUid} ${omnigraphExe}
@@ -564,9 +674,9 @@
               counted_writer other-binary-as-root 0 /usr/local/bin/omnigraph
             }
 
-            # A writer may spell the root with doubled slashes, `.` segments,
-            # a trailing slash or as a file URI, and so may the configured
-            # root; the scan compares both normalised.
+            # A writer may spell the root with doubled slashes, `.` and `..`
+            # segments, a trailing slash or as a file URI, and so may the
+            # configured root; the scan compares both normalised.
             spelled_writer() { # <name> <root as the writer names it>
               start_row "$1"
               serve_lock
@@ -574,12 +684,15 @@
               run_program
               refused_untouched
               expect_calls
-              expect_reason "pid 57: omnigraph --target $2 load"
+              expect_reason "an omnigraph process has the root open (pid 57, omnigraph)"
+              expect_journal_only "pid 57 runs ${omnigraphExe}: omnigraph --target $2 load"
             }
             row_spelled_writers() {
               spelled_writer doubled-slash /var/lib/omnigraph//clusters/cookbooks-f17
               spelled_writer dot-segment-trailing-slash /var/lib/omnigraph/./clusters/cookbooks-f17/
               spelled_writer file-uri file:///var/lib/omnigraph//clusters/cookbooks-f17/
+              spelled_writer dot-dot-segment /var/lib/omnigraph/clusters/x/../cookbooks-f17
+              spelled_writer dot-dot-above-root /../var/lib/omnigraph/clusters/cookbooks-f17
             }
             row_spelled_root() {
               start_row spelled-root
@@ -589,7 +702,8 @@
               run_program
               refused_untouched
               expect_calls
-              expect_reason "pid 58: omnigraph --target ${root} load"
+              expect_reason "an omnigraph process has the root open (pid 58, omnigraph)"
+              expect_journal_only "pid 58 runs ${omnigraphExe}: omnigraph --target ${root} load"
             }
 
             # A refusal whose notice fails still refuses, with exit status 1.
@@ -662,6 +776,7 @@
               unreadable unlock_unconfirmed counter_counts_on notice_fails refusal_notice_fails
               listing_unreadable exe_unreadable owner_unreadable btime_missing stat_unreadable
               stepped_clock_server imposter_ignored counted_writers spelled_writers spelled_root
+              status_answers jq_missing later_step_fails counter_unwritable
             )
             program=${lib.getExe program}
             for r in "''${rows[@]}"; do

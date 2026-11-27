@@ -24,10 +24,13 @@
 #      which the server's sandbox would hide from it); an executable of that
 #      name elsewhere, run by another user, is not omnigraph's, and counting
 #      it would let any user hold the server down. Each argument and the
-#      root are compared with runs of slashes collapsed, `.` segments
-#      dropped and a trailing slash removed, so that
-#      `/var/lib/omnigraph//clusters/<root>/` and
-#      `file:///var/lib/omnigraph/clusters/<root>` name the root too;
+#      root are compared normalised lexically, without reading the file
+#      system: runs of slashes collapsed, `.` segments dropped, a `..`
+#      segment taking away the one before it, and a trailing slash removed,
+#      so that `/var/lib/omnigraph//clusters/x/../<root>/` and
+#      `file:///var/lib/omnigraph/clusters/<root>` name the root too; a
+#      symbolic link in an argument's path is not followed, so a writer
+#      naming the root through a link is not counted by this step;
 #   4. the record is OmniGraph's held-lock shape (version 1, string lock_id,
 #      operation and created_at, positive integer pid), its created_at is a
 #      date, and `omnigraph cluster status --json` reports the same lock_id;
@@ -45,12 +48,17 @@
 # --json`, requires `"unlocked": true`, adds one to the integer in
 # `counterFile` (0 when absent), which omnigraph-probe publishes, and posts a
 # low-priority notice to fleet-alerts through ntfy-send, whose failure does
-# not fail the start. Any other case leaves lock.json as it is, prints the
-# reason and the manual step, posts both to fleet-alerts in one notice of
-# default priority, never with the lock file's content, and exits 1, so the
-# start fails visibly; a failed post is logged and changes nothing else. An
-# unlock that does not report the lock removed also posts a notice and exits
-# 1.
+# not fail the start; a counter that cannot be written is logged, named in
+# the notice, and does not fail the start either. Any other case, an
+# unguarded step that fails included (an ERR trap catches it and names the
+# step), leaves lock.json as it is, prints the reason and the manual step,
+# posts both to fleet-alerts in one notice of default priority, and exits 1,
+# so the start fails visibly; a failed post is logged and changes nothing
+# else. The notice carries the reason and the manual step, which may name
+# the lock's id, operation, pid and creation time and a process's pid and
+# executable name; never a line of the lock file and never a process's
+# arguments, which only the journal gets. An unlock that does not report the
+# lock removed also posts a notice and exits 1.
 #
 # A server in another pid namespace (a container) passes steps 7 and 8:
 # its record's pid is the namespace's, which on the host is absent or
@@ -95,6 +103,7 @@
         pkgs.jq
       ];
       text = ''
+        set -o errtrace
         root=${lib.escapeShellArg root}
         lock="$root/__cluster/lock.json"
         proc=${lib.escapeShellArg proc}
@@ -118,23 +127,57 @@
         }
         refusal_title=${lib.escapeShellArg "omnigraph lock not recovered on ${hostName}"}
 
-        refuse() { # <reason> <manual step>
+        # Every end but "no lock" and "recovered" comes here. The detail, a
+        # process's command line, goes to the journal only.
+        refuse() { # <reason> <manual step> [detail]
+          trap - ERR
+          set +e
           printf 'omnigraph-lock-recovery: left %s in place: %s\n' "$lock" "$1" >&2
+          [ -z "''${3:-}" ] || printf 'omnigraph-lock-recovery: %s\n' "$3" >&2
           printf 'omnigraph-lock-recovery: omnigraph-server stays stopped until the lock is cleared. %s\n' "$2" >&2
           post "refusal notice" "$refusal_title" \
             "omnigraph-server on ${hostName} stays stopped: omnigraph-lock-recovery left $lock in place: $1. $2"
           exit 1
         }
 
-        # Sets `normalised` to $1 with runs of slashes collapsed, `.`
-        # segments dropped and a trailing slash removed.
+        # A failing command outside any guard. errtrace hands the trap to
+        # command substitutions and functions too; there it only ends that
+        # subshell with the status, so the main shell refuses once.
+        # shellcheck disable=SC2329 # invoked by the ERR trap below
+        on_error() { # <status> <line> <command>
+          [ "$BASHPID" = "$$" ] || exit "$1"
+          refuse "the step \`$3\` (line $2) failed with exit status $1" \
+            "Read journalctl -u omnigraph-server, and once no omnigraph process runs against the root, run: $manual force-unlock ''${lock_id:-<lock_id>}"
+        }
+        # mutant: errTrapRemoved
+        trap 'on_error "$?" "$LINENO" "$BASH_COMMAND"' ERR
+
+        # Sets `normalised` to $1 normalised lexically: what precedes its
+        # first slash (a relative path's first segment, `file:`, `--x=`) is
+        # kept, and the rest is an absolute path whose runs of slashes are
+        # collapsed, whose `.` segments are dropped, whose `..` segments take
+        # away the segment before them (none at the top), and which has no
+        # trailing slash.
         normalise() {
-          local p=$1
-          while [[ $p == *//* ]]; do p=''${p//\/\//\/}; done
-          while [[ $p == */./* ]]; do p=''${p//\/.\//\/}; done
-          p=''${p%/.}
-          [ "$p" = / ] || p=''${p%/}
-          normalised=$p
+          local p=$1 prefix rest segment
+          local -a kept=()
+          if [[ $p != */* ]]; then
+            normalised=$p
+            return 0
+          fi
+          prefix=''${p%%/*}
+          rest=''${p#*/}/
+          while [ -n "$rest" ]; do
+            segment=''${rest%%/*}
+            rest=''${rest#*/}
+            case $segment in
+              "" | .) ;;
+              ..) [ "''${#kept[@]}" = 0 ] || unset 'kept[-1]' ;;
+              *) kept+=("$segment") ;;
+            esac
+          done
+          local IFS=/
+          normalised="$prefix/''${kept[*]}"
         }
         normalise "$root"
         root_path=$normalised
@@ -153,7 +196,7 @@
           [ "''${#args[@]}" -gt 0 ] || return 1
           if ! exe=$(readlink -- "$1/exe" 2>/dev/null); then
             [ -e "$1" ] || return 1
-            refuse "the executable of pid $pid (''${args[*]}) cannot be read" "$check"
+            refuse "the executable of pid $pid cannot be read" "$check" "pid $pid's command line: ''${args[*]}"
           fi
           exe=''${exe% (deleted)}
         }
@@ -164,8 +207,9 @@
           local uids uid writer
           if ! uids=$(awk '$1 == "Uid:" { print $2, $3, $4, $5; found = 1 } END { exit !found }' "$1/status" 2>/dev/null); then
             [ -e "$1" ] || return 1
-            refuse "the owner of pid ''${1##*/} (''${args[*]}) cannot be read" \
-              "Confirm with ps -o pid,user,args -p ''${1##*/} that it is not an omnigraph process using the root, then run: systemctl restart omnigraph-server"
+            refuse "the owner of pid ''${1##*/} (''${exe##*/}) cannot be read" \
+              "Confirm with ps -o pid,user,args -p ''${1##*/} that it is not an omnigraph process using the root, then run: systemctl restart omnigraph-server" \
+              "pid ''${1##*/} runs $exe: ''${args[*]}"
           fi
           for uid in $uids; do
             for writer in "''${writer_uids[@]}"; do
@@ -175,7 +219,8 @@
           return 1
         }
 
-        # Sets `holder` to `pid <pid>: <argv>` of the first process that may
+        # Sets `holder` to `pid <pid>, <executable name>` and `holder_detail`
+        # to its executable and command line, of the first process that may
         # write the root and has an argument naming it.
         scan_processes() {
           local entries entry arg
@@ -198,7 +243,8 @@
               normalise "$arg"
               case $normalised in
                 *"$root_path" | *"$root_path"/*)
-                  holder="pid $entry: ''${args[*]}"
+                  holder="pid $entry, ''${exe##*/}"
+                  holder_detail="pid $entry runs $exe: ''${args[*]}"
                   return 0
                   ;;
               esac
@@ -208,6 +254,12 @@
         }
 
         [ -e "$lock" ] || exit 0
+
+        for tool in awk chmod date dirname id install jq ls mktemp mv readlink timeout omnigraph; do
+          command -v "$tool" >/dev/null \
+            || refuse "$tool is not on the PATH of omnigraph-lock-recovery" \
+              "Check the program's runtime inputs (systemctl cat omnigraph-server), and once no omnigraph process runs against the root, run: $manual force-unlock <lock_id>"
+        done
 
         writer_uids=(0)
         ${lib.optionalString (writerUser != null) ''
@@ -221,7 +273,8 @@
         # mutant: scanSkipped
         if scan_processes; then
           refuse "an omnigraph process has the root open ($holder)" \
-            "Wait for that process to finish or stop it, then run: systemctl restart omnigraph-server"
+            "Wait for that process to finish or stop it, then run: systemctl restart omnigraph-server" \
+            "$holder_detail"
         fi
 
         if ! record=$(jq -er '
@@ -250,7 +303,13 @@
           refuse "omnigraph cluster status failed, so the record's lock $lock_id cannot be confirmed as the cluster's" \
             "Read $manual status --json, and once no omnigraph process runs against the root, run: $manual force-unlock $lock_id"
         fi
-        reported=$(jq -r '.lock_id // "none"' <<<"$status")
+        status_filter='if length == 1 and (.[0] | type) == "object" and ((.[0].lock_id | type) == "string" or .[0].lock_id == null)
+          then .[0].lock_id // "none" else error("not one status object") end'
+        # mutant: statusUnguarded
+        if ! reported=$(jq -ser "$status_filter" <<<"$status" 2>/dev/null); then
+          refuse "omnigraph cluster status --json did not answer with one JSON object whose lock_id is a string or null, so the record's lock $lock_id cannot be confirmed as the cluster's" \
+            "Read $manual status --json, and once no omnigraph process runs against the root, run: $manual force-unlock $lock_id"
+        fi
         if [ "$reported" != "$lock_id" ]; then
           refuse "the record names lock $lock_id but omnigraph cluster status reports $reported, so the lock changed while it was read" \
             "Run systemctl restart omnigraph-server to read it again; if it persists, compare $lock with $manual status --json"
@@ -271,8 +330,9 @@
             pid_program=''${exe##*/}
             # mutant: omnigraphAtPidExcused
             if [ "$pid_program" = omnigraph ] || [ "$pid_program" = omnigraph-server ]; then
-              refuse "pid $pid, which lock $lock_id names, is running $exe (''${args[*]}), so the lock may be that server's whatever the boot time says" \
-                "Confirm pid $pid does not serve the root (ps -o pid,args -p $pid); if it does not, run $manual force-unlock $lock_id and systemctl restart omnigraph-server; if it does, stop it, then run systemctl restart omnigraph-server"
+              refuse "pid $pid, which lock $lock_id names, is running ''${exe##*/}, so the lock may be that server's whatever the boot time says" \
+                "Confirm pid $pid does not serve the root (ps -o pid,args -p $pid); if it does not, run $manual force-unlock $lock_id and systemctl restart omnigraph-server; if it does, stop it, then run systemctl restart omnigraph-server" \
+                "pid $pid runs $exe: ''${args[*]}"
             fi
           fi
           if [ "$created" -ge "$btime" ]; then
@@ -282,12 +342,18 @@
 
         if ! unlocked=$(og --target "$root" cluster force-unlock "$lock_id" --json) \
           || ! jq -e '.unlocked == true' <<<"$unlocked" >/dev/null; then
+          trap - ERR
+          set +e
           printf 'omnigraph-lock-recovery: omnigraph cluster force-unlock %s did not report the lock removed: %s\n' "$lock_id" "''${unlocked:-}" >&2
           post "refusal notice" "$refusal_title" \
             "omnigraph-server on ${hostName} stays stopped: omnigraph cluster force-unlock $lock_id did not report the lock removed. Read its output with journalctl -u omnigraph-server, and once no omnigraph process runs against the root, run: $manual force-unlock $lock_id"
           exit 1
         fi
 
+        # The lock is gone: from here on the start goes on, and nothing that
+        # fails makes it a refusal.
+        trap - ERR
+        set +e
         count=0
         if [ -e "$counter" ]; then
           read -r count <"$counter" || true
@@ -297,14 +363,20 @@
           fi
         fi
         count=$((count + 1))
-        install -d -m 0755 -- "$(dirname -- "$counter")"
-        printf '%s\n' "$count" >"$counter.tmp"
-        chmod 0644 -- "$counter.tmp"
-        mv -f -- "$counter.tmp" "$counter"
+        if install -d -m 0755 -- "$(dirname -- "$counter")" \
+          && printf '%s\n' "$count" >"$counter.tmp" \
+          && chmod 0644 -- "$counter.tmp" \
+          && mv -f -- "$counter.tmp" "$counter"; then
+          counted="lock recoveries on ${hostName}: $count"
+        else
+          printf 'omnigraph-lock-recovery: the lock-recovery counter %s could not be written\n' "$counter" >&2
+          counted="the lock-recovery counter $counter could not be written"
+        fi
 
-        message="omnigraph-server on ${hostName} cleared the stale serve lock $lock_id of $root (pid $pid, taken $created_at) and starts; lock recoveries on ${hostName}: $count"
+        message="omnigraph-server on ${hostName} cleared the stale serve lock $lock_id of $root (pid $pid, taken $created_at) and starts; $counted"
         echo "omnigraph-lock-recovery: $message"
         post "recovery notice" "omnigraph lock recovered on ${hostName}" "$message" -H "Priority: low"
+        exit 0
       '';
     };
 }
