@@ -133,9 +133,15 @@ It is on for magnetite's local root; the module's assertions refuse an `s3://` r
 A file-by-file copy of a live root may not open, so the backup is taken from an instant image.
 `restic-backups-omnigraph`, run by its timer every night at 03:30 UTC plus up to 15 minutes, and after a missed night at the next boot:
 1. takes the ZFS snapshot `zroot/root/omnigraph@restic`, destroying one a failed run left;
-2. backs up only `/var/lib/omnigraph/.zfs/snapshot/restic`, a fixed path, so restic finds each run's parent;
-3. destroys the snapshot;
-4. prunes to 7 daily, 4 weekly and 6 monthly copies per host, and reads back a tenth of the repository.
+2. removes the repository's stale locks with `restic unlock`;
+3. backs up only `/var/lib/omnigraph/.zfs/snapshot/restic`, a fixed path, so restic finds each run's parent;
+4. prunes to 7 daily, 4 weekly and 6 monthly copies per host, and reads back a tenth of the repository;
+5. destroys the snapshot.
+
+A backup takes a shared lock on the repository, and prune and check take an exclusive one; restic refuses a backup while any exclusive lock is in the repository, stale or not.
+A run interrupted during its prune or check, by a reset for instance, leaves its exclusive lock behind, so step 2 runs before the backup.
+restic counts a lock as stale when its time is more than 30 minutes old, which a running restic refreshes every 5 minutes, or when it was taken on this host by a process that is gone (restic 0.20.0, `internal/repository/lock_file.go`).
+`unlock` therefore never removes the lock of a restic that is still running, here or on another host; each host has a repository path of its own, so the job is that path's only writer.
 
 The repository is `s3:https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com/sciexp-omnigraph-backup/<host>`, in the R2 bucket `sciexp-omnigraph-backup` (`modules/terranix/cloudflare.nix`, location `enam`, no lifecycle rule: restic's prune owns every deletion).
 Its R2 keys come from the prompted clan vars generator `omnigraph-backup-r2`, for a token scoped to that bucket alone, and its password from the generated `omnigraph-backup-restic`.
@@ -381,6 +387,7 @@ cat /run/node-exporter-textfile/omnigraph-backup.prom
 
 Then, by what you find:
 - The job failed in its prepare or cleanup step: read the `zfs` error; `zfs list -t snapshot zroot/root/omnigraph` shows a leftover `@restic`, which the next run destroys and takes anew.
+- The job failed with `repository is already locked exclusively by PID <pid> on <host>`: the job removes stale locks before it backs up, so this lock belongs to a restic that is running, or to one on another host whose lock is less than 30 minutes old. Read its host, pid and time with `sudo restic-omnigraph --no-lock list locks` and `sudo restic-omnigraph --no-lock cat lock <id>`; once that restic has stopped (`ps -o pid,args -p <pid>` on its host), `sudo restic-omnigraph unlock` removes the lock. `sudo restic-omnigraph unlock --remove-all` also removes locks that are not stale; run it only when you are sure that no restic uses the repository.
 - The job failed talking to R2: a 403 means the `omnigraph-backup-r2` token lost its scope or was revoked, so mint a new one for `sciexp-omnigraph-backup` alone and run `clan vars generate <host> --generator omnigraph-backup-r2 --regenerate`; a wrong-password error means `omnigraph-backup-restic` was regenerated, and the repository can only be read with the old password from the vars history.
 - The timer has not run: check the host was up at 03:30 UTC; `Persistent` makes it run at the next boot after a missed night.
 - The stamp in `omnigraph-backup.prom` is old while the job succeeded: read `sudo journalctl -u omnigraph-backup-metric -n 20 --no-pager`.

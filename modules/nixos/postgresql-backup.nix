@@ -194,6 +194,11 @@ let
         ${pkgs.coreutils}/bin/mv -f ${record}.tmp ${record}
         ${publish}
       '';
+      resticCommand =
+        let
+          job = config.services.restic.backups.${jobName};
+        in
+        "${lib.getExe job.package}${lib.concatMapStrings (option: " -o ${option}") job.extraOptions}";
     in
     {
       options.vanixiets.postgresqlBackup.enable = lib.mkOption {
@@ -281,8 +286,19 @@ let
               checkOpts = [ "--read-data-subset=10%" ];
             };
 
-            # Runs only after backup, prune and check have all succeeded.
-            systemd.services.${jobUnit}.serviceConfig.ExecStartPost = [ "${stamp}" ];
+            systemd.services.${jobUnit}.serviceConfig = {
+              # Runs only after backup, prune and check have all succeeded.
+              ExecStartPost = [ "${stamp}" ];
+              # restic refuses the backup's lock while any exclusive lock
+              # is in the repository, stale or not, and nixpkgs runs
+              # `unlock` only after the backup, so a run interrupted in its
+              # prune or check would fail every later run. `unlock` removes
+              # only stale locks: one older than 30 minutes, which a running
+              # restic refreshes every 5, or one taken on this host by a
+              # process that is gone (restic 0.20.0,
+              # internal/repository/lock_file.go).
+              ExecStart = lib.mkBefore [ "${resticCommand} unlock" ];
+            };
 
             vanixiets.nodeExporter.textfileWriters = [ writer ];
 

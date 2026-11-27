@@ -39,7 +39,10 @@
 #      chosen backup's snapshot directory, `chown -R omnigraph:omnigraph`,
 #      `omnigraph-cluster force-unlock` of the restored lock, start, destroy
 #      the pre-restore snapshot, start the timer) serves the same counts and
-#      answers;
+#      answers; a `restic prune` killed with SIGKILL while it holds its
+#      exclusive lock leaves that lock in the repository, as a reset during
+#      the job's prune or check does, and the job's next run still backs up
+#      and leaves no lock;
 #   5. after a reboot the dataset is mounted before the units, which start
 #      and serve the same answers, and the server, bootstrap, apply and seed
 #      units each require the mounts of /var/lib/omnigraph/clusters
@@ -428,6 +431,26 @@
                   owned_by_omnigraph()
                   machine.succeed("zfs destroy ${backup.dataset}@pre-restore")
                   machine.succeed("systemctl start restic-backups-omnigraph.timer")
+
+              with subtest("a backup after a prune killed while holding its exclusive lock succeeds"):
+                  locks = "/var/lib/restic-test/locks"
+                  before_snapshots = len(json.loads(machine.succeed("restic-omnigraph snapshots --json")))
+                  # restic waits 200 ms after writing its lock before it
+                  # checks for others, so the lock is seen before prune ends.
+                  machine.succeed(
+                      f"restic-omnigraph prune >/tmp/prune.log 2>&1 & pid=$!;"
+                      f" until ls {locks} | grep -qE '^[0-9a-f]{{64}}$'; do :; done;"
+                      " kill -9 $pid; wait $pid || true"
+                  )
+                  stale = machine.succeed(f"ls {locks}").split()
+                  assert len(stale) == 1, stale
+                  held = json.loads(machine.succeed(f"restic-omnigraph --no-lock cat lock {stale[0]}"))
+                  print(f"the killed prune's lock: {held}")
+                  assert held["exclusive"] is True, held
+                  machine.succeed("systemctl start restic-backups-omnigraph.service")
+                  after_snapshots = json.loads(machine.succeed("restic-omnigraph snapshots --json"))
+                  assert len(after_snapshots) == before_snapshots + 1, after_snapshots
+                  machine.succeed(f"[ -z \"$(ls -A {locks})\" ]")
 
               with subtest("after a reboot the dataset is mounted before the units, which serve"):
                   machine.shutdown()

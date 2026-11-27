@@ -27,10 +27,11 @@ The recovery point is up to 24 h: there is no WAL archiving.
 At 02:30 UTC (with up to 15 min of random delay, and at the next boot if a night was missed) the timer starts `restic-backups-postgresql.service`:
 
 1. Its prepare step starts, one at a time, `postgresqlBackup-<db>.service` for every database and then `postgresql-dump-globals.service`. Each writes an uncompressed `pg_dump -C` file, `<db>.sql`, or `globals.sql`, to `/var/backup/postgresql-nightly`, keeping the previous night's `<db>.sql` as `<db>.prev.sql`. If any dump fails, the job fails before uploading anything, so restic never uploads an old dump as tonight's.
-2. `restic backup` uploads exactly those files to the repository `s3:https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com/sciexp-postgresql-backup/<host>`.
-3. `restic forget --prune` keeps 7 daily, 4 weekly and 6 monthly snapshots. Restic owns every deletion in the bucket: never add an age-based lifecycle rule to `sciexp-postgresql-backup`, because deleting packs behind restic's back corrupts the repository.
-4. `restic check --read-data-subset=10%` reads back a random tenth of the repository, so the whole repository is verified every few weeks.
-5. Only if all of these succeeded, the job writes `vanixiets_postgresql_backup_last_success_timestamp_seconds` with the current time. The value goes to its record `/var/lib/postgresql-backup-metrics/backup.prom` and to `postgresql-backup.prom` in node_exporter's textfile directory, `/run/node-exporter-textfile`.
+2. `restic unlock` removes the repository's stale locks: one more than 30 minutes old, which a running restic refreshes every 5 minutes, or one taken on this host by a process that is gone (restic 0.20.0, `internal/repository/lock_file.go`). A run interrupted in its prune or check leaves an exclusive lock, and restic refuses a backup while any exclusive lock is in the repository, so this step comes before the backup. It never removes the lock of a restic that is still running.
+3. `restic backup` uploads exactly those files to the repository `s3:https://1ece4a9a8f092f8cbdd679d22b9ecb1f.r2.cloudflarestorage.com/sciexp-postgresql-backup/<host>`.
+4. `restic forget --prune` keeps 7 daily, 4 weekly and 6 monthly snapshots. Restic owns every deletion in the bucket: never add an age-based lifecycle rule to `sciexp-postgresql-backup`, because deleting packs behind restic's back corrupts the repository.
+5. `restic check --read-data-subset=10%` reads back a random tenth of the repository, so the whole repository is verified every few weeks.
+6. Only if all of these succeeded, the job writes `vanixiets_postgresql_backup_last_success_timestamp_seconds` with the current time. The value goes to its record `/var/lib/postgresql-backup-metrics/backup.prom` and to `postgresql-backup.prom` in node_exporter's textfile directory, `/run/node-exporter-textfile`.
 
 A failed dump unit or a failed job posts a failure notice naming the unit.
 
@@ -69,7 +70,7 @@ systemctl start restic-backups-postgresql
 Common causes:
 - a dump failed: read its unit's journal;
 - R2 refused the key: the token was revoked or rescoped;
-- a stale lock was left by an interrupted run: `restic-postgresql unlock`;
+- the repository is locked by a restic that is still running, or by one whose lock is less than 30 minutes old, which the job's own `unlock` leaves: `restic-postgresql --no-lock list locks` and `restic-postgresql --no-lock cat lock <id>` show its host, pid and time; once it has stopped, `restic-postgresql unlock`;
 - the dataset is full: `zfs list zroot/root/postgresql-dumps`.
 
 The alert resolves within a few minutes after the next successful run, once the metric unit has copied the new time.
