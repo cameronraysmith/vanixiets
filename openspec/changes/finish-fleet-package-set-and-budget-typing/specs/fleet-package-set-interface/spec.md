@@ -7,7 +7,7 @@ Trust boundary: this property guarantees only that, when the flake is evaluated,
 
 ### Requirement: Runtime tests evaluate against the fleet package set
 
-Every runtime test under `vmTests.<system>` that sets its nodes' package set SHALL take it from the per-system `fleetPkgs` of the system it evaluates for and SHALL NOT import nixpkgs itself. The drvPaths these tests keep rest on A330.
+Every runtime test under `vmTests.<system>` that sets its nodes' package set SHALL take it from the per-system `fleetPkgs` of the system it evaluates for and SHALL NOT instantiate a package set of its own. The drvPaths these tests keep rest on A330.
 
 **Discharged by**: `rg -n 'import inputs\.nixpkgs' modules/vm-tests` returning no match; the cross-revision identity oracle showing no `vmTests` difference that its exact-path allow-list does not name with its cause.
 
@@ -16,7 +16,7 @@ Every runtime test under `vmTests.<system>` that sets its nodes' package set SHA
 - **WHEN** `vmTests.x86_64-linux.greptimedb-pipeline` is evaluated
 - **THEN** its nodes' `pkgs` is `fleetPkgs` for `x86_64-linux`, which carries `greptimedb-bin` and `ntfy-send` from the fleet overlay
 
-#### Scenario: No runtime-test module imports nixpkgs
+#### Scenario: No runtime test instantiates a package set of its own
 
 - **WHEN** `modules/vm-tests` is searched for `import inputs.nixpkgs`
 - **THEN** no file matches, `perses-greptimedb.nix` and `shared-reference-tree.nix` included

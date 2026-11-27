@@ -163,14 +163,21 @@ let
               '';
             };
             envelopeBudget = lib.mkOption {
-              type = lib.types.nullOr lib.types.attrs;
+              type = lib.types.nullOr (
+                lib.types.submodule {
+                  options = {
+                    storeUrl = lib.mkOption { type = lib.types.str; };
+                    notifiedUnits = lib.mkOption { type = lib.types.attrsOf (lib.types.listOf lib.types.str); };
+                    databases = lib.mkOption { type = lib.types.attrsOf lib.types.str; };
+                  };
+                }
+              );
               default = null;
               description = ''
-                flake.lib.otelEnvelope's `budget`, { storeUrl; notifiedUnits;
-                databases; }, set by the clan ingress role: otel-envelope then
-                also judges the store's series and row budget hourly as the
-                store's `regulator`, whose password it loads as the
-                regulator-password credential (design D8).
+                flake.lib.otelEnvelope's `budget`, set by the clan ingress
+                role: otel-envelope then also judges the store's series and
+                row budget hourly as the store's `regulator`, whose password
+                it loads as the regulator-password credential (design D8).
               '';
             };
             devloopRecordFiles = lib.mkOption {

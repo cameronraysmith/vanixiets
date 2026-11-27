@@ -75,9 +75,8 @@
         );
         toplevel;
     in
-    assert lib.assertMsg (
-      builtins.attrNames machineSystems == builtins.attrNames inventory
-    ) "flake.lib.machineSystems names must match clan.inventory.machines";
+    assert lib.assertMsg (builtins.attrNames machineSystems == builtins.attrNames inventory)
+      "flake.lib.machineSystems names must match clan.inventory.machines; only in machineSystems: [${lib.concatStringsSep ", " (lib.subtractLists (builtins.attrNames inventory) (builtins.attrNames machineSystems))}]; only in the inventory: [${lib.concatStringsSep ", " (lib.subtractLists (builtins.attrNames machineSystems) (builtins.attrNames inventory))}]";
     assert lib.assertMsg (
       inventoryNamesFor "nixos" == builtins.attrNames self.nixosConfigurations
     ) "NixOS inventory names must match nixosConfigurations";

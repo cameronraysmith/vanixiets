@@ -29,14 +29,11 @@
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     let
-      nodePkgs = import inputs.nixpkgs {
-        inherit (pkgs.stdenv.hostPlatform) system;
-        config.allowUnfree = true;
-        overlays = [ self.overlays.default ];
-      };
+      nodePkgs = fleetPkgs;
       readers = [
         "cameron"
         "omnigent-cameron"

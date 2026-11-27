@@ -1,0 +1,21 @@
+# Declared drvPath differences of finish-fleet-package-set-and-budget-typing,
+# from its parent (main) to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/finish-fleet-package-set-and-budget-typing/drv-delta.txt
+# Checks that embed the whole flake source are covered by the base allow-list
+# (modules/apps/drv-diff-base-allow.txt), which every run applies, and are not
+# repeated here.
+#
+# None. Evaluated against main 26b0ceff1dea, the change's three edits leave
+# every vmTests attribute of perses-greptimedb.nix and
+# shared-reference-tree.nix (mutations included), vmTests.x86_64-linux.fleet-ingress,
+# checks.x86_64-linux.nixos-magnetite and every NixOS and darwin toplevel
+# with its drvPath (logs/ffp-{base,head}-drvpaths-20261127T090*Z.json,
+# logs/ffp-{base,head}-hosts-20261127T0902Z.json).
+#
+# Those per-attribute comparisons covered only the attributes named above. The
+# full `just drv-diff c21a2dc87701 ccf786c25f99` with this file
+# (logs/drv-diff-c21a2dc87701-ccf786c25f99-20261127T090914Z) then covered every
+# dumped attribute: nixos 6, darwin 4, home 20, checks.x86_64-linux 240,
+# checks.aarch64-darwin 115, vmTests.x86_64-linux 21, vmTests.aarch64-linux 3.
+# The only differences were the five checks of the base allow-list, and it
+# passed.

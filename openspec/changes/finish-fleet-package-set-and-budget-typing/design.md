@@ -9,7 +9,7 @@
 ## Goals / Non-Goals
 
 **Goals:**
-- No module under `modules/vm-tests` imports nixpkgs; the two moved tests keep their derivations.
+- No runtime test instantiates a package set of its own; the two moved tests keep their derivations.
 - `envelopeBudget` rejects a malformed definition at evaluation, with every derivation unchanged.
 - The two scenarios above are each shown failing by one recorded mutant run.
 - The change is accepted on one `just drv-diff` run with an exact-path allow-list.
@@ -31,7 +31,7 @@
 ### D2: `envelopeBudget` becomes a submodule
 
 - **Choice**: `type = lib.types.nullOr (lib.types.submodule { options = { storeUrl = mkOption { type = str; }; notifiedUnits = mkOption { type = attrsOf (listOf str); }; databases = mkOption { type = attrsOf str; }; }; });`, in the file that holds the option once the other session has landed, with the description unchanged apart from dropping the inline shape.
-- **Rationale**: both writers set exactly these three fields. The merged value has the same attributes and values, so `otelEnvelope`'s rendered script is unchanged and magnetite's toplevel and `vmTests.x86_64-linux.fleet-ingress` keep their derivations. A misspelled field now fails evaluation. Boundary: first-party option on a vendored service; only the first-party option type changes.
+- **Rationale**: both writers set exactly these three fields. The merged value has the same attributes and values, so `otelEnvelope`'s rendered script is unchanged and magnetite's toplevel and `vmTests.x86_64-linux.fleet-ingress` keep their derivations. A definition with a field the record does not have, such as `storeURL`, now fails evaluation at the option, naming it; the untyped set accepted such a field (a missing `storeUrl` already failed, where `otelEnvelope` reads `budget.storeUrl`). Boundary: first-party option on a vendored service; only the first-party option type changes.
 - **Alternatives considered**: `attrsOf anything` with an assertion. It is weaker, and the error arrives later.
 
 ### D3: two evaluation-only mutants, as tasks rather than requirements
@@ -41,6 +41,7 @@
   - extend magnetite's configuration with one database in `services.postgresql.ensureDatabases` outside the backup set and evaluate `checks.x86_64-linux.nixos-magnetite`.
   Each run's output goes to `logs/` and its result into `tasks.md` and `verify.md`.
 - **Rationale**: both scenarios are already stated in other capabilities; what is missing is the evidence. Restating the backup scenario here would make this change wait for `back-up-postgresql-off-host` to archive. Boundary: source-only; nothing committed changes.
+- **Amendment (2026-11-27)**: the host-record mutant showed evaluation failing at the `flake.lib.machineSystems names must match clan.inventory.machines` assert in `modules/checks/machines.nix`, before the fleet pin, with a message that does not name the host, so the assert's message now lists the names only in `machineSystems` and only in the inventory (`lib.subtractLists` both ways); its condition, every other assert and every derivation are unchanged.
 - **Alternatives considered**: permanent mutant checks in `checks.<system>`. Each would need a fixture configuration and a size-class entry for a one-off proof.
 
 ### D4: sequencing and acceptance

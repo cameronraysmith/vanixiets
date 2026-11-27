@@ -34,13 +34,14 @@
 # R2 storage, OOM behaviour (a container shares the host's kernel), or that
 # a chart renders the values it reads. It lives in the non-gating vmTests
 # lane: on-demand evidence, not pull-request coverage.
-{ self, inputs, ... }:
+{ self, ... }:
 {
   perSystem =
     {
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     {
@@ -54,11 +55,7 @@
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         perses-greptimedb =
           let
-            nodePkgs = import inputs.nixpkgs {
-              inherit system;
-              config.allowUnfree = true;
-              overlays = [ self.overlays.default ];
-            };
+            nodePkgs = fleetPkgs;
             reference = self.nixosConfigurations.magnetite.config;
             inherit (self.lib.otelCollectorSchema) databases;
             usersGenerator = reference.clan.core.vars.generators.greptimedb-users;
