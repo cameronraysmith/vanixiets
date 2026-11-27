@@ -412,3 +412,12 @@ Tasks 4.1 and 4.2 are done (§9, §11).
 **Next step**:
 
 finishing-a-development-branch and archive; CAM-136 stays In Progress until the change is archived.
+
+---
+
+## In Review gates (2026-11-27)
+
+- **Code review: accepted.** It rests on the five verifications above, each of which read every requirement the change adds or amends against the code and tried to break it: the first (08:50 UTC, against `d901fd6b`), second (10:10 UTC, `ce9e492d`), third (10:45 UTC, `cd4dd583`) and fourth (15:45 UTC, `c6aeb3cb`) runs of §4, and §10 (19:45 UTC, against `af1ce8a3`, `874fd667` and `c6b26e76`), which tried the merge listing on 1,691 generated commits in 66 histories and nine single-line mutants of the handler. The findings of the first three runs are closed by `ce9e492df`, `df8c75572` and `9952b92c7` on `main`, the two faults §9 found and the fourth run's trailing-slash warning by `3ebf59000` and `d2b222d1e`, and §10's three warnings by `1d9c9dd54`. It rests also on the deployed-host checks of §9 and §11 on stibnite, the second of which read every commit five updates brought in. No separate review was run.
+- **Documentation: accepted as amended.** The reference-repository guidance `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md` (which now also describes the writer's waiting note and log line, the follow-up `serialise-shared-reference-tree-writes` left to this change), the agent-context fragment `modules/home/ai/plugins/agent-context-vanixiets/.apm/instructions/30-reference-repositories.instructions.md`, `ghq-sync`'s usage text in `pkgs/by-name/ghq-sync/ghq-sync.sh`, and the paragraph on the readers' include in `modules/home/README.md` are accepted without follow-up.
+
+`review_round` stays 3: neither gate re-queued the change.

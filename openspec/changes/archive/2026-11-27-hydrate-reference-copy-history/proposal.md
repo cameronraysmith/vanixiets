@@ -3,15 +3,19 @@ linear_story_id: CAM-136
 linear_story_identifier: CAM-136
 linear_story_title: "Make the commits a reference copy brings in readable as diffs"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-136/make-the-commits-a-reference-copy-brings-in-readable-as-diffs
-linear_story_state: In Progress
+linear_story_state: Done
 linear_team: CAM
-last_synced_state: In Progress
-last_synced_at: "2026-11-27T05:05:13Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T21:20:22Z"
 review_round: 3
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:56:11Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-136 created in Todo on team CAM with no project, description seeded from proposal.md; state confirmed by read-only view" }
   - { at: "2026-11-27T05:05:13Z", transition: "Todo->In Progress", outcome: "posted", note: "First tasks.md checkbox ticked (1.1); state set by name and confirmed by read-only view; milestone comment added" }
+  - { at: "2026-11-27T21:12:38Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md Overall Decision PASS WITH WARNINGS after five verifications and two rounds of deployed-host checks; state set to In Review with a comment and confirmed by read-only view" }
+  - { at: "2026-11-27", transition: "In Review gates", outcome: "posted", note: "Code review accepted on the five verifications and the deployed-host checks; documentation accepted as amended (verify.md, In Review gates); review_round stays 3" }
+  - { at: "2026-11-27T21:20:22Z", transition: "archive->mirror", outcome: "dropped", note: "no linear_project bound; spec mirror skipped" }
+  - { at: "2026-11-27T21:20:22Z", transition: "In Review->Done", outcome: "posted", note: "Archived after syncing shared-reference-tree and shared-reference-tree-interface; state confirmed Done by read-only view, closing comment posted" }
 ---
 
 ## Why
