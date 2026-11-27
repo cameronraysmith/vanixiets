@@ -22,7 +22,8 @@ Groups 1 to 3 and 5 to 7 are each one delivery commit, in that order; group 4 fo
 ## 4. Integration Verification
 
 - [ ] 4.1 After deploying to stibnite, as `crs58`: `ghq-sync -u` a blobless copy that is behind its upstream, then `git -C <path> --no-lazy-fetch show <c>` for every commit the update brought in; start lazygit in that copy under a terminal with `GIT_TRACE` set and confirm no `git fetch` in the trace; and `git -C <path> show` of a commit outside the hydrated range, which must print `transport 'https' not allowed` and no `Permission denied`. Read every alert or notice posted since the deploy started and record each with its cause. — verify: the commands and their output, recorded in this task (command).
-- [ ] 4.2 Run the repository's hooks on the changed files. — verify: `prek run --files <changed files>` passes (command).
+  Run on 2026-11-27 (`verify.md` §9): jj and iets passed every part, lazygit ran no fetch, and the read outside the range printed the refusal without `Permission denied`, with no alert since the deploy; open because in nixpkgs 96 of the 210 merges two updates brought in do not read as `git show` reads them, rename detection needing blobs of the second parent's side that the hydrate's `--no-renames` listings do not name.
+- [x] 4.2 Run the repository's hooks on the changed files. — verify: `prek run --files <changed files>` passes (command).
 
 ## 5. Remedies of the verification of 2026-11-27
 
