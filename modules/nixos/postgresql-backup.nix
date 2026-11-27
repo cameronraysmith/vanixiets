@@ -392,6 +392,9 @@ in
     failures = name: hostConfig: problems (factsOf name hostConfig);
   };
 
+  fleetObligations.postgresqlBackupObligations.failures =
+    config.flake.lib.postgresqlBackupObligations.failures;
+
   flake.modules.nixos.postgresql-backup = module;
   flake.modules.nixos.base.imports = [ modules.nixos.postgresql-backup ];
 }

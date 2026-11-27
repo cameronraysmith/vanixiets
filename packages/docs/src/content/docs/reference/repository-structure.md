@@ -192,7 +192,7 @@ All overlays are collected into `flake.nixpkgsOverlays` via deferred module comp
 ```nix
 # modules/nixpkgs/compose.nix - composed via lib.composeManyExtensions
 [
-  channels.nix              # Multi-channel nixpkgs access (stable, unstable, patched)
+  channels.nix              # Multi-channel nixpkgs access (stable, unstable, nixpkgs)
   stable-fallbacks.nix      # Platform-specific stable fallbacks
   overrides.nix             # Per-package build modifications
   nvim-treesitter.nix       # External overlay: nvim-treesitter-main

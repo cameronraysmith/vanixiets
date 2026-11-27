@@ -18,19 +18,19 @@ Every runtime test under `vmTests.<system>` that sets its nodes' package set, an
 
 #### Scenario: The devin-worker check across two systems
 
-- **WHEN** `checks.x86_64-linux.devin-worker` evaluates its `x86_64-linux` and `aarch64-darwin` homes
+- **WHEN** `checks.x86_64-linux.devin-worker-structural` evaluates its `x86_64-linux` and `aarch64-darwin` homes
 - **THEN** it reads one package set per system, bound once, and its drvPath equals the revision before
 
 #### Scenario: Checks, systems and homes are unchanged
 
 - **WHEN** the oracle compares the revisions before and after the package-set move
-- **THEN** every NixOS, darwin and home toplevel and every `checks.{x86_64-linux,aarch64-darwin}` attribute, including `omnigent-workers` and `devin-worker`, has the same drvPath
+- **THEN** every NixOS, darwin and home toplevel and every `checks.{x86_64-linux,aarch64-darwin}` attribute, including the `omnigent-workers` checks and `devin-worker-structural`, has the same drvPath
 
 ### Requirement: The channels overlay offers no patched channel
 
 The overlay in `modules/nixpkgs/overlays/channels.nix` SHALL NOT define `patched`, and no repository document SHALL describe `pkgs.patched` as available. ADR-0017 SHALL carry a dated amendment stating that Layer 1 no longer exports `patched`, why, and that an upstream fix is applied per package with `overrideAttrs` and `fetchpatch` in an overlay.
 
-**Discharged by**: `rg -n '\bpatched\b' modules/nixpkgs packages/docs/src/content/docs` returning only the amendment's own text; `just docs-build` succeeding; the oracle showing no drvPath difference.
+**Discharged by**: `rg -n '\bpatched\b' modules/nixpkgs packages/docs/src/content/docs` returning only the amendment's own text; `just docs-build` succeeding; the oracle showing no drvPath difference outside the checks built from the docs site, whose amended pages change their source.
 
 #### Scenario: A reader looks for the patching path
 

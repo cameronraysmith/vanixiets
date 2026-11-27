@@ -28,13 +28,14 @@
 # What it does not establish: anything about R2 (the S3 marker requests are
 # covered by checks.omnigraph-bootstrap-rehearsal), nor activation's handling
 # of changed units, which follows from switch-to-configuration's source.
-{ self, inputs, ... }:
+{ self, ... }:
 {
   perSystem =
     {
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     {
@@ -46,10 +47,7 @@
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         omnigraph-seed =
           let
-            nodePkgs = import inputs.nixpkgs {
-              inherit system;
-              overlays = [ self.overlays.default ];
-            };
+            nodePkgs = fleetPkgs;
             reference = self.nixosConfigurations.magnetite.config.services.omnigraph;
             # Two of the smallest seeds, in the order the seed units run
             # (graph id order). Each with a featured question of its cookbook

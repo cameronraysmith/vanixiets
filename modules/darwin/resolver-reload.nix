@@ -32,7 +32,7 @@
 # rendered activation script carries one such line per managed file after the
 # /etc link loop; checks.x86_64-linux.darwin-resolver-reload exercises its
 # judge on fixtures.
-{ lib, ... }:
+{ config, lib, ... }:
 let
   # The targets of the enabled environment.etc entries under resolver/.
   resolverTargets =
@@ -79,6 +79,12 @@ in
         targets = resolverTargets hostConfig.environment.etc;
         script = builtins.unsafeDiscardStringContext hostConfig.system.activationScripts.script.text;
       });
+  };
+
+  # Darwin only: NixOS has no /etc/resolver.
+  fleetObligations.resolverReloadObligations = {
+    classes = [ "darwin" ];
+    inherit (config.flake.lib.resolverReloadObligations) failures;
   };
 
   flake.modules.darwin.base =

@@ -43,13 +43,14 @@
 # real address and refusal are observed at acceptance (design D12). It lives
 # in the non-gating vmTests lane: on-demand evidence, not pull-request
 # coverage.
-{ self, inputs, ... }:
+{ self, ... }:
 {
   perSystem =
     {
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     {
@@ -76,18 +77,13 @@
         let
           # The flake overlay carries greptimedb-bin; the recording
           # ntfy-send replaces the real one for the notifier.
-          nodePkgs = import inputs.nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-            overlays = [
-              self.overlays.default
-              (final: _prev: {
-                ntfy-send = final.writeShellScriptBin "ntfy-send" ''
-                  printf '%s|%s\n' "$2" "$1" >> /run/ntfy-posts
-                '';
-              })
-            ];
-          };
+          nodePkgs = fleetPkgs.appendOverlays [
+            (final: _prev: {
+              ntfy-send = final.writeShellScriptBin "ntfy-send" ''
+                printf '%s|%s\n' "$2" "$1" >> /run/ntfy-posts
+              '';
+            })
+          ];
           reference = self.nixosConfigurations.magnetite.config;
           # flake data; fleetIngress asserts magnetite declares exactly this map
           inherit (self.lib.otelCollectorSchema) databases;

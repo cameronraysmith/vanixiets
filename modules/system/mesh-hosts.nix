@@ -103,6 +103,8 @@ in
     inherit meshHostsObligations;
   };
 
+  fleetObligations.meshHostsObligations.failures = meshHostsObligations.failures;
+
   flake.modules.nixos.mesh-hosts =
     { config, ... }:
     {

@@ -283,7 +283,7 @@ inventory.machines = {
 **Actor**: Developer/Maintainer (crs58)
 
 **Preconditions**:
-- Multi-channel nixpkgs inputs configured (unstable, stable, patched)
+- Multi-channel nixpkgs inputs configured (unstable, stable)
 - Overlays infrastructure operational (`modules/nixpkgs/overlays/stable-fallbacks.nix`, `modules/nixpkgs/overlays/channels.nix`)
 - Package broken in nixpkgs-unstable
 - Understanding of overlay composition layers
@@ -293,7 +293,7 @@ inventory.machines = {
 2. System builds fail due to broken package in unstable
 3. Developer investigates issue (compilation failure, test failure, etc.)
 4. Developer determines appropriate fix strategy (stable fallback, upstream patch, or build modification)
-5. Developer edits appropriate overlay file (`stable-fallbacks.nix`, `patches.nix`, or `overrides/<package>.nix`)
+5. Developer edits appropriate overlay file (`stable-fallbacks.nix`, a per-package overlay `<package>.nix` for an upstream patch, or `overrides/<package>.nix`)
 6. Developer tests fix: `nix build .#legacyPackages.<system>.<package>`
 7. System builds successfully using fixed package
 8. Developer commits fix with tracking comment (hydra link, TODO condition)
@@ -302,7 +302,7 @@ inventory.machines = {
 
 **Alternate flows**:
 - **A1**: If multiple packages broken, developer considers flake.lock rollback before selective fixes
-- **A2**: If upstream fix in PR exists, developer applies patch via `patches.nix` and references `pkgs.patched.<package>`
+- **A2**: If upstream fix in PR exists, developer adds a per-package overlay that appends the PR's patch to `<package>` with `overrideAttrs` and `fetchpatch`
 - **A3**: If package works but has minor issues, developer uses build modification in `overrides/<package>.nix`
 - **A4**: If stable version also broken, developer investigates older stable channels or custom build
 

@@ -58,15 +58,6 @@
           problems = 1;
         };
       };
-      wrong = lib.filterAttrs (
-        _: case:
-        lib.length (
-          o.problems {
-            name = "m";
-            inherit (case) deployUser peers;
-          }
-        ) != case.problems
-      ) cases;
       # targetProblems: the deploy address has one source (F83).
       target = {
         name = "m";
@@ -75,46 +66,65 @@
         configTargetHost = "cameron@m.zt";
         inventoryTargetHost = null;
       };
-      targetCases = {
-        darwinFromHosts = target // {
-          problems = 0;
-        };
-        nixosInventoryFromHosts = target // {
-          class = "nixos";
-          targetHost = "root@m.zt";
-          configTargetHost = "root@m.zt";
-          inventoryTargetHost = "root@m.zt";
-          problems = 0;
-        };
-        darwinLiteralElsewhere = target // {
-          configTargetHost = "cameron@m.vanixiets.internal";
-          problems = 1;
-        };
-        darwinInventoryTarget = target // {
-          inventoryTargetHost = "cameron@m.zt";
-          problems = 1;
-        };
-      };
-      wrongTarget = lib.filterAttrs (
-        _: case: lib.length (o.targetProblems (removeAttrs case [ "problems" ])) != case.problems
-      ) targetCases;
+      # The target cases carry their own judge; the export cases use the
+      # default one.
+      targetCases =
+        lib.mapAttrs
+          (
+            _: case:
+            case
+            // {
+              judge =
+                c:
+                o.targetProblems (
+                  removeAttrs c [
+                    "problems"
+                    "judge"
+                  ]
+                );
+            }
+          )
+          {
+            darwinFromHosts = target // {
+              problems = 0;
+            };
+            nixosInventoryFromHosts = target // {
+              class = "nixos";
+              targetHost = "root@m.zt";
+              configTargetHost = "root@m.zt";
+              inventoryTargetHost = "root@m.zt";
+              problems = 0;
+            };
+            darwinLiteralElsewhere = target // {
+              configTargetHost = "cameron@m.vanixiets.internal";
+              problems = 1;
+            };
+            darwinInventoryTarget = target // {
+              inventoryTargetHost = "cameron@m.zt";
+              problems = 1;
+            };
+          };
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: 0 runs, too few to class (design D4)
         network-target-obligations = {
           class = "medium";
           measured = false;
         };
       };
-      checks.network-target-obligations =
-        assert lib.assertMsg (wrong == { } && wrongTarget == { })
-          "network-target-obligations: the judge misjudges ${
-            toString (lib.attrNames wrong ++ lib.attrNames wrongTarget)
-          }";
-        pkgs.runCommand "network-target-obligations" { } "touch $out";
+      checks.network-target-obligations = self.lib.mkJudgeCheck pkgs {
+        name = "network-target-obligations";
+        judge =
+          case:
+          o.problems {
+            name = "m";
+            inherit (case) deployUser peers;
+          };
+        cases = cases // targetCases;
+      };
     };
 }

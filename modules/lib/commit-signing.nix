@@ -289,4 +289,6 @@ in
         ;
     };
   };
+
+  fleetObligations.commitSigningObligations.failures = failures;
 }

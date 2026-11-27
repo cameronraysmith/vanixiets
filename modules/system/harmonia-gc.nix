@@ -94,6 +94,8 @@ in
     inherit harmoniaGcObligations;
   };
 
+  fleetObligations.harmoniaGcObligations.failures = harmoniaGcObligations.failures;
+
   flake.modules.darwin.base =
     { config, pkgs, ... }:
     {

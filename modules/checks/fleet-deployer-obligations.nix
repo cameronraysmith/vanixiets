@@ -399,31 +399,39 @@
         };
       };
 
-      wrongPolicy = lib.filterAttrs (
-        _: case: lib.length (d.policyProblems case.args) != case.problems
-      ) policyCases;
-      wrongHost = lib.filterAttrs (
-        _: case: lib.length (d.hostProblems case.args) != case.problems
-      ) hostCases;
+      # One case set: the policy cases carry their own judge, the host cases
+      # use the default one.
+      cases =
+        lib.mapAttrs (
+          _: case:
+          case
+          // {
+            judge = c: d.policyProblems c.args;
+          }
+        ) policyCases
+        // hostCases;
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: 1 run, too few to class (design D4)
         fleet-deployer-obligations = {
           class = "medium";
           measured = false;
         };
       };
-      checks.fleet-deployer-obligations =
-        assert lib.assertMsg derivedTargets
-          "fleet-deployer-obligations: targetsFrom misderives the targets";
-        assert lib.assertMsg (wrongPolicy == { } && wrongHost == { })
-          "fleet-deployer-obligations: the judges misjudge ${
-            toString (lib.attrNames wrongPolicy ++ lib.attrNames wrongHost)
-          }";
-        pkgs.runCommand "fleet-deployer-obligations" { } "touch $out";
+      checks.fleet-deployer-obligations = self.lib.mkJudgeCheck pkgs {
+        name = "fleet-deployer-obligations";
+        judge = case: d.hostProblems case.args;
+        inherit cases;
+        assertions = [
+          {
+            assertion = derivedTargets;
+            message = "targetsFrom misderives the targets";
+          }
+        ];
+      };
     };
 }

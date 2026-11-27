@@ -70,7 +70,7 @@ Adopts proven patterns from [mirkolenz/nixos](https://github.com/mirkolenz/nixos
 
 **Key components:**
 
-- **Multi-channel inputs**: Stable, unstable, and patched nixpkgs variants
+- **Multi-channel inputs**: Stable and unstable nixpkgs variants, with upstream fixes patched into individual packages
 - **Stable fallbacks infrastructure**: Platform-specific stable fallbacks
 - **Five-layer overlay composition**: Structured package and overlay merging
 
@@ -113,7 +113,7 @@ The overlay system provides stable fallbacks for nixpkgs breakage through intern
 ```nix
 # Overlay composition order (via lib.composeManyExtensions)
 lib.composeManyExtensions [
-  channels       # Multi-channel nixpkgs access (stable, unstable, patched)
+  channels       # Multi-channel nixpkgs access (stable, unstable, nixpkgs)
   stable-fallbacks       # Platform-specific stable fallbacks
   overrides      # Build modifications
   nvim-treesitter # External overlay: nvim-treesitter from flake input
@@ -127,7 +127,7 @@ lib.composeManyExtensions [
 ```nix
 # modules/nixpkgs/overlays/channels.nix
 final: prev: {
-  inherit inputs nixpkgs patched;
+  inherit inputs nixpkgs;
   stable = systemInput system;   # darwin-stable or linux-stable
   unstable = prev;               # Default nixpkgs
 }

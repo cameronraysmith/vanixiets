@@ -56,6 +56,7 @@
   inputs,
   lib,
   self,
+  withSystem,
   ...
 }:
 {
@@ -68,13 +69,9 @@
       # modules/home/mk-home.nix): `self.legacyPackages` is the channel before
       # flake.overlays.default is applied, where `devin-cli` would resolve to
       # the channel's older build rather than the one this repository vendors.
-      probePkgs =
-        system:
-        import inputs.nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-          overlays = [ self.overlays.default ];
-        };
+      fleetPkgsBySystem = lib.genAttrs [ "x86_64-linux" "aarch64-darwin" ] (
+        s: withSystem s ({ fleetPkgs, ... }: fleetPkgs)
+      );
 
       # Real home-manager evaluation: option types enforced, assertions
       # required to pass (home-manager throws otherwise, so reaching the
@@ -86,7 +83,7 @@
           worker,
         }:
         (inputs.home-manager.lib.homeManagerConfiguration {
-          pkgs = probePkgs system;
+          pkgs = fleetPkgsBySystem.${system};
           # Same reason as modules/home/mk-home.nix: a module formal that the
           # module system cannot resolve throws rather than taking its default.
           extraSpecialArgs.osConfig = null;
@@ -112,7 +109,7 @@
             self.modules.homeManager.devin
             {
               _module.check = false;
-              _module.args.pkgs = probePkgs system;
+              _module.args.pkgs = fleetPkgsBySystem.${system};
               freeformType = lib.types.lazyAttrsOf lib.types.raw;
             }
             { services.devin-worker = worker; }

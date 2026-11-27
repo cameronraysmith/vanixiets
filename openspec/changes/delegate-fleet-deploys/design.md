@@ -151,7 +151,7 @@ The operator decided Q1-Q8 and, after Gate 1 was approved (Q33), Q30-Q32 on 2026
 
 ### D15: Regulators sit in the machine checks and in fixture checks
 - **Choice**:
-  - `flake.lib.fleetDeployer.failures` is asserted in `withFleetObligations` on every `nixos-<host>` and `darwin-<host>` check, at no added evaluation. It requires:
+  - `flake.lib.fleetDeployer.failures` is asserted on every `nixos-<host>` and `darwin-<host>` check, at no added evaluation: it is registered as `fleetObligations.fleetDeployer` (`modules/lib/fleet-deployer.nix`), and `modules/checks/machines.nix` folds every registered judge into each machine check. It requires:
     - the primary user's account;
     - no deployer key on a non-target, nor on a second account;
     - exactly the restricted line on a target's deploy account;

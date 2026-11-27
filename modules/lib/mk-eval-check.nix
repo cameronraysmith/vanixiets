@@ -20,6 +20,8 @@
 #
 # Tests requiring full flake evaluation belong as runCommand JSON-diff
 # checks under `modules/checks/structure/`, not as nix-unit tests.
+# A check that judges a fixture set by problem count uses flake.lib.mkJudgeCheck
+# or flake.lib.judgeCases (modules/lib/judge-check.nix), not nix-unit.
 { ... }:
 {
   flake.lib.mkEvalCheck =

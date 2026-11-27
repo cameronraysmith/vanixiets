@@ -6,13 +6,9 @@
 }:
 {
   perSystem =
-    { system, ... }:
+    { system, fleetPkgs, ... }:
     let
-      pkgs = import inputs.nixpkgs {
-        inherit system;
-        config.allowUnfree = true;
-        overlays = [ config.flake.overlays.default ];
-      };
+      pkgs = fleetPkgs;
       flake = config.flake // {
         inputs = inputs // {
           contentPrivate = throw "worker imported contentPrivate";

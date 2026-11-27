@@ -1,0 +1,49 @@
+# Declared drvPath differences of register-fleet-obligations, from its parent
+# (main at db0beed0db3c, above 9055ae0f1333, type-the-fleet-host-registry) to
+# its commit:
+#   just drv-diff <parent> <commit> openspec/changes/register-fleet-obligations/drv-delta.txt
+# Checks that embed the whole flake source, or every .nix file under modules/,
+# are covered by the base allow-list (modules/apps/drv-diff-base-allow.txt),
+# which every run applies, and are not repeated here. Every other dumped
+# attribute must keep its drvPath (design D10): the machine checks and every
+# toplevel (assertions leave the asserted derivation unchanged, A332), the
+# migrated fixture checks and otel-collector-config (same), the checks whose
+# inner system condition was dropped (same entries per system), and the
+# runtime tests and checks moved to fleetPkgs (A330; tasks 4.1-4.3 found every
+# one of them unchanged by evaluation against the parent).
+
+# The patched channel's removal edits the docs site (design D6, task 5.2):
+# ADR-0017's amendment, the broken-package guide, the repository-structure
+# reference and four architecture and requirements pages under
+# packages/docs/src/content/docs. They are part of the
+# docs package source, so every check that builds or consumes that package
+# changes with it. apps-build changes only through its deploy-docs input,
+# which embeds the package.
+checks.x86_64-linux.agent-skills-index  changed
+checks.x86_64-linux.apps-build  changed
+checks.x86_64-linux.deploy-docs-rehearsal  changed
+checks.x86_64-linux.package-vanixiets-docs  changed
+checks.x86_64-linux.package-vanixiets-docs-payload  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-report  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-linkcheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-typecheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-unit  changed
+checks.aarch64-darwin.apps-build  changed
+checks.aarch64-darwin.package-vanixiets-docs  changed
+checks.aarch64-darwin.package-vanixiets-docs-payload  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-report  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-linkcheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-typecheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-unit  changed

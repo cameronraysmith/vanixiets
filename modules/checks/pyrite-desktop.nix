@@ -30,7 +30,7 @@ in
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: median 2.1 s, slowest 737 s, 12 runs in 30 days
         pyrite-bitwarden-unlock.class = "small";
         # nixbot: median 70 s, slowest 737 s, 6 runs in 30 days

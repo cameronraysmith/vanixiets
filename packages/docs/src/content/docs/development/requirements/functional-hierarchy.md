@@ -166,10 +166,9 @@ See [ADR-0018: Deferred Module Composition Architecture](/development/architectu
 **Inputs**:
 - nixpkgs (unstable, default)
 - darwin-stable / linux-stable (OS-specific stable)
-- patched (unstable with patches applied)
 
 **Outputs**:
-- pkgs.stable, pkgs.unstable, pkgs.patched namespaces
+- pkgs.stable, pkgs.unstable, pkgs.nixpkgs namespaces
 - Overlay-accessible in all expressions
 
 **Invocation**: Via overlay composition in modules/nixpkgs/overlays/channels.nix
@@ -200,13 +199,13 @@ See [ADR-0018: Deferred Module Composition Architecture](/development/architectu
 **Inputs**:
 - Patch URL (GitHub PR)
 - Hash for verification
-- Base nixpkgs (unstable)
+- Package to patch (from unstable)
 
 **Outputs**:
-- pkgs.patched with patches applied
-- Fixed packages available
+- The one package rebuilt with the patch appended to its patches via overrideAttrs and fetchpatch
+- Fixed package available under its usual name
 
-**Invocation**: Via patches.nix configuration, referenced in overlays
+**Invocation**: Via a per-package overlay in modules/nixpkgs/overlays/
 
 **Related use cases**: UC-005 (Handle broken packages)
 

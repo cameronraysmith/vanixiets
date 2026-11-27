@@ -7,7 +7,6 @@
 # Exports to nixpkgsOverlays list:
 #   - inputs: Raw flake inputs reference
 #   - nixpkgs: Main nixpkgs (unstable) - for reference
-#   - patched: nixpkgs with patches applied (empty in test-clan)
 #   - stable: OS-specific stable nixpkgs (parked: commented out below)
 #   - unstable: Explicit unstable nixpkgs (same as nixpkgs, for clarity)
 #
@@ -36,13 +35,6 @@
         # Main nixpkgs (unstable) - imported for reference
         # Note: prev is already from nixpkgs, this is explicit
         nixpkgs = import inputs.nixpkgs nixpkgsConfig;
-
-        # Patched nixpkgs (empty patches in test-clan, vanixiets uses vanixiets/patches.nix)
-        patched = import (prev.applyPatches {
-          name = "nixpkgs-patched";
-          src = inputs.nixpkgs.outPath;
-          patches = [ ]; # Empty in test-clan
-        }) nixpkgsConfig;
 
         # ~keep Restore with nixpkgs-{darwin,linux}-stable in flake.nix inputs.
         # Stable channel (OS-specific: darwin-stable or linux-stable)

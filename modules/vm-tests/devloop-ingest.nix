@@ -52,6 +52,7 @@
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     {
@@ -74,11 +75,7 @@
         let
           # perSystem `pkgs` lacks the flake overlay that carries
           # greptimedb-bin.
-          nodePkgs = import inputs.nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-            overlays = [ self.overlays.default ];
-          };
+          nodePkgs = fleetPkgs;
           reference = self.nixosConfigurations.magnetite.config;
           # flake data; devloopIngest asserts magnetite declares exactly this map
           inherit (self.lib.otelCollectorSchema) databases;

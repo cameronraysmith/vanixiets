@@ -86,9 +86,6 @@ let
       tokenConsumers = a.tokenConsumers ++ [ "nixbot" ];
     });
   };
-  wrong = lib.filterAttrs (
-    _: case: lib.length (o.problems (removeAttrs case [ "problems" ])) != case.problems
-  ) cases;
 
   dashboard = lib.importJSON ../nixos/perses/resources/dashboard-r2-usage.json;
   costPanelQueries = map (q: q.spec.plugin.spec.query) dashboard.spec.panels.cost.spec.queries;
@@ -198,20 +195,29 @@ in
       };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         r2-usage =
-          assert lib.assertMsg (
-            wrong == { }
-          ) "r2-usage: the judge misjudges ${toString (lib.attrNames wrong)}";
-          assert lib.assertMsg (costPanelQueries == costQueries)
-            "r2-usage: the dashboard's cost panel queries ${builtins.toJSON costPanelQueries}, not flake.lib.r2Usage.costQueries ${builtins.toJSON costQueries}";
-          pkgs.runCommand "r2-usage"
+          config.flake.lib.judgeCases
             {
-              passthru = legs;
-              meta.description = "the R2 usage poller formats a recorded GraphQL response and rejects three mutants; the poller's obligation judge; the dashboard's cost queries";
+              name = "r2-usage";
+              judge = case: o.problems (removeAttrs case [ "problems" ]);
+              inherit cases;
+              assertions = [
+                {
+                  assertion = costPanelQueries == costQueries;
+                  message = "the dashboard's cost panel queries ${builtins.toJSON costPanelQueries}, not flake.lib.r2Usage.costQueries ${builtins.toJSON costQueries}";
+                }
+              ];
             }
-            ''
-              ${lib.concatMapStrings (leg: "test -e ${leg}\n") (lib.attrValues legs)}
-              touch $out
-            '';
+            (
+              pkgs.runCommand "r2-usage"
+                {
+                  passthru = legs;
+                  meta.description = "the R2 usage poller formats a recorded GraphQL response and rejects three mutants; the poller's obligation judge; the dashboard's cost queries";
+                }
+                ''
+                  ${lib.concatMapStrings (leg: "test -e ${leg}\n") (lib.attrValues legs)}
+                  touch $out
+                ''
+            );
       };
     };
 }

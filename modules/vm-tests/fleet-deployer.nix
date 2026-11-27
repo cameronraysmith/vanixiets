@@ -25,20 +25,18 @@
 #
 # It establishes nothing about clan, the forge, niks3, ntfy or darwin, which
 # the change's verification observes on the fleet.
-{ self, inputs, ... }:
+{ self, ... }:
 {
   perSystem =
     {
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     let
-      nodePkgs = import inputs.nixpkgs {
-        inherit system;
-        overlays = [ self.overlays.default ];
-      };
+      nodePkgs = fleetPkgs;
       keys = import (pkgs.path + "/nixos/tests/ssh-keys.nix") pkgs;
       # Every stand-in needs what clan and nix need from their environment: a
       # writable HOME and XDG_RUNTIME_DIR (clan's cache) and TMPDIR, and

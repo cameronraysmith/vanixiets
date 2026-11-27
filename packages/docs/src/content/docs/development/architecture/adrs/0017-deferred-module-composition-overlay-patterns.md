@@ -6,6 +6,7 @@ title: "ADR-0017: Deferred Module Composition Overlay Patterns"
 - **Date**: 2024-12-02
 - **Scope**: Nix configuration
 - **Supersedes**: ADR-0003 (deleted, nixos-unified overlay patterns)
+- **Amended**: 2026-11-27, see [Amendment](#amendment-2026-11-27)
 
 ## Context
 
@@ -390,6 +391,38 @@ pkgs/by-name/           # Custom packages
 # Usage
 nixpkgs.overlays = [ inputs.self.overlays.default ];
 ```
+
+## Amendment (2026-11-27)
+
+The Decision text above is left as written; this amendment supersedes it in place where the two disagree.
+
+- Layer 1 (`modules/nixpkgs/overlays/channels.nix`) no longer exports `patched`. It exports `inputs`, `nixpkgs`, `unstable` and, when the stable inputs are restored, `stable`.
+- Nothing read `patched`. Reading it would have imported the output of the `applyPatches` derivation during evaluation (import from derivation), forcing a build of the patched nixpkgs source before any evaluation could finish.
+- An upstream pull request's fix is now applied per package: an overlay overrides that one package with `overrideAttrs` and appends the pull request's patch, fetched with `fetchpatch`, to its `patches`.
+  Only the affected derivation changes, and no nixpkgs tree is imported from a build output.
+
+```nix
+# modules/nixpkgs/overlays/packageName.nix
+# Upstream PR: https://github.com/upstream/packageName/pull/123
+# TODO: Remove when the fix reaches nixpkgs-unstable
+{ ... }:
+{
+  nixpkgsOverlays = [
+    (final: prev: {
+      packageName = prev.packageName.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [
+          (final.fetchpatch {
+            url = "https://github.com/upstream/packageName/pull/123.patch";
+            hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          })
+        ];
+      });
+    })
+  ];
+}
+```
+
+- Layer 2 `stable` fallbacks (`inherit (final.stable) packageName;` in `stable-fallbacks.nix`) are unchanged.
 
 ## References
 

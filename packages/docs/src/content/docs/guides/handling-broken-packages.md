@@ -12,7 +12,7 @@ Systematic approach to fixing broken packages from nixpkgs unstable using the st
 |----------|----------|------|---------------|
 | Single package broken | Stable fallback | modules/nixpkgs/overlays/stable-fallbacks.nix | 5 minutes |
 | Tests fail only | Build modification | modules/nixpkgs/overlays/overrides.nix | 5 minutes |
-| Fix exists in PR | Upstream patch | modules/nixpkgs/overlays/channels.nix (patches list) | 10 minutes |
+| Fix exists in PR | Upstream patch | modules/nixpkgs/overlays/\<package\>.nix (overrideAttrs + fetchpatch) | 10 minutes |
 | Multiple packages broken | Flake.lock rollback | flake.lock | 2 minutes |
 | Darwin-specific issue | Platform-specific stable fallback | modules/nixpkgs/overlays/stable-fallbacks.nix (darwin section) | 5 minutes |
 
@@ -66,12 +66,12 @@ Questions to answer:
    - All platforms → Use cross-platform section
 
 3. Is upstream fix available?
-   - PR exists → Use patches.nix
+   - PR exists → Apply the PR's patch to that package with overrideAttrs
    - No fix yet → Use stable fallback
 
 4. Can I work around it?
    - Tests only → Use overrides with doCheck = false
-   - Compilation → Use stable or patches
+   - Compilation → Use stable or an upstream patch
 
 ### Phase 2: Resolution
 
@@ -190,33 +190,45 @@ When to use:
 - Fix not yet merged or not in your channel
 - Need specific fix without full stable fallback
 
-Patches are now integrated directly into the channels.nix overlay, which provides a `patched` attribute containing nixpkgs with all patches applied.
+The patch is applied to the one affected package: an overlay overrides that package with `overrideAttrs` and appends the PR's patch, fetched with `fetchpatch`, to its `patches`.
+Only that derivation changes.
+There is no patched copy of nixpkgs to select packages from.
 
 Steps:
 
 1. Find the PR patch URL:
 
 ```bash
-# For nixpkgs PR #123456
-# URL: https://github.com/NixOS/nixpkgs/pull/123456.patch
+# For upstream project PR #123
+# URL: https://github.com/upstream/packageName/pull/123.patch
 ```
 
-2. Edit modules/nixpkgs/overlays/channels.nix to add the patch:
+If the fix is a nixpkgs PR that changes the package expression rather than the package source, port the same change into the overlay's `overrideAttrs` instead of fetching the nixpkgs patch, which applies to the nixpkgs tree and not to the package source.
+
+2. Create modules/nixpkgs/overlays/packageName.nix with the patch:
 
 ```nix
-# In the patched section (around lines 41-46), add to the patches list:
-patched = import (prev.applyPatches {
-  name = "nixpkgs-patched";
-  src = inputs.nixpkgs.outPath;
-  patches = [
-    # nixpkgs PR#123456: Fix packageName compilation on darwin
-    # TODO: Remove when merged to unstable
-    (prev.fetchpatch {
-      url = "https://github.com/NixOS/nixpkgs/pull/123456.patch";
-      hash = "";  # Leave empty initially
+# packageName upstream patch
+#
+# Upstream PR#123: Fix packageName compilation on darwin
+# Reference: https://github.com/upstream/packageName/pull/123
+# TODO: Remove when the fix reaches nixpkgs-unstable
+# Date added: YYYY-MM-DD
+{ ... }:
+{
+  nixpkgsOverlays = [
+    (final: prev: {
+      packageName = prev.packageName.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [
+          (final.fetchpatch {
+            url = "https://github.com/upstream/packageName/pull/123.patch";
+            hash = "";  # Leave empty initially
+          })
+        ];
+      });
     })
   ];
-}) nixpkgsConfig;
+}
 ```
 
 3. Get the hash:
@@ -225,24 +237,18 @@ patched = import (prev.applyPatches {
 cd /path/to/infra  # Your local clone of this repository
 
 # Try to build - it will fail with hash mismatch
-nix build .#packages.aarch64-darwin.patched.hello 2>&1 | grep "got:"
+nix build .#legacyPackages.aarch64-darwin.packageName 2>&1 | grep "got:"
 
 # Output example:
 # got:    sha256-ABC123...
 
-# Copy the hash and update channels.nix
+# Copy the hash into the fetchpatch call
 ```
 
-4. Use patched package in stable-fallbacks.nix:
+4. Build the patched package:
 
-```nix
-{
-  inherit (final.patched)
-    # Uses nixpkgs with PR#123456 applied
-    # TODO: Remove when PR merges and reaches unstable
-    packageName
-    ;
-}
+```bash
+nix build .#legacyPackages.aarch64-darwin.packageName
 ```
 
 5. Test and commit:
@@ -252,13 +258,13 @@ nix build .#packages.aarch64-darwin.patched.hello 2>&1 | grep "got:"
 nix flake check
 darwin-rebuild build --flake . --dry-run
 
-# Commit both files
-git add modules/nixpkgs/overlays/channels.nix modules/nixpkgs/overlays/stable-fallbacks.nix
-git commit -m "fix(overlays): apply nixpkgs#123456 for packageName
+# Commit the overlay
+git add modules/nixpkgs/overlays/packageName.nix
+git commit -m "fix(overlays): apply upstream PR#123 to packageName
 
-- Applies upstream fix from PR#123456
+- Applies upstream fix from PR#123
 - Fixes [describe issue]
-- TODO: Remove when PR merges to unstable"
+- TODO: Remove when the fix reaches unstable"
 ```
 
 Time: 10 minutes total
@@ -398,7 +404,7 @@ grep -B2 -A2 "overrideAttrs" modules/nixpkgs/overlays/overrides.nix
 
 # List active patches
 echo "=== Active Patches ==="
-grep -A5 "patches = \[" modules/nixpkgs/overlays/channels.nix
+grep -l "fetchpatch" modules/nixpkgs/overlays/*.nix
 ```
 
 For each stable fallback/override/patch:
@@ -416,7 +422,7 @@ cd /path/to/infra  # Your local clone of this repository
 
 # For overrides: Remove override entry from modules/nixpkgs/overlays/overrides.nix
 
-# For patches: Remove fetchpatch entry from modules/nixpkgs/overlays/channels.nix
+# For patches: Remove the fetchpatch entry, or the whole per-package overlay file, from modules/nixpkgs/overlays/
 
 # Test
 nix flake check
@@ -467,7 +473,7 @@ When same package breaks on multiple platforms:
 ### Package doesn't exist in stable
 
 Options:
-1. Use patches.nix to apply fix
+1. Apply the upstream fix with overrideAttrs and fetchpatch
 2. Use override to fix build
 3. Use older unstable (flake.lock)
 4. Build from source with custom derivation
@@ -525,16 +531,20 @@ packageName = prev.packageName.overrideAttrs (old: {
 });
 ```
 
-### Patch template (modules/nixpkgs/overlays/channels.nix)
+### Patch template (modules/nixpkgs/overlays/packageName.nix)
 
 ```nix
-# Add to the patches list in the patched section:
-(prev.fetchpatch {
-  # nixpkgs PR#12345: Fix packageName compilation on darwin
-  # TODO: Remove when merged to unstable
-  url = "https://github.com/NixOS/nixpkgs/pull/12345.patch";
-  hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-})
+# Add to the overlay's attribute set:
+# Upstream PR#123: Fix packageName compilation on darwin
+# TODO: Remove when the fix reaches nixpkgs-unstable
+packageName = prev.packageName.overrideAttrs (old: {
+  patches = (old.patches or [ ]) ++ [
+    (final.fetchpatch {
+      url = "https://github.com/upstream/packageName/pull/123.patch";
+      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    })
+  ];
+});
 ```
 
 ### Commit message template
@@ -561,13 +571,13 @@ Solution: Check overlay order in default.nix, ensure inputs' comes first
 
 Cause: Overlay not applied or wrong order
 
-Solution: Verify modules/nixpkgs/overlays/channels.nix is loaded (it provides stable, unstable, patched attrs), check overlay composition order
+Solution: Verify modules/nixpkgs/overlays/channels.nix is loaded (it provides stable, unstable, nixpkgs attrs), check overlay composition order
 
 ### Error: hash mismatch in patch
 
 Expected: This happens on first build when adding a new patch
 
-Solution: Copy the "got:" hash from error output to the fetchpatch in channels.nix
+Solution: Copy the "got:" hash from error output to the fetchpatch call in the package's overlay
 
 ### Error: package not found in stable
 

@@ -1,4 +1,9 @@
-{ self, lib, ... }:
+{
+  self,
+  config,
+  lib,
+  ...
+}:
 {
   perSystem =
     { system, ... }:
@@ -27,73 +32,47 @@
         machine.machineClass == "darwin" && machineSystems.${name} == system && hosts.${name}.checked
       ) inventory;
 
-      # Every network clan may reach the machine through logs in as its login
-      # user, and its deploy address is flake.lib.hosts.<name>.targetHost
-      # (modules/lib/network-targets.nix).
-      withNetworkTargets =
-        name: machineConfig: toplevel:
-        let
-          unmet = self.lib.networkTargetObligations.failures name machineConfig;
-        in
-        assert lib.assertMsg (
-          unmet == [ ]
-        ) "networkTargetObligations unmet on ${name}: ${lib.concatStringsSep "; " unmet}";
-        toplevel;
+      # The judges registered in fleetObligations, each beside its definition
+      # (modules/lib/fleet-obligations.nix). Literal, so that adding or
+      # removing one is a deliberate edit here as well as at its registration.
+      registeredObligations = [
+        "commitSigningObligations"
+        "deployRecordObligations"
+        "fleetDeployer"
+        "harmoniaGcObligations"
+        "meshHostsObligations"
+        "networkTargetObligations"
+        "nixEvalJobsObligations"
+        "omnigentFleetObligations"
+        "postgresqlBackupObligations"
+        "r2UsageObligations"
+        "resolverReloadObligations"
+        "sopsBootInstallObligations"
+      ];
+      registered = builtins.attrNames config.fleetObligations;
 
-      obligations = self.lib.omnigentFleetObligations;
-      deployRecordObligations = self.lib.deployRecordObligations;
-      commitSigningObligations = self.lib.commitSigningObligations;
-      resolverReloadObligations = self.lib.resolverReloadObligations;
-      meshHostsObligations = self.lib.meshHostsObligations;
-      harmoniaGcObligations = self.lib.harmoniaGcObligations;
-      postgresqlBackupObligations = self.lib.postgresqlBackupObligations;
-      r2UsageObligations = self.lib.r2UsageObligations;
-      fleetDeployer = self.lib.fleetDeployer;
-      nixEvalJobsObligations = self.lib.nixEvalJobsObligations;
-      sopsBootInstallObligations = self.lib.sopsBootInstallObligations;
-
+      # Every registered judge whose classes contain the configuration's class,
+      # folded into one assertion that names each unmet judge. The class is
+      # the configuration set being mapped, never the host's system string.
       withFleetObligations =
-        name: machineConfig: toplevel:
+        class: name: machineConfig: toplevel:
         let
-          unmet = obligations.failures name machineConfig;
-          unmetDeployRecord = deployRecordObligations.failures name machineConfig;
-          unmetSigning = commitSigningObligations.failures name machineConfig;
-          # Darwin only: NixOS has no /etc/resolver.
-          unmetResolverReload = lib.optionals (self.lib.hosts.${name}.class == "darwin") (
-            resolverReloadObligations.failures name machineConfig
+          unmet = lib.concatLists (
+            lib.mapAttrsToList (
+              key: entry:
+              lib.optionals (lib.elem class entry.classes) (
+                map (message: "${key}: ${message}") (entry.failures name machineConfig)
+              )
+            ) config.fleetObligations
           );
-          # Darwin only: NixOS homes install secrets from their systemd user unit.
-          unmetSopsBootInstall = lib.optionals (self.lib.hosts.${name}.class == "darwin") (
-            sopsBootInstallObligations.failures name machineConfig
-          );
-          unmetMeshHosts = meshHostsObligations.failures name machineConfig;
-          unmetHarmoniaGc = harmoniaGcObligations.failures name machineConfig;
-          unmetPostgresqlBackup = postgresqlBackupObligations.failures name machineConfig;
-          unmetR2Usage = r2UsageObligations.failures name machineConfig;
-          unmetFleetDeployer = fleetDeployer.failures name machineConfig;
-          unmetNixEvalJobs = nixEvalJobsObligations.failures name machineConfig;
           hostFailures = map (a: a.message) (lib.filter (a: !a.assertion) machineConfig.assertions);
         in
-        assert lib.assertMsg
-          (
-            unmet == [ ]
-            && unmetDeployRecord == [ ]
-            && unmetSigning == [ ]
-            && unmetResolverReload == [ ]
-            && unmetMeshHosts == [ ]
-            && unmetHarmoniaGc == [ ]
-            && unmetPostgresqlBackup == [ ]
-            && unmetR2Usage == [ ]
-            && unmetFleetDeployer == [ ]
-            && unmetNixEvalJobs == [ ]
-            && unmetSopsBootInstall == [ ]
+        assert lib.assertMsg (unmet == [ ]) (
+          "Fleet obligations unmet on ${name}:\n${lib.concatStringsSep "\n" unmet}"
+          + lib.optionalString (hostFailures != [ ]) (
+            "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
           )
-          (
-            "Fleet obligations unmet on ${name}: omnigentFleetObligations [${lib.concatStringsSep ", " unmet}]; deployRecordObligations [${lib.concatStringsSep ", " unmetDeployRecord}]; commitSigningObligations [${lib.concatStringsSep ", " unmetSigning}]; resolverReloadObligations [${lib.concatStringsSep ", " unmetResolverReload}]; meshHostsObligations [${lib.concatStringsSep ", " unmetMeshHosts}]; harmoniaGcObligations [${lib.concatStringsSep ", " unmetHarmoniaGc}]; postgresqlBackupObligations [${lib.concatStringsSep ", " unmetPostgresqlBackup}]; r2UsageObligations [${lib.concatStringsSep ", " unmetR2Usage}]; fleetDeployer [${lib.concatStringsSep ", " unmetFleetDeployer}]; nixEvalJobsObligations [${lib.concatStringsSep ", " unmetNixEvalJobs}]; sopsBootInstallObligations [${lib.concatStringsSep ", " unmetSopsBootInstall}]"
-            + lib.optionalString (hostFailures != [ ]) (
-              "\n${name} assertion failures: ${lib.concatStringsSep "\n" hostFailures}"
-            )
-          );
+        );
         toplevel;
     in
     assert lib.assertMsg (
@@ -115,11 +94,13 @@
       machineDirs "darwin" == inventoryNamesFor "darwin"
     ) "modules/machines/darwin/ directories must match the Darwin inventory machines";
     assert lib.assertMsg (lib.all (name: inventory ? ${name} && hosts.${name}.checked) (
-      lib.attrNames obligations.expectedOwners
+      lib.attrNames self.lib.omnigentFleetObligations.expectedOwners
     )) "every machine carrying Omnigent fleet obligations must have a machine check to assert them";
     assert lib.assertMsg (
-      fleetDeployer.problems == [ ]
-    ) "flake.lib.fleetDeployer: ${lib.concatStringsSep "; " fleetDeployer.problems}";
+      self.lib.fleetDeployer.problems == [ ]
+    ) "flake.lib.fleetDeployer: ${lib.concatStringsSep "; " self.lib.fleetDeployer.problems}";
+    assert lib.assertMsg (registered == registeredObligations)
+      "fleetObligations keys must equal registeredObligations in modules/checks/machines.nix; missing: ${lib.concatStringsSep ", " (lib.subtractLists registered registeredObligations)}; unlisted: ${lib.concatStringsSep ", " (lib.subtractLists registeredObligations registered)}";
     {
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
@@ -154,19 +135,15 @@
         (lib.mapAttrs' (
           name: _:
           lib.nameValuePair "nixos-${name}" (
-            withFleetObligations name self.nixosConfigurations.${name}.config (
-              withNetworkTargets name self.nixosConfigurations.${name}.config
-                self.nixosConfigurations.${name}.config.system.build.toplevel
-            )
+            withFleetObligations "nixos" name self.nixosConfigurations.${name}.config
+              self.nixosConfigurations.${name}.config.system.build.toplevel
           )
         ) nixosForSystem)
         // (lib.mapAttrs' (
           name: _:
           lib.nameValuePair "darwin-${name}" (
-            withFleetObligations name self.darwinConfigurations.${name}.config (
-              withNetworkTargets name self.darwinConfigurations.${name}.config
-                self.darwinConfigurations.${name}.system
-            )
+            withFleetObligations "darwin" name self.darwinConfigurations.${name}.config
+              self.darwinConfigurations.${name}.system
           )
         ) darwinForSystem);
     };

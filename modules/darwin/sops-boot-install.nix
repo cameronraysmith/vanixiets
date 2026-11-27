@@ -36,7 +36,7 @@
 # modules/checks/machines.nix on every darwin machine check, fails unless each
 # home with secrets has its daemon, running as that account at load, whose
 # arguments run that home's install program.
-{ lib, ... }:
+{ config, lib, ... }:
 let
   daemonName = user: "sops-nix-${user}";
 
@@ -90,6 +90,12 @@ in
         homes = homesWithSecrets hostConfig;
         daemons = hostConfig.launchd.daemons;
       });
+  };
+
+  # Darwin only: NixOS homes install secrets from their systemd user unit.
+  fleetObligations.sopsBootInstallObligations = {
+    classes = [ "darwin" ];
+    inherit (config.flake.lib.sopsBootInstallObligations) failures;
   };
 
   flake.modules.darwin.base =

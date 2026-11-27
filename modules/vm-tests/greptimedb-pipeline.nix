@@ -33,13 +33,14 @@
 # see greptimedb-oom-order), ntfy delivery, or anything about magnetite's
 # deployed credentials. It lives in the non-gating vmTests lane: on-demand
 # evidence, not pull-request coverage.
-{ self, inputs, ... }:
+{ self, ... }:
 {
   perSystem =
     {
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     {
@@ -64,11 +65,7 @@
           let
             # perSystem `pkgs` lacks the flake overlay that carries
             # greptimedb-bin and ntfy-send.
-            nodePkgs = import inputs.nixpkgs {
-              inherit system;
-              config.allowUnfree = true;
-              overlays = [ self.overlays.default ];
-            };
+            nodePkgs = fleetPkgs;
             # Databases and their TTLs are flake data (flake.lib.otelCollectorSchema),
             # and the assertion below keeps magnetite, which declares them, from
             # drifting past this test silently. The users generator is read from

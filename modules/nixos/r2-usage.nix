@@ -432,6 +432,8 @@ in
     failures = name: hostConfig: problems (factsOf name hostConfig);
   };
 
+  fleetObligations.r2UsageObligations.failures = config.flake.lib.r2UsageObligations.failures;
+
   flake.modules.nixos.r2-usage = module;
   flake.modules.nixos.base.imports = [ modules.nixos.r2-usage ];
 }

@@ -58,13 +58,14 @@
 # nightly timer, prune and check over many nights, magnetite's memory, or a
 # reboot between a crash and the next start (the rehearsal
 # checks.x86_64-linux.omnigraph-lock-recovery-rehearsal holds that row).
-{ self, inputs, ... }:
+{ self, ... }:
 {
   perSystem =
     {
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     {
@@ -76,10 +77,7 @@
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         omnigraph-local-root =
           let
-            nodePkgs = import inputs.nixpkgs {
-              inherit system;
-              overlays = [ self.overlays.default ];
-            };
+            nodePkgs = fleetPkgs;
             reference = self.nixosConfigurations.magnetite.config.services.omnigraph;
             roots = self.lib.omnigraphClusterRoots;
             backup = self.lib.omnigraphBackup;

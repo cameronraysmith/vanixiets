@@ -94,32 +94,28 @@
           problems = 1;
         };
       };
-      wrong = lib.filterAttrs (
-        _: case:
-        lib.length (
-          o.mismatches {
-            inherit records;
-            inherit (case) hosts;
-            own = case.own or null;
-          }
-        ) != case.problems
-      ) cases;
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: 0 runs, too few to class (design D4)
         mesh-hosts-obligations = {
           class = "medium";
           measured = false;
         };
       };
-      checks.mesh-hosts-obligations =
-        assert lib.assertMsg (
-          wrong == { }
-        ) "mesh-hosts-obligations: the judge misjudges ${toString (lib.attrNames wrong)}";
-        pkgs.runCommand "mesh-hosts-obligations" { } "touch $out";
+      checks.mesh-hosts-obligations = self.lib.mkJudgeCheck pkgs {
+        name = "mesh-hosts-obligations";
+        judge =
+          case:
+          o.mismatches {
+            inherit records;
+            inherit (case) hosts;
+            own = case.own or null;
+          };
+        inherit cases;
+      };
     };
 }

@@ -165,7 +165,7 @@ Clear separation between infrastructure provisioning and system deployment.
 The overlay composition subsystem implements a five-layer nixpkgs overlay architecture.
 This architecture enables surgical package fixes without system-wide flake.lock rollbacks.
 
-**Layer 1 - Multi-channel access (modules/nixpkgs/overlays/channels.nix)**: The first layer provides pkgs.stable (OS-specific stable nixpkgs), pkgs.unstable (explicit unstable), pkgs.patched (unstable with upstream patches applied), and pkgs.nixpkgs (main unstable).
+**Layer 1 - Multi-channel access (modules/nixpkgs/overlays/channels.nix)**: The first layer provides pkgs.stable (OS-specific stable nixpkgs), pkgs.unstable (explicit unstable), and pkgs.nixpkgs (main unstable).
 
 **Layer 2 - Platform-specific stable fallbacks (modules/nixpkgs/overlays/stable-fallbacks.nix)**: The second layer selectively uses stable versions for completely broken unstable packages.
 Platform conditionals isolate fixes to affected systems (isDarwin, isLinux, specific architecture).
@@ -232,7 +232,7 @@ Provider differences isolated in provider modules.
 **Stable fallback**: Broken unstable packages use stable versions without rolling back entire nixpkgs.
 Layer 2 stable fallbacks enable per-package channel selection.
 
-**Upstream patch application**: Layer 1 patched channel applies upstream PR patches before they reach nixpkgs channel.
+**Upstream patch application**: A per-package overlay applies an upstream PR's patch to the one affected package with overrideAttrs and fetchpatch before the fix reaches the nixpkgs channel.
 
 **Platform-specific fixes**: Conditionals in Layer 2 isolate fixes to affected systems.
 Darwin-only issues don't affect linux builds.
@@ -321,15 +321,14 @@ Handling broken nixpkgs packages through overlay composition without system-wide
 5. Commit change
 6. Remove when upstream fix lands in unstable
 
-**Upstream patch (Layer 1)**:
+**Upstream patch (per-package overlay)**:
 
 1. Identify upstream PR with fix
-2. Add patch URL to modules/nixpkgs/overlays/channels.nix patches list
+2. Add an overlay for the package whose overrideAttrs appends the PR's patch, fetched with fetchpatch, to the package's patches
 3. Get hash from nix build failure output
-4. Reference patched package in stable-fallbacks: inherit (final.patched) packageX;
-5. Test with nix build
-6. Commit change
-7. Remove when PR merges and reaches channel
+4. Test with nix build .#legacyPackages.\<system\>.\<package\>
+5. Commit change
+6. Remove when PR merges and reaches channel
 
 **Build modification (Layer 4)**:
 
@@ -515,7 +514,7 @@ Machine configurations traverse this structure via config.flake.modules.* to acc
 inputs (flake inputs)
   ↓
 overlays/*.nix wrapper modules append to flake.nixpkgsOverlays list:
-  ├─ channels.nix (Layer 1): Export stable/unstable/patched nixpkgs
+  ├─ channels.nix (Layer 1): Export stable/unstable/nixpkgs channels
   ├─ stable-fallbacks.nix (Layer 2): Selective stable fallbacks
   ├─ overrides.nix (Layer 4): Package build modifications
   ├─ nuenv.nix (Layer 5): External nuenv overlay
@@ -677,7 +676,7 @@ Terraform output: perSystem.packages.terraform generates terraform JSON.
 
 ### Overlay implementation
 
-Layer 1 channels: modules/nixpkgs/overlays/channels.nix exports stable/unstable/patched.
+Layer 1 channels: modules/nixpkgs/overlays/channels.nix exports stable/unstable/nixpkgs.
 
 Layer 2 stable fallbacks: modules/nixpkgs/overlays/stable-fallbacks.nix with platform conditionals.
 

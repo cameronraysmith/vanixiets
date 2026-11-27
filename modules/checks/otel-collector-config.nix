@@ -2390,25 +2390,57 @@
       };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
         otel-collector-config =
-          assert lib.assertMsg (actual == [ ]) "otel-collector-config failures: ${builtins.toJSON actual}";
-          assert lib.assertMsg (lib.all (mutant: failures (mutant input) != [ ]) (lib.attrValues mutants))
-            "otel-collector-config accepted a mutant: ${
-              builtins.toJSON (builtins.attrNames (lib.filterAttrs (_: m: failures (m input) == [ ]) mutants))
-            }";
-          assert lib.assertMsg (agentAccepted == [ ])
-            "otel-collector-config: an agent-session mutant did not fail its clauses: ${
-              builtins.toJSON (lib.genAttrs agentAccepted (name: agentRejections.${name}))
-            }";
-          pkgs.runCommand "otel-collector-config" { passthru = { inherit failures; }; } ''
-            # The notifier's rate limit (review F1).
-            test -e ${notifierRehearsal}
-            ${lib.concatStrings (
-              lib.mapAttrsToList (name: failed: ''
-                echo ${lib.escapeShellArg "mutant ${name} rejected: ${builtins.toJSON failed}"}
-              '') agentRejections
-            )}
-            touch "$out"
-          '';
+          let
+            table = self.lib.observabilityHosts;
+            row = table.cinnabar;
+            mutantRow = changed: {
+              table = table // {
+                mutant = changed;
+              };
+              problems = 1;
+            };
+          in
+          self.lib.judgeCases
+            {
+              name = "otel-collector-config";
+              judge = case: self.lib.observabilityHostProblems case.table;
+              # The observability host table's row schema (design D8): the
+              # committed table, and one mutant row per rule.
+              cases = {
+                committed = {
+                  inherit table;
+                  problems = 0;
+                };
+                unknownField = mutantRow (row // { extra = true; });
+                missingField = mutantRow (removeAttrs row [ "textfile" ]);
+                platformUnknown = mutantRow (row // { platform = "android"; });
+                flagNotBool = mutantRow (row // { alwaysOn = "yes"; });
+                smartDevicesNotList = mutantRow (row // { smartDevices = "/dev/nvme0"; });
+                unitNotString = mutantRow (row // { notifiedUnits = row.notifiedUnits ++ [ 1 ]; });
+                queueNotPositive = mutantRow (row // { agentSpanQueueMiB = 0; });
+              };
+            }
+            (
+              assert lib.assertMsg (actual == [ ]) "otel-collector-config failures: ${builtins.toJSON actual}";
+              assert lib.assertMsg (lib.all (mutant: failures (mutant input) != [ ]) (lib.attrValues mutants))
+                "otel-collector-config accepted a mutant: ${
+                  builtins.toJSON (builtins.attrNames (lib.filterAttrs (_: m: failures (m input) == [ ]) mutants))
+                }";
+              assert lib.assertMsg (agentAccepted == [ ])
+                "otel-collector-config: an agent-session mutant did not fail its clauses: ${
+                  builtins.toJSON (lib.genAttrs agentAccepted (name: agentRejections.${name}))
+                }";
+              pkgs.runCommand "otel-collector-config" { passthru = { inherit failures; }; } ''
+                # The notifier's rate limit (review F1).
+                test -e ${notifierRehearsal}
+                ${lib.concatStrings (
+                  lib.mapAttrsToList (name: failed: ''
+                    echo ${lib.escapeShellArg "mutant ${name} rejected: ${builtins.toJSON failed}"}
+                  '') agentRejections
+                )}
+                touch "$out"
+              ''
+            );
       };
     };
 }

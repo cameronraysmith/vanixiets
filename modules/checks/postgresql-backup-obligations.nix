@@ -114,25 +114,22 @@
           secretsGenerated = false;
         });
       };
-      wrong = lib.filterAttrs (
-        _: case: lib.length (o.problems (removeAttrs case [ "problems" ])) != case.problems
-      ) cases;
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: 0 runs, too few to class (design D4)
         postgresql-backup-obligations = {
           class = "medium";
           measured = false;
         };
       };
-      checks.postgresql-backup-obligations =
-        assert lib.assertMsg (
-          wrong == { }
-        ) "postgresql-backup-obligations: the judge misjudges ${toString (lib.attrNames wrong)}";
-        pkgs.runCommand "postgresql-backup-obligations" { } "touch $out";
+      checks.postgresql-backup-obligations = self.lib.mkJudgeCheck pkgs {
+        name = "postgresql-backup-obligations";
+        judge = case: o.problems (removeAttrs case [ "problems" ]);
+        inherit cases;
+      };
     };
 }

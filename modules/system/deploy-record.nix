@@ -174,6 +174,8 @@ in
     inherit deployRecordScript deployRecordObligations;
   };
 
+  fleetObligations.deployRecordObligations.failures = deployRecordObligations.failures;
+
   flake.modules.nixos.deploy-record =
     { config, pkgs, ... }:
     {

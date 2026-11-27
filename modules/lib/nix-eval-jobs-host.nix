@@ -291,4 +291,6 @@ in
       in
       lib.attrNames (lib.filterAttrs (_: ps: !lib.all isWrapped (evaluatorsOf ps)) lists);
   };
+
+  fleetObligations.nixEvalJobsObligations.failures = config.flake.lib.nixEvalJobsObligations.failures;
 }

@@ -95,4 +95,7 @@ in
         inventoryTargetHost = inputs.self.clan.inventory.machines.${name}.deploy.targetHost or null;
       };
   };
+
+  fleetObligations.networkTargetObligations.failures =
+    config.flake.lib.networkTargetObligations.failures;
 }

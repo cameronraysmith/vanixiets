@@ -594,4 +594,7 @@ in
         lib.attrNames (lib.filterAttrs (_: met: !met) (cases machine hostConfig))
       );
   };
+
+  fleetObligations.omnigentFleetObligations.failures =
+    config.flake.lib.omnigentFleetObligations.failures;
 }

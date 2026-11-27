@@ -359,6 +359,8 @@ let
     };
 in
 {
+  fleetObligations.fleetDeployer.failures = failures;
+
   flake.lib.fleetDeployer = {
     inherit
       deployerHost

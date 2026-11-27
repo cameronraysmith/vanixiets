@@ -20,13 +20,14 @@
 # zram swap (the VM has none) or nixbot's bubblewrap sandbox; nothing about the
 # store's real memory use, which R7.2 measures hourly on magnetite. It lives in
 # the non-gating vmTests lane: on-demand evidence, not pull-request coverage.
-{ self, inputs, ... }:
+{ self, ... }:
 {
   perSystem =
     {
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     {
@@ -39,11 +40,7 @@
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         greptimedb-oom-order =
           let
-            nodePkgs = import inputs.nixpkgs {
-              inherit system;
-              config.allowUnfree = true;
-              overlays = [ self.overlays.default ];
-            };
+            nodePkgs = fleetPkgs;
             reference = self.nixosConfigurations.magnetite.config;
             inherit (self.lib.otelCollectorSchema) databases;
             storeAdj = reference.systemd.services.greptimedb.serviceConfig.OOMScoreAdjust;

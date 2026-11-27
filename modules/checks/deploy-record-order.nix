@@ -55,22 +55,12 @@
           problems = 1;
         };
       };
-      wrong = lib.filterAttrs (
-        _: case:
-        lib.length (
-          o.orderProblems {
-            name = "h";
-            inherit script;
-            inherit (case) isDarwin text;
-          }
-        ) != case.problems
-      ) cases;
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: 0 runs, too few to class (design D4)
         deploy-record-order = {
           class = "medium";
@@ -78,9 +68,6 @@
         };
       };
       checks.deploy-record-order =
-        assert lib.assertMsg (
-          wrong == { }
-        ) "deploy-record-order: the judge misjudges ${toString (lib.attrNames wrong)}";
         let
           record = self.lib.deployRecordScript {
             inherit pkgs;
@@ -89,20 +76,34 @@
             currentSystem = "/build/current-system";
           };
         in
-        pkgs.runCommand "deploy-record-order" { nativeBuildInputs = [ pkgs.jq ]; } ''
-          mkdir -p /build/old /build/new
-          ln -s /build/new /build/current-system
-          fail() { echo "deploy-record-order: $*"; exit 1; }
-          ${record} /build/new /build/old
-          jq -e '.closure == "/build/new" and .previous_closure == "/build/old"' <<<"$(tail -n 1 /build/records.jsonl)" >/dev/null ||
-            fail "the earlier read was not written as previous_closure: $(tail -n 1 /build/records.jsonl)"
-          ${record} /build/new ""
-          jq -e 'has("previous_closure") | not' <<<"$(tail -n 1 /build/records.jsonl)" >/dev/null ||
-            fail "an empty read wrote a previous_closure: $(tail -n 1 /build/records.jsonl)"
-          ${record} /build/new
-          jq -e '.previous_closure == "/build/new"' <<<"$(tail -n 1 /build/records.jsonl)" >/dev/null ||
-            fail "without a read the link was not read: $(tail -n 1 /build/records.jsonl)"
-          touch $out
-        '';
+        self.lib.judgeCases
+          {
+            name = "deploy-record-order";
+            judge =
+              case:
+              o.orderProblems {
+                name = "h";
+                inherit script;
+                inherit (case) isDarwin text;
+              };
+            inherit cases;
+          }
+          (
+            pkgs.runCommand "deploy-record-order" { nativeBuildInputs = [ pkgs.jq ]; } ''
+              mkdir -p /build/old /build/new
+              ln -s /build/new /build/current-system
+              fail() { echo "deploy-record-order: $*"; exit 1; }
+              ${record} /build/new /build/old
+              jq -e '.closure == "/build/new" and .previous_closure == "/build/old"' <<<"$(tail -n 1 /build/records.jsonl)" >/dev/null ||
+                fail "the earlier read was not written as previous_closure: $(tail -n 1 /build/records.jsonl)"
+              ${record} /build/new ""
+              jq -e 'has("previous_closure") | not' <<<"$(tail -n 1 /build/records.jsonl)" >/dev/null ||
+                fail "an empty read wrote a previous_closure: $(tail -n 1 /build/records.jsonl)"
+              ${record} /build/new
+              jq -e '.previous_closure == "/build/new"' <<<"$(tail -n 1 /build/records.jsonl)" >/dev/null ||
+                fail "without a read the link was not read: $(tail -n 1 /build/records.jsonl)"
+              touch $out
+            ''
+          );
     };
 }

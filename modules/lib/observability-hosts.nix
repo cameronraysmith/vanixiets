@@ -36,6 +36,12 @@
 # flags; rosegold and argentum neither.
 # A row's `platform` is its host's flake.fleet.hosts class, so the rules
 # choose a host's expected signals by the class clan builds it as.
+# flake.lib.observabilityHostProblems judges a table against the row schema
+# (register-fleet-obligations design D8): one message per unknown field, per
+# missing field and per value of the wrong type. `platform` must be nixos or
+# darwin, which the class's own type does not ensure (it also admits
+# android). checks.x86_64-linux.otel-collector-config runs it over this table
+# and one mutant per rule; the readers read the table without it.
 { config, lib, ... }:
 {
   flake.lib.observabilityHosts =
@@ -157,4 +163,42 @@
         notifiedUnits = [ "otel-envelope" ];
       };
     };
+
+  flake.lib.observabilityHostProblems =
+    let
+      isStrings = v: lib.isList v && lib.all lib.isString v;
+      rules = {
+        collect = lib.isBool;
+        platform =
+          v:
+          lib.elem v [
+            "nixos"
+            "darwin"
+          ];
+        alwaysOn = lib.isBool;
+        smartDevices = isStrings;
+        textfile = lib.isBool;
+        agentTelemetry = lib.isBool;
+        langfuse = lib.isBool;
+        agentSpanQueueMiB = v: lib.isInt v && v > 0;
+        notifiedUnits = isStrings;
+      };
+      rowProblems =
+        name: row:
+        map (field: "${name}: unknown field ${field}") (
+          lib.filter (field: !(rules ? ${field})) (lib.attrNames row)
+        )
+        ++ lib.concatLists (
+          lib.mapAttrsToList (
+            field: valid:
+            if !(row ? ${field}) then
+              [ "${name}: missing field ${field}" ]
+            else
+              lib.optional (
+                !valid row.${field}
+              ) "${name}: ${field} is ${builtins.toJSON row.${field}}, of the wrong type"
+          ) rules
+        );
+    in
+    table: lib.concatLists (lib.mapAttrsToList rowProblems table);
 }

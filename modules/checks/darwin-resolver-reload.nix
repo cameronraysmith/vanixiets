@@ -66,15 +66,6 @@
           problems = 1;
         };
       };
-      wrong = lib.filterAttrs (
-        _: case:
-        lib.length (
-          o.missingReloads {
-            inherit targets;
-            inherit (case) script;
-          }
-        ) != case.problems
-      ) cases;
       etc = {
         "resolver/vanixiets.internal" = {
           enable = true;
@@ -98,20 +89,28 @@
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: 0 runs, too few to class (design D4)
         darwin-resolver-reload = {
           class = "medium";
           measured = false;
         };
       };
-      checks.darwin-resolver-reload =
-        assert lib.assertMsg (
-          wrong == { }
-        ) "darwin-resolver-reload: the judge misjudges ${toString (lib.attrNames wrong)}";
-        assert lib.assertMsg (
-          lib.sort lib.lessThan (o.resolverTargets etc) == targets
-        ) "darwin-resolver-reload: resolverTargets returns ${toString (o.resolverTargets etc)}";
-        pkgs.runCommand "darwin-resolver-reload" { } "touch $out";
+      checks.darwin-resolver-reload = self.lib.mkJudgeCheck pkgs {
+        name = "darwin-resolver-reload";
+        judge =
+          case:
+          o.missingReloads {
+            inherit targets;
+            inherit (case) script;
+          };
+        inherit cases;
+        assertions = [
+          {
+            assertion = lib.sort lib.lessThan (o.resolverTargets etc) == targets;
+            message = "resolverTargets returns ${toString (o.resolverTargets etc)}";
+          }
+        ];
+      };
     };
 }

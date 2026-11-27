@@ -60,7 +60,7 @@
       ) cases;
     in
     lib.optionalAttrs (system == "x86_64-linux") {
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: 0 runs, too few to class (declare-test-size-classes design D4)
         host-key-obligations = {
           class = "medium";

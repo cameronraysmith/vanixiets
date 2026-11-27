@@ -63,6 +63,7 @@
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     let
@@ -94,11 +95,7 @@
             # The same package set every machine builds against: perSystem `pkgs`
             # omits the first-party pkgs-by-name attributes that the worker Home
             # Manager profile resolves, such as linear-cli.
-            nodePkgs = import inputs.nixpkgs {
-              inherit (pkgs.stdenv.hostPlatform) system;
-              config.allowUnfree = true;
-              overlays = [ self.overlays.default ];
-            };
+            nodePkgs = fleetPkgs;
             # Effective fleet account shape, read from the machine that declares it
             # rather than restated here, so an inventory change cannot drift past
             # this test silently.

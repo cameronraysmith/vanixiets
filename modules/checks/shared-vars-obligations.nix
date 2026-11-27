@@ -60,31 +60,27 @@
           problems = 1;
         };
       };
-      wrong = lib.filterAttrs (
-        _: case:
-        lib.length (
-          o.missing {
-            inherit (case) generators;
-            isRecipient = recipientOf case.allowed;
-          }
-        ) != case.problems
-      ) cases;
     in
     lib.optionalAttrs (system == "x86_64-linux") {
       # Size classes (declare-test-size-classes design D1, D2): the median of
       # nixbot's uncached runs of at least 1 s, read 2026-11-24
       # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+      testSizes.checks = {
         # nixbot: 0 runs, too few to class (design D4)
         shared-vars-obligations = {
           class = "medium";
           measured = false;
         };
       };
-      checks.shared-vars-obligations =
-        assert lib.assertMsg (
-          wrong == { }
-        ) "shared-vars-obligations: the judge misjudges ${toString (lib.attrNames wrong)}";
-        pkgs.runCommand "shared-vars-obligations" { } "touch $out";
+      checks.shared-vars-obligations = self.lib.mkJudgeCheck pkgs {
+        name = "shared-vars-obligations";
+        judge =
+          case:
+          o.missing {
+            inherit (case) generators;
+            isRecipient = recipientOf case.allowed;
+          };
+        inherit cases;
+      };
     };
 }

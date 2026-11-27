@@ -50,13 +50,14 @@
 # activation removes the static user of a later generation, which this
 # test cannot do while switching specialisations), or the disko-declared
 # dataset magnetite mounts at boot.
-{ self, inputs, ... }:
+{ self, ... }:
 {
   perSystem =
     {
       pkgs,
       lib,
       system,
+      fleetPkgs,
       ...
     }:
     {
@@ -68,10 +69,7 @@
       vmTests = lib.optionalAttrs (system == "x86_64-linux") {
         omnigraph-state-directory-transitions =
           let
-            nodePkgs = import inputs.nixpkgs {
-              inherit system;
-              overlays = [ self.overlays.default ];
-            };
+            nodePkgs = fleetPkgs;
             reference = self.nixosConfigurations.magnetite.config.services.omnigraph;
             roots = self.lib.omnigraphClusterRoots;
             backup = self.lib.omnigraphBackup;
