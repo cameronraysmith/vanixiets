@@ -21,6 +21,7 @@
     "WeeklyPipelineTest": {},
     "FilesystemFillingWarn": { "host_name": "magnetite", "mountpoint": "/" },
     "FilesystemFull": { "host_name": "magnetite", "mountpoint": "/" },
+    "ZfsPoolErrors": { "host_name": "magnetite", "zpool": "zroot" },
     "ZfsPoolCapacityWarn": { "host_name": "magnetite", "zpool": "zroot" },
     "ZfsPoolCapacityCritical": { "host_name": "magnetite", "zpool": "zroot" },
     "ZfsDatasetQuotaFilling": {

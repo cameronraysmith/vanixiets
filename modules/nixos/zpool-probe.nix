@@ -1,5 +1,5 @@
-# zpool-probe: each ZFS pool's size and fullness, and each dataset with a
-# quota against it, for node_exporter's textfile collector.
+# zpool-probe: each ZFS pool's size, fullness and errors, and each dataset
+# with a quota against it, for node_exporter's textfile collector.
 # node_exporter's zfs collector (1.12.1, as run on magnetite) reports each
 # pool's state and per-dataset I/O counters from /proc/spl/kstat/zfs, and
 # no pool size, allocation, fragmentation or dataset space, so fleet-alert's
@@ -25,15 +25,31 @@
 #   and snapshots, as its quota does, where statfs on its mount counts
 #   neither;
 # - vanixiets_zfs_dataset_quota_bytes, its quota;
-# - vanixiets_zfs_dataset_snapshots_used_bytes, its USEDSNAP.
+# - vanixiets_zfs_dataset_snapshots_used_bytes, its USEDSNAP;
+# and, per pool under `zpool`, from `zpool status -jp --json-int` (OpenZFS
+# 2.3 and later), read with jq rather than from the status text:
+# - vanixiets_zpool_data_errors, the pool's `error_count`, the entries
+#   `zpool status -v` lists under `errors:`, which can be non-zero while the
+#   pool's state stays ONLINE and its device counters stay zero;
+# - vanixiets_zpool_device_errors, the sum of `read_errors`, `write_errors`
+#   and `checksum_errors` over every vdev of the pool, its root, interior,
+#   log, cache and spare vdevs included, so an error a mirror and its disk
+#   both count counts twice: the rule reads only whether it is above zero;
+# - vanixiets_zpool_scrub_end_timestamp_seconds and
+#   vanixiets_zpool_scrub_errors, the end and error count of the pool's
+#   last scan where that scan is a finished scrub, left out while a scrub
+#   or resilver runs and where none has finished, so a stale error entry
+#   can be told from a fresh one.
+# Where `zpool status -j` fails, as before OpenZFS 2.3, the four are left
+# out and RuleSignalMissing reports the host.
 # omnigraph-probe also reports the used bytes and quota of the one dataset
 # holding an omnigraph root, quota or not, which the OmniGraph view reads;
 # these cover every dataset with a quota for the quota rule and the Fleet
 # hosts view.
 # The keep-list keeps only seriesNames, the series fleet-alert's
-# ZfsPoolCapacityWarn, ZfsPoolCapacityCritical and ZfsDatasetQuotaFilling
-# and the Fleet hosts view read; the pool byte series stay on the host's
-# node_exporter for reading there.
+# ZfsPoolErrors, ZfsPoolCapacityWarn, ZfsPoolCapacityCritical and
+# ZfsDatasetQuotaFilling and the Fleet hosts view read; the pool byte series
+# stay on the host's node_exporter for reading there.
 # The assertions keep the keep-list, the textfile collector and the writer
 # from drifting apart from the probe, and hold every collecting NixOS row
 # of flake.lib.observabilityHosts to a host that runs the probe, because
@@ -53,6 +69,10 @@ let
     "vanixiets_zfs_dataset_used_bytes"
     "vanixiets_zfs_dataset_quota_bytes"
     "vanixiets_zfs_dataset_snapshots_used_bytes"
+    "vanixiets_zpool_data_errors"
+    "vanixiets_zpool_device_errors"
+    "vanixiets_zpool_scrub_end_timestamp_seconds"
+    "vanixiets_zpool_scrub_errors"
   ];
 
   probe =
@@ -62,6 +82,7 @@ let
       runtimeInputs = [
         pkgs.coreutils
         pkgs.gawk
+        pkgs.jq
         zfs
       ];
       text = ''
@@ -110,6 +131,24 @@ let
             family("vanixiets_zfs_dataset_snapshots_used_bytes", "USEDSNAP of a dataset with a local quota, the space its snapshots alone hold.")
             for (i = 1; i <= n; i++) sample("vanixiets_zfs_dataset_snapshots_used_bytes", i, snap[i])
           }' <<<"$datasets" >&3
+        # `zpool status -j` came with OpenZFS 2.3: where it fails, the error
+        # series are left out rather than read from the status text.
+        if status=$(zpool status -jp --json-int); then
+          jq -r '
+            def family($metric; $help): "# HELP \($metric) \($help)\n# TYPE \($metric) gauge";
+            def sample($metric; $value): "\($metric){zpool=\"\(.name)\"} \($value)";
+            def scrubbed: select(.scan_stats.function == "SCRUB" and .scan_stats.state == "FINISHED");
+            [.pools // {} | .[]] as $pools
+            | family("vanixiets_zpool_data_errors"; "The data errors zpool status -v lists for the pool, its error_count."),
+              ($pools[] | select(.error_count != null) | sample("vanixiets_zpool_data_errors"; .error_count)),
+              family("vanixiets_zpool_device_errors"; "Read, write and checksum errors summed over every vdev of the pool."),
+              ($pools[] | sample("vanixiets_zpool_device_errors"; [.. | objects | select(has("read_errors")) | .read_errors + .write_errors + .checksum_errors] | add // 0)),
+              family("vanixiets_zpool_scrub_end_timestamp_seconds"; "The end of the last scrub of the pool, where its last scan is a finished scrub."),
+              ($pools[] | scrubbed | sample("vanixiets_zpool_scrub_end_timestamp_seconds"; .scan_stats.end_time)),
+              family("vanixiets_zpool_scrub_errors"; "The errors the last finished scrub of the pool found."),
+              ($pools[] | scrubbed | sample("vanixiets_zpool_scrub_errors"; .scan_stats.errors))
+          ' <<<"$status" >&3
+        fi
         exec 3>&-
         mv -f -- "$out.tmp" "$out"
       '';
@@ -128,7 +167,7 @@ let
       assertions = [
         {
           assertion = row == null || !row.collect || row.platform != "nixos" || active;
-          message = "zpool-probe: ${config.networking.hostName} collects on NixOS in flake.lib.observabilityHosts, so ZfsPoolUnhealthy, ZfsPoolCapacityWarn and ZfsPoolCapacityCritical expect its pool series, but it ${
+          message = "zpool-probe: ${config.networking.hostName} collects on NixOS in flake.lib.observabilityHosts, so ZfsPoolUnhealthy, ZfsPoolErrors, ZfsPoolCapacityWarn and ZfsPoolCapacityCritical expect its pool series, but it ${
             if config.boot.zfs.enabled then "runs no node_exporter" else "has no ZFS"
           }; give it the pool, or render those rules' expected hosts from a row field.";
         }
@@ -138,7 +177,7 @@ let
           lib.all (name: lib.elem name schema.nodeExporterKeep) seriesNames
           && lib.elem writer config.vanixiets.nodeExporter.textfileWriters
           && lib.elem "${flag}=${directory}" node.extraFlags;
-        message = "zpool-probe: node_exporter must run its textfile collector on ${directory} with ${writer} among vanixiets.nodeExporter.textfileWriters, and nodeExporterKeep must keep ${lib.concatStringsSep ", " seriesNames}, or the pool capacity rules and the Fleet hosts view never see a pool.";
+        message = "zpool-probe: node_exporter must run its textfile collector on ${directory} with ${writer} among vanixiets.nodeExporter.textfileWriters, and nodeExporterKeep must keep ${lib.concatStringsSep ", " seriesNames}, or the pool error and capacity rules and the Fleet hosts view never see a pool.";
       };
 
       vanixiets.nodeExporter.textfileWriters = lib.mkIf active [ writer ];
@@ -147,7 +186,7 @@ let
       # reads: a DynamicUser's files would sit under /run/private, which
       # node_exporter cannot traverse (./magnetite-memory-budget.nix).
       systemd.services.zpool-probe = lib.mkIf active {
-        description = "ZFS pool size, capacity and fragmentation for node_exporter's textfile collector";
+        description = "ZFS pool size, capacity, fragmentation and errors for node_exporter's textfile collector";
         after = [ "zfs-import.target" ];
         serviceConfig = {
           Type = "oneshot";
@@ -165,7 +204,7 @@ let
       };
 
       systemd.timers.zpool-probe = lib.mkIf active {
-        description = "Every minute: ZFS pool size, capacity and fragmentation";
+        description = "Every minute: ZFS pool size, capacity, fragmentation and errors";
         wantedBy = [ "timers.target" ];
         timerConfig = {
           OnBootSec = "1min";

@@ -413,6 +413,120 @@
           ]
         }
       },
+      "pool-errors": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "ZFS pool errors",
+            "description": "Per pool: the data errors zpool status -v lists, the read, write and checksum errors summed over its vdevs, and the errors its last finished scrub found; ZfsPoolErrors fires when either of the first two is above 0 for 10 min. A data error with no file list is cleared by two clean scrubs."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "decimal"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, zpool) (vanixiets_zpool_data_errors{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{zpool}} data errors"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, zpool) (vanixiets_zpool_device_errors{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{zpool}} device errors"
+                  }
+                }
+              }
+            },
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "max by (host_name, zpool) (vanixiets_zpool_scrub_errors{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{zpool}} last scrub errors"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "pool-scrub": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Time since each pool's last finished scrub",
+            "description": "Now less the end of each pool's last finished scrub; no line while a scrub or resilver runs. ZFS keeps a data error entry until two scrubs in a row find it clean, so beside the pool errors panel this tells an entry left from before the last scrub from a fresh one."
+          },
+          "plugin": {
+            "kind": "TimeSeriesChart",
+            "spec": {
+              "yAxis": {
+                "format": {
+                  "unit": "seconds"
+                }
+              },
+              "legend": {
+                "position": "bottom",
+                "mode": "list"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "TimeSeriesQuery",
+              "spec": {
+                "plugin": {
+                  "kind": "PrometheusTimeSeriesQuery",
+                  "spec": {
+                    "datasource": {
+                      "kind": "PrometheusDatasource",
+                      "name": "greptimedb-promql"
+                    },
+                    "query": "time() - max by (host_name, zpool) (vanixiets_zpool_scrub_end_timestamp_seconds{host_name=~\"$host_name\"})",
+                    "seriesNameFormat": "{{host_name}} {{zpool}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
       "dataset-quota": {
         "kind": "Panel",
         "spec": {
@@ -909,6 +1023,24 @@
               "height": 8,
               "content": {
                 "$ref": "#/spec/panels/dataset-quota"
+              }
+            },
+            {
+              "x": 12,
+              "y": 24,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/pool-errors"
+              }
+            },
+            {
+              "x": 0,
+              "y": 32,
+              "width": 12,
+              "height": 8,
+              "content": {
+                "$ref": "#/spec/panels/pool-scrub"
               }
             }
           ]

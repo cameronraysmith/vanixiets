@@ -24,7 +24,7 @@
 # Every rule's expected hosts and RuleSignalMissing's `alwaysOn` come from
 # `hosts`, flake.lib.observabilityHosts by default (S4 design D9), among the
 # hosts that collect, by each host's `platform`: HostMemoryPressure,
-# HostOOMKill, ZfsPoolUnhealthy, ZfsPoolCapacityWarn,
+# HostOOMKill, ZfsPoolUnhealthy, ZfsPoolErrors, ZfsPoolCapacityWarn,
 # ZfsPoolCapacityCritical, SystemdUnitRestartLoop and SystemdUnitFailed
 # expect the NixOS hosts, whose selectors darwin never writes, and each of
 # which has a ZFS pool (modules/nixos/zpool-probe.nix asserts it); the
@@ -247,6 +247,20 @@
           severity = "critical";
           annotations.summary = "A ZFS pool is not online";
           presence = [ (presence nixosHosts "node_zfs_zpool_state") ];
+        }
+        # zpool-probe writes each pool's data error count and the sum of its
+        # vdevs' read, write and checksum error counters every minute from
+        # `zpool status -j`. A pool can list a data error while its state
+        # stays ONLINE and its device counters stay zero, which
+        # ZfsPoolUnhealthy does not see. A warning: it needs a person to
+        # read `zpool status -v` or run a scrub, not a page.
+        {
+          alert = "ZfsPoolErrors";
+          expr = "max by (host_name, zpool) (vanixiets_zpool_data_errors) > 0 or max by (host_name, zpool) (vanixiets_zpool_device_errors) > 0";
+          for = "10m";
+          severity = "warning";
+          annotations.summary = "A ZFS pool reports data errors, or read, write or checksum errors on its devices, the message's zpool naming it; run zpool status -v <pool> on the host, which lists the files a data error affects. An entry with no file list is cleared by two clean scrubs (zpool scrub <pool>), and the Fleet hosts view's pool errors panel shows when the last scrub ended";
+          presence = [ (presence nixosHosts "vanixiets_zpool_data_errors") ];
         }
         # zpool-probe (flake.modules.nixos.zpool-probe) writes each pool's
         # allocated bytes over its size every minute, the CAP of `zpool

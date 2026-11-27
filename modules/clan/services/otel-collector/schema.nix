@@ -125,6 +125,14 @@
       "vanixiets_zfs_dataset_used_bytes"
       "vanixiets_zfs_dataset_quota_bytes"
       "vanixiets_zfs_dataset_snapshots_used_bytes"
+      # Each ZFS pool's data errors and device error counters, and the end
+      # and error count of its last completed scrub, from `zpool status -j`,
+      # which the zfs collector does not report either: a pool can stay
+      # ONLINE with its device counters at zero while it lists a data error.
+      "vanixiets_zpool_data_errors"
+      "vanixiets_zpool_device_errors"
+      "vanixiets_zpool_scrub_end_timestamp_seconds"
+      "vanixiets_zpool_scrub_errors"
     ];
 
     # The units magnetite's memory budget reports (CAM-111 design D11), as
