@@ -63,15 +63,15 @@ The `planningHome`/`artifactPaths` status-JSON shape is verified against openspe
 `openspec status --change <change>` only resolves while the change is still active, so the planning root (and, if needed, the capability list from `artifactPaths.specs.existingOutputPaths[]`) is captured in the readiness step before `openspec archive` moves the change into the archive; the worked example below shows the exact single-field `jq` capture, which extracts only the field needed rather than dumping the full status payload.
 The capture guards on repo mode (`select(.planningHome.kind=="repo")`): in workspace mode there is no single main specs dir, the select yields empty, and the spec-mirror is skipped and logged rather than guessed — the same non-blocking, single-openspec-root-per-repo degradation as a missing `linear_project`.
 
-The document commands and `.nodes[]` connection shape in this recipe are verified against v2.6.0 using command help and `listCommand` in `src/commands/document/document-list.ts`.
+The document commands in this recipe are verified against v2.6.0 using command help and `listCommand` in `src/commands/document/document-list.ts`; the `--json` output of `document list` is a plain array of documents at linear-cli 3.1.0.
 
 A capability listed in `defaults.archive_documents.unmirrored` is skipped, because its spec exceeds Linear's document size limit, and the skip is recorded in the attempt log (`{ outcome: "dropped", note: "<capability> exceeds Linear's document size limit; spec mirror skipped" }`).
 For each other capability the change produces:
 
 1. Look up the stored document id first: read `projects."<project-slug>".archive_documents."<capability>".id` from openspec/linear.yaml, where `<project-slug>` is the change's `linear_project`.
 2. If a stored id exists, update in place: `linear document update <stored-id> --title "OpenSpec: <capability>" --content-file <spec-file> --workspace <slug>`.
-3. Only if no stored id exists, fall back to a title scan: `linear document list --project <p> --json --workspace <slug>` and match the deterministic title `OpenSpec: <capability>` over the `.nodes[]` array of the returned connection object.
-   The `--json` output is a connection with `nodes` and `pageInfo`, not a bare array, so the match must walk `.nodes[]`; introspect the exact shape via `linear schema -o <file>` and confirm against the `linear-cli` skill's `references/api.md` and the `linear-cli` skill's `references/schema.md`.
+3. Only if no stored id exists, fall back to a title scan: `linear document list --project <p> --json --workspace <slug>` and match the deterministic title `OpenSpec: <capability>` over the returned array with `.[]`.
+   The `--json` output is a plain array of documents, not a connection with `nodes` and `pageInfo`: `.nodes[]` fails on it with `Cannot index array with string "nodes"`, and inside `$(…)` that failure leaves the id empty, so the recipe would create a duplicate document.
 4. If the title scan finds a match, update that id as in step 2.
 5. If no stored id and no title match, create: `linear document create --project <p> --title "OpenSpec: <capability>" --content-file <spec-file> --workspace <slug>`, which creates it already parented to the project, and store the returned id back into openspec/linear.yaml under `projects."<project-slug>".archive_documents."<capability>".id` so the next archive takes the stored-id path.
 
@@ -94,7 +94,7 @@ Every step is guarded by the strictly-behind rule (see references/lifecycle.md):
 The ledger updates that accompany each transition (`last_synced_state`, `last_synced_at`, `review_round`, `attempt_log`) are written to this change's proposal.md frontmatter, not to openspec/linear.yaml.
 
 This trace is a policy-level walkthrough: the ordering, the guards, the archive sequence, and the per-crossing comment discipline are the load-bearing parts.
-The concrete flags and the two `.nodes[]` jq filters below are illustrative at linear-cli v2.0.0; they are authoritative in the `linear-cli` skill's `references/issue.md`, the `linear-cli` skill's `references/document.md`, the `linear-cli` skill's `references/api.md`, and the `linear-cli` skill's `references/schema.md`, and in the `linear-cli` skill's `references/auth.md` for the `whoami` gate.
+The concrete flags and the two document-list jq filters below are illustrative at linear-cli v2.0.0; they are authoritative in the `linear-cli` skill's `references/issue.md`, the `linear-cli` skill's `references/document.md`, the `linear-cli` skill's `references/api.md`, and the `linear-cli` skill's `references/schema.md`, and in the `linear-cli` skill's `references/auth.md` for the `whoami` gate.
 
 First, gate on the workspace before any mutation:
 
@@ -190,20 +190,20 @@ for cap in $caps; do
   # Primary lookup: the stored per-capability document id under this project in openspec/linear.yaml.
   DOC_ID=$(yq -r ".projects.\"<pslug>\".archive_documents.\"$cap\".id // \"\"" openspec/linear.yaml)
   if [ -z "$DOC_ID" ]; then
-    # Fallback: scan the connection's .nodes[] array for the deterministic title.
+    # Fallback: scan the returned array of documents for the deterministic title.
     DOC_ID=$(linear document list --project <p> --json --workspace <slug> \
-      | jq -r --arg t "OpenSpec: $cap" '.nodes[] | select(.title == $t) | .id')
+      | jq -r --arg t "OpenSpec: $cap" '.[] | select(.title == $t) | .id')
   fi
   if [ -n "$DOC_ID" ]; then
     linear document update "$DOC_ID" --title "OpenSpec: $cap" --content-file "$planning_root/openspec/specs/$cap/spec.md" --workspace <slug>
   else
     # Create already-parented to the project; document create has no --json, so read the id back
-    # rather than piping create stdout into a list+jq lookup. Re-scan the connection by deterministic
+    # rather than piping create stdout into a list+jq lookup. Re-scan the list by deterministic
     # title (linear api is the alternative when the title scan is ambiguous);
-    # the connection shape is the .nodes[] walk noted in the UPSERT recipe above.
+    # the list is the plain array noted in the UPSERT recipe above.
     linear document create --project <p> --title "OpenSpec: $cap" --content-file "$planning_root/openspec/specs/$cap/spec.md" --workspace <slug>
     NEW_ID=$(linear document list --project <p> --json --workspace <slug> \
-      | jq -r --arg t "OpenSpec: $cap" '.nodes[] | select(.title == $t) | .id')
+      | jq -r --arg t "OpenSpec: $cap" '.[] | select(.title == $t) | .id')
     # This deployment's PATH yq is kislyuk/yq (a jq wrapper), for which -i requires a YAML output flag,
     # so -y is mandatory with -i; the read form above (yq -r ... // "") needs no -y. (mikefarah/yq -i needs no companion flag.)
     yq -y -i ".projects.\"<pslug>\".archive_documents.\"$cap\".id = \"$NEW_ID\"" openspec/linear.yaml
