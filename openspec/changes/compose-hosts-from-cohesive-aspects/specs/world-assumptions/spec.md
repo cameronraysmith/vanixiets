@@ -5,6 +5,8 @@
 It is true of nix-darwin at the locked revision, independent of what this fleet builds, that `postActivation.text` definitions are ordered by `mkOrder` priority, keeping merge order within a priority, and that `postActivation` runs after every other snippet and before `/run/current-system` is relinked.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
+**Evidence**: nix-darwin `663d8b962a11` `modules/system/activation-scripts.nix:114-151` (the activate script splices every snippet's `text` in a fixed order, `postActivation` at `:140` after the last of the others at `:138`, then relinks `/run/current-system` at `:146`) and `modules/lib/write-text.nix:25-31` (each snippet's `text` is `types.lines`); nixpkgs `bd5b7d01ccc4` (which nix-darwin follows) `lib/types.nix:794-813` (`lines` joins the merged definitions with `"\n"` in list order) and `lib/modules.nix:1417-1422,1652-1668` (when any definition carries `mkOrder`, definitions are sorted by `builtins.sort` on priority, default `1000`, which keeps merge order among equal priorities).
+
 #### Scenario: Read at the source at apply
 
 - **WHEN** nix-darwin `663d8b96` `modules/system/activation-scripts.nix:114-158` and the `lines` merge in nixpkgs `lib/types.nix` and `lib/modules.nix` are read (task 1.5)
@@ -17,8 +19,10 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A351 — The module system applies a module once per key, and a flake-parts module value carries no key
 
-It is true of the nixpkgs module system and flake-parts at the locked revisions, independent of what this fleet builds, that modules are collected once per `key`, that a module without one gets a key derived from its importer, and that flake-parts' `flake.modules` values carry no `key`, so one imported from two parents applies twice.
+It is true of the nixpkgs module system and flake-parts at the locked revisions, independent of what this fleet builds, that modules are collected once per `key`, that a module given as a value without one gets a key derived from its importer, and that flake-parts' `flake.modules` values carry no `key`, so one imported from two parents applies twice.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: nixpkgs `bd5b7d01ccc4` `lib/modules.nix:543-546` (an imported module gets the fallback key `<importer's key>:anon-<index>`), `:765,783` (a module's own `key` replaces the fallback), `:463-468` (a path import's key is its path) and `:594-614` (`filterModules` keeps one module per key through `builtins.genericClosure`); flake-parts `ea2630b74709` `extras/modules.nix:12-28,72` (every non-`generic` `flake.modules` value is wrapped in a function returning `_class`, `_file` and `imports`, with `# TODO: set key?` at `:24` and no `key`); nixpkgs `lib/types.nix:1992-1998` (a `deferredModule` merges to `{ imports = [ … ]; }`, with no `key`).
 
 #### Scenario: Read at the source at apply
 
@@ -40,7 +44,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of the nixpkgs module system at the locked revision, independent of what this fleet builds, that a configuration's modules are collected breadth-first over the import tree and that definitions merge in that order, so a definition's place in a list option depends on its import depth as well as on its order among its siblings.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: nixpkgs `lib/modules.nix:600-614` (`filterModules` returns `builtins.genericClosure` over the collected tree) and `lib/types.nix` `deferredModuleWith`'s merge, read 2026-11-27.
+**Evidence**: nixpkgs `bd5b7d01ccc4` `lib/modules.nix:594-614` (`filterModules` returns the modules in `builtins.genericClosure` order, starting from the top-level imports and expanding each module's `modules`) and `lib/types.nix:1992-1998` (`deferredModuleWith` merges its definitions into one `imports` list in definition order); the breadth-first order is the evaluator's, not nixpkgs': Nix 2.35.6 returns `a b c d` for `genericClosure` over `a → [b c]`, `b → [d]` (evaluated 2026-11-27).
 
 #### Scenario: Measured on this fleet
 
@@ -62,7 +66,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of nix-darwin at the locked revision, independent of what this fleet builds, that `nix.settings.substituters` and `trusted-public-keys` are `listOf str`, that every definition's elements are kept, duplicates included, and that `/etc/nix/nix.conf` renders each list as one line of space-joined values.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: nix-darwin `663d8b96` `modules/nix/default.nix:38-50` (`mkValueString` renders a list with `toString`), `:622-657` (the two options), `:947-949` (nix-darwin's own cache.nixos.org entries).
+**Evidence**: nix-darwin `663d8b962a11` `modules/nix/default.nix:38-50` (`mkValueString` renders a list with `toString`), `:622-657` (the two options), `:947-949` (nix-darwin's own cache.nixos.org entries).
 
 #### Scenario: Observed at apply
 
@@ -79,7 +83,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of nix-darwin at the locked revision, independent of what this fleet builds, that activation sends `nix-daemon` `HUP` when `/etc/nix/nix.conf` differs from the running system's, so a changed cache list takes effect at the deploy.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: nix-darwin `663d8b96` `modules/nix/default.nix:934-936`.
+**Evidence**: nix-darwin `663d8b962a11` `modules/nix/default.nix:935` (the `diff` of `/etc/nix/nix.conf` against the running system's), `:937` (`launchctl kill HUP system/org.nixos.nix-daemon`).
 
 #### Scenario: Observed at deploy
 
@@ -93,12 +97,14 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 ### Requirement: A355 — Neither srvos nor clan-core forces the darwin documentation options or GRUB's enable
 
-It is true of srvos and clan-core at the locked revisions, independent of what this fleet builds, that neither sets the darwin documentation options, `programs.{info,man}.enable` or `boot.loader.grub.enable` above `mkDefault` priority, so a plain host value wins.
+It is true of srvos and clan-core at the locked revisions, independent of what this fleet builds, that neither the srvos modules this fleet imports nor clan-core's `clanCore` defaults sets the darwin documentation options, `programs.{info,man}.enable` or `boot.loader.grub.enable` above `mkDefault` priority, so a plain host value wins.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the srvos modules this fleet imports are `server` (NixOS and darwin), `mixins-nginx`, `hardware-hetzner-cloud` and, in pyrite, the file `shared/common/well-known-hosts.nix` (`rg -n srvos modules lib`, 2026-11-27); of every srvos file those import, at srvos `e151e24ac800`, only these set an option named here: `shared/server.nix:26-29` (`documentation.{enable,doc.enable,info.enable,man.enable}` set with `mkDefault`), `darwin/server/default.nix:14-15` (`programs.{info,man}.enable` set with `mkDefault`); `nixos/hardware/hetzner-cloud/default.nix:16` sets `boot.loader.grub.devices` with `mkDefault`, not `grub.enable`, and `shared/common/well-known-hosts.nix` sets only `programs.ssh.knownHosts`. clan-core `78d5de23bd56` `nixosModules/clanCore/defaults.nix:38-45` (`documentation.{doc,info}.enable = mkDefault false` in a NixOS module, under `enableRecommendedDefaults`).
 
 #### Scenario: Read at the source at apply
 
-- **WHEN** srvos `e151e24a` `shared/server.nix:26-29`, `darwin/server/default.nix:14-15` and `nixos/hardware/hetzner-cloud/default.nix:16,23-24`, and clan-core `78d5de23` `nixosModules/clanCore/defaults.nix:42,45`, are read (task 1.5)
+- **WHEN** srvos `e151e24a` `shared/server.nix:26-29`, `darwin/server/default.nix:14-15` and `nixos/hardware/hetzner-cloud/default.nix:16`, and clan-core `78d5de23` `nixosModules/clanCore/defaults.nix:42,45`, are read (task 1.5)
 - **THEN** srvos sets those options with `mkDefault`, its Hetzner module sets `grub.devices` and not `grub.enable`, and clan-core's `mkDefault false` documentation settings are a NixOS-only module
 
 #### Scenario: Observed by evaluation
@@ -116,7 +122,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of import-tree at the locked revision, independent of what this fleet builds, that a file whose path under the imported directory has a component beginning with `_` is not imported as a module.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: import-tree `eb1b52ea`'s default filter, read at apply (task 1.5); `modules/_disabled/` relies on it today.
+**Evidence**: import-tree `eb1b52eaecc5` `default.nix:64-68,83-87` (the default filter keeps `.nix` files whose path relative to the imported directory has no `/_` infix, unless the caller replaces the initial filter); `modules/_disabled/` relies on it today.
 
 #### Scenario: Observed at apply
 
