@@ -322,16 +322,93 @@ PASS WITH WARNINGS: no requirement these commits add or amend is unmet, and no d
 
 ---
 
+## 11. Deployed-host checks repeated on stibnite, 2026-11-27
+
+Run as `crs58` on stibnite after activation at `main` `1d9c9dd5` (system profile 259, `/run/current-system` linked at 20:37:49 UTC), from 20:38 to 21:04 UTC, with git 2.56.0 and lazygit 0.66.3.
+The logs are `logs/cam136-host41b-<copy>-update-*.log` and `logs/cam136-host41b-<copy>-reads-*.log` for `nixpkgs`, `iets`, `home-manager`, `git-hooks.nix` and `nix-src`, `logs/cam136-host41b-iets-noop-20261127-154106.log`, `logs/cam136-host41b-lazygit-20261127-154409.log`, `logs/cam136-host41b-nixpkgs-old-merges-20261127-154429.log`, `logs/cam136-host41b-nixpkgs-recipe-20261127-155633.log` and `logs/cam136-host41b-nixpkgs-old-merges-after-recipe-20261127-155752.log`.
+
+### What is deployed
+
+- The writer's launchd unit `org.vanixiets.ghq-writer` runs `/nix/store/ghxrsv0s…-ghq-shared-0.1.0/libexec/ghq-shared/ghq-writer-handler`, which names `RECORD = "ghq-writer-hydrated"` and lists merge sides with `--diff-filter=AD`; it differs from `pkgs/by-name/ghq-shared/ghq-writer-handler.py` at `1d9c9dd5` only in its interpreter line and the three substituted store paths.
+- `ghq-sync --help` says `git show REV` needs REV and each of its parents hydrated, and that the writer hydrates what an update brings into a clone's branches and remote-tracking branches, merges included, or at the clone's next update or deepen for a request that stops after its fetch.
+- `/private/var/lib/ghq/.lazygit.yml` holds `git:` / `  autoFetch: false`, `_ghq:_ghq`, mode `0640`, written at activation; `protocol.allow` in the nixpkgs copy is `never` from the `hm_gitconfig` file, as in §9.
+
+### The updates
+
+Copies were chosen as in §9: blobless and behind `git ls-remote <url> HEAD` run from `/tmp`; `git-hooks.nix` and `nix-src` because their recent history is mostly merges.
+Readable means `git -C <path> --no-lazy-fetch show --stat -p <c>` exits 0 with default rename detection, with a limit of 600 s per command; for each merge, lazygit's two commands from §10, its `git show … --find-renames=50% … --stat --decorate -p <c> --` and its commit-files listing `git diff --submodule --no-ext-diff --name-status -z --find-renames=50% <c>^ <c>`, both with `--no-lazy-fetch`, must exit 0 as well.
+Missing is `git --no-lazy-fetch rev-list --objects --missing=print OLD..NEW | grep -c '^?'`.
+
+| Copy | Old tip → new tip | Commits (merges) | Packs before → after | Wall time | Writer's exit line | Readable (merges; lazygit's commands) | Missing |
+|---|---|---|---|---|---|---|---|
+| `github.com/nixos/nixpkgs` | `aa08d423` → `c7a754b3` | 77 (36) | 6 → 9 | 4.47 s | `exit status=0 duration=3.994s history=hydrated:26` | 77 of 77 (36 of 36; 36 of 36) | 0 |
+| `github.com/numtide/iets` | `1a1c28bd` → `d016486e` | 4 (2) | 14 → 16 | 1.18 s | `exit status=0 duration=0.950s history=hydrated:0` | 4 of 4 (2 of 2; 2 of 2) | 0 |
+| `github.com/nix-community/home-manager` | `361da94f` → `54f903fd` | 3 (0) | 65 → 2 | 1.36 s | `exit status=0 duration=1.181s history=hydrated:0` | 3 of 3 | 0 |
+| `github.com/cachix/git-hooks.nix` | `1ba1dbfe` → `26f3f17f` | 11 (4) | 7 → 10 | 1.40 s | `exit status=0 duration=1.154s history=hydrated:15` | 11 of 11 (4 of 4; 4 of 4) | 0 |
+| `github.com/DeterminateSystems/nix-src` | `ea7e9be2` → `7e38738b` | 452 (146) | 12 → 15 | 2.71 s | `exit status=0 duration=2.521s history=hydrated:435` | 452 of 452 (146 of 146; 146 of 146) | 0 |
+
+nixpkgs had gained 77 commits in the five hours since §9, not hundreds.
+No read came near the limit: the slowest five in nixpkgs took 0.159 s (`c3a65b02`), 0.077 s (`0707dcdf`), 0.058 s (`d8cab1e5` and `7b9a7d29`) and 0.056 s (`5e6338b3`), all merges, and lazygit's two commands together at most 0.076 s; in nix-src the slowest took 0.057 s.
+No request reported `history not hydrated`.
+home-manager's reply printed `Auto packing the repository for optimum performance.`, hence its pack count.
+
+### The record
+
+`.git/ghq-writer-hydrated` exists in each of the five copies, `_ghq:_ghq`, mode `0640` (nixpkgs' `.git` is `_ghq:_ghq` `0750`); for `crs58`, `test -r` succeeds and `test -w` fails.
+Its `ref` lines equal `git for-each-ref refs/heads refs/remotes` after the update, the new tips, and its `shallow` lines equal `.git/shallow`.
+None of the five had a record before.
+For nixpkgs, the record's modification and birth times are 20:39:18.031 UTC, the instant of the exit line of the request that started at 20:39:14.038, after its fetch; the file was not polled there, so a write before the fetch, replaced by this one, was not observed.
+For the other four, a poll of the file every 20 ms saw it appear 28 to 42 ms after the request's start line and replaced by a new inode 16 to 31 ms after the exit line (iets: start 20:39:51.259, record 20:39:51.292, exit 20:39:52.208, new inode 20:39:52.239).
+A second `ghq-sync -u github.com/numtide/iets`, with nothing new, took 0.73 s and printed `Already up to date.`; its exit line `exit status=0 duration=0.532s` carries no history token, and the record's modification time and inode were unchanged.
+The six `--hydrate` requests below left nixpkgs' record unchanged.
+
+### lazygit
+
+lazygit ran in a tmux pseudo-terminal of 200 by 50 in the nixpkgs copy with `GIT_TRACE` and `GIT_TRACE2_EVENT` set and the account's own configuration, from 20:41:35 to 20:43:27 UTC (112 s), exiting 0.
+With the commits panel focused it moved down 80 commits at 1.2 s each; lazygit ran 81 `git show … --find-renames=50% … -p <c> --`, all exiting 0, covering all 77 commits of `aa08d423..c7a754b3` and all 36 of its merges, among them `0707dcdf`, whose diff against its second parent adds or deletes 485 entries, the most in the range, and the Patch pane showed each diff.
+The traces hold no `fetch`, `fetch-pack` or `remote-https`; the copy's pack list and refs were unchanged.
+
+### The merges that predate the record
+
+Of the 96 merges of `2a21d231..aa08d423` that §9 found unreadable, read again with the same command, 8 at a time, with a limit of 600 s: 36 are now readable, in 0.03 to 0.13 s, and 60 still exit 128 with `fatal: could not fetch <oid> from promisor remote` after 71 to 98 s each.
+
+The recipe the usage text gives, `ghq-sync --hydrate <rev>` then `ghq-sync --hydrate <rev>^2` (each is a two-parent merge), applied to three:
+
+| Merge | Before | `--hydrate <rev>` | `--hydrate <rev>^2` | Pack growth | Read after (`show`; lazygit's show and listing) |
+|---|---|---|---|---|---|
+| `a2138be0` | unreadable, 94.9 s | 0 objects, 1.13 s, `duration=0.755s` | 309 objects, 2.46 s, `duration=2.252s` | 1,678 KiB | 0.046 s; 0.042 s, 0.024 s |
+| `e3c7a9df` | readable, 0.058 s | 0 objects, 0.93 s, `duration=0.742s` | 459 objects, 2.41 s, `duration=2.228s` | 1,543 KiB | 0.051 s; 0.052 s, 0.024 s |
+| `400c87b5` | unreadable, 98.4 s | 0 objects, 0.94 s, `duration=0.734s` | 11,055 objects, 5.61 s, `duration=5.400s` | 24,067 KiB | 0.151 s; 0.128 s, 0.023 s |
+
+Every request's exit line is `exit status=0` with no history token, as `--hydrate` runs no walk.
+`--hydrate <rev>^2` fetches the missing objects of that commit's tree, which `git --no-lazy-fetch rev-list --objects --missing=print --no-walk 400c87b5^2` counts as 11,055 (the merge and its first parent: 0); the same command without `--no-walk` walks all of `400c87b5^2`'s history and counts 1,188,150, which no hydrate fetches.
+Rename detection on `400c87b5` reads 1,346 blobs, so the recipe fetched about eight times what the read needed; it took 98 s to fail before and 0.15 s to succeed after.
+
+After the three, the other 58 were read again: 29 are readable and 29 are not, each failing as before after 76 to 99 s.
+Their second parents' trees lack 21,385 objects in all, 3,935 distinct (median 31 per merge, largest 2,099), and their own and their first parents' trees none; at the rates above, the recipe would recover all 29 in 58 requests of one to three seconds each.
+
+### Warnings, failures and stale files
+
+The writer's log after activation holds only the twelve requests above, each `exit status=0`, with no warning, failure or history token other than those shown.
+The five copies updated hold no `tmp_pack_*`, `maintenance.lock`, other `.lock` or `ghq-writer-hydrated.new`; other copies were not checked for stale files.
+
+### Result
+
+4.1 holds: every commit the five updates brought in, 547 with 188 merges, reads under default rename detection and lazygit's commands, lazygit on nixpkgs' merges ran no fetch, and each copy's record is the writer's, mode `0640`, readable and not writable by readers.
+29 of the 96 merges that predate the record stay unreadable until the recipe is applied to each.
+
+---
+
 ## Overall Decision
 
 - [ ] (pass) PASS — may proceed to finishing-a-development-branch and archive
-- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: "brings in" is defined by refs; the request-half handler check ran 47.4 s of its 60 s limit; a darwin activation killed mid-write leaves `.lazygit.yml.<hex>` in the root; a home declared with a trailing slash, or a root with glob characters, would defeat the include, though none is; two amended clauses have no test that fails without them (§10, W1 and W2); tasks 4.1 and 4.2 stay open until the deploy
+- [x] (warn) PASS WITH WARNINGS — may proceed to subsequent steps but note: "brings in" is defined by refs; the request-half handler check ran 47.4 s of its 60 s limit; a darwin activation killed mid-write leaves `.lazygit.yml.<hex>` in the root; a home declared with a trailing slash, or a root with glob characters, would defeat the include, though none is; two amended clauses have no test that fails without them (§10, W1 and W2); 29 nixpkgs merges fetched before the record stay unreadable until `ghq-sync --hydrate` (§11)
 - [ ] (fail) FAIL — return to the failed artifact, correct it, then re-run verify
 
 Every finding of the first, second and third runs is closed, and every requirement holds against `c6aeb3cb`; §10 finds the remedies of the deployed-host checks (`af1ce8a3`, `874fd667`, `c6b26e76`) meeting every requirement they add or amend.
 No checked FAIL remains.
-Tasks 4.1 and 4.2 remain open.
+Tasks 4.1 and 4.2 are done (§9, §11).
 
 **Next step**:
 
-Deploy, then tasks 4.1 and 4.2; CAM-136 stays In Progress until its deployed-host tasks are done.
+finishing-a-development-branch and archive; CAM-136 stays In Progress until the change is archived.
