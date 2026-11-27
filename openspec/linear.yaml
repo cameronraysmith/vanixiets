@@ -159,6 +159,10 @@ projects:
         id: "5b5e07bb-e093-4c40-8c38-a73cf7033b14"
       "host-configuration-independence-interface":
         id: "7883ca19-041f-4b75-8169-d1255e515b89"
+      "host-user-attachment":
+        id: "ab8cc76f-74a6-4bf1-893a-86af86da0e48"
+      "host-user-attachment-interface":
+        id: "87d31015-2891-42cf-b720-c523f808f4bb"
       "refactor-identity-oracle":
         id: "8a18c207-3c66-4e84-b5a2-e806a419925a"
       "refactor-identity-oracle-interface":

@@ -463,6 +463,12 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | graph backup | — | a copy of graph data made from one local snapshot and held in a bucket away from the host, which survives the loss of the host and its disk | shared |
 | runbook | — | the written procedure in the repository's operations docs that the operator follows for a named task | shared |
 | recovery notice | — | a low-priority message on the fleet's notification service telling the operator that the graph store cleared a stale writer claim on a named host | shared |
+| primary user | — | the person a host belongs to and is set up around, at most one per host, whose account on it is that person's own | shared |
+| admin account | — | the one account on a darwin host through which the operator administers it and under which its system-wide steps that act for a user run, which may or may not belong to the host's primary user | shared |
+| person-account correspondence | — | the fixed pairing between a person and the one account name under which the fleet keeps that person's home configuration and keys, which for cameron is crs58 and for every other person is the person's own name | world-only |
+| private settings | — | the part of a person's home configuration that only that person's own accounts may hold, such as the references to that person's secrets and personal choices | shared |
+| fleet description | — | the repository's statement of the fleet's hosts, people, packages and inputs, from which every host and home configuration is built | shared |
+| checked system | — | a platform, x86_64-linux or aarch64-darwin, for which the fleet's checks are built | shared |
 
 #### Scenario: The terms with two senses are read
 
@@ -2079,3 +2085,156 @@ Any requirement relying on this SHALL name it and SHALL lose its discharge once 
 #### Scenario: the assumption drifts
 - **WHEN** a release releases the admission lock when a direct `optimize` completes
 - **THEN** this assumption is void, and the reason `graph-store-interface` requirement `Optimize is not enabled on a local root` forbids the optimize timer is void and is reviewed
+
+### Requirement: A340 — home-manager gives every home of a host one shallowly merged set of special arguments
+
+It is true of home-manager at the revision this repository locks, independent of what this fleet builds, that `home-manager.extraSpecialArgs` is typed `attrs`, merged by shallow update with the later definition winning, and passed to every home-manager user of the host.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the `extraSpecialArgs` option in home-manager's `nixos/common.nix`, and `types.attrs`' merge in nixpkgs `lib/types.nix`; both are read at the locked revisions at apply (task 1.4) and cited there with their lines. The two writers on stibnite, blackphos, argentum and rosegold (design Context) are why the value there is order-dependent.
+
+#### Scenario: Read at the source at apply
+
+- **WHEN** the option and the type's merge are read at the locked revisions
+- **THEN** the option is host-wide and the merge is a shallow update, later definition winning
+
+#### Scenario: home-manager makes special arguments per user
+
+- **WHEN** a home-manager update lets each `home-manager.users.<name>` carry special arguments of its own, or changes the merge of `extraSpecialArgs`
+- **THEN** this assumption is void; the `host-user-attachment` requirements `A person's home configuration does not depend on the order a host's settings are read` and `An Omnigent worker's home configuration cannot read any person's private settings or whole home configuration` lose their discharge until the per-home argument is restated against the new interface
+
+### Requirement: A341 — A special argument shadows a module argument of the same name, and a module argument cannot feed imports
+
+It is true of the nixpkgs module system at the locked revision, independent of what this fleet builds, that a module given one name both as a special argument and in `_module.args` receives the special argument, and that a `_module.args` value cannot be read while `imports` are collected.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: `evalModules` in nixpkgs `lib/modules.nix` applies each module to its special arguments together with `config._module.args`; the precedence and the infinite recursion an `imports` list reading a `_module.args` value causes are read and cited at apply (task 1.4).
+
+#### Scenario: Read at the source at apply
+
+- **WHEN** `evalModules` is read at the locked revision
+- **THEN** a special argument takes precedence and `_module.args` is defined by the collected modules
+
+#### Scenario: The precedence changes
+
+- **WHEN** a nixpkgs update gives `_module.args` precedence over a special argument, which `checks.x86_64-linux.omnigent-worker-scope`'s `noShadow` case would no longer need the aspect's assertion to guard
+- **THEN** this assumption is void; the `host-user-attachment` requirement `An Omnigent worker's home configuration cannot read any person's private settings or whole home configuration` keeps its discharge only after the assertion and the case are restated
+
+### Requirement: A342 — No vendored module set reads a module argument named flake
+
+It is true of every module set a host or home imports from outside the repository (nixpkgs, nix-darwin, home-manager, clan-core, srvos, sops-nix and the rest) at the locked revisions, independent of what this fleet builds, that none reads a module argument named `flake`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: a search of the locked inputs' module sources for a `flake` formal, run at apply (task 1.4); and the drvPath diff of this change's commit, which removes the nine host modules' `_module.args.flake` definitions (ten hosts: `darwin/laptop.nix` serves argentum and rosegold) and finds every NixOS and darwin toplevel unchanged.
+
+#### Scenario: Observed by the drvPath diff
+
+- **WHEN** the drvPath diff runs over the commit that removes every host `_module.args.flake`
+- **THEN** every host configuration evaluates and no toplevel differs
+
+#### Scenario: An input starts reading flake
+
+- **WHEN** an input update adds a module that reads a `flake` argument, so a host or home fails to evaluate for want of it, or a drvPath differs where only the argument was removed
+- **THEN** this assumption is void; the `host-user-attachment` requirement `A person's home configuration does not depend on the order a host's settings are read` loses its discharge until that module's argument is supplied explicitly
+
+### Requirement: A343 — clan's users service creates its account only on the NixOS machines its role names
+
+It is true of clan-core's `users` service at the revision this repository locks, independent of what this fleet builds, that an instance's account is created, with the instance's settings, on each NixOS machine named in its role and on no other machine, and that on a nix-darwin machine only the instance's `extraModules` apply.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the comments at `modules/clan/inventory/services/users/cameron.nix:2` and `crs58.nix:2`, and the darwin bodies, which declare their accounts themselves; clan-core's `clanServices/users` is read and cited at apply (task 4.1).
+
+#### Scenario: Observed at apply
+
+- **WHEN** the generated instance machine lists are evaluated and each host's `users.users` names are compared with the parent revision
+- **THEN** every attached account exists on its host and no other account appears
+
+#### Scenario: clan changes where the account is created
+
+- **WHEN** a clan-core update makes the users service create accounts on nix-darwin, or select machines other than those named in its role
+- **THEN** this assumption is void; the `host-user-attachment` requirements `Each account a person holds on a host is declared once` and `A host provides exactly its declared accounts, home configurations and secret access` lose their discharge until the generator is restated against the new service
+
+### Requirement: A344 — A list option's definitions merge in reverse breadth-first module order
+
+It is true of nixpkgs' module system at the revision the fleet evaluates with that modules are collected breadth-first and equal-priority list definitions merge in reverse of that order: deeper modules' definitions come first, a module's own follow only its direct imports', and only an order priority overrides import depth.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the root flake's nixpkgs input, `bd5b7d01`, the one hosts and homes evaluate with: `lib/modules.nix:600-614` (`filterModules` collects modules with `genericClosure` at `:602`, which works through its list first in, first out: the start set, then their imports, then the imports' imports), `:278` (`merged = mergeModules prefix (reverseList (doCollect { }).modules)`, which reverses that list before merging), `:1652-1668` (`sortProperties` then orders only by `mkOrder` priority, stably) and `lib/types.nix:1034-1046` (`listOf` concatenates the definitions in that order). Observed 2026-11-27, against two earlier statements of this assumption (first with the order the other way round, then as "a module's own definitions after its imports'" in general): at the parent, stibnite's host module defined crs58's home inline, so that definition was one of the home evaluation's top-level modules and the last of the home's 168 `home.packages` definitions. Generated by the integration aspect, the same definitions sit in the pair's `overrides`, a direct import of the generated home module and so one level deeper; without an order priority they came 101st of 168. This change relies on `lib.mkAfter` on those definitions in stibnite's crs58 `overrides` (`modules/lib/host-users.nix`), which puts them last of 168 again, not on where `overrides` is imported. The drvPath diff of this change's commit observes the result for every attached home.
+
+#### Scenario: Observed by the drvPath diff
+
+- **WHEN** the drvPath diff runs over the commit that generates each host's home entries
+- **THEN** no home's activation package differs
+
+#### Scenario: A home's list changes order
+
+- **WHEN** the diff shows an attached home's activation package differing where only definitions moved
+- **THEN** this assumption is void as applied; the `host-user-attachment` requirement `A host provides exactly its declared accounts, home configurations and secret access` keeps its discharge only after the entry's order is changed to restore the home, or the difference is explained and declared
+
+### Requirement: A345 — nix-darwin's system.primaryUser names the account that runs its per-user activation
+
+It is true of nix-darwin at the revision this repository locks, independent of what this fleet builds, that `system.primaryUser` names the one account under which nix-darwin runs the activation steps that act for a user (Homebrew, user defaults), and that nothing in nix-darwin relates it to who uses the Mac.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the option's declaration and readers in nix-darwin, read and cited at apply (task 1.4); `modules/darwin/laptop.nix:72-73`'s "cameron is the admin user and manages homebrew".
+
+#### Scenario: Read at the source at apply
+
+- **WHEN** the option and its readers are read at the locked revision
+- **THEN** it is the account per-user activation runs as
+
+#### Scenario: nix-darwin changes the option's meaning
+
+- **WHEN** a nix-darwin update removes the option, or derives it from another setting
+- **THEN** this assumption is void; the `host-user-attachment` requirement `A darwin host's admin account is declared separately from its primary user` loses its discharge until the admin account is mapped onto the new setting
+
+### Requirement: A346 — nix-darwin skips, with a warning, a managed account whose existing uid differs from the declared one
+
+It is true of nix-darwin at the revision this repository locks, independent of what this fleet builds, that activating a configuration whose `users.users.<name>.uid` differs from an existing managed account's uid warns, skips that account and completes.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: nix-darwin `modules/users/default.nix:285-288` and `:197-198` (task 1.4).
+
+#### Scenario: Read at the source at apply
+
+- **WHEN** the users module's activation is read at the locked revision
+- **THEN** a uid mismatch on an existing managed account prints a warning, skips the account, and activation succeeds
+
+#### Scenario: nix-darwin starts refusing or changing uids
+
+- **WHEN** a nix-darwin update refuses to activate on a uid mismatch, or changes an existing account's uid to the declared one
+- **THEN** this assumption is void; the `host-user-attachment-interface` trust boundary's statement that a wrong recorded uid goes undetected is revised, and if nix-darwin changes uids, a darwin attachment's uid must be checked against the machine before a deploy
+
+### Requirement: A347 — builtins.tryEval catches a throw but not a missing attribute
+
+It is true of the Nix evaluator this repository uses, independent of what this fleet builds, that `builtins.tryEval` returns `success = false` for an evaluation that fails by `throw` or a failed `assert`, and does not catch other evaluation errors, among them selecting an attribute a set does not have.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: the documentation of `builtins.tryEval`, read at apply (task 1.4); `checks.x86_64-linux.omnigent-worker-scope`'s `reachUsers` and `reachContentPrivate` cases observe it for the two `throw` bindings.
+
+#### Scenario: Observed by the mutant check
+
+- **WHEN** `checks.x86_64-linux.omnigent-worker-scope` is built
+- **THEN** both reaches return `success = false` under `tryEval`
+
+#### Scenario: The evaluator changes what tryEval catches
+
+- **WHEN** an evaluator update stops catching `throw`, or starts catching every error
+- **THEN** this assumption is void; the `host-user-attachment` requirement `An Omnigent worker's home configuration cannot read any person's private settings or whole home configuration` keeps its discharge only after the mutant check is restated
+
+### Requirement: A348 — A flake's self outputs are the flake-parts flake values
+
+It is true of flake-parts and Nix at the locked revisions, independent of what this fleet builds, that a flake's `self` holds the flake-parts `config.flake` values plus the attributes Nix adds (`outPath`, `sourceInfo`, `outputs`, `_type`, revision fields), so the two `flake` values this change unifies agree on every name they share.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: flake-parts' `mkFlake` returns `config.flake` as the flake's outputs, read and cited at apply (task 1.4); the drvPath diff of this change's commit observes it for every home that changes from the first value to the second.
+
+#### Scenario: Observed by the drvPath diff
+
+- **WHEN** the drvPath diff runs over the commit that gives every NixOS home `config.flake // { inherit inputs; }` in place of `inputs.self // { inherit inputs; }`
+- **THEN** no home or host configuration differs
+
+#### Scenario: The two values diverge
+
+- **WHEN** flake-parts or Nix starts transforming outputs between `config.flake` and `self`, so a home reading the same name gets a different value
+- **THEN** this assumption is void; the `host-user-attachment` requirement `A person's home configuration does not depend on the order a host's settings are read` keeps its discharge only after the differing derivations are traced and declared

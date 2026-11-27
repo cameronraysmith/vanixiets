@@ -53,7 +53,7 @@ Reading an attachment field, or a host's `primaryUser`, SHALL fail with a `throw
 #### Scenario: What the aspect generates
 
 - **WHEN** the aspect's definitions are read
-- **THEN** it sets `home-manager.useGlobalPkgs`, `useUserPackages` and `backupFileExtension`; one `home-manager.users.<account>` per attachment, of the form `{ imports = flake.users.<account>.modules ++ extraImports ++ [ overrides ]; _module.args.flake = flake.lib.homeFlake; }`, in that order, because a list option's definitions of equal priority merge in import order: the pair's `overrides` come after the person's modules and the extra imports, which keeps stibnite's crs58 `home.packages` in its parent-revision order (task 4.7); on NixOS, `hm-sops-bridge.users` for the attachments with `sopsBridge`; on darwin, `system.primaryUser` from the `admin` attachment and `users.users.<account>.uid` from each `uid`
+- **THEN** it sets `home-manager.useGlobalPkgs`, `useUserPackages` and `backupFileExtension`; one `home-manager.users.<account>` per attachment, of the form `{ imports = flake.users.<account>.modules ++ extraImports ++ [ overrides ]; _module.args.flake = flake.lib.homeFlake; }`, in that order; because a list option's equal-priority definitions merge by import depth as well as sibling order (A344), an `overrides` list whose order reaches a derivation carries an order priority, as stibnite's crs58 `home.packages` does with `lib.mkAfter`, which keeps it in its parent-revision order (task 4.7); on NixOS, `hm-sops-bridge.users` for the attachments with `sopsBridge`; on darwin, `system.primaryUser` from the `admin` attachment and `users.users.<account>.uid` from each `uid`
 
 #### Scenario: The generated values equal the hand-written ones
 

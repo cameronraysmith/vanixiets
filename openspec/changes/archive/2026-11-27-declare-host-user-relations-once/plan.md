@@ -132,7 +132,7 @@ in
 
 ```nix
 home-manager.users.${account} = {
-  # in this order: a list option's equal-priority definitions merge in import order, so overrides come last
+  # in this order; import order alone does not place a list definition across import depths (A344), so an override whose list order matters uses lib.mkAfter
   imports = config'.flake.users.${account}.modules ++ a.extraImports ++ [ a.overrides ];
 };
 ```

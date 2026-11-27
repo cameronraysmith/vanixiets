@@ -3,11 +3,11 @@ linear_story_id: CAM-130
 linear_story_identifier: CAM-130
 linear_story_title: "Declare which people have accounts on which hosts once, and derive everything else from it"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-130/declare-which-people-have-accounts-on-which-hosts-once-and-derive
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: In Review
-last_synced_at: "2026-11-27T09:51:18Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T16:12:50Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
@@ -15,6 +15,9 @@ attempt_log:
   - { at: "2026-11-27T08:21:40Z", transition: "Todo->In Progress", outcome: "posted", note: "first tasks.md checkbox ticked (task 1.1); state confirmed In Progress by read-only view" }
   - { at: "2026-11-27T09:48:18Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md created (PASS WITH WARNINGS: Linux check builds and darwin worker builds not yet observed); state confirmed In Review by read-only view; milestone comment posted; description not re-synced: Why and What Changes unchanged since seeding" }
   - { at: "2026-11-27T09:51:18Z", transition: "description-resync", outcome: "posted", note: "What Changes and Capabilities corrected (two flags, primary and admin, instead of a role; custom.laptop.primaryUser removed, not generated); the description's first deliverable re-synced to the two flags and the generated darwin admin account and uids; confirmed by read-only view; state unchanged (In Review)" }
+  - { at: "2026-11-27T16:12:40Z", transition: "archive->mirror", outcome: "posted", note: "Documents in project Den-ready fleet architecture (06049a4f18a4): OpenSpec: host-user-attachment (ab8cc76f) and host-user-attachment-interface (87d31015) created; ids stored in openspec/linear.yaml" }
+  - { at: "2026-11-27T16:12:40Z", transition: "archive->mirror", outcome: "dropped", note: "world-assumptions (69e977af) not updated: the synced spec is 263961 characters, over Linear's 250000-character document limit; the document still holds the previous archive's copy" }
+  - { at: "2026-11-27T16:12:50Z", transition: "In Review->Done", outcome: "posted", note: "Archived after tasks 6.5 and 9.6 held and host-user-attachment, host-user-attachment-interface and world-assumptions were synced (6 designation rows added to main's 363-row table, A340-A348 added with A344 rewritten to the measured breadth-first rule); operator waived the code and docs review sub-gates; workspace confirmed by linear auth whoami; state confirmed Done by read-only view, closing comment posted" }
 ---
 
 ## Why
