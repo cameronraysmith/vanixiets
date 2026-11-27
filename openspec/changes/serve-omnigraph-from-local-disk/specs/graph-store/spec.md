@@ -37,13 +37,19 @@ Switching a host back to the bucket SHALL serve the graph data the bucket held w
 ### Requirement: One setting switches the storage location
 
 The one setting that chooses a host's storage location SHALL be the only change that switches it: what exists only for one location, its graph backup and the failure notices and alerts about it included, SHALL follow that setting.
+A deploy of the switch SHALL leave on the host no reading of a graph backup that is no longer made, so that no alert fires on it.
 
-**Discharged by**: `graph-store-interface` requirements `One value switches the store, and the local-root units follow it` and `A check reads magnetite on both stores`.
+**Discharged by**: `graph-store-interface` requirements `One value switches the store, and the local-root units follow it`, `A check reads magnetite on both stores` and `Activation removes every textfile no declared writer writes`.
 
 #### Scenario: the setting is the only change
 
 - **WHEN** magnetite's setting is changed to the bucket and nothing else is changed
 - **THEN** magnetite's whole configuration evaluates, no graph backup of the disk is configured, and no failure notice or overdue-backup alert expects one
+
+#### Scenario: the switch is deployed without a reboot
+
+- **WHEN** magnetite is deployed with its setting changed to the bucket and is not rebooted
+- **THEN** the last graph backup's reading is gone from magnetite once the deploy has switched, and neither an overdue-backup alert nor a stale-reading alert fires on it
 
 ### Requirement: The graph store recovers from its own crash without a person
 
@@ -62,10 +68,21 @@ Each such recovery SHALL be counted, and SHALL send a recovery notice to the ope
 - **WHEN** magnetite reboots after the graph store crashed, and the claim names a writer that matches something running in the new boot
 - **THEN** the graph store clears the claim made before the boot and serves
 
+### Requirement: A recovery that cannot be counted is still announced
+
+When the graph store clears a stale claim and cannot record the recovery count, it SHALL still serve and send the recovery notice, which SHALL say that the count could not be recorded.
+
+**Discharged by**: `graph-store-interface` requirements `A recovery that cannot be counted is still announced` and `A rehearsal holds the recovery's verdicts`.
+
+#### Scenario: a recovery that cannot be counted
+
+- **WHEN** the graph store clears a stale claim and the recovery count cannot be recorded
+- **THEN** the graph store serves, and the operator receives the recovery notice saying the count could not be recorded
+
 ### Requirement: The graph store refuses to clear a writer claim it cannot prove stale
 
 The graph store's start SHALL leave a writer claim in place and fail visibly, telling the operator why and the manual step that clears it, whenever it cannot show the claim is stale.
-The operator SHALL receive that reason and manual step in a failure notice, without the claim's own content; a failure notice that cannot be sent SHALL change nothing else about the refusal.
+The operator SHALL receive that reason and manual step in a failure notice; a failure notice that cannot be sent SHALL change nothing else about the refusal.
 
 **Discharged by**: `graph-store-interface` requirements `The server's start clears a stale serve lock`, `A refusal is announced` and `A rehearsal holds the recovery's verdicts`; relies on A232.
 
@@ -93,6 +110,28 @@ The operator SHALL receive that reason and manual step in a failure notice, with
 
 - **WHEN** the claim found at start is not in the form the graph store writes
 - **THEN** the claim stays and the graph store does not serve
+
+### Requirement: Every other end of the clearing step is a refusal
+
+Every way the start's clearing step can end other than finding no claim or clearing a stale one, an answer or a failure it did not foresee included, SHALL be a refusal as `The graph store refuses to clear a writer claim it cannot prove stale` describes it, sent once.
+
+**Discharged by**: `graph-store-interface` requirements `The recovery ends only by nothing to do, a recovery or a refusal`, `An unforeseen failure in the recovery is refused once` and `A rehearsal holds the recovery's verdicts`.
+
+#### Scenario: the graph store's own answer cannot be read
+
+- **WHEN** the graph store's report of its claim, read at start, is not the form it answers in, or a step of the clearing fails unforeseen
+- **THEN** the claim stays, the graph store does not serve, and the operator receives one failure notice naming what could not be read or which step failed
+
+### Requirement: A failure notice carries no record, token or argument
+
+A failure notice MAY name the claim's id, its kind, its writer's process id and its time, and a running program's process id and name; it SHALL carry no line of the claim's record, no token and no argument of a running program, which the host's journal alone records.
+
+**Discharged by**: `graph-store-interface` requirements `A refusal's message carries no record, token or argument` and `A rehearsal holds the recovery's verdicts`.
+
+#### Scenario: a running writer is named
+
+- **WHEN** the graph store refuses because a direct writer is running against its graph data
+- **THEN** the failure notice names the writer by its process id and program name and carries none of its arguments
 
 ### Requirement: Graph data is copied off its host every night from an instant image
 

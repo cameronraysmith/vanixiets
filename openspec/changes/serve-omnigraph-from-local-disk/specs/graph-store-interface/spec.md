@@ -47,12 +47,27 @@ magnetite's module SHALL declare the internal option `vanixiets.omnigraphRootSto
 
 ### Requirement: A check reads magnetite on both stores
 
-`checks.x86_64-linux.omnigraph-retired-roots` SHALL evaluate magnetite on its committed store and, through `extendModules` with the option and the notified units set as `stores` naming the other store would set them, on the other, and hold on each the storage URI, the server's R2 environment and environment file, the `omnigraph-r2` generator, the backup option, the notified local-root units, and that every notified unit has an `ExecStart`.
+`checks.x86_64-linux.omnigraph-retired-roots` SHALL evaluate magnetite on its committed store and, through `extendModules` with the option and the notified units set as `stores` naming the other store would set them, on the other, and hold on each the storage URI, the server's R2 environment and environment file, the `omnigraph-r2` generator, the backup option and its textfile, the notified local-root units, and that every notified unit has an `ExecStart`.
 
 #### Scenario: the check runs
 
 - **WHEN** `nix build .#checks.x86_64-linux.omnigraph-retired-roots` runs
 - **THEN** it passes, and over a row that lists the local-root units on either store it fails naming the units on `"r2"`
+
+### Requirement: Activation removes every textfile no declared writer writes
+
+`modules/nixos/node-exporter-textfile.nix` SHALL declare the read-only `vanixiets.nodeExporter.textfiles`, `<name>.prom` for each name in `vanixiets.nodeExporter.textfileWriters`, and an activation script that, at boot and on every `switch-to-configuration`, removes and prints each `*.prom` file in `textfileDirectory` not in that list and leaves every other file.
+Every textfile writer SHALL write only the file its declared name gives.
+
+#### Scenario: a file no writer declares
+
+- **WHEN** `vmTests.x86_64-linux.omnigraph-local-root` plants `retired-writer.prom` beside the declared writers' files and a `.prom.tmp` file and runs `switch-to-configuration test`
+- **THEN** `retired-writer.prom` is gone and `node-exporter-textfile: removed <path>, which no writer in vanixiets.nodeExporter.textfileWriters writes` printed, every declared file and the `.tmp` file are kept, byte for byte where no writer rewrote them, and node_exporter's next scrape has none of the removed file's series
+
+#### Scenario: the backup's file on either store
+
+- **WHEN** magnetite is evaluated on `"local"` and on `"r2"`
+- **THEN** `omnigraph-backup.prom` is in `vanixiets.nodeExporter.textfiles` on `"local"` and not on `"r2"`
 
 ### Requirement: R2 settings apply only to an R2 root
 
@@ -157,7 +172,7 @@ It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios bel
 #### Scenario: a running direct writer
 
 - **WHEN** the program runs while `omnigraph --target /var/lib/omnigraph/clusters/cookbooks-f17 …` is running
-- **THEN** it exits non-zero naming that process, and `lock.json` is unchanged
+- **THEN** it exits 1 naming that process's pid and executable name, and `lock.json` is unchanged
 
 #### Scenario: a direct writer's lock
 
@@ -196,7 +211,7 @@ It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios bel
 
 #### Scenario: the process scan
 
-- **WHEN** a process whose executable is named `omnigraph` or `omnigraph-server`, and lies under `/nix/store/*-omnigraph-*/bin/` from any version or runs as root or `omnigraph`, has an argument naming the root as `/var/lib/omnigraph/…`, compared with the root after collapsing runs of slashes, dropping `.` segments and a trailing slash on both, so that `/var/lib/omnigraph//clusters/cookbooks-f17/` and `file:///var/lib/omnigraph/clusters/cookbooks-f17` name it too
+- **WHEN** a process whose executable is named `omnigraph` or `omnigraph-server`, and lies under `/nix/store/*-omnigraph-*/bin/` from any version or runs as root or `omnigraph`, has an argument naming the root as `/var/lib/omnigraph/…`, compared with the root after normalising both lexically, without reading the file system (runs of slashes collapsed, `.` segments dropped, a `..` segment taking away the one before it, a trailing slash removed), so that `/var/lib/omnigraph//clusters/x/../cookbooks-f17/` and `file:///var/lib/omnigraph/clusters/cookbooks-f17` name it too; a symbolic link in the argument is not followed
 - **THEN** the program refuses, whatever the record says
 
 #### Scenario: another user's executable named omnigraph
@@ -209,6 +224,30 @@ It SHALL run `cluster force-unlock <lock_id>` only in the clearing scenarios bel
 - **WHEN** the program runs with a `serve` lock whose `created_at` is earlier than `btime` in `/proc/stat`, its pid now belongs to an unrelated process, and no omnigraph process names the root
 - **THEN** it runs `force-unlock` with exactly that `lock_id` and exits 0
 
+### Requirement: The recovery ends only by nothing to do, a recovery or a refusal
+
+The program SHALL end in exactly one of three ways: exit 0 with nothing run when `lock.json` is absent, exit 0 after a `force-unlock` that reports `"unlocked": true`, or a refusal as `The server's start clears a stale serve lock` describes it.
+It SHALL refuse a `cluster status --json` answer that is not exactly one JSON object whose `lock_id` is a string or null, and a program it runs that is not on its PATH.
+
+#### Scenario: an unreadable status answer
+
+- **WHEN** `cluster status --json` exits 0 printing `not json`, `[1]`, `{"lock_id":5}`, two objects, or nothing
+- **THEN** the program exits 1 saying the answer is not one JSON object with a string or null `lock_id`, posts one refusal notice, and `lock.json` is unchanged
+
+#### Scenario: a missing program
+
+- **WHEN** `jq` is not on the program's PATH
+- **THEN** it exits 1 naming `jq`, posts one refusal notice, and `lock.json` is unchanged
+
+### Requirement: An unforeseen failure in the recovery is refused once
+
+Through an `ERR` trap that functions and command substitutions inherit, the program SHALL refuse any failing step that no guard covers, naming the failing command, its line and its exit status; in a subshell the trap SHALL only pass the status on, and the refusal SHALL disarm the trap, so that the program refuses once and exits 1 whether or not its post succeeds.
+
+#### Scenario: an unforeseen failure
+
+- **WHEN** the program's working directory for `omnigraph` cannot be made
+- **THEN** it exits 1 naming the failing `mktemp -d` and its exit status, posts one refusal notice whether the post succeeds or fails, and `lock.json` is unchanged
+
 ### Requirement: Recoveries are counted and announced
 
 After a successful `force-unlock`, the program SHALL add one to the integer in `/var/lib/omnigraph-metrics/lock-recoveries` (starting from 0 when absent) and post one message at low priority to the `fleet-alerts` topic through `ntfy-send` with `services.observability-notify.tokenFile`, naming the host, the root and the cleared `lock_id`; a failed post SHALL NOT fail the start.
@@ -218,9 +257,18 @@ After a successful `force-unlock`, the program SHALL add one to the integer in `
 - **WHEN** the program clears one lock on a host whose counter file holds 2
 - **THEN** the file holds 3 and one low-priority message naming the `lock_id` is posted
 
+### Requirement: A recovery that cannot be counted is still announced
+
+After a successful `force-unlock`, a counter that cannot be written SHALL be logged and named in the recovery message in place of the count, the message SHALL still be posted, and the program SHALL exit 0.
+
+#### Scenario: a counter that cannot be written
+
+- **WHEN** the program clears one lock and the counter's directory cannot be made
+- **THEN** it exits 0, logs `the lock-recovery counter <file> could not be written`, and posts one low-priority message naming the `lock_id`
+
 ### Requirement: A refusal is announced
 
-Every refusal, and a `force-unlock` that does not report `"unlocked": true`, SHALL post one message at default priority to the `fleet-alerts` topic through `ntfy-send` with `services.observability-notify.tokenFile`, titled `omnigraph lock not recovered on <host>`, carrying the printed reason and manual command and no line of `lock.json`; a post that fails or does not finish in 30 s SHALL be logged and SHALL NOT change the exit status 1.
+Every refusal, and a `force-unlock` that does not report `"unlocked": true`, SHALL post one message at default priority to the `fleet-alerts` topic through `ntfy-send` with `services.observability-notify.tokenFile`, titled `omnigraph lock not recovered on <host>`, carrying the printed reason and manual command; a post that fails or does not finish in 30 s SHALL be logged and SHALL NOT change the exit status 1.
 
 #### Scenario: a refusal's notice
 
@@ -232,9 +280,18 @@ Every refusal, and a `force-unlock` that does not report `"unlocked": true`, SHA
 - **WHEN** the program runs and `lock.json` is absent
 - **THEN** it posts nothing
 
+### Requirement: A refusal's message carries no record, token or argument
+
+A refusal's message MAY name the root's path, the lock's `lock_id`, `operation`, `pid` and `created_at`, and a process's pid and executable name; it SHALL carry no line of `lock.json`, no token and no argument of any process, whose command line the program prints to the journal only.
+
+#### Scenario: a refusal that names a process
+
+- **WHEN** the program refuses because of a running process whose command line is `omnigraph --target /var/lib/omnigraph/clusters/cookbooks-f17 load --data /tmp/seed.jsonl`
+- **THEN** the message names that process's pid and `omnigraph` and none of its arguments, and the journal holds `pid <pid> runs <exe>: omnigraph --target … load --data /tmp/seed.jsonl`
+
 ### Requirement: A rehearsal holds the recovery's verdicts
 
-`checks.x86_64-linux.omnigraph-lock-recovery-rehearsal`, class `small`, SHALL run the program from `flake.lib.omnigraphLockRecovery` against stubs of `omnigraph` and `ntfy-send`, a scripted process table and boot time, and a fresh lock directory per row, asserting for each scenario of `The server's start clears a stale serve lock` and `A refusal is announced` the exit status, the stubs' logs, the counter and the lock file.
+`checks.x86_64-linux.omnigraph-lock-recovery-rehearsal`, class `small`, SHALL run the program from `flake.lib.omnigraphLockRecovery` against stubs of `omnigraph` and `ntfy-send`, a scripted process table and boot time, and a fresh lock directory per row, asserting for each scenario of the recovery's requirements above the exit status, the stubs' logs, the counter and the lock file.
 
 #### Scenario: the check runs
 
@@ -245,6 +302,11 @@ Every refusal, and a `force-unlock` that does not report `"unlocked": true`, SHA
 
 - **WHEN** a release of the packaged omnigraph changes the record `omnigraph-server` leaves when killed
 - **THEN** the check's row over a record written by the packaged `omnigraph-server` fails
+
+#### Scenario: the rows of the second verification
+
+- **WHEN** the check runs
+- **THEN** the rows for an unreadable status answer, `jq` missing from the PATH, a failing working directory with and without a failed post, an unwritable counter, and writers naming the root through `..` pass; every refusal exits 1 and its notice holds no argument of a process; a mutant without the status answer's guard fails the status-answer row, and one without the `ERR` trap fails the failing-step row
 
 ### Requirement: The backup job copies a ZFS snapshot to its R2 repository
 
