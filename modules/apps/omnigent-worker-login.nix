@@ -1,9 +1,17 @@
 { config, lib, ... }:
 let
+  omnigent = config.flake.clan.inventory.instances.omnigent;
+  # The omnigent server role's one member, which must be named under
+  # `.machines` because its entry's `settings` carry the server's domain.
+  servers = config.flake.lib.inventoryMembers omnigent "server";
+  server = builtins.head servers;
   serverSettings =
-    (builtins.head (
-      builtins.attrValues config.flake.clan.inventory.instances.omnigent.roles.server.machines
-    )).settings;
+    assert lib.assertMsg (builtins.length servers == 1)
+      "omnigent-worker-login: the omnigent server role has ${toString (builtins.length servers)} members, not one";
+    assert lib.assertMsg (
+      omnigent.roles.server.machines ? ${server}
+    ) "omnigent-worker-login: the omnigent server ${server} is not named under roles.server.machines";
+    omnigent.roles.server.machines.${server}.settings;
   serverDomain =
     (lib.evalModules {
       modules = [

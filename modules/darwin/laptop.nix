@@ -66,8 +66,6 @@ in
         # (flake.lib.hosts.<name>.targetHost, the single source).
         clan.core.networking.targetHost = hosts.${hostName}.targetHost;
 
-        nixpkgs.hostPlatform = "aarch64-darwin";
-
         # Override base.nix which sets stateVersion = 5
         system.stateVersion = lib.mkForce 4;
 

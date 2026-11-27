@@ -45,10 +45,17 @@ Worker profiles prefer procps' `kill` over coreutils' overlapping executable, ma
 `checks.<system>.omnigent-worker-capabilities` makes two Home Manager evaluations of the worker module: a positive worker home, whose assertions, generated PATH order, ACP settings, tools, skills and harnesses it compares, and one composite invalid home whose failed assertions must equal the four guard messages.
 Its build confirms that the harness executables exist in the generated profile and that `playwright-cli` reports its packaged version; it runs no CLI adapters, archive or file utilities, or workflow-tool smoke tests.
 
+## Host registry
+
+Each fleet member is one typed record, `flake.fleet.hosts.<name>` (`lib/hosts.nix`), and `flake.lib.hosts` is its read-only alias.
+A record declares the host's `system` (null for a phone), endpoints, deploy user, services, ZeroTier address, primary user, memory, `nixClassic`, `checked` and `stateVersion`; `class`, `fqdn`, `address`, `targetHost`, `memoryGiB`, `enrolled` (its clan machine key is committed) and `cloud` (from `flake.lib.cloudMachines`) are derived.
+`flake.lib.machineSystems`, the inventory's `machineClass` and NixOS `deploy.targetHost`, `flake.clan.machines` with its `nixpkgs.hostPlatform`, the collector rows' `platform`, the NixOS names of `flake.lib.hostKeys` and the ZeroTier controller's external members are generated from it; the inventory keeps each host's tags and description.
+A service role's members are `flake.lib.inventoryMembers` (`lib/inventory-members.nix`), clan's own rule over the declared inventory.
+
 ## Evaluators
 
 A host's memory decides its many-attribute evaluator, and nothing else does.
-`flake.lib.hosts.<name>.memoryGiB` (`lib/hosts.nix`) is required for every member that runs Nix, `"unknown"` where nobody has read it.
+`flake.fleet.hosts.<name>.memoryGiB` (`lib/hosts.nix`) is required for every member that runs Nix, `"unknown"` where nobody has read it; a cloud host's follows from its machine type through `flake.lib.cloudMachineMemoryGiB` (`lib/cloud-machines.nix`).
 `flake.lib.nixEvalJobsBoundRules` (`lib/nix-eval-jobs-host.nix`) turns it into a bound, by the first rule for the host's platform that its memory reaches.
 A host with a bound gets iets as `nix-eval-jobs`, capped at the bound's workers and, on Linux, its per-worker `--max-memory-size`: the bound is the default when the caller gives none and the ceiling when it asks for more.
 Stock is beside it as `nix-eval-jobs-stock`.
@@ -118,7 +125,7 @@ Its clause D reads, at evaluation, the `NTFY_URL` each darwin sender's `ntfy-sen
 The dev-loop checks are gated the same way and need no runtime host.
 `checks.x86_64-linux.devloop-queries` applies the nixbot input's migrations to a sandboxed PostgreSQL, creates the two reader roles with the column grants rendered by `nixos/devloop-collection.nix`, loads fixture rows, and runs the two export queries as `opentelemetry-collector` and the reconcile's queries as `devloop-reconcile`; it requires `abandoned` to be true only for the row carrying `flake.lib.devloopCollection.abandonMarker`, which nixbot wrote until 2026-11-25 and which now only reads stored history, no result cell to contain a fixture error string, `outputs_out` to be empty for a null `outputs`, and the five-minute overlap and tied rows to be read, and it rejects the mutants `renameCached`, `selectError`, `grantWithoutError`, `errorUnderAlias`, `reconcileGrantWithoutFinishedAt` and `currentFinishIgnoresDuplicates`.
 `checks.x86_64-linux.fleet-alert` also replays `PullRequestQueueWaitBurn` against `devloop` through the fixture server's `/v1/sql` and requires each rule's query to reach its own database.
-The five x86_64-linux NixOS machine checks (cinnabar, electrum, galena, magnetite, pyrite) require the deploy-record snippet in the machine's activation through `flake.lib.deployRecordObligations`; the darwin machine checks require it too, and the deferred scheelite carries the snippet with no machine check.
+The five x86_64-linux NixOS machine checks (cinnabar, electrum, galena, magnetite, pyrite) require the deploy-record snippet in the machine's activation through `flake.lib.deployRecordObligations`; the darwin machine checks require it too, and scheelite, whose record sets `checked = false`, carries the snippet with no machine check.
 The same judge requires the rendered activation to read the previous system before anything relinks `/run/current-system`: on NixOS the record runs before the relink, and on darwin `preActivation` reads it before launchd reloads nix-darwin's `activate-system`, which links `/run/current-system` to the already updated profile (F86). `checks.x86_64-linux.deploy-record-order` runs that judge over fixtures and its mutants, and runs the record script with and without the earlier read.
 The darwin machine checks also require, through `flake.lib.resolverReloadObligations`, a `touch -h` of each managed `/etc/resolver` file after the `/etc` link loop in the rendered activation script, so that configd rereads the files (`darwin/resolver-reload.nix`); `checks.x86_64-linux.darwin-resolver-reload` runs that judge over fixtures and its mutants on every pull request.
 Every NixOS and darwin machine check also requires, through `flake.lib.meshHostsObligations`, that the machine's hosts entries map every name under `vanixiets.internal` or `.zt` to exactly the registry's addresses (`system/mesh-hosts.nix`); `checks.x86_64-linux.mesh-hosts-obligations` runs that judge over fixtures and its mutants on every pull request.

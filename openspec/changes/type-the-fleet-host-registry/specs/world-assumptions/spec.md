@@ -22,7 +22,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of nixpkgs' `lib` at the revision this repository locks, independent of what this fleet builds, that a definition not matching its option's type and a failed `lib.assertMsg` both fail by `builtins.throw`, which `builtins.tryEval` catches, rather than by `abort` or a bare `assert`, which it does not.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: nixpkgs `lib/modules.nix` raises "A definition for option … is not of type …" with `throw` (`:1240`, `:1249` in a nixpkgs source read 2026-11-26; the locked revision `2074cc67` is re-read at apply); `lib.assertMsg pred msg` is `pred || builtins.throw msg`.
+**Evidence**: nixpkgs `lib/modules.nix` raises "A definition for option … is not of type …" with `throw` (`:1434`, `:1443` at the locked revision `bd5b7d01`, read 2026-11-27); `lib.assertMsg pred msg` is `pred || builtins.throw msg`.
 
 #### Scenario: Read at the source on 2026-11-26
 

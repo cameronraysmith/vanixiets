@@ -3,8 +3,8 @@
   perSystem =
     { system, ... }:
     let
-      deferred = [ "scheelite" ];
       inventory = self.clan.inventory.machines;
+      hosts = self.lib.hosts;
       machineSystems = self.lib.machineSystems;
 
       machineDirs =
@@ -19,13 +19,12 @@
 
       nixosForSystem = lib.filterAttrs (
         name: machine:
-        machine.machineClass == "nixos"
-        && machineSystems.${name} == system
-        && !(builtins.elem name deferred)
+        machine.machineClass == "nixos" && machineSystems.${name} == system && hosts.${name}.checked
       ) inventory;
 
       darwinForSystem = lib.filterAttrs (
-        name: machine: machine.machineClass == "darwin" && machineSystems.${name} == system
+        name: machine:
+        machine.machineClass == "darwin" && machineSystems.${name} == system && hosts.${name}.checked
       ) inventory;
 
       # Every network clan may reach the machine through logs in as its login
@@ -60,11 +59,11 @@
           unmetDeployRecord = deployRecordObligations.failures name machineConfig;
           unmetSigning = commitSigningObligations.failures name machineConfig;
           # Darwin only: NixOS has no /etc/resolver.
-          unmetResolverReload = lib.optionals (lib.hasSuffix "-darwin" machineSystems.${name}) (
+          unmetResolverReload = lib.optionals (self.lib.hosts.${name}.class == "darwin") (
             resolverReloadObligations.failures name machineConfig
           );
           # Darwin only: NixOS homes install secrets from their systemd user unit.
-          unmetSopsBootInstall = lib.optionals (lib.hasSuffix "-darwin" machineSystems.${name}) (
+          unmetSopsBootInstall = lib.optionals (self.lib.hosts.${name}.class == "darwin") (
             sopsBootInstallObligations.failures name machineConfig
           );
           unmetMeshHosts = meshHostsObligations.failures name machineConfig;
@@ -115,7 +114,7 @@
     assert lib.assertMsg (
       machineDirs "darwin" == inventoryNamesFor "darwin"
     ) "modules/machines/darwin/ directories must match the Darwin inventory machines";
-    assert lib.assertMsg (lib.all (name: inventory ? ${name} && !(builtins.elem name deferred)) (
+    assert lib.assertMsg (lib.all (name: inventory ? ${name} && hosts.${name}.checked) (
       lib.attrNames obligations.expectedOwners
     )) "every machine carrying Omnigent fleet obligations must have a machine check to assert them";
     assert lib.assertMsg (

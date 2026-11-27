@@ -6,8 +6,9 @@
 # flake.lib.darwinHostKeys (modules/lib/darwin-host-keys.nix). No host's
 # configuration is read to build it.
 #
-# nixosKeyHosts is a literal list: deriving it from the vars tree would
-# silently add any machine that gains an `openssh` directory.
+# The NixOS hosts are the flake.fleet.hosts entries whose class is nixos;
+# deriving them from the vars tree instead would silently add any machine
+# that gains an `openssh` directory.
 #
 # flake.lib.hostKeyObligations: each NixOS host asserts that its own
 # generated public key equals its hostKeys entry, so a regenerated but
@@ -19,14 +20,7 @@
 let
   inherit (config.flake.lib) vars darwinHostKeys;
 
-  nixosKeyHosts = [
-    "cinnabar"
-    "electrum"
-    "galena"
-    "scheelite"
-    "magnetite"
-    "pyrite"
-  ];
+  nixosKeyHosts = lib.attrNames (lib.filterAttrs (_: h: h.class == "nixos") config.flake.fleet.hosts);
 
   hostKeys =
     lib.genAttrs nixosKeyHosts (

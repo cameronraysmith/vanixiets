@@ -86,20 +86,15 @@ let
       }) inventory.machines;
       machineNames = sorted (attrNames machines);
 
+      # Role membership is flake.lib.inventoryMembersIn, clan's rule, over this
+      # inventory; a named machine outside the inventory is left out.
       membersOf =
-        role:
-        let
-          tags = namesOf (role.tags or { });
-          byTag = filter (
-            n: elem "all" tags || builtins.any (t: elem t machines.${n}.tags) tags
-          ) machineNames;
-          named = filter (n: machines ? ${n}) (namesOf (role.machines or { }));
-        in
-        sorted (unique (byTag ++ named));
+        instance: role:
+        filter (n: machines ? ${n}) (config.flake.lib.inventoryMembersIn inventory.machines instance role);
 
       instances = mapAttrs (_: i: {
         module = i.module.name;
-        roles = mapAttrs (_: membersOf) (i.roles or { });
+        roles = mapAttrs (role: _: membersOf i role) (i.roles or { });
       }) inventory.instances;
 
       everyHost = sorted (

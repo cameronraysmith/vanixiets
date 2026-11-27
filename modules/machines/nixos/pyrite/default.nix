@@ -134,9 +134,6 @@ in
       # Ambient flake argument; its removal is tracked with the poisoned-flake guard in checks/omnigent-workers.nix
       _module.args.flake = inputs.self;
 
-      # System platform (Kaby Lake, Intel Iris Plus 640)
-      nixpkgs.hostPlatform = "x86_64-linux";
-
       # Bootloader: UEFI with systemd-boot. canTouchEfiVariables writes the machine's
       # 8 MiB SPI boot ROM (not the disk the install wipes); an EFI write failing is
       # recoverable by an NVRAM reset, not a brick.

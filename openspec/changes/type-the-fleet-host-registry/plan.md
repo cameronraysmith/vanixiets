@@ -14,9 +14,9 @@
 
 ## Global Constraints
 
-- Lands after establish-refactor-oracle and stop-reading-other-hosts-configs; its parent is the latter's tip, and after any rebase onto it `just drv-diff` is re-run from the new parent. `just drv-diff` is the acceptance oracle for every commit; `just eval-identity` is not (it compares stock and iets at one revision).
-- One pull request of four commits (tasks groups 2, 3, 4, 5), each evaluating on its own. Edits are made in `@` and routed into the change's chain with `jj squash --into <chain> --use-destination-message --keep-emptied <paths>`. This repository is a shared jj development join, so never `jj new`, `describe` or `commit` on another session's chain.
-- Commits 1–3 run `just drv-diff <parent> <commit>` with no change-specific allow-list and must exit 0. Commit 4 and the merged head run `just drv-diff <parent> <tip> openspec/changes/type-the-fleet-host-registry/drv-delta.txt`, which declares `nixos.cinnabar`, `checks.x86_64-linux.nixos-cinnabar`, `checks.x86_64-linux.eval-fleet-topology` and `checks.x86_64-linux.fleet-topology-fresh` changed and `checks.x86_64-linux.eval-inventory-members` added (design D10).
+- Lands after establish-refactor-oracle and stop-reading-other-hosts-configs; its parent is the latter's tip, and after any rebase onto it `just drv-diff` is re-run from the new parent. `just drv-diff` is the acceptance oracle; `just eval-identity` is not (it compares stock and iets at one revision).
+- One pull request of one commit: the task groups 2, 3, 4 and 5 are not separately shippable, and a drvPath diff costs about 15 minutes. Each group keeps its own evidence by evaluation against task 1's baselines. Edits are made in `@` and routed into the change's chain with `jj squash --into <chain> --use-destination-message --keep-emptied <paths>`. This repository is a shared jj development join, so never `jj new`, `describe` or `commit` on another session's chain.
+- The commit and the merged head each run `just drv-diff <parent> <tip> openspec/changes/type-the-fleet-host-registry/drv-delta.txt` once, which declares `nixos.cinnabar`, `checks.x86_64-linux.nixos-cinnabar`, `checks.x86_64-linux.eval-fleet-topology`, `checks.x86_64-linux.fleet-topology-fresh`, `checks.x86_64-linux.fleet-alert` and the checks that build or consume the docs package changed, and `checks.x86_64-linux.eval-inventory-members` added (design D10).
 - Check key sets read only `flake.fleet.hosts`, the inventory, literals and `system`; never an evaluated configuration.
 - Mutants run in a throwaway tree (`jj workspace add` under `/tmp`, or a `git worktree`), never in `@`, and each runs only the expression it must fail.
 - Every run is small or medium. The drvPath diff's own duration is set by establish-refactor-oracle. If it exceeds 5 minutes, announce it with its expected duration, the fact that it alone proves neutrality, and that the commit's push waits on it.
@@ -62,7 +62,7 @@ nix eval --json .#checks.aarch64-darwin --apply builtins.attrNames > logs/thr-1-
 - [ ] **Step 4:** Record the tincr peers. Read the instance's `roles.peer.machines` names from `.#clan.inventory.instances` (the instance name is `flake.lib.mesh.instance`).
 - [ ] **Step 5:** Measure the key set three times in fresh processes: `NIX_SHOW_STATS=1 nix eval .#checks.x86_64-linux --apply builtins.attrNames`. Record CPU time and thunks.
 
-## Task 2: The typed record (tasks 2.1–2.5)
+## Task 2: The typed record (tasks 2.1–2.4)
 
 **Files:** `modules/lib/hosts.nix`.
 
@@ -112,7 +112,7 @@ in
 - [ ] **Step 3:** Keep `flake.lib.meshRecords`, reading `config.flake.fleet.hosts`.
 - [ ] **Step 4:** Evaluate the twelve names and diff the alias projection against `logs/thr-1-hosts-<ts>.json`. It must be empty.
 - [ ] **Step 5:** Run the four mutants of task 2.4 in a throwaway tree; log them.
-- [ ] **Step 6:** Run `just drv-diff <parent> <commit>` and require exit 0. Route the edits into the change's chain as commit 1, "hosts: type the fleet host registry as flake.fleet.hosts".
+- [ ] **Step 6:** No separate drvPath diff: the group's evidence is Steps 4 and 5.
 
 ## Task 3: Derive system, class and the seam (tasks 3.1–3.9)
 
@@ -123,11 +123,11 @@ in
 - [ ] **Step 3:** Rewrite `clan/machines.nix` as a `mapAttrs` over the hosts with a system, setting `imports` and `nixpkgs.hostPlatform`. Delete the nine `hostPlatform` lines.
 - [ ] **Step 4:** Replace the seven suffix tests with `config.flake.lib.hosts.${name}.class == "darwin"` (or `self.lib.hosts` in perSystem checks).
 - [ ] **Step 5:** In `observability-hosts.nix`, make each row's `platform` read the registry's class. Keep the `agent` helper's `platform = "nixos"` default for rows the VM tests build. Delete `mismatched` in `otel-collector.nix`.
-- [ ] **Step 6:** In `modules/lib/host-keys.nix`, replace the literal `nixosKeyHosts` with `lib.attrNames (lib.filterAttrs (_: h: h.class == "nixos") config.flake.fleet.hosts)`. Leave every assert in `checks/machines.nix:100-123` in place; the two name asserts now compare the record against the inventory's literal entries (design D4).
+- [ ] **Step 6:** In `modules/lib/host-keys.nix`, replace the literal `nixosKeyHosts` with `lib.attrNames (lib.filterAttrs (_: h: h.class == "nixos") config.flake.fleet.hosts)`. Leave every assert in `checks/machines.nix:100-123` in place; the two name asserts catch a literal inventory entry with no record, and the directory assert catches a record with no inventory entry, since clan-core adds every `clan.machines` name to the inventory (design D4).
 - [ ] **Step 7:** Evaluate each projection and `attrNames flake.lib.hostKeys` against its baseline, run the three mutants of task 3.8, and build `network-target-obligations`, `fleet-alert` and `otel-collector-config`.
-- [ ] **Step 8:** Run `just drv-diff <parent> <commit>` (exit 0) and re-measure the key set. Route as commit 2, "hosts: derive system, class and the machine seam from flake.fleet.hosts".
+- [ ] **Step 8:** Re-measure the key set against task 1's measurement.
 
-## Task 4: Lifecycle, cloud and memory (tasks 4.1–4.7)
+## Task 4: Lifecycle, cloud and memory (tasks 4.1–4.6)
 
 **Files:** `modules/lib/hosts.nix`, `modules/checks/machines.nix`, `modules/clan/inventory/services/tincr.nix`, `modules/lib/observability-hosts.nix` (comment), `modules/lib/fleet-deployer.nix`.
 
@@ -136,7 +136,7 @@ in
 - [ ] **Step 3:** In `tincr.nix`, set `peers = lib.filterAttrs (_: host: host.class != "android" && host.enrolled) hosts;`.
 - [ ] **Step 4:** In `fleet-deployer.nix`, set `enabledOf = name: (hosts.${name}.cloud or null).enabled or true;` and delete the local `cloud` merge if nothing else reads it.
 - [ ] **Step 5:** Evaluate memory, peers, check names and deployer targets against their baselines. Run the `cx99` mutant. Build `nix-eval-jobs-iets` and `fleet-deployer-obligations`.
-- [ ] **Step 6:** Run `just drv-diff <parent> <commit>` (exit 0). Route as commit 3, "hosts: lifecycle, cloud and memory as separate registry fields".
+- [ ] **Step 6:** No separate drvPath diff: the group's evidence is Step 5.
 
 ## Task 5: Role membership, admission and the tag rename (tasks 5.1–5.5)
 
@@ -160,7 +160,7 @@ inventoryMembersIn = machines: instance: role:
 - [ ] **Step 4:** In `zerotier.nix`, set `allowedIps = map (h: h.zerotier.address) (lib.attrValues (lib.filterAttrs (_: h: lib.elem h.class [ "darwin" "android" ]) config.flake.lib.hosts));` and update the comment.
 - [ ] **Step 5:** Build the topology, clamp and controller checks. Evaluate `allowedIps` and compare it as a set with the baseline.
 - [ ] **Step 6:** In `modules/clan/inventory/machines.nix`, replace stibnite's tag `controller` with `deployer-workstation`; leave cinnabar's `controller`. Run `just topology-generate`, confirm `fleet.json` changes only in stibnite's `tags`, and build `fleet-topology-fresh`. Evaluate the inventory machines carrying `controller`: exactly cinnabar.
-- [ ] **Step 7:** Run `just drv-diff <parent> <commit> openspec/changes/type-the-fleet-host-registry/drv-delta.txt`; it must exit 0. Route as commit 4, "inventory: one role resolver; ZeroTier admission from host class; stibnite tag deployer-workstation".
+- [ ] **Step 7:** Route the whole change into its chain as one commit, "hosts: record each fleet host once as one typed record", and run `just drv-diff <parent> <commit> openspec/changes/type-the-fleet-host-registry/drv-delta.txt`; it must exit 0.
 
 ## Task 6: Documents (task 6.1)
 

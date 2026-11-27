@@ -37,9 +37,6 @@ in
       # Ambient flake argument; its removal is tracked with the poisoned-flake guard in checks/omnigent-workers.nix
       _module.args.flake = inputs.self;
 
-      # System platform
-      nixpkgs.hostPlatform = "x86_64-linux";
-
       # ZFS device node path - more stable for cloud VMs
       boot.zfs.devNodes = "/dev/disk/by-path";
 

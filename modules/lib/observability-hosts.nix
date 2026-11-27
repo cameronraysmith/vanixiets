@@ -34,7 +34,9 @@
 # requirement, and the host must be a recipient of the shared `langfuse` var
 # (flake.lib.sharedVarsObligations). magnetite, pyrite and stibnite set both
 # flags; rosegold and argentum neither.
-{ ... }:
+# A row's `platform` is its host's flake.fleet.hosts class, so the rules
+# choose a host's expected signals by the class clan builds it as.
+{ config, lib, ... }:
 {
   flake.lib.observabilityHosts =
     let
@@ -54,7 +56,7 @@
         ++ extra;
       };
     in
-    {
+    lib.mapAttrs (name: row: row // { platform = config.flake.fleet.hosts.${name}.class; }) {
       magnetite =
         agent [
           "cache-completeness"
@@ -125,7 +127,6 @@
       # A darwin workstation: launchd jobs and the probe's textfile instead of
       # systemd units; its SMART device is read by the probe (design D4, D7).
       stibnite = agent [ ] // {
-        platform = "darwin";
         notifiedUnits = [
           "otel-envelope"
           "otel-agent-session-envelope"
@@ -141,20 +142,18 @@
       # ntfy-alerter token the collector role wires, which
       # sharedVarsObligations holds on the machine checks.
       rosegold = agent [ ] // {
-        platform = "darwin";
         notifiedUnits = [ "otel-envelope" ];
         smartDevices = [ "disk0" ];
       };
       argentum = agent [ ] // {
-        platform = "darwin";
         notifiedUnits = [ "otel-envelope" ];
         smartDevices = [ "disk0" ];
       };
-      # A reserved name with no machine (modules/clan/inventory/services/tincr.nix):
-      # it stays off until a machine takes the name, and nothing can be watched.
+      # A reserved name with no machine (flake.fleet.hosts.blackphos.enrolled is
+      # false): it stays off until a machine takes the name, and nothing can be
+      # watched.
       blackphos = agent [ ] // {
         collect = false;
-        platform = "darwin";
         notifiedUnits = [ "otel-envelope" ];
       };
     };

@@ -1,10 +1,21 @@
 # Cloud machine definitions, read by the terranix modules that provision them
-# (modules/terranix/hetzner.nix, modules/terranix/gcp.nix) and by
+# (modules/terranix/hetzner.nix, modules/terranix/gcp.nix) and, through
+# flake.fleet.hosts.<name>.cloud (modules/lib/hosts.nix), by
 # flake.lib.fleetDeployer, which deploys only machines whose `enabled` is true.
+# flake.lib.cloudMachineMemoryGiB gives each machine type's memory, from which
+# a cloud host's memoryGiB follows.
 #
 # Set enabled = true to deploy, false to destroy.
 # Run: nix run .#terraform (regenerates config and applies)
 {
+  flake.lib.cloudMachineMemoryGiB = {
+    cx43 = 16;
+    ccx23 = 16;
+    cx53 = 32;
+    "e2-standard-8" = 32;
+    "n1-standard-8" = 30;
+  };
+
   flake.lib.cloudMachines = {
     hetzner = {
       cinnabar = {

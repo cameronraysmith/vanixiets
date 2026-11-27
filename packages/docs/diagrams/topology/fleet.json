@@ -25,7 +25,7 @@
   "machine/pyrite": {"class":"nixos","description":"Apple MacBookPro14,1 bare-metal NixOS laptop, zerotier peer","tags":["all","laptop","nixos","peer"]},
   "machine/rosegold": {"class":"darwin","description":"janettesmith's laptop (primary user), cameron admin","tags":["all","darwin","fleet","laptop","workstation"]},
   "machine/scheelite": {"class":"nixos","description":"GCP GPU node (n1-standard-8, T4), zerotier peer","tags":["all","cloud","gcp","gpu","nixos","peer"]},
-  "machine/stibnite": {"class":"darwin","description":"crs58's primary workstation, deployment controller","tags":["all","controller","darwin","laptop","workstation"]},
+  "machine/stibnite": {"class":"darwin","description":"crs58's primary workstation, deployment controller","tags":["all","darwin","deployer-workstation","laptop","workstation"]},
   "network/vanixiets": {"members":{"argentum":"peer","cinnabar":"peer","electrum":"peer","galena":"peer","magnetite":"peer","pixel11":"device","pyrite":"peer","rosegold":"peer","scheelite":"peer","stibnite":"peer"},"module":"tincr"},
   "network/zerotier": {"members":{"argentum":"external","blackphos":"external","cinnabar":"controller","electrum":"peer","galena":"peer","magnetite":"peer","pixel11":"external","pixel7":"external","pyrite":"peer","rosegold":"external","scheelite":"peer","stibnite":"external"},"module":"zerotier"}
 }

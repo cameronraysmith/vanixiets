@@ -34,7 +34,7 @@
       machineSystems = self.lib.machineSystems;
 
       controllers = lib.filter (name: machineSystems.${name} == system) (
-        builtins.attrNames self.clan.inventory.instances.zerotier.roles.controller.machines
+        self.lib.inventoryMembers self.clan.inventory.instances.zerotier "controller"
       );
 
       controllerPackage =

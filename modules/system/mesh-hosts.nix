@@ -38,7 +38,6 @@
 let
   inherit (config.flake.lib)
     fleet
-    machineSystems
     meshRecords
     ztRecords
     ;
@@ -81,7 +80,7 @@ let
     failures =
       name: hostConfig:
       let
-        isDarwin = lib.hasSuffix "-darwin" machineSystems.${name};
+        isDarwin = config.flake.lib.hosts.${name}.class == "darwin";
       in
       if isDarwin then
         if hostConfig ? vanixiets.hosts then

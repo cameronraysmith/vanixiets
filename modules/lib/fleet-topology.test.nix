@@ -30,6 +30,14 @@
                   flake.lib = {
                     hosts = { };
                     topologyFacts = { };
+                    inherit
+                      ((import ${./inventory-members.nix} {
+                        inherit lib;
+                        config.flake.clan.inventory.machines = { };
+                      }).flake.lib
+                      )
+                      inventoryMembersIn
+                      ;
                   };
                 };
               }).flake.lib
