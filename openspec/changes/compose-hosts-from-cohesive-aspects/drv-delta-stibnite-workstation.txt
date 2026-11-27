@@ -1,0 +1,21 @@
+# Declared drvPath differences of stibnite importing
+# flake.modules.darwin.darwin-workstation, from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-stibnite-workstation.txt
+# The aspect's definitions sit one import level below stibnite's body, and
+# the module system merges definitions in breadth-first import order, so two
+# of stibnite's lists keep their members and change order
+# (logs/chca-stibnite-workstation-before-20261127-160531.log,
+# logs/chca-stibnite-workstation-after-20261127-160658.log):
+# environment.systemPackages moves colima, colima-init, colima-stop and
+# colima-restart from after dnscrypt-pin-dns to after tmux, and
+# users.knownUsers moves crs58 ahead of nix-grpc-daemon. nix derivation show
+# of the two toplevels, followed down the changed inputs: system-path and
+# system-applications differ only in the order of structuredAttrs
+# chosenOutputs (the same entries); etc, the toplevel's activationScript and
+# buildCommand differ only in those two store paths. The knownUsers order
+# reaches no derivation. knownUsers and knownGroups hold the same names, and
+# every uid and gid is the same. argentum, rosegold and blackphos, and every
+# checks.x86_64-linux and checks.aarch64-darwin attribute outside the base
+# allow-list, keep their drvPaths.
+darwin.stibnite changed  # imports darwin-workstation: systemPackages order (colima's four after tmux); system-path and system-applications chosenOutputs reordered
+checks.aarch64-darwin.darwin-stibnite changed  # embeds darwin.stibnite's toplevel

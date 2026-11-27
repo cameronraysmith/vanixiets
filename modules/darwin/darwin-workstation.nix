@@ -9,10 +9,8 @@ let
 in
 {
   # The shape of a Mac in the fleet: a host imports it and states only its
-  # delta (hostName, casks, dnscrypt-proxy). argentum, rosegold and blackphos
-  # import it; stibnite does not yet, because importing it reorders two of
-  # stibnite's lists (openspec/changes/compose-hosts-from-cohesive-aspects,
-  # design Open Question 11).
+  # delta (hostName, casks, dnscrypt-proxy). argentum, rosegold, blackphos
+  # and stibnite import it.
   flake.modules.darwin.darwin-workstation =
     {
       config,
