@@ -106,6 +106,10 @@ let
       '';
     in
     {
+      # Declares the vanixiets.nodeExporter options set below, which the
+      # module system requires even while the backup is off.
+      imports = [ modules.nixos.node-exporter-textfile ];
+
       options.vanixiets.omnigraphBackup.enable = lib.mkOption {
         type = lib.types.bool;
         default = false;

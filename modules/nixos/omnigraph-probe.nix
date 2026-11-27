@@ -268,6 +268,10 @@ let
       };
     in
     {
+      # Declares the vanixiets.nodeExporter options set below, which the
+      # module system requires even while the probe is off.
+      imports = [ modules.nixos.node-exporter-textfile ];
+
       config = lib.mkIf (cfg.enable && node.enable) {
         assertions = [
           {

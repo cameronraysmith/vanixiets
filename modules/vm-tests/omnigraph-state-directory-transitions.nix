@@ -97,7 +97,6 @@
               {
                 imports = [
                   self.modules.nixos.omnigraph
-                  self.modules.nixos.node-exporter-textfile
                   self.modules.nixos.observability-notify
                   # Every omnigraph unit waits for the bucket.
                   {

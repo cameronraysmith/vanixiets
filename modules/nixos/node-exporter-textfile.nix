@@ -11,7 +11,10 @@
 # restarts of node_exporter and of every probe.
 # The assertion keeps the directory flag to at most one in node_exporter's
 # rendered ExecStart, whoever adds it; checks.x86_64-linux.node-exporter-textfile
-# shows a second flag failing it. Imported by every NixOS base.
+# shows a second flag failing it. Imported by every NixOS base, and by
+# ./omnigraph-probe.nix and ./omnigraph-backup.nix, which the omnigraph module
+# also brings onto nodes without base (the omnigraph runtime tests); the
+# shared key loads it once on a host holding both.
 { config, lib, ... }:
 let
   inherit (config.flake) modules;
@@ -32,6 +35,8 @@ let
       row = hosts.${config.networking.hostName} or null;
     in
     {
+      key = "vanixiets#node-exporter-textfile";
+
       options.vanixiets.nodeExporter = {
         textfileDirectory = lib.mkOption {
           type = lib.types.path;
