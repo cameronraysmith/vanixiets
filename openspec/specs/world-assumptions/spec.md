@@ -399,7 +399,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | approval card | — | the prompt the platform shows the operator before it applies a change to a cloud environment that a cloud session proposes | shared |
 | operator action | — | an act the operator performs by hand, such as starting a cloud session with a prompt, as distinct from accepting an approval card | world-only |
 | Linear workspace | — | a named organisation on Linear in which the operator's issues, projects and documents live, reached with a key that workspace issues | world-only |
-| disk | — | the persistent storage of a cloud session's container, which survives into the environment snapshot, as distinct from memory-backed storage that does not | shared |
+| disk | cloud session | the persistent storage of a cloud session's container, which survives into the environment snapshot, as distinct from memory-backed storage that does not | shared |
 | interactive terminal | — | a terminal screen a person watches and types into while a program runs, as distinct from a shell that only runs commands and returns their output | world-only |
 | clipboard | — | the copy-and-paste buffer of a person's desktop session | world-only |
 | main branch | — | this repository's default branch on the forge, whose newest commits the build service builds and publishes, and which a cloud environment that is not pinned follows | shared |
@@ -439,11 +439,35 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | inventory tag | — | a label the operator gives hosts to select them as a group, both for a service role and for deploying several hosts in one command | shared |
 | externally joined member | — | a fleet member that joins the overlay network with its own client rather than through the fleet's configuration, today the nix-darwin hosts and the phones | shared |
 | state version | — | the release a host's stateful defaults were first set from, fixed when the host is installed and not changed afterwards | shared |
+| graph store | — | the program on a host that keeps the fleet's graphs and answers queries and changes to them over the network, OmniGraph on magnetite | shared |
+| graph | — | one named body of entities and their relations that the graph store keeps and answers questions about | shared |
+| example graph | — | a graph whose content is example data recreated from its published seed, so its loss costs no one's work | world-only |
+| seed | — | the published file of example data loaded once into a new example graph | shared |
+| graph data | — | everything the graph store keeps for its graphs across restarts: the graphs, their history, their policies and the record of which writer holds them | shared |
+| graph data name | — | the name that identifies one body of graph data in either storage location and records the storage format its graphs were created at | shared |
+| storage format | — | the version of the on-disk layout the graph store wrote a graph in, which every later release that serves the graph must read | shared |
+| entity count | — | the number of entities of a graph as the graph store reports it for its current version | shared |
+| stored query | — | a named question declared with a graph, which the graph store answers on request | shared |
+| writer | graph store | a running program that holds graph data open for change; the graph store admits one at a time | shared |
+| direct writer | — | a writer the operator runs by hand against graph data, outside the graph store's own service | shared |
+| writer claim | — | the record a writer leaves in graph data naming itself as its one writer, which any later writer must find absent before it starts | shared |
+| stale writer claim | — | a writer claim left behind by a writer that is no longer running | shared |
+| crash | — | the end of the graph store's run without its own orderly shutdown, by a kill, a fault or a loss of power | shared |
+| boot | — | one period of a host's running between two starts of its operating system | shared |
+| serving | — | the state in which the graph store answers for every graph it is configured with and none is blocked | shared |
+| blocked graph | — | a graph the graph store is configured with but could not open at its last start | shared |
+| storage location | — | where a host's graph store keeps its graph data: that host's disk or a bucket, one at a time | shared |
+| bucket | — | a named container of objects at the fleet's object storage provider, Cloudflare R2, reached over the network with a credential | shared |
+| disk | host | the storage attached to one host, which survives its reboots and is lost with the host | shared |
+| local snapshot | — | a read-only image of graph data as it stood at one instant, kept on the host's disk and lost with it | shared |
+| graph backup | — | a copy of graph data made from one local snapshot and held in a bucket away from the host, which survives the loss of the host and its disk | shared |
+| runbook | — | the written procedure in the repository's operations docs that the operator follows for a named task | shared |
+| recovery notice | — | a low-priority message on the fleet's notification service telling the operator that the graph store cleared a stale writer claim on a named host | shared |
 
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-six terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, and `closure`, of which `probe`, `release`, `credential` and `evaluator` carry three and every other term two
+- **THEN** twenty-seven terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, `closure`, and `disk`, of which `probe`, `release`, `credential`, `evaluator` and `writer` carry three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 
@@ -1923,3 +1947,135 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** the cross-revision identity oracle shows a machine check or a judge fixture check whose drvPath changed in a revision that changed only how its assertions are wired
 - **THEN** this assumption is void for that construction; the `fleet-obligation-registry-interface` requirements "Every machine check asserts every judge registered for its class" and "A judge-over-fixtures check reports each wrong case" lose their unchanged-derivation discharge until the cause is found
+
+### Requirement: A231 — OmniGraph admits one writer process per cluster and serves no read replicas
+
+It is true of OmniGraph 0.16.0, independent of what this fleet builds, that one mutation-capable writer process may hold a cluster at a time, that read replicas and overlapping writers are not a supported topology, and that a cluster may live on a local filesystem, on S3-compatible object storage, or on Azure in preview.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: OmniGraph `docs/user/deployment.md` at v0.16.0, "Writer topology" and introduction.
+
+#### Scenario: the assumption drifts
+- **WHEN** a release supports read replicas or several writers
+- **THEN** this assumption is void, and `graph-store` requirement `Graph data lives on the disk of the host that serves it` loses its discharge
+
+### Requirement: A232 — A local OmniGraph cluster lock is a file that outlives a crash and that force-unlock removes by id alone
+
+It is true of OmniGraph 0.16.0, independent of what this fleet builds, that a local root's lock file `__cluster/lock.json` records `version`, `lock_id`, `operation`, `created_at` and `pid` and nothing of host or boot, survives a kill, blocks every start and is never taken over, and that `cluster force-unlock <id>` removes it on a matching id without checking its holder.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: Crash probe on stibnite against the packaged 0.16.0 binary (2026-11-26): kill left the lock naming the dead pid, restart refused with `state_lock_held` in about 0.17 s, `force-unlock` with a live server's id removed its lock; leases apply only to S3 roots; the file is created only if absent; source `state_lock.rs:83-90,330`, `store.rs:1303`, `admission.rs:624`; `docs/user/operations/storage-failures.md:120-126`.
+
+#### Scenario: the assumption drifts
+- **WHEN** a release takes over a stale local lock itself, adds or removes a field of the record, or checks the holder in `force-unlock`
+- **THEN** this assumption is void, and `graph-store` requirements `The graph store recovers from its own crash without a person`, `The graph store refuses to clear a writer claim it cannot prove stale` and `Graph data can be restored to identical answers` lose their discharge
+
+### Requirement: A233 — An OmniGraph commit is whole or absent after a kill
+
+It is true of OmniGraph 0.16.0 on a local root, independent of what this fleet builds, that a server killed during writes leaves each load either wholly committed or absent, and that the next start serves the committed state.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: Crash probe trials 1-5 (2026-11-26): five kills during concurrent loads; counts above baseline were always whole batches; one acknowledged-reply loss counted one extra committed row.
+
+#### Scenario: the assumption drifts
+- **WHEN** a restarted server serves a partial load, or fails to open a graph after a kill
+- **THEN** this assumption is void, and `graph-store` requirement `The graph store recovers from its own crash without a person` loses its discharge
+
+### Requirement: A234 — A file-by-file copy of a live OmniGraph root may not open, and every copy carries the lock
+
+It is true of OmniGraph 0.16.0, independent of what this fleet builds, that a copy of a local root taken file by file while its server writes may reference files the copy lacks and fail to open, that a copy of a frozen state opens consistently, and that any copy carries the lock of the server it was taken from.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: Crash probe experiment 6 (2026-11-26): `cp -a` under write load opened 2 times of 8; copies with the server stopped by SIGSTOP opened 8 of 8; every copy carried `lock.json`. OmniGraph `docs/user/deployment.md`, "Upgrade and backup": back up the whole root.
+
+#### Scenario: the assumption drifts
+- **WHEN** a release documents a consistent online copy of a live root
+- **THEN** this assumption is void, and the reason given by `graph-store` requirement `Graph data is copied off its host every night from an instant image` for forbidding file copies is void, and that requirement is reviewed
+
+### Requirement: A235 — A ZFS snapshot is an instant read-only image that lives on its pool
+
+It is true of OpenZFS, independent of what this fleet builds, that a snapshot captures a dataset atomically at one instant, is read-only and reachable under the dataset's `.zfs/snapshot/<name>`, and lives on the same pool and disks as the dataset, so it is lost with them.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: zfs-snapshot(8); magnetite's single disk (`modules/machines/nixos/magnetite/disko.nix`).
+
+#### Scenario: the assumption drifts
+- **WHEN** a graph backup made from a snapshot fails to open after restore while the frozen-copy case of A234 holds
+- **THEN** this assumption is void, and `graph-store` requirements `Graph data is copied off its host every night from an instant image`, `Graph data can be restored to identical answers` and `Local snapshots stay available` lose their discharge
+
+### Requirement: A236 — An R2 bucket's location is fixed when its name is first created
+
+It is true of Cloudflare R2, independent of what this fleet builds, that a bucket's location hint applies only when the bucket is first created and cannot be changed later, so `sciexp` stays in eastern North America (`location = "enam"`).
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: https://developers.cloudflare.com/r2/reference/data-location; `modules/terranix/cloudflare.nix`.
+
+#### Scenario: the assumption drifts
+- **WHEN** R2 offers moving an existing bucket
+- **THEN** this assumption is void, and the latency reason in `graph-store` requirement `Graph data lives on the disk of the host that serves it` is reviewed
+
+### Requirement: A237 — Hetzner Object Storage does not document conditional writes on unversioned buckets
+
+It is true of Hetzner Object Storage as documented on 2026-11-26, independent of what this fleet builds, that conditional PUT and DELETE on versioned buckets are listed as unsupported, that unversioned buckets are not addressed, that storage is HDD-backed, and that its FAQ advises against many objects under 1 MB, frequent small reads and writes, and latency-sensitive use.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: https://docs.hetzner.com/storage/object-storage/supported-actions/ and …/faq/general/.
+
+#### Scenario: the assumption drifts
+- **WHEN** Hetzner documents `If-None-Match` and `If-Match` PUT on unversioned buckets and an SSD tier
+- **THEN** this assumption is void, and the rejection of Hetzner Object Storage recorded with `graph-store` requirement `Graph data lives on the disk of the host that serves it` is reviewed
+
+### Requirement: A238 — OmniGraph exposes readiness publicly and per-graph state only to a bearer token, and no metrics
+
+It is true of OmniGraph 0.16.0, independent of what this fleet builds, that it serves no metrics endpoint, that `GET /readyz` needs no token and reports readiness and graph counts by state without graph names, and that `GET /graphs/{id}/snapshot` needs a bearer token and reports a graph's entity counts, manifest version and storage format.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: OmniGraph `crates/omnigraph-server/src/http_operations.rs:196-222`, `handlers.rs:62-226`, `omnigraph-api-types/src/lib.rs:447-468,2396-2440` (read on `main` after v0.16.0); `/readyz` answers 200 also when degraded, so a reader must use the counts; `modules/lib/omnigraph-readiness.nix` parses `/readyz`.
+
+#### Scenario: the assumption drifts
+- **WHEN** a release renames a readiness field, adds a metrics endpoint, or moves the snapshot read behind another action
+- **THEN** this assumption is void, and `graph-store` requirements `The operator learns when the graph store is not serving` and `The graph store's state is visible on a dashboard` lose their discharge
+
+### Requirement: A239 — OmniGraph's trace exporter trusts only public certificate authorities
+
+It is true of OmniGraph 0.16.0, independent of what this fleet builds, that it exports OpenTelemetry traces only, over OTLP HTTP with `reqwest-rustls-webpki-roots`, so an HTTPS collector signed by a private authority fails verification.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: OmniGraph `crates/omnigraph-server/Cargo.toml:36-40`; `docs/user/operations/observability.md`.
+
+#### Scenario: the assumption drifts
+- **WHEN** a release accepts a configured certificate authority
+- **THEN** this assumption is void, and the reason this fleet exports no OmniGraph traces is void and is reviewed
+
+### Requirement: A240 — omnigraph cleanup runs only directly against storage
+
+It is true of OmniGraph 0.16.0, independent of what this fleet builds, that `omnigraph cleanup` runs only as a direct writer, needs the cluster's lock and so the server stopped, and is destructive.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: OmniGraph `docs/user/operations/maintenance.md`, `docs/user/operations/recorded-operations.md:60-66`.
+
+#### Scenario: the assumption drifts
+- **WHEN** a release runs cleanup through the server
+- **THEN** this assumption is void, and the reason this fleet schedules no cleanup is void and is reviewed
+
+### Requirement: A241 — systemd 262 id-maps a DynamicUser state directory and hands a static user's root-owned one to that user
+
+It is true of systemd 262, independent of what this fleet builds, that a `DynamicUser` unit's state directory is moved into `/var/lib/private` behind a symlink and, owned by root or `nobody`, id-mapped, which fails with a mount below it, and that a static-user unit moves it back out and chowns a root-owned one to that user at start.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: systemd.exec(5), `StateDirectory=`; systemd v262 `src/core/exec-invoke.c` `setup_exec_directory` (the private migration, the `nobody` and root-owned id-mapping branch, `path_chown_recursive`) and `src/core/namespace.c`; observed on magnetite 2026-11-26: `/var/lib/omnigraph -> private/omnigraph`; runtime test 2026-11-26: every omnigraph unit failed with `Failed to create an id-mapped mount: Device or resource busy` while a dataset was mounted at `/var/lib/private/omnigraph/clusters`; `vmTests.x86_64-linux.omnigraph-state-directory-transitions` (2026-11-26): the private directory moved back out at the first static-user start and stayed `65534:65534` behind an id-mapped mount, a root-owned dataset at `/var/lib/omnigraph` was chowned to the static user, and a `DynamicUser` start with that dataset mounted failed with status 238/STATE_DIRECTORY.
+
+#### Scenario: the assumption drifts
+- **WHEN** a systemd release leaves the state directory of a static-user unit behind the `/var/lib/private` symlink, leaves a root-owned one owned by root, or id-maps it
+- **THEN** this assumption is void, and `graph-store` requirements `Graph data lives on the disk of the host that serves it` and `The storage location is chosen per host, and switching back serves what the bucket held` lose their discharge
+
+### Requirement: A242 — omnigraph optimize run directly against a local root leaves its admission lock behind
+
+It is true of OmniGraph 0.16.0, independent of what this fleet builds, that `omnigraph optimize` run directly against a local root exits with its cluster admission lock still in `__cluster/lock.json`, so that every later writer and server start meets `state_lock_held` until `cluster force-unlock` of that id.
+Any requirement relying on this SHALL name it and SHALL lose its discharge once the condition below is observed.
+
+**Evidence**: runtime test of 2026-11-26 against the packaged 0.16.0 binary: `omnigraph optimize --graph <first>` logged `cluster admission retained … use exact-ID cluster force-unlock; command completion alone does not release this lock`, and the next `omnigraph` command on the root failed with `[state_lock_held]`.
+
+#### Scenario: the assumption drifts
+- **WHEN** a release releases the admission lock when a direct `optimize` completes
+- **THEN** this assumption is void, and the reason `graph-store-interface` requirement `Optimize is not enabled on a local root` forbids the optimize timer is void and is reviewed

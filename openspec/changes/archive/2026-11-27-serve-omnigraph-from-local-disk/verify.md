@@ -506,3 +506,12 @@ Observable only after a deploy of the remedies:
 **Next step**:
 
 Proceed to the In Review sub-gates.
+
+---
+
+## In Review gates (2026-11-27)
+
+- **Code review: accepted.** It rests on the independent review of the second delivery commit, `7d02f0a5` (`feat(omnigraph): serve a local root with stale-lock recovery and nightly backup`), on 2026-11-26: no critical or high finding, one medium (an unreadable `btime` let the recovery unlock a lock whose pid was running) and five low (a clock step or another pid namespace past the boot check; any local user's file named `omnigraph` keeping the server from starting; the runtime test's mount assertion satisfied by `StateDirectory=` alone; the restore racing the nightly backup and restoring `latest`; a stale probe sentence in design.md). `72596929` (`fix(omnigraph): refuse lock recovery on unreadable process state or an omnigraph at the lock pid`) fixed all of them but the server in another pid namespace, which design.md (Risks) and the runbook record as a limit. It rests also on the four verification checks above (2026-11-27 09:20, 10:15, 11:00 and 15:40 UTC), which read every requirement of the three deltas against the code and, where it applies, the running host, and whose seven findings are closed. No further review was run.
+- **Documentation: accepted as it is.** The runbook `packages/docs/src/content/docs/development/operations/omnigraph.md` and the alert table in `fleet-observability.md` (`OmnigraphNotServing`, `OmnigraphBackupStale`) are accepted without follow-up.
+
+`review_round` stays 3: neither gate re-queued the change.

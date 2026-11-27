@@ -3,16 +3,19 @@ linear_story_id: CAM-127
 linear_story_identifier: CAM-127
 linear_story_title: "Serve OmniGraph from local disk on magnetite"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-127/serve-omnigraph-from-local-disk-on-magnetite
-linear_story_state: In Review
+linear_story_state: Done
 linear_team: CAM
-last_synced_state: In Review
-last_synced_at: "2026-11-27T15:42:31Z"
+last_synced_state: Done
+last_synced_at: "2026-11-27T15:54:08Z"
 review_round: 3
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T04:04:41Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-127 created in Todo on team CAM with no project, description seeded from proposal.md; state confirmed by read-only view" }
   - { at: "2026-11-26T04:59:43Z", transition: "Todo->In Progress", outcome: "posted", note: "First tasks.md checkbox ticked; state set to In Progress with a comment and confirmed by read-only view" }
   - { at: "2026-11-27T15:42:31Z", transition: "In Progress->In Review", outcome: "posted", note: "verify.md Overall Decision PASS WITH WARNINGS after the fourth check; state set to In Review with a comment and confirmed by read-only view" }
+  - { at: "2026-11-27", transition: "In Review gates", outcome: "posted", note: "Code review accepted on the review of 7d02f0a5 and the four verification checks; documentation accepted as it is (verify.md, In Review gates); review_round stays 3" }
+  - { at: "2026-11-27T15:54:08Z", transition: "archive->mirror", outcome: "dropped", note: "no linear_project bound; spec mirror skipped" }
+  - { at: "2026-11-27T15:54:08Z", transition: "In Review->Done", outcome: "posted", note: "Archived after syncing graph-store, graph-store-interface and world-assumptions; state confirmed Done by read-only view, closing comment posted" }
 ---
 
 ## Why
