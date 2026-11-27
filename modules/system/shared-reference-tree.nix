@@ -86,20 +86,67 @@ let
   # lazygit reads .lazygit.yml in every ancestor of a repository; at the shared
   # root this turns off its start-up fetch for every copy.
   lazygitConfig = "git:\n  autoFetch: false\n";
-  # Whether a participant's Home Manager git configuration refuses every transport
-  # under each form git may resolve the root to, and sets no protocol.<name>.allow,
-  # which outranks protocol.allow wherever it is set.
-  refusesTransport =
+  # Whether an include's condition can hold for a repository beneath one of
+  # roots. Only a gitdir: or gitdir/i: pattern that is a literal absolute path is
+  # judged, matching when it encloses a root or lies beneath one; any other
+  # condition (a glob, a relative or ~/ pattern, onbranch:, hasconfig:) may hold
+  # beneath the root and counts as matching.
+  includeReachesRoot =
+    roots: include:
+    let
+      condition = include.condition or null;
+      parsed = builtins.match "gitdir(/i)?:(.*)" condition;
+      fold = if lib.elemAt parsed 0 == null then lib.id else lib.toLower;
+      pattern = fold (lib.elemAt parsed 1);
+      literal = lib.hasPrefix "/" pattern && builtins.match ".*[*?[].*" pattern == null;
+    in
+    condition == null
+    || parsed == null
+    || !literal
+    || lib.any (
+      root: lib.hasPrefix pattern (fold "${root}/") || lib.hasPrefix (fold "${root}/") pattern
+    ) roots;
+  # Why a participant's Home Manager git configuration may let git use a
+  # transport beneath the root, one line each; empty when it refuses every one.
+  # It must have an include under gitdir:<form>/ setting protocol.allow to never
+  # for each form git may resolve the root to, and no protocol.<name>.allow in
+  # its settings, which outranks protocol.allow wherever it is set. An include
+  # with inline contents whose condition can hold beneath the root must set
+  # neither a protocol.<name>.allow nor a protocol.allow other than never, as
+  # Home Manager writes the includes after the settings. An include given only
+  # as a path is read by git, not by evaluation, and is not seen here.
+  transportGaps =
     roots: git:
-    lib.all (
-      form:
-      lib.any (
-        include:
-        (include.condition or null) == "gitdir:${form}/"
-        && (include.contents.protocol or null) == transportPolicy
-      ) (git.includes or [ ])
-    ) roots
-    && lib.attrNames (removeAttrs (git.settings.protocol or { }) [ "allow" ]) == [ ];
+    let
+      named = protocol: lib.attrNames (removeAttrs protocol [ "allow" ]);
+      fromInclude =
+        index: include:
+        let
+          protocol = include.contents.protocol or { };
+          name = "include ${toString index} (${
+            if (include.condition or null) == null then "unconditional" else include.condition
+          })";
+        in
+        lib.optionals (includeReachesRoot roots include) (
+          map (key: "${name} sets protocol.${key}.allow") (named protocol)
+          ++ lib.optional (
+            (protocol.allow or "never") != "never"
+          ) "${name} sets protocol.allow to ${toString protocol.allow}"
+        );
+    in
+    map (form: "no include under gitdir:${form}/ sets protocol.allow to never") (
+      lib.filter (
+        form:
+        !lib.any (
+          include:
+          (include.condition or null) == "gitdir:${form}/"
+          && (include.contents.protocol or null) == transportPolicy
+        ) (git.includes or [ ])
+      ) roots
+    )
+    ++ map (key: "its settings set protocol.${key}.allow") (named (git.settings.protocol or { }))
+    ++ lib.concatLists (lib.imap1 fromInclude (git.includes or [ ]));
+  refusesTransport = roots: git: transportGaps roots git == [ ];
 in
 {
   flake.modules.nixos.shared-reference-tree-options = options false;
@@ -107,6 +154,7 @@ in
   flake.lib.sharedReferenceTreeSafeDirectoriesConform = safeDirectoriesConform;
   flake.lib.sharedReferenceTreeLfsPolicy = lfsPolicy;
   flake.lib.sharedReferenceTreeTransportPolicy = transportPolicy;
+  flake.lib.sharedReferenceTreeTransportGaps = transportGaps;
   flake.lib.sharedReferenceTreeRefusesTransport = refusesTransport;
   flake.lib.sharedReferenceTreeLazygitConfig = lazygitConfig;
 }

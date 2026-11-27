@@ -35,6 +35,28 @@ in
       lazygitFile = pkgs.writeText "lazygit.yml" flakeConfig.flake.lib.sharedReferenceTreeLazygitConfig;
       provisionLazygit = "/usr/bin/install -m 0640 -o ${cfg.writer} -g ${cfg.writer} ${lazygitFile} \"$ghqRoot/.lazygit.yml\"";
       provisionLog = "/usr/bin/install -m 0640 -o ${cfg.writer} -g ${cfg.writer} /dev/null \"$ghqLog\"";
+      # The writer owns the log's directory and can put a link at the log's path
+      # between any test and any change by path, so the log is opened once,
+      # refusing a symbolic link, and tested and changed through that descriptor:
+      # only a regular file the writer owns is changed, whatever the path names
+      # afterwards.
+      setLogMode = pkgs.writeScript "ghq-writer-log-mode" ''
+        #!${pkgs.python3}/bin/python3
+        import os, stat, sys
+        path, writer = sys.argv[1], ${toString cfg.writerId}
+        try:
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        except OSError as error:
+            print(f"shared-reference-tree: {path}: {error.strerror}; leaving its mode", file=sys.stderr)
+            sys.exit(0)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != writer or st.st_nlink != 1:
+            print(f"shared-reference-tree: {path} is not a regular file of ${cfg.writer}'s with one link; leaving its mode",
+                  file=sys.stderr)
+            sys.exit(0)
+        os.fchown(fd, writer, writer)
+        os.fchmod(fd, 0o640)
+      '';
     in
     {
       imports = [ flakeConfig.flake.modules.darwin.shared-reference-tree-options ];
@@ -62,9 +84,11 @@ in
                   include.condition == "gitdir:${form}/" && (include.contents.filter.lfs or null) == lfsPolicy
                 ) (hm.${user}.programs.git.includes or [ ])
               ) cfg.rootForms;
-            transportOpen = lib.filter (
+            transportOpen = lib.concatMap (
               user:
-              !flakeConfig.flake.lib.sharedReferenceTreeRefusesTransport cfg.rootForms hm.${user}.programs.git
+              map (gap: "${user}: ${gap}") (
+                flakeConfig.flake.lib.sharedReferenceTreeTransportGaps cfg.rootForms hm.${user}.programs.git
+              )
             ) humanParticipants;
             provision = "/usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} \"$ghqRoot\"";
             # Everything activation runs before it first touches this daemon's plist;
@@ -101,7 +125,7 @@ in
             }
             {
               assertion = transportOpen == [ ];
-              message = "shared-reference-tree: every participant's git must refuse every transport in the shared tree, with an include with condition gitdir:<form>/ setting protocol.allow to never for each of ${toString cfg.rootForms}, and must set no protocol.<name>.allow; not so for: ${toString transportOpen}.";
+              message = "shared-reference-tree: every participant's git must refuse every transport in the shared tree, with an include with condition gitdir:<form>/ setting protocol.allow to never for each of ${toString cfg.rootForms}, no protocol.<name>.allow in its settings, and no include that can apply there setting protocol.<name>.allow or a protocol.allow other than never; not so: ${lib.concatStringsSep "; " transportOpen}.";
             }
             {
               assertion = lib.all (
@@ -140,7 +164,7 @@ in
               assertion =
                 daemonLoaded
                 && lib.hasInfix provisionLog beforeDaemon
-                && lib.hasInfix "/bin/chmod 0640 \"$ghqLog\"" beforeDaemon;
+                && lib.hasInfix "${builtins.unsafeDiscardStringContext setLogMode} \"$ghqLog\"" beforeDaemon;
               message = "shared-reference-tree: ${logDir}/writer.log must be created mode 0640, or set to it, before activation loads ${label}.";
             }
           ];
@@ -220,24 +244,22 @@ in
         # trusting entries another account controls. The root then gets
         # .lazygit.yml, rewritten at each activation, which turns off lazygit's
         # start-up fetch for every copy; ghq-shared-migrate counts a root holding
-        # only that file as empty.
+        # only that file as empty. install(1) given a directory, or a link to
+        # one, as its destination writes into it and succeeds, so either there
+        # stops activation.
         #
         # launchd creates the writer's log 0644 at its first connection, and
         # newsyslog gives it mode 640 only when it rotates, so activation creates
-        # it 0640 first and corrects an existing one. A log that is not a regular
-        # file of the writer's with one link is left alone and reported: the
-        # writer owns the directory, and root changing what such an entry points
-        # at would change a file the writer does not own.
+        # it 0640 first and corrects an existing one through setLogMode, which
+        # leaves alone and reports a log that is not a regular file of the
+        # writer's with one link.
         system.activationScripts.launchd.text = lib.mkBefore ''
           /usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} ${logDir}
           ghqLog=${logDir}/writer.log
           if [ ! -e "$ghqLog" ] && [ ! -L "$ghqLog" ]; then
             ${provisionLog}
-          elif [ ! -L "$ghqLog" ] && [ -f "$ghqLog" ] && [ "$(/usr/bin/stat -f '%Su %l' "$ghqLog")" = "${cfg.writer} 1" ]; then
-            /usr/sbin/chown ${cfg.writer}:${cfg.writer} "$ghqLog"
-            /bin/chmod 0640 "$ghqLog"
           else
-            echo "shared-reference-tree: $ghqLog is not a regular file of ${cfg.writer}'s with one link; leaving its mode" >&2
+            ${setLogMode} "$ghqLog"
           fi
           /usr/bin/install -d -m 0700 -o ${cfg.writer} -g ${cfg.writer} ${lockDir}
           ghqRoot=${lib.escapeShellArg cfg.root}
@@ -252,6 +274,10 @@ in
           else
             /usr/sbin/chown ${cfg.writer}:${cfg.writer} "$ghqRoot"
             /bin/chmod 0750 "$ghqRoot"
+          fi
+          if [ -d "$ghqRoot/.lazygit.yml" ]; then
+            echo "shared-reference-tree: $ghqRoot/.lazygit.yml is a directory or a link to one; refusing to provision it" >&2
+            exit 1
           fi
           ${provisionLazygit}
         '';

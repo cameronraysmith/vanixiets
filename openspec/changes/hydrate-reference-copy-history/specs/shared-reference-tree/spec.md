@@ -2,7 +2,7 @@
 
 ### Requirement: A refreshed or deepened reference repository shows what each commit it gained changed
 
-When the writer refreshes or deepens a reference repository whose file contents the reference tree holds only in part, every participating account SHALL be able to read what each commit thereby brought into its history changed, with no further acquisition request, unless the writer's answer to that acquisition request says the commits were too many to make readable then.
+When the writer refreshes, deepens or fetches the tags of a reference repository whose file contents the reference tree holds only in part, every participating account SHALL be able to read what each commit thereby brought into its branches' history changed, with no further acquisition request, unless the writer's answer says it could not make them readable then.
 Adding a reference repository SHALL take no more history and no more file contents than before.
 
 #### Scenario: A reference repository is refreshed
@@ -20,15 +20,29 @@ Adding a reference repository SHALL take no more history and no more file conten
 - **WHEN** the writer deepens a reference repository
 - **THEN** every participating account reads what each commit the deepening brought in changed, except the deepest commits the reference repository now holds, with no further acquisition request
 
+#### Scenario: A deepening also brings in what upstream gained
+
+- **WHEN** the writer deepens a reference repository whose upstream has gained commits since its last refresh, and the deepening brings those commits in as well
+- **THEN** every participating account reads what each of those commits changed, as for a refresh, with no further acquisition request
+
 #### Scenario: Making the changes readable fails
 
-- **WHEN** the writer refreshes a reference repository and cannot fetch the file contents that make its new commits' changes readable
-- **THEN** the refresh still succeeds, and the writer's answer says that making them readable failed
+- **WHEN** the writer refreshes a reference repository and cannot fetch the file contents that make its new commits' changes readable, or a later step of the same acquisition request fails
+- **THEN** the refresh's own outcome is unchanged by the failure to make them readable, and the writer's answer says whether making them readable succeeded or failed
 
 #### Scenario: A reference repository is added
 
 - **WHEN** a participating account makes an acquisition request for a reference repository absent from the reference tree
 - **THEN** the reference repository arrives with the same history and the same file contents as before this requirement, in no more time
+
+### Requirement: A tag's commit fetched without its history is readable once requested
+
+When the writer fetches a reference repository's tags, a tag's commit it fetches without that commit's history SHALL be excepted from what the writer makes readable: what that commit changed SHALL become readable once an acquisition request makes that tag readable.
+
+#### Scenario: Tags are fetched
+
+- **WHEN** the writer fetches a reference repository's tags, bringing in the upstream branch's new commits and a tag's commit without its history
+- **THEN** every participating account reads what each of the branch's new commits changed, and reading what the tag's commit changed fails at once until an acquisition request makes that tag readable
 
 ### Requirement: A read that needs content the reference tree lacks fails at once
 

@@ -19,9 +19,10 @@ The first ACCOUNT is the primary: when the shared root is empty, or holds only
 the .lazygit.yml the host's modules provision there, and is on the same
 filesystem as that account's home, its whole ~/ghq is renamed to the root, an
 O(1) operation; .lazygit.yml waits in the state directory meanwhile and comes
-back with its owner and mode. Every other repository is moved in by rename on
-the same filesystem or copied (reflink or clonefile where available) across
-filesystems.
+back with its owner and mode, and a .lazygit.yml of the account's own, renamed
+in with its tree, goes to ~/ghq.pre-shared-<date>. Every other repository is
+moved in by rename on the same filesystem or copied (reflink or clonefile where
+available) across filesystems.
 Where accounts hold the same repository, the deeper clone is kept. Whatever is
 not moved in stays in ~/ghq.pre-shared-<date>, untouched. Everything moved in
 becomes owned by the writer, gains group read, and loses group write, every
@@ -696,6 +697,12 @@ def migrate(entry, winners, writer, date):
             manifest.record({"op": "mkdir", "path": entry["aside"]})
             os.makedirs(entry["aside"], mode=0o700, exist_ok=True)
             os.chown(entry["aside"], account["uid"], account["gid"])
+            # The account's own .lazygit.yml came with its tree; it stays the
+            # account's, beside what else of the tree is not moved in, and the
+            # provisioned file takes its place at the root.
+            own_lazygit = os.path.lexists(provisioned)
+            if own_lazygit:
+                place(provisioned, os.path.join(entry["aside"], LAZYGIT), True, manifest, account, entry["aside"])
             for rel, info in entry["repos"].items():
                 if info["gitfile"] or winners.get(rel) != name:
                     place(os.path.join(ROOT, rel), os.path.join(entry["aside"], rel), True, manifest, account, entry["aside"])
@@ -704,10 +711,9 @@ def migrate(entry, winners, writer, date):
         with Phase(f"ownership {name}"):
             fix_ownership(ROOT, writer, manifest, os.path.join(manifest.dir, "root"), hold=True)
         if os.path.lexists(kept):
-            if os.path.lexists(provisioned):
-                say(f"{name}: its tree held its own {LAZYGIT}, which stays; the host's activation rewrites it")
-            else:
-                move_file(kept, provisioned, manifest)
+            move_file(kept, provisioned, manifest)
+        if own_lazygit:
+            say(f"{name}: its tree held its own {LAZYGIT}, now in {entry['aside']}; the root keeps the provisioned one")
     else:
         with Phase(f"{'rename' if entry['same_volume'] else 'copy'} and ownership {name}"):
             for rel, info in entry["repos"].items():

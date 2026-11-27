@@ -47,10 +47,13 @@ Options:
                    A diff reads both sides: `git show REV` needs REV and each of
                    its parents hydrated (REV^1, and REV^2 for a merge), and
                    `git diff A B` needs A and B. On a host-shared tree the writer
-                   already does this for the commits an update or deepen brought
-                   in, and readers' git there refuses every transport, so a read
-                   needing absent contents fails with "transport '<scheme>' not
-                   allowed" and "could not fetch <oid> from promisor remote".
+                   already does this for the commits an update, deepen or tag
+                   fetch brings into a clone's branches and remote-tracking
+                   branches, but not for a tag commit --tags fetches at depth 1,
+                   which needs --hydrate TAG; readers' git there refuses every
+                   transport, so a read needing absent contents fails with
+                   "transport '<scheme>' not allowed" and "could not fetch <oid>
+                   from promisor remote".
   --seed-zoxide [QUERY]
                    Register every repo in `ghq list -p [QUERY]` with zoxide
                    without any network access, printing one `added: <path>` line
@@ -71,7 +74,8 @@ Options:
   -u, --update     Pass ghq's -u to update already-cloned repos (fetch mode).
   --tags           On a host-shared tree, also fetch the remote's tags; full clones
                    always fetch tags on update, shallow clones fetch absent tags at
-                   depth 1 without moving their history boundary (fetch mode).
+                   depth 1 without moving their history boundary, and each such
+                   tag commit stays unhydrated until --hydrate TAG (fetch mode).
   -j, --jobs N     Bounded concurrency for --deepen/--full/--hydrate (default: 6).
   -n, --dry-run    Print intended actions for --deepen/--full/--hydrate/--all/
                    --seed-zoxide; no mutation.

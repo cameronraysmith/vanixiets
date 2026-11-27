@@ -7,7 +7,7 @@ linear_story_state: In Progress
 linear_team: CAM
 last_synced_state: In Progress
 last_synced_at: "2026-11-27T05:05:13Z"
-review_round: 0
+review_round: 1
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T23:56:11Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-136 created in Todo on team CAM with no project, description seeded from proposal.md; state confirmed by read-only view" }
@@ -26,7 +26,7 @@ Decisions tagged `D<n>` are developed in `design.md`; items 1 to 3 of the outlin
 
 **History of an update or deepen**
 - From: an update or deepen fetches commits and trees, and only the blobs its checkout needs.
-- To: before releasing the repository's lock, the writer fetches the blobs each brought-in commit's diff needs (D1 to D3), unless more than 100,000 are missing, when it fetches none and says so, naming `ghq-sync --hydrate` (D4); a failed fetch leaves the request's outcome unchanged (D5).
+- To: before releasing the repository's lock, the writer fetches the blobs each commit brought into the copy's branches and remote-tracking branches needs for its diff (D1 to D3), leaving a tag commit fetched at depth 1 for `ghq-sync --hydrate <tag>`, unless more than 100,000 are missing, when it fetches none and says so, naming `ghq-sync --hydrate` (D4); a failed fetch leaves the request's outcome unchanged (D5).
 - Reason: every commit a reader sees in a copy should be readable as a diff.
 - Impact: non-breaking; updates take longer and copies grow by their window's blobs; a first acquisition is unchanged.
 
@@ -53,14 +53,14 @@ None.
 
 ### Modified Capabilities
 
-- `shared-reference-tree` (stratum: `behavioral`): adds `A refreshed or deepened reference repository shows what each commit it gained changed` and `A read that needs content the reference tree lacks fails at once`.
-- `shared-reference-tree-interface` (stratum: `interface`): adds `An update makes every commit it brought in readable as a diff`, `A deepen makes every commit it brought in readable as a diff`, `The writer bounds the history it makes readable`, `A failed history fetch leaves the request's outcome as it was`, `The writer's exit log line names what the history fetch did`, `A first acquisition fetches nothing more than before`, `Participating accounts' git refuses every transport beneath the shared root`, `lazygit fetches nothing at start-up beneath the shared root` and `A revision's diff is readable once the revision and its parents are hydrated`; every new scenario names its witness. Trust boundary: these hold at the hosts' declared configuration, the writer's handler and Unix permissions; they do not cover an account's own `-c` or environment overrides, programs that read no git configuration, lazygit versions other than the one inspected, or history fetched before the change.
+- `shared-reference-tree` (stratum: `behavioral`): adds `A refreshed or deepened reference repository shows what each commit it gained changed`, `A tag's commit fetched without its history is readable once requested` and `A read that needs content the reference tree lacks fails at once`.
+- `shared-reference-tree-interface` (stratum: `interface`): adds `An update makes every commit it brought in readable as a diff`, `Tag commits fetched at depth 1 stay unhydrated`, `The history fetch keeps the clone's partial-clone filter`, `A deepen makes every commit it brought in readable as a diff`, `The writer bounds the history it makes readable`, `A failed history fetch leaves the request's outcome as it was`, `The history walk gives git its lists on standard input`, `The writer's exit log line names what the history fetch did`, `A first acquisition fetches nothing more than before`, `Participating accounts' git refuses every transport beneath the shared root`, `Evaluation rejects an include that reopens a transport beneath the shared root`, `lazygit fetches nothing at start-up beneath the shared root`, `Migration keeps the provisioned .lazygit.yml over an administrator's own` and `A revision's diff is readable once the revision and its parents are hydrated`; every new scenario names its witness. Trust boundary: these hold at the hosts' declared configuration, the writer's handler and Unix permissions; they do not cover an account's own `-c` or environment overrides, programs that read no git configuration, lazygit versions other than the one inspected, or history fetched before the change.
   `Acquisition is delegated to the writer through a socket-activated entry point` keeps its text, and its scenario "A participating account bypasses the wrapper" stays true: a plain `git fetch` opens `.git/FETCH_HEAD` before it connects, so the operating system still refuses it with a permission error (design, decisions of 2026-11-27, item 5).
 
 `world-assumptions` is unchanged: the behavioral requirements use its existing designations (reference repository, reference tree, participating account, writer, acquisition request, commit, history).
 
 ## Impact
 
-- Code: `pkgs/by-name/ghq-shared/ghq-writer-handler.py` and `test_handler.py`; `pkgs/by-name/ghq-shared/ghq-shared-migrate.py`; `pkgs/by-name/ghq-sync/ghq-sync.sh` (usage text); `modules/home/development/repository-acquisition.nix`; `modules/system/shared-reference-tree.nix`, `modules/nixos/shared-reference-tree.nix`, `modules/darwin/shared-reference-tree.nix`; `modules/vm-tests/shared-reference-tree.nix`; `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`.
-- Tests: `checks.*.package-ghq-shared-test-handler` gains seven cases; `vmTests.x86_64-linux.shared-reference-tree-migration` gains two subtests (about 2 to 3 s of its 33 to 35 s), `shared-reference-tree` one assertion and a reworked hydrate subtest.
+- Code: `pkgs/by-name/ghq-shared/ghq-writer-handler.py` and `test_handler.py`; `pkgs/by-name/ghq-shared/ghq-shared-migrate.py`; `pkgs/by-name/ghq-sync/ghq-sync.sh` (usage text); `modules/home/development/repository-acquisition.nix`; `modules/system/shared-reference-tree.nix`, `modules/nixos/shared-reference-tree.nix`, `modules/darwin/shared-reference-tree.nix`; `modules/system/shared-reference-tree.test.nix`; `modules/vm-tests/shared-reference-tree.nix`; `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`; `modules/home/ai/plugins/agent-context-vanixiets/.apm/instructions/30-reference-repositories.instructions.md`.
+- Tests: `checks.*.package-ghq-shared-test-handler` gains eleven cases, four of them, covering seven findings, after verification; `checks.x86_64-linux.eval-shared-reference-tree` is new; `vmTests.x86_64-linux.shared-reference-tree-migration` gains two subtests (about 2 to 3 s of its 33 to 35 s), `shared-reference-tree` one assertion and a reworked hydrate subtest.
 - Hosts: magnetite, pyrite and stibnite, by their usual deploys.

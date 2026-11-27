@@ -68,9 +68,11 @@ in
               in
               builtins.length fields > 1 && builtins.elemAt fields 1 == lazygitPath
             ) config.systemd.tmpfiles.rules;
-            transportOpen = lib.filter (
+            transportOpen = lib.concatMap (
               user:
-              !flakeConfig.flake.lib.sharedReferenceTreeRefusesTransport cfg.rootForms hm.${user}.programs.git
+              map (gap: "${user}: ${gap}") (
+                flakeConfig.flake.lib.sharedReferenceTreeTransportGaps cfg.rootForms hm.${user}.programs.git
+              )
             ) cfg.participants;
           in
           [
@@ -100,7 +102,7 @@ in
             }
             {
               assertion = transportOpen == [ ];
-              message = "shared-reference-tree: every participant's git must refuse every transport in the shared tree, with an include with condition gitdir:<form>/ setting protocol.allow to never for each of ${toString cfg.rootForms}, and must set no protocol.<name>.allow; not so for: ${toString transportOpen}.";
+              message = "shared-reference-tree: every participant's git must refuse every transport in the shared tree, with an include with condition gitdir:<form>/ setting protocol.allow to never for each of ${toString cfg.rootForms}, no protocol.<name>.allow in its settings, and no include that can apply there setting protocol.<name>.allow or a protocol.allow other than never; not so: ${lib.concatStringsSep "; " transportOpen}.";
             }
             {
               assertion = lib.all (

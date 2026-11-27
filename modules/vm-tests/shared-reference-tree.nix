@@ -492,18 +492,23 @@
             listing = ("find /home/cameron/ghq /home/omnigent-cameron/ghq"
                        " \\( -type f -printf '%p %u %m %s\\n' \\) -o -printf '%p %u %m\\n' | sort")
             date = machine.succeed("date +%Y%m%d").strip()
-            # The root holds the provisioned .lazygit.yml, which migration keeps in place.
-            outside_lazygit = f"ls -A {R} | grep -cvxF .lazygit.yml || true"
+            # The root holds only the provisioned .lazygit.yml, which migration
+            # keeps in place, with its owner, mode and content, over cameron's own.
             lazygit_file = f"stat -c '%U %G %a' {R}/.lazygit.yml && cat {R}/.lazygit.yml"
             lazygit_kept = "ghq ghq 640\ngit:\n  autoFetch: false\n"
+            root_state = f"ls -A {R} && {lazygit_file}"
+            root_kept = f".lazygit.yml\n{lazygit_kept}"
+            own_lazygit = "git:\n  autoFetch: true\n"
 
             # cameron, an administrator (wheel): a full clone with a hook, an
-            # uncommitted change, a local-only commit, a setuid file, and an LFS
-            # path holding the content its pointer names, as git-lfs leaves it.
+            # uncommitted change, a local-only commit, a setuid file, an LFS path
+            # holding the content its pointer names, as git-lfs leaves it, and a
+            # .lazygit.yml of its own at the top of its tree.
             machine.succeed(as_user("cameron",
                 "rm ~/ghq && git -c 'filter.lfs.smudge=cat >/dev/null; cat /tmp/lfs-real'"
                 " clone -q git://localhost/fixture/mig ~/ghq/localhost/fixture/mig"
                 " && cmp ~/ghq/localhost/fixture/mig/a.bin /tmp/lfs-real"
+                " && printf 'git:\\n  autoFetch: true\\n' > ~/ghq/.lazygit.yml"
                 " && cd ~/ghq/localhost/fixture/mig"
                 " && printf '#!/bin/sh\\nexit 0\\n' > .git/hooks/post-checkout && chmod +x .git/hooks/post-checkout"
                 " && git -c user.name=c -c user.email=c@c commit -q --allow-empty -m local-only"
@@ -536,7 +541,7 @@
             status, out = machine.execute(f"{migrate} --apply cameron omnigent-cameron 2>&1")
             expect(status != 0 and "omnigent-cameron not an administrator (wheel)" in out and "nothing changed" in out,
                    ("apply moved a non-administrator's tree in place", out))
-            expect(machine.succeed(listing) == before and machine.succeed(outside_lazygit).strip() == "0"
+            expect(machine.succeed(listing) == before and machine.execute(root_state)[1] == root_kept
                    and machine.execute(f"test -e {S}/cameron")[0] != 0,
                    "a refused apply changed a tree, the root or the state directory")
             if status == 0:
@@ -560,7 +565,7 @@
             status, out = machine.execute(f"{migrate} --apply cameron 2>&1")
             expect(status != 0 and "could have written" in out and "nothing changed" in out,
                    ("apply moved a tree carrying an ACL", out))
-            expect(machine.succeed(listing) == with_acl and machine.succeed(outside_lazygit).strip() == "0"
+            expect(machine.succeed(listing) == with_acl and machine.execute(root_state)[1] == root_kept
                    and machine.execute(f"test -e {S}/cameron")[0] != 0,
                    "apply refused for an ACL changed a tree, the root or the state directory")
             if status == 0:
@@ -584,7 +589,7 @@
             status, out = machine.execute(f"{migrate} --apply cameron 2>&1")
             expect(status != 0 and "could have written" in out and "nothing changed" in out,
                    ("apply moved a tree another account could have written", out))
-            expect(machine.succeed(listing) == exposed and machine.succeed(outside_lazygit).strip() == "0"
+            expect(machine.succeed(listing) == exposed and machine.execute(root_state)[1] == root_kept
                    and machine.execute(f"test -e {S}/cameron")[0] != 0,
                    "apply refused for an exposed tree changed a tree, the root or the state directory")
             if status == 0:
@@ -617,7 +622,12 @@
             expect(machine.succeed(f"find {R} -perm -g+w ! -type l | wc -l").strip() == "0", "an entry is group-writable")
             expect(machine.succeed(f"find {R} -perm /o=rwx ! -type l | wc -l").strip() == "0", "an entry grants others access")
             expect(machine.succeed(f"stat -c '%U %a' {S}").strip() == "root 700", "the state directory is not root 700")
-            expect(machine.succeed(lazygit_file) == lazygit_kept, "migration did not keep .lazygit.yml with its owner, mode and content")
+            expect(machine.execute(lazygit_file)[1] == lazygit_kept,
+                   "migration did not put the provisioned .lazygit.yml back with its owner, mode and content")
+            expect(machine.execute(f"stat -c %U /home/cameron/ghq.pre-shared-{date}/.lazygit.yml"
+                                   f" && cat /home/cameron/ghq.pre-shared-{date}/.lazygit.yml")[1] == f"cameron\n{own_lazygit}"
+                   and "cameron: its tree held its own .lazygit.yml" in applied,
+                   ("migration did not keep cameron's own .lazygit.yml beside the tree's other leftovers", applied))
             expect(machine.execute(f"test -x {M}/.git/hooks/post-checkout")[0] == 0, "an administrator's tree was changed beyond ownership and modes")
             migrated_status = machine.succeed(as_writer(f"git --no-optional-locks -C {M} status --porcelain"))
             assert "f" in migrated_status
@@ -687,7 +697,8 @@
             expect(machine.execute("test -d /home/omnigent-cameron/ghq && test ! -L /home/omnigent-cameron/ghq")[0] == 0,
                    "rollback did not put back the set-aside tree")
             assert machine.succeed(f"stat -c '%U %a' {R}").strip() == "ghq 750"
-            expect(machine.succeed(lazygit_file) == lazygit_kept, "rollback did not keep .lazygit.yml with its owner, mode and content")
+            expect(machine.execute(lazygit_file)[1] == lazygit_kept,
+                   "rollback did not leave the provisioned .lazygit.yml with its owner, mode and content")
 
             machine.succeed("umount /home/omnigent-cameron")
             machine.succeed("rm -rf /home/cameron/ghq")

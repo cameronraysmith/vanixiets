@@ -1003,7 +1003,7 @@ if (reply["exit"] != 0 or expected not in reply["stdout"] or history_token(reply
     failures.append(f"an update past the history limit must succeed and say it hydrated nothing: {reply}")
 if len(unreadable(l_clone, brought_in(l_clone, old))) < 3:
     failures.append("an update past the history limit must fetch no blob for its range")
-if any("--merges" in call["argv"] or "--stdin" in call["argv"] for call in recorded) or not 0 < checked < 7:
+if any("--merges" in call["argv"] or "--no-write-fetch-head" in call["argv"] for call in recorded) or not 0 < checked < 7:
     failures.append(f"the walk must stop once the count passes the limit: {checked} ids checked, {recorded}")
 
 # A history fetch that fails leaves the update's exit status and says so: the
@@ -1098,6 +1098,155 @@ if not unreadable(g_clone, [commit_x]):
 ask({"action": "hydrate", "rev": parent_x, "path": g_clone}, file_cfg)
 if unreadable(g_clone, [commit_x]):
     failures.append("hydrating a commit and its parent must make its diff readable")
+
+def clone_of(bare, name):
+    """A depth-1 blobless clone of bare under the root, where target github.com/o/<name> names it."""
+    clone_dir = os.path.join(root, "github.com", "o", name)
+    git("clone", "-q", "--depth", "1", "--filter=blob:none", "--no-tags", f"file://{bare}", clone_dir)
+    return clone_dir
+
+
+def recorded_calls(path):
+    with open(path) as handle:
+        return [json.loads(line) for line in handle]
+
+
+# A deepen also moves the remote-tracking branch to the commits upstream gained
+# since the last update: those, and the deepened ones but the new deepest, are
+# readable as diffs. The clone also holds a shallow boundary for each of 200
+# root commits fetched at depth 1, which the walk excludes: no git the handler
+# starts gets one of them as an argument, and the walk's git log reads them on
+# standard input, so their number is bounded by no argument list.
+t_tree, t_bare = upstream("history-deepen-tip")
+git("config", "uploadpack.allowAnySHA1InWant", "true", cwd=t_bare)
+marks = os.path.join(work, "history-deepen-tip-marks")
+plain_env = dict(os.environ, GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL="/dev/null")
+subprocess.run(["git", "fast-import", "--quiet", f"--export-marks={marks}"], cwd=t_bare, env=plain_env, check=True,
+               input="".join(f"reset refs/roots\ncommit refs/roots\nmark :{i + 1}\ncommitter t <t@t> {i} +0000\n"
+                             "data 0\n\n" for i in range(200)).encode())
+with open(marks) as handle:
+    root_ids = [line.split()[1] for line in handle]
+t_clone = clone_of(t_bare, "history-deepen-tip")
+subprocess.run(["git", "-c", "protocol.file.allow=always", "fetch", "-q", "--depth", "1", "--stdin", "origin"],
+               cwd=t_clone, env=plain_env, check=True, input="".join(f"{oid}\n" for oid in root_ids).encode())
+for i in range(3):
+    change(t_tree, f"tip{i}", f=f"tip{i}\n")
+git("push", "-q", "up", "master", cwd=t_tree)
+with open(os.path.join(t_clone, ".git", "shallow")) as handle:
+    held_boundaries = set(handle.read().split())
+deepen_calls = os.path.join(work, "history-deepen-tip-calls.jsonl")
+reply = finish(*start({"action": "deepen", "depth": 2, "path": t_clone}, file_cfg,
+                      recording.replace(repr(calls), repr(deepen_calls))))
+tip = offline(t_clone, "rev-list", "HEAD..origin/master").stdout.split()
+deepened = offline(t_clone, "rev-list", "HEAD").stdout.split()
+if (not set(root_ids) <= held_boundaries or reply["exit"] != 0 or len(tip) != 3 or len(deepened) != 3
+        or not (history_token(reply) or "").startswith("hydrated:")):
+    failures.append(f"deepen-tip fixture: the deepen must move origin/master by 3 and deepen by 2 past 200 boundaries: "
+                    f"{tip} {deepened} {reply}")
+if unreadable(t_clone, tip + deepened[:2]):
+    failures.append(f"a deepen must make the commits it moved origin/master to readable: "
+                    f"unreadable {unreadable(t_clone, tip + deepened[:2])}")
+roots_set = set(root_ids)
+deepen_recorded = recorded_calls(deepen_calls)
+in_argv = [call["argv"][:6] for call in deepen_recorded if any(arg.lstrip("^") in roots_set for arg in call["argv"])]
+on_stdin = [call for call in deepen_recorded if "log" in call["argv"] and "--stdin" in call["argv"]
+            and roots_set <= {line.lstrip("^") for line in call["stdin"].split()}]
+if in_argv or not on_stdin:
+    failures.append(f"the walk must give git the clone's boundaries on standard input and never as arguments: "
+                    f"{len(in_argv)} calls with a boundary in argv {in_argv[:2]}, {len(on_stdin)} git log --stdin calls")
+
+# A get with tags of a shallow clone fetches its branches first: the commits
+# origin/master gains are readable, while a tag commit fetched at depth 1 is
+# left for ghq-sync --hydrate.
+u_tree, u_bare = upstream("history-tags")
+u_clone = clone_of(u_bare, "history-tags")
+o_clone = clone_of(u_bare, "history-tag-timeout")
+for i in range(2):
+    change(u_tree, f"gain{i}", f=f"gain{i}\n")
+git("checkout", "-q", "-b", "far", "HEAD~3", cwd=u_tree)
+change(u_tree, "far", f="far\n")
+git("tag", "t-far", cwd=u_tree)
+git("checkout", "-q", "master", cwd=u_tree)
+git("push", "-q", "up", "master", "t-far", cwd=u_tree)
+reply = ask({"action": "get", "target": "github.com/o/history-tags", "tags": True}, file_cfg)
+gained = offline(u_clone, "rev-list", "HEAD..origin/master").stdout.split()
+if (reply["exit"] != 0 or len(gained) != 2 or unreadable(u_clone, gained)
+        or not (history_token(reply) or "").startswith("hydrated:")):
+    failures.append(f"a get with tags must make the commits origin/master gained readable: {gained} "
+                    f"unreadable {unreadable(u_clone, gained)}, {reply}")
+if offline(u_clone, "rev-parse", "-q", "--verify", "t-far^{commit}").returncode or not unreadable(u_clone, ["t-far"]):
+    failures.append("a tag commit fetched at depth 1 must arrive and stay unhydrated")
+
+# A command after the history fetch that outlasts the command timeout, here the
+# fetch of a tag at depth 1, whose upload-pack hangs, leaves the history fetch's
+# status line in the reply and its token on the exit log line. The limit of 2 s
+# leaves every other command of the request, each through a Python upload-pack
+# wrapper, a margin to finish within it.
+stalled_ids = os.path.join(work, "stalled-ids")
+put(stalled_ids, git("rev-parse", "t-far", cwd=u_tree) + "\n")
+stalling = os.path.join(work, "stalling-upload-pack")
+put(stalling, f"#!{sys.executable}\n" + """import os, subprocess, sys, time
+stalled = open(STALLED).read().split()
+child = subprocess.Popen(["git", "upload-pack", *sys.argv[1:]], stdin=subprocess.PIPE)
+seen = b""
+while chunk := os.read(0, 65536):
+    seen += chunk
+    if any(oid.encode() in seen for oid in stalled):
+        time.sleep(60)
+    child.stdin.write(chunk)
+    child.stdin.flush()
+child.stdin.close()
+sys.exit(child.wait())
+""".replace("STALLED", repr(stalled_ids)))
+os.chmod(stalling, 0o755)
+git("config", "remote.origin.uploadpack", stalling, cwd=o_clone)
+reply = finish(*start({"action": "get", "target": "github.com/o/history-tag-timeout", "update": True, "tags": True,
+                       "lazy": True}, config(protocols=("file",), command_timeout=2)), within=60)
+if (reply["exit"] != 124 or not (history_token(reply) or "").startswith("hydrated:")
+        or f"hydrated history: {os.path.realpath(o_clone)} (" not in reply["stdout"]
+        or " reason: timed out after 2 s running git fetch" not in reply["log"]):
+    failures.append(f"a timeout after the history fetch must keep its status line and token: {reply}")
+
+# The history fetch passes the filter the clone records, and a promisor clone
+# that records none gets no history fetch, which would record one. An error
+# starting git in the history walk is the history fetch's failure, not the
+# request's. The three clones share one upstream.
+k_tree, k_bare = upstream("history-filter")
+k_clone = clone_of(k_bare, "history-limit-filter")
+v_clone = clone_of(k_bare, "history-no-filter")
+w_clone = clone_of(k_bare, "history-oserror")
+git("config", "remote.origin.partialclonefilter", "blob:limit=1", cwd=k_clone)
+git("config", "--unset-all", "remote.origin.partialclonefilter", cwd=v_clone)
+old = git("rev-parse", "HEAD", cwd=k_clone)
+for i in range(2):
+    change(k_tree, f"kept{i}", f=f"kept{i}\n")
+git("push", "-q", "up", "master", cwd=k_tree)
+reply = ask({"action": "get", "target": "github.com/o/history-limit-filter", "update": True}, file_cfg)
+if (reply["exit"] != 0 or unreadable(k_clone, brought_in(k_clone, old))
+        or git("config", "--get", "remote.origin.partialclonefilter", cwd=k_clone) != "blob:limit=1"):
+    failures.append(f"the history fetch must keep the clone's recorded filter: "
+                    f"{offline(k_clone, 'config', '--get-all', 'remote.origin.partialclonefilter').stdout!r} {reply}")
+no_filter_calls = os.path.join(work, "history-no-filter-calls.jsonl")
+reply = finish(*start({"action": "get", "target": "github.com/o/history-no-filter", "update": True}, file_cfg,
+                      recording.replace(repr(calls), repr(no_filter_calls))))
+history_calls = [call["argv"] for call in recorded_calls(no_filter_calls)
+                 if "--no-write-fetch-head" in call["argv"] or "log" in call["argv"]]
+expected = f"history not hydrated: {os.path.realpath(v_clone)} (the clone records no partial-clone filter;"
+recorded_filter = offline(v_clone, "config", "--get-all", "remote.origin.partialclonefilter")
+if (reply["exit"] != 0 or expected not in reply["stdout"] or history_token(reply) != "not-hydrated"
+        or recorded_filter.returncode != 1 or history_calls):
+    failures.append(f"a promisor clone recording no filter must get no history fetch and keep its configuration: "
+                    f"{recorded_filter.stdout!r} {history_calls} {reply}")
+failing_log = ("real_run = handler.run\n"
+               "def run(argv, env, *rest, **options):\n"
+               "    if 'log' in argv:\n"
+               "        raise OSError(7, 'Argument list too long', 'git')\n"
+               "    return real_run(argv, env, *rest, **options)\n"
+               "handler.run = run\n")
+reply = finish(*start({"action": "get", "target": "github.com/o/history-oserror", "update": True}, file_cfg, failing_log))
+if (reply["exit"] != 0 or history_token(reply) != "failed" or " reason: " in reply["log"]
+        or "history hydrate failed:" not in reply["stdout"]):
+    failures.append(f"an error starting git in the history walk must leave the update's exit status: {reply}")
 
 if failures:
     sys.exit("\n".join(failures))
