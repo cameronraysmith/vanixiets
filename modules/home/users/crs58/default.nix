@@ -180,12 +180,6 @@ let
           # ~/.hindsight/config by the template below. omp no longer reads it:
           # its memory backend is mnemopi, which is local and unauthenticated.
           hindsight-api-token = { };
-          # Per-host scoped cognee X-Api-Key for the always-on cognee-memory
-          # plugin and the cognee-cli wrapper. Declared here; its ciphertext is
-          # added to secrets.yaml after the one-time owner-authenticated mint
-          # against the live magnetite server (a user-run bootstrap gate), so
-          # home-manager activation requires the minted value to be present.
-          cognee-api-key = { };
           # Moshi pairing token, copied from the app's Settings -> Hooks screen
           # and consumed once per host by the moshi-hook launcher in
           # modules/home/ai/moshi. Seeded blank in secrets.yaml because
