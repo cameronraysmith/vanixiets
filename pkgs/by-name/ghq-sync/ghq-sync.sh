@@ -36,7 +36,13 @@ Targets:
 
 Options:
   --deepen N       Deepen each resolved repo by N commits (git fetch --deepen=N),
-                   keeping the blobless partial filter.
+                   keeping the blobless partial filter. git marks the commits N
+                   below each shallow boundary as new boundaries even when the
+                   clone holds their history, so a sized N can hide history the
+                   clone held; --deepen 1000000 reaches every root and hides
+                   none. It is the repair an update names when a shallow
+                   boundary blocks its fast-forward ("shallow boundary blocks
+                   the update"); run -u after it.
   --full           Promote each resolved lazy clone to a full clone in place. A
                    target that is not yet cloned is cloned fully (plain ghq get).
   --hydrate REV    Make every blob and tree of REV's tree present in each
