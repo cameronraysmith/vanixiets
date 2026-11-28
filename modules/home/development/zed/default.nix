@@ -51,9 +51,9 @@
           # ]
 
           userSettings = {
-            # Disable AI features to prevent .git/info/exclude pollution from checkpoints
-            # See: zed 38391
-            disable_ai = true;
+            # Written out because the settings merge never deletes a key and any `true` layer wins.
+            disable_ai = false;
+            edit_predictions.provider = "none";
 
             vim_mode = true;
             base_keymap = "VSCode";
@@ -91,6 +91,10 @@
             agent = {
               dock = "right";
               play_sound_when_agent_done = "always";
+            };
+            # Setting CLAUDE_CODE_EXECUTABLE would put MCP servers' `env` and `headers` on the adapter's command line.
+            agent_servers = lib.mkIf config.programs.claude-code.enable {
+              claude-acp.type = "registry";
             };
             outline_panel = {
               dock = "right";

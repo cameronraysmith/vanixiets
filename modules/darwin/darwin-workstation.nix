@@ -44,6 +44,7 @@ in
         zt-dns
         fleet-services-trust
         zed-delta
+        zeditor
       ]);
 
       config = {

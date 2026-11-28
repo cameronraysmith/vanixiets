@@ -11,7 +11,7 @@ Each later sub-project (groups 10 to 14 in tasks.md) opens by recording its deci
 2. S1 (group 2) is delivered by its own owner; this plan only records its merge.
 3. S2 (groups 3 and 4): the spike is answered and D6 is DECIDED; pyrite's Bitwarden agent, polkit touch unlock and per-host pins were deployed from branch `pyrite-bitwarden-yubikey`; the remaining commits are the backup YubiKey enrollment, stibnite's per-host pins, `refactor(ssh): one ssh-identity module for both laptops`, and its checks; group 4 adds no declaration, since `bitwarden-cli` is already in the `security` home aggregate and D5 (revised 2026-11-16) rejects `rbw`, so it is the evaluation of that declaration and the script check on each laptop.
 4. S3 (groups 5 and 6): `feat(niri): generate chord binds from one chord table`, then the half-window chords after the operator chooses O1 or O2, then the keyboard modifier and Caps Lock settings after Q4 and Q5 are decided.
-5. Shared-layer fixes (group 7), one commit each: CA trust on pyrite, Zed on Linux, fonts in Nix, darwin-only command gating, Delta as `zed-delta` on every workstation.
+5. Shared-layer fixes (group 7), one commit each: CA trust on pyrite, Zed on Linux, fonts in Nix, darwin-only command gating, Delta as `zed-delta` on every workstation, Zed's FHS package on Linux with `zeditor` on every workstation, its AI settings and Claude Agent.
 6. Declarative Zen (group 8), then desktop behaviour (group 9), then the sub-projects in group order.
 
 ## Steps per slice

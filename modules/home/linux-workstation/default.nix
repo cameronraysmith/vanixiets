@@ -12,8 +12,10 @@
     {
       # The development aggregate leaves the package null for headless homes
       # and for the Macs, which take Zed from the zed Homebrew cask in the
-      # darwin base cask list.
-      programs.zed-editor.package = pkgs.zed-editor;
+      # darwin base cask list. The FHS variant runs the language servers and
+      # agent binaries Zed downloads. Its command stays `zeditor`: on a ZFS host
+      # `zed` is the ZFS event daemon on the system PATH.
+      programs.zed-editor.package = pkgs.zed-editor.fhs;
       programs.calibre.enable = true;
       # Zathura, themed by catppuccin.zathura, is the LaTeX preview and
       # presentation viewer; Papers stays the default for PDFs.

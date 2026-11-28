@@ -148,7 +148,10 @@ Observed divergences that the slices close:
 ### D9: shared-layer fixes
 
 - **Choice**: pyrite trusts the caddy `.zt` root CA and the local k8s development CA that stibnite already trusts (`modules/darwin/zt-services-trust.nix`, `modules/machines/darwin/stibnite/default.nix:214-233`).
-  Linux gets a Zed binary while the base cask list keeps supplying every Mac's.
+  Linux gets a Zed binary, nixpkgs' FHS variant (`zed-editor.fhs`) so the language servers and agent binaries Zed downloads run on NixOS, while the base cask list keeps supplying every Mac's.
+  Zed's command is `zeditor` on every workstation: nixpkgs' package provides it on Linux, and the darwin aspect `zeditor` (`modules/darwin/zeditor.nix`), which `darwin-workstation` imports, installs a `zeditor` command that execs the bundle's `Contents/MacOS/cli`; Linux cannot use the name `zed`, because ZFS's event daemon `zed` is on pyrite's system `PATH`, and the cask's own `zed` link on the Macs stays as Homebrew installs it.
+  Zed's AI features are on with edit predictions off (`disable_ai = false` written out, `edit_predictions.provider = "none"`), and every home that installs Claude Code declares Zed's Claude Agent as the bare registry entry (`agent_servers.claude-acp`, type `registry`), so the adapter runs its bundled Claude.
+  The entry sets no `CLAUDE_CODE_EXECUTABLE`: with it set, the adapter passes a session's MCP servers, their `env` and `headers` included, on a command line other accounts of the machine can read.
   Fonts are declared in Nix on both machines instead of the fifteen Homebrew cask fonts.
   `dnsreset` is installed only on Darwin, and `zerotier-join`'s launchctl hint is printed only on Darwin.
 - **Rationale**: each is a gap or a wrong-platform artifact in the shared layer that the inventory located with file and line.

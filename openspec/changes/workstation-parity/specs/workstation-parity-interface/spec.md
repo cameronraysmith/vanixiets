@@ -124,13 +124,33 @@ The fifteen fonts currently installed on stibnite as Homebrew cask fonts SHALL b
 
 ### Requirement: Linux has a Zed binary and darwin-only commands stay on Darwin
 
-On Linux the operator's home SHALL set `programs.zed-editor.package` to a Zed package, while on Darwin it MUST remain null so the cask supplies the binary.
+On Linux the operator's home SHALL set `programs.zed-editor.package` to nixpkgs' FHS Zed package (`zed-editor.fhs`), while on Darwin it MUST remain null so the cask supplies the binary.
 `dnsreset` MUST be installed only on Darwin, and `zerotier-join` MUST print its launchctl hint only on Darwin.
 
 #### Scenario: Evaluate the platform-specific packages
 
 - **WHEN** the operator's home on pyrite and on stibnite is evaluated
-- **THEN** pyrite has a Zed package and no `dnsreset`, stibnite has a null Zed package and `dnsreset`, and pyrite's `zerotier-join` contains no `launchctl`
+- **THEN** pyrite has Zed's FHS package and no `dnsreset`, stibnite has a null Zed package and `dnsreset`, and pyrite's `zerotier-join` contains no `launchctl`
+
+### Requirement: Zed's command is zeditor on every workstation
+
+pyrite's operator home SHALL provide `zeditor` from nixpkgs' Zed package, and every Mac importing `darwin-workstation` SHALL import the `zeditor` darwin aspect, whose `zeditor` command execs `/Applications/Zed.app/Contents/MacOS/cli`.
+A workstation declaration MUST NOT add a command named `zed`.
+
+#### Scenario: Observe zeditor after activation
+
+- **WHEN** pyrite, stibnite, rosegold, argentum or blackphos has activated the configuration
+- **THEN** `zeditor --version` prints Zed's version
+
+### Requirement: Zed's AI is on with edit predictions off and the Claude Agent declared where Claude Code is installed
+
+Every home importing the shared Zed settings SHALL set `disable_ai` to false and `edit_predictions.provider` to `"none"`.
+A home that installs Claude Code SHALL declare `agent_servers.claude-acp` as `{ type = "registry"; }` with no `env`, and a home without Claude Code MUST NOT declare it.
+
+#### Scenario: Evaluate Zed's AI settings
+
+- **WHEN** the Zed `userSettings` of the operator's homes on pyrite and stibnite and of a `development` home without `ai` are evaluated
+- **THEN** each has `disable_ai = false` and `edit_predictions.provider = "none"`, the operator's homes have `agent_servers.claude-acp` equal to `{ type = "registry"; }`, and the home without `ai` has no `agent_servers`
 
 ### Requirement: Delta is declared under the command zed-delta on every workstation
 
