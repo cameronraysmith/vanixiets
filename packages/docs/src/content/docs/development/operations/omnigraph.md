@@ -266,10 +266,11 @@ Stop the server and remove `$S` when done.
 
 Setting `flake.lib.omnigraphClusterRoots.stores.magnetite = "r2"` serves `s3://sciexp/omnigraph/clusters/cookbooks-f17` as the bucket held it when magnetite left it.
 Its markers are still in the bucket, so the bootstrap adopts the root rather than recreating it.
+`cookbooks-f17` is the only root in the bucket, so it is the only way back to R2; the roots magnetite served before it, `dev-graph`, `dev-graph-v9` and `dev-graph-v10`, and their markers have been deleted.
 
 What carries over: nothing written while serving locally.
 Every load, apply and seed of the local root stays on the dataset, and the bucket's root has none of them.
-The R2 settings, the `omnigraph-r2` generator and the retired and rollback roots were kept unchanged under `"local"`, so the R2 configuration is whole.
+The R2 settings and the `omnigraph-r2` generator were kept unchanged under `"local"`, so the R2 configuration is whole.
 On R2, the dataset series and `vanixiets_omnigraph_lock_recoveries_total` are no longer written, and the per-graph series depend on whether the bucket's root was applied with the `monitor` grants.
 
 The units run as `omnigraph` on both stores, so switching changes no unit's user and no state directory, and the dataset may stay mounted at `/var/lib/omnigraph`, holding the local root for a later return; `vmTests.x86_64-linux.omnigraph-state-directory-transitions`, with RustFS standing in for R2, shows every unit starting and serving from the bucket with the dataset mounted.
@@ -291,6 +292,9 @@ sudo zfs set canmount=noauto zroot/root/omnigraph
 sudo zfs unmount zroot/root/omnigraph
 sudo rmdir /var/lib/omnigraph
 ```
+
+Only a generation that serves `cookbooks-f17` has a root to roll back to.
+An older generation serves `dev-graph-v10` or an earlier root from the bucket, which no longer holds it or its marker; its bootstrap finds neither and creates that root anew, empty.
 
 ## What watches the server
 

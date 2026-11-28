@@ -1,5 +1,5 @@
-# OmniGraph cluster roots in the `sciexp` R2 bucket: how a root is named, which
-# roots are retired, and which retired-looking root is kept as the way back.
+# OmniGraph cluster roots in the `sciexp` R2 bucket: how a root is named, how
+# a root is retired, and how a root is kept as the way back.
 #
 # A root's name ends in the storage format its graphs were created at
 # (`omnigraph version --json`, `internal_schema.writes` of the binary that
@@ -18,10 +18,12 @@
 #   omnigraph/clusters/_omnigraph-markers/<root>.  its bootstrap markers
 #
 # and they take effect once that terraform configuration is applied. The
-# separators keep one root's prefixes from matching another's (`dev-graph/`
-# never matches `dev-graph-v9/`). The markers may go only once the root is
-# retired: the bootstrap refuses to start a configured root that has a marker
-# but no cluster state, so a configured root's marker must outlive its data.
+# separators keep one root's prefixes from matching another's
+# (`cookbooks-f17/` never matches `cookbooks-f17-r2/`). A root whose objects
+# are already gone from the bucket needs no entry. The markers may go only
+# once the root is retired: the bootstrap refuses to start a configured root
+# that has a marker but no cluster state, so a configured root's marker must
+# outlive its data.
 #
 # `rollback` names roots kept intact as the way back after a host moved to a
 # new root; a root leaves it for `retired` in a later change, once the new
@@ -30,8 +32,8 @@
 # `conflicts` lists every way the retired list would delete what a configured
 # or rollback root still needs. The omnigraph module asserts it is empty for
 # the root each host serves, and checks.x86_64-linux.omnigraph-retired-roots
-# asserts it for the rollback roots and shows that each kind of conflict is
-# reported.
+# asserts it for the rollback roots and magnetite's root and shows that each
+# kind of conflict is reported.
 #
 # A root of the same name may also live on the serving host's disk, under
 # `localDirectory`: `uriIn` maps a host's root store, "local" or "r2", and a
@@ -64,15 +66,9 @@ in
     inherit bucket clustersPrefix markersPrefix;
 
     # Retired roots, deleted from `sciexp` by lifecycle rules.
-    retired = [
-      "dev-graph"
-      "dev-graph-v9"
-    ];
+    retired = [ ];
 
-    # magnetite served dev-graph-v10, created by omnigraph 0.15 at storage
-    # format 16, before it moved to cookbooks-f17; it stays intact until it
-    # is moved to `retired`.
-    rollback = [ "dev-graph-v10" ];
+    rollback = [ ];
 
     # The name of a root whose graphs are created at `createdAtFormat`.
     name =
@@ -129,20 +125,24 @@ in
       else
         null;
 
-    # The lifecycle rules that delete one retired root, as
+    # The lifecycle rules that delete the roots `retiredRoots`, as
     # cloudflare_r2_bucket_lifecycle rules.
-    lifecycleRules = lib.concatMap (
-      root:
-      map (p: {
-        id = "omnigraph retired root ${root} ${p.kind}";
-        enabled = true;
-        conditions.prefix = p.prefix;
-        delete_objects_transition.condition = {
-          type = "Age";
-          max_age = 86400; # 1 day
-        };
-      }) (prefixesOf root)
-    ) retired;
+    lifecycleRulesOf =
+      retiredRoots:
+      lib.concatMap (
+        root:
+        map (p: {
+          id = "omnigraph retired root ${root} ${p.kind}";
+          enabled = true;
+          conditions.prefix = p.prefix;
+          delete_objects_transition.condition = {
+            type = "Age";
+            max_age = 86400; # 1 day
+          };
+        }) (prefixesOf root)
+      ) retiredRoots;
+
+    lifecycleRules = lifecycleRulesOf retired;
 
     # Every way `retiredRoots` would delete objects of `keptRoots`, as
     # messages; empty when there is none. A kept root is named retired, or a

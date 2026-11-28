@@ -11,8 +11,8 @@
 # outside the root, so it survives loss of the root: strip trailing slashes
 # from the storage URI, split it into parent and basename, and the marker is
 # `<parent>/_omnigraph-markers/<basename>.initialized`
-# (s3://sciexp/omnigraph/clusters/dev-graph-v10 ->
-# s3://sciexp/omnigraph/clusters/_omnigraph-markers/dev-graph-v10.initialized).
+# (s3://sciexp/omnigraph/clusters/cookbooks-f17 ->
+# s3://sciexp/omnigraph/clusters/_omnigraph-markers/cookbooks-f17.initialized).
 # A sibling `<root>.initialized` would share the root's string prefix, so a
 # prefix delete of the root would take the marker with it; a separate
 # directory does not. The cluster state comes from

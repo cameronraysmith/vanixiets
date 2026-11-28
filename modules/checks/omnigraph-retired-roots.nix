@@ -11,9 +11,9 @@
 # rollback roots and magnetite's root to the same rule, and shows on fixed
 # lists that each way of reaching a kept root is reported: the kept root
 # itself listed as retired, and a retired root whose data or marker prefix
-# shares objects with the kept root's; while the separators keep `dev-graph`
-# from reaching `dev-graph-v10`. It also pins the two prefixes each retired
-# root's rules delete.
+# shares objects with the kept root's; while the separators keep
+# `cookbooks-f17` from reaching `cookbooks-f17-r2`. It also pins the two
+# prefixes a retired root's rules delete.
 #
 # It pins uriIn and rootOf for both root stores, and reads magnetite on
 # both: as committed, on the store flake.lib.omnigraphClusterRoots.stores
@@ -114,10 +114,6 @@
                 retiredRoots = [ "cookbooks-f17" ];
                 keptRoots = [ "cookbooks-f17" ];
               };
-              rollbackRootRetired = reports {
-                retiredRoots = roots.retired ++ roots.rollback;
-                keptRoots = roots.rollback;
-              };
               dataPrefixShared = reports {
                 retiredRoots = [ "cookbooks" ];
                 keptRoots = [ "cookbooks/f17" ];
@@ -127,11 +123,11 @@
                 keptRoots = [ "cookbooks.f17" ];
               };
               separatedNames = reports {
-                retiredRoots = [ "dev-graph" ];
-                keptRoots = [ "dev-graph-v10" ];
+                retiredRoots = [ "cookbooks-f17" ];
+                keptRoots = [ "cookbooks-f17-r2" ];
               };
             };
-            prefixes = map (rule: rule.conditions.prefix) roots.lifecycleRules;
+            prefixes = map (rule: rule.conditions.prefix) (roots.lifecycleRulesOf [ "cookbooks-f17" ]);
             locations = {
               local = roots.uriIn "local" "cookbooks-f17";
               r2 = roots.uriIn "r2" "cookbooks-f17";
@@ -154,15 +150,14 @@
             inUse = [ ];
             reported = {
               keptRootRetired = true;
-              rollbackRootRetired = true;
               dataPrefixShared = true;
               markerPrefixShared = true;
               separatedNames = false;
             };
-            prefixes = lib.concatMap (root: [
-              "omnigraph/clusters/${root}/"
-              "omnigraph/clusters/_omnigraph-markers/${root}."
-            ]) roots.retired;
+            prefixes = [
+              "omnigraph/clusters/cookbooks-f17/"
+              "omnigraph/clusters/_omnigraph-markers/cookbooks-f17."
+            ];
             locations = {
               local = "/var/lib/omnigraph/clusters/cookbooks-f17";
               r2 = "s3://sciexp/omnigraph/clusters/cookbooks-f17";

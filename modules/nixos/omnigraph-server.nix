@@ -167,11 +167,8 @@ in
           # bootstrap unit. Its name records the storage format its graphs are
           # created at (flake.lib.omnigraphClusterRoots.name), so it follows
           # createdAtFormat; a fresh copy at the same format to replay the seeds
-          # takes a revision (`revision = 2;` names cookbooks-f17-r2). The
-          # previous root, dev-graph-v10, created by 0.15 at format 16 with one
-          # empty graph `dev`, stays intact as the way back
-          # (flake.lib.omnigraphClusterRoots.rollback). The root lives where
-          # vanixiets.omnigraphRootStore says, under the same name.
+          # takes a revision (`revision = 2;` names cookbooks-f17-r2). The root
+          # lives where vanixiets.omnigraphRootStore says, under the same name.
           storageUri = omnigraphRoots.uriIn omnigraphRootStore (
             omnigraphRoots.name {
               family = "cookbooks";
