@@ -39,7 +39,7 @@ Not the target for new work; `superpowers-bridge-wrspm` supersedes it.
 
 It nevertheless stays delivered, and must.
 A change records its schema in its own `.openspec.yaml` at creation and is never repinned, so withdrawing this bundle would strand every change already pinned to `superpowers-bridge` with an unresolvable schema and no diagnostic beyond the `schema=` attribute of `openspec instructions` output.
-Four in-flight changes are so pinned as of 2026-08-25: `agentic-planning-development-management-skills`, `apm-skills-marketplace`, `declarative-cognee-endpoint`, and `validate-harborize-instrument`.
+One in-flight change is so pinned as of 2026-11-27: `validate-harborize-instrument`.
 
 Fix it only where an in-flight change pinned to it is actually blocked; carry anything forward-looking into the WRSPM fork instead.
 
