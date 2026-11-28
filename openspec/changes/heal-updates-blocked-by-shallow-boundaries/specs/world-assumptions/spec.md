@@ -48,5 +48,5 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 #### Scenario: A copy deeper than the named depth
 
-- **WHEN** a reference repository's history from a boundary to a root is found to run 1,000,000 commits or more, as an update whose reply still names a shallow boundary after the named deepen shows
+- **WHEN** a reference repository's history from a boundary to a root is found to run 1,000,000 commits or more, as an update whose reply still names a shallow boundary after the named deepen printed `deepened: <path>` shows
 - **THEN** this assumption is void; the repair the `shared-reference-tree-interface` requirement `The writer's reply names a shallow boundary between a failed update's branch and its upstream` names may leave a boundary on held history, that copy is repaired with `ghq-sync --full`, as `ghq-sync`'s usage text tells the reader, and the named depth is re-examined

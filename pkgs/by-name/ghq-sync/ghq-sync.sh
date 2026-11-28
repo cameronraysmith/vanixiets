@@ -47,17 +47,20 @@ Options:
                    between the local branch and upstream's ("shallow boundary
                    between the local branch and upstream's"); run -u after it.
                    If -u then fails without that line, upstream rewrote its
-                   branch and the boundary was not the cause; if the line
-                   still appears, the history runs deeper than the deepen
-                   reaches, and --full repairs it. The deepen fetches the
-                   commits and trees of the whole history below those
-                   boundaries, which on a large copy can take long, within the
-                   writer's limit of one hour per command. A deepen that limit
-                   stops normally leaves the clone's history as it was and can
-                   be rerun, starting over; if git had to be killed it can
-                   leave .git/shallow.lock, after which each deepen of that
-                   copy prints only "failed: <path>" and a tag fetch at depth
-                   1 fails with git's "Unable to create
+                   branch and the boundary was not the cause. If the line
+                   still appears after a deepen that printed "deepened:
+                   <path>", the history runs deeper than the deepen reaches,
+                   and --full repairs it; after one that printed "failed:
+                   <path>", the deepen did not run to its end (see the lock
+                   below), and the line says nothing of the depth. The deepen
+                   fetches the commits and trees of the whole history below
+                   those boundaries, which on a large copy can take long,
+                   within the writer's limit of one hour per command. A deepen
+                   that limit stops normally leaves the clone's history as it
+                   was and can be rerun, starting over; if git had to be
+                   killed it can leave .git/shallow.lock, after which each
+                   deepen of that copy prints only "failed: <path>" and a tag
+                   fetch at depth 1 fails with git's "Unable to create
                    '<path>/.git/shallow.lock': File exists.", until the tree's
                    administrator removes the file once no git runs there.
                    --full is the other repair that hides nothing, at the cost

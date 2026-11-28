@@ -38,7 +38,7 @@ Boundaries: every file this change edits is first-party (the handler, its tests,
 
 - **Choice**: the reply keeps the update's output and exit status, git's `fatal:` line among them, and ends its standard error with two lines:
   `shallow boundary between the local branch and upstream's: <path> (the copy holds <commit> without its history, and it lies between the local branch and upstream's <remote>/<branch>)` and
-  `to repair it: ghq-sync --deepen 1000000 <path> then ghq-sync -u <path> (that deepen hides none of the history the copy holds, where a smaller one can; if the update still fails without this line, upstream rewrote its branch and this boundary was not the cause; ghq-sync --help, under --deepen, says what the deepen costs and names the other repair)`.
+  `to repair it: ghq-sync --deepen 1000000 <path> then ghq-sync -u <path> (that deepen hides none of the history the copy holds, where a smaller one can; if the update still fails with git's fast-forward refusal and without this line, upstream rewrote its branch and this boundary was not the cause; ghq-sync --help, under --deepen, says what the deepen costs and names the other repair)`.
   The exit log line adds ` boundary=blocked` after the history token.
 - **Rationale**: the caller sees what the clone shows beside git's refusal, a command to run, and how to read the update after it; the cost, the time limit and the other repair are in `ghq-sync --help`, which the line points to, so the reply stays two lines; the log can be counted across hosts. The exit status stays git's, so callers that act on it act as before.
 

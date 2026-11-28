@@ -103,9 +103,9 @@ def report_lines(clone_dir, commit):
     return (f"shallow boundary between the local branch and upstream's: {path} (the copy holds {commit} without its"
             f" history, and it lies between the local branch and upstream's origin/master)\n"
             f"to repair it: ghq-sync --deepen 1000000 {path} then ghq-sync -u {path} (that deepen hides none of the"
-            f" history the copy holds, where a smaller one can; if the update still fails without this line, upstream"
-            f" rewrote its branch and this boundary was not the cause; ghq-sync --help, under --deepen, says what the"
-            f" deepen costs and names the other repair)\n")
+            f" history the copy holds, where a smaller one can; if the update still fails with git's fast-forward"
+            f" refusal and without this line, upstream rewrote its branch and this boundary was not the cause;"
+            f" ghq-sync --help, under --deepen, says what the deepen costs and names the other repair)\n")
 
 
 def blocked(name, clone_dir, bare, commit):

@@ -50,8 +50,8 @@ after the history fetch.
 An update that fails while a commit the clone holds without its history lies
 between the local branch and its upstream keeps git's refusal and exit status;
 two lines after it name that commit and the deepen that repairs it, and say
-that an update still failing after it without that line means upstream
-rewrote its branch. Finding the commit reads the clone and writes nothing; any
+that an update still refused a fast-forward after it without that line
+means upstream rewrote its branch. Finding the commit reads the clone and writes nothing; any
 failure while finding it, a time-out included, reports nothing. The exit log
 line adds boundary=blocked.
 
@@ -922,9 +922,10 @@ def run_get(request, argv, config, env, session):
             f"shallow boundary between the local branch and upstream's: {path} (the copy holds {commit} without"
             f" its history, and it lies between the local branch and upstream's {branch})\n"
             f"to repair it: ghq-sync --deepen {FULL_DEEPEN} {path} then ghq-sync -u {path} (that deepen hides none"
-            " of the history the copy holds, where a smaller one can; if the update still fails without this line,"
-            " upstream rewrote its branch and this boundary was not the cause; ghq-sync --help, under --deepen, says"
-            " what the deepen costs and names the other repair)\n").encode()))
+            " of the history the copy holds, where a smaller one can; if the update still fails with git's"
+            " fast-forward refusal and without this line, upstream rewrote its branch and this boundary was not the"
+            " cause; ghq-sync --help, under --deepen, says what the deepen costs and names the other repair)\n"
+            ).encode()))
     shallow = None
     if request.get("tags") is True:
         tagged = repo_dir(request["target"], config["root"])

@@ -8,7 +8,7 @@ Finding the commit SHALL only read the clone (A381), and a failure while finding
 #### Scenario: The lines' text
 
 - **WHEN** an update with such a commit replies
-- **THEN** its standard error ends `shallow boundary between the local branch and upstream's: <path> (the copy holds <commit> without its history, and it lies between the local branch and upstream's <remote>/<branch>)` and `to repair it: ghq-sync --deepen 1000000 <path> then ghq-sync -u <path> (that deepen hides none of the history the copy holds, where a smaller one can; if the update still fails without this line, upstream rewrote its branch and this boundary was not the cause; ghq-sync --help, under --deepen, says what the deepen costs and names the other repair)`
+- **THEN** its standard error ends `shallow boundary between the local branch and upstream's: <path> (the copy holds <commit> without its history, and it lies between the local branch and upstream's <remote>/<branch>)` and `to repair it: ghq-sync --deepen 1000000 <path> then ghq-sync -u <path> (that deepen hides none of the history the copy holds, where a smaller one can; if the update still fails with git's fast-forward refusal and without this line, upstream rewrote its branch and this boundary was not the cause; ghq-sync --help, under --deepen, says what the deepen costs and names the other repair)`
 
 #### Scenario: Upstream's branch moves onto a tag's commit fetched at depth 1
 
