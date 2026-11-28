@@ -71,12 +71,14 @@
 
             ui_font_size = 14;
             ui_font_family = "Zed Plex Sans";
-            buffer_font_size = 12;
-            buffer_font_family = "MonaspiceNe Nerd Font Mono";
+            buffer_font_size = 15;
+            buffer_font_family = "JetBrains Mono";
+            buffer_font_weight = 500;
             icon_theme = "Catppuccin Mocha";
 
             terminal = {
-              font_family = "MonaspiceNe Nerd Font Mono";
+              font_family = "JetBrainsMono Nerd Font Mono";
+              font_weight = 500;
             };
 
             theme = {
