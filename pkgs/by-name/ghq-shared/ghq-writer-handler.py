@@ -47,12 +47,13 @@ status stays as its other commands set it, and the exit log line adds
 history=hydrated:<n>, history=not-hydrated or history=failed, on every path
 after the history fetch.
 
-An update whose fast-forward fails while a shallow boundary lies between the
-local branch and its upstream keeps git's refusal and exit status; two lines
-after it say that the copy holds a commit without its history, which upstream's
-branch has moved past, and name the deepen that fetches the history below every
-boundary without hiding any. Finding that reads the clone and writes nothing,
-and the exit log line adds boundary=blocked.
+An update that fails while a commit the clone holds without its history lies
+between the local branch and its upstream keeps git's refusal and exit status;
+two lines after it name that commit and the deepen that repairs it, and say
+that an update still failing after it without that line means upstream
+rewrote its branch. Finding the commit reads the clone and writes nothing; any
+failure while finding it, a time-out included, reports nothing. The exit log
+line adds boundary=blocked.
 
 Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group",
 "allowedProtocols", "lockDir" and optionally "lockTimeout", "commandTimeout"
@@ -620,26 +621,32 @@ FULL_DEEPEN = 1_000_000
 
 
 def blocking_boundary(path, env):
-    """The boundary blocking a failed fast-forward and the upstream ref it blocks, or None.
+    """A boundary between the local branch and its upstream, and that upstream's name, or None.
 
-    A boundary blocks when the local branch is not an ancestor of its upstream
-    and upstream's commits past it reach that boundary. Reads only.
+    A boundary lies between them when the local branch is not an ancestor of
+    its upstream and upstream's commits past it reach that boundary; upstream
+    may have moved past it or rewritten its branch, which the clone cannot
+    tell apart. Reads only; any failure finds none, so the update's outcome is
+    git's alone.
     """
-    start = boundaries(path)
-    if not start:
+    try:
+        start = boundaries(path)
+        if not start:
+            return None
+        quiet = {**env, "GIT_NO_LAZY_FETCH": "1"}
+        tracking = git(path, quiet, "rev-parse", "--symbolic-full-name", "@{upstream}")
+        upstream_ref = tracking.stdout.strip().decode(errors="replace")
+        if tracking.returncode or not upstream_ref:
+            return None
+        if git(path, quiet, "merge-base", "--is-ancestor", "HEAD", upstream_ref).returncode != 1:
+            return None
+        gap = git(path, quiet, "rev-list", upstream_ref, "^HEAD")
+        if gap.returncode:
+            return None
+        held = [commit for commit in gap.stdout.decode().split() if commit in start]
+        return (held[0], upstream_ref.removeprefix("refs/remotes/")) if held else None
+    except Exception:
         return None
-    quiet = {**env, "GIT_NO_LAZY_FETCH": "1"}
-    tracking = git(path, quiet, "rev-parse", "--symbolic-full-name", "@{upstream}")
-    upstream_ref = tracking.stdout.strip().decode(errors="replace")
-    if tracking.returncode or not upstream_ref:
-        return None
-    if git(path, quiet, "merge-base", "--is-ancestor", "HEAD", upstream_ref).returncode != 1:
-        return None
-    gap = git(path, quiet, "rev-list", upstream_ref, "^HEAD")
-    if gap.returncode:
-        return None
-    held = [commit for commit in gap.stdout.decode().split() if commit in start]
-    return (held[0], upstream_ref.removeprefix("refs/remotes/")) if held else None
 
 
 def branch_refs(path, env):
@@ -912,11 +919,12 @@ def run_get(request, argv, config, env, session):
         session.boundary = True
         commit, branch = blocked
         results.append(subprocess.CompletedProcess([], 0, b"", (
-            f"shallow boundary blocks the update: {path} (the copy holds {commit} without its history, and"
-            f" upstream's {branch} has moved past it, so git cannot fast-forward)\n"
-            f"to repair it: ghq-sync --deepen {FULL_DEEPEN} {path} fetches the history below every boundary of"
-            f" this copy and hides none of it, then ghq-sync -u {path}; a smaller --deepen can hide history the"
-            " copy holds\n").encode()))
+            f"shallow boundary between the local branch and upstream's: {path} (the copy holds {commit} without"
+            f" its history, and it lies between the local branch and upstream's {branch})\n"
+            f"to repair it: ghq-sync --deepen {FULL_DEEPEN} {path} then ghq-sync -u {path} (that deepen hides none"
+            " of the history the copy holds, where a smaller one can; if the update still fails without this line,"
+            " upstream rewrote its branch and this boundary was not the cause; ghq-sync --help, under --deepen, says"
+            " what the deepen costs and names the other repair)\n").encode()))
     shallow = None
     if request.get("tags") is True:
         tagged = repo_dir(request["target"], config["root"])
