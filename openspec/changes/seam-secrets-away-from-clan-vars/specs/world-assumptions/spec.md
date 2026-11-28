@@ -22,16 +22,16 @@ Any requirement whose motivation depends on this fact SHALL name it explicitly, 
 It is true of clan-core at the locked revision 78d5de23, independent of what this fleet builds, that its sops backend installs each secret file as the sops secret `vars/<rel_dir>/<file>`, `rel_dir` being `shared/<generator>` or `per-machine/<machine>/<generator>`, and that the file's evaluated `path` is that secret's path.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: read on 2026-11-27 from a clan-core source in the local Nix store, whose revision was not confirmed against 78d5de23: `nixosModules/clanCore/vars/interface.nix:74-80` (`rel_dir`), `nixosModules/clanCore/vars/secret/sops/default.nix:36` (`path = config.sops.secrets."vars/${rel_dir}/${name}".path`). `modules/home/ai/omnigent/credentials.nix:127,186-195` relies on the same naming. The read is repeated at the locked revision before the first delivery step.
+**Evidence**: read on 2026-11-27 from a clan-core source in the local Nix store, whose revision was not confirmed against 78d5de23: `nixosModules/clanCore/vars/interface.nix:74-80` (`rel_dir`), `nixosModules/clanCore/vars/secret/sops/default.nix:36` (`path = config.sops.secrets."vars/${rel_dir}/${name}".path`). `modules/home/ai/omnigent/credentials.nix:127,186-195` relies on the same naming. The read is repeated at the locked revision before the first delivery step. Read on 2026-11-28 from sops-nix at the locked revision d5abe5e53200 (`nix-stock eval --raw .#inputs.sops-nix.outPath`): `modules/sops/templates/default.nix:116-127` declares `sops.placeholder` with default `{ }`, and `:130-134` sets `sops.placeholder = mapAttrs (…) config.sops.secrets` under `lib.mkIf (config.sops.templates != { })`; `modules/nix-darwin/templates/default.nix:95-106,109-113` does the same for darwin.
 
 #### Scenario: Read at the source
 
-- **WHEN** the two files above are read at the locked revision
-- **THEN** the sops name and the path are formed as stated
+- **WHEN** the files above are read at the locked revisions
+- **THEN** the sops name and the path are formed as stated, and sops-nix defines the placeholder `sops.placeholder.<name>` of each sops secret `<name>` only on a host with `sops.templates`; elsewhere `sops.placeholder` is `{ }`
 
 #### Scenario: clan changes the sops naming
 
-- **WHEN** a clan-core update changes `rel_dir`'s form, the sops secret name, or where a secret file's `path` comes from; the omnigent credential assertions failing on every host with a worker is how this shows
+- **WHEN** a clan-core update changes `rel_dir`'s form, the sops secret name, or where a secret file's `path` comes from, or a sops-nix update changes when or under which name it defines a placeholder; the omnigent credential assertions failing on every host with a worker is how this shows
 - **THEN** this assumption is void; the `secret-consumption-seam-interface` requirement `Read-only fields come from the backend` loses its discharge for `placeholder` and `path` until the seam is restated against the new naming
 
 ### Requirement: A362 — Declaring a first-party option changes no system or home derivation

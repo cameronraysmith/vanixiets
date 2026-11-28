@@ -132,7 +132,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 | A3 | Three host↔user relations restated in four to seven places | `modules/lib/hosts.nix`, `modules/clan/inventory/services/users/`, host bodies, `modules/checks/home.nix` | P1, P3 | O04 |
 | A4 | Cross-host evaluated-config reads | `modules/system/ssh-known-hosts.nix`, `modules/machines/darwin/stibnite/default.nix` | P3, P5 | O18 |
 | A5 | Vars layout read ad hoc | `modules/clan/inventory/services/tincr.nix`, `modules/darwin/fleet-services-trust.nix`, about fifteen readers | P3 | O24 |
-| A6 | No seam for secret consumption; features reach into each other's generators | `modules/nixos/nixbot.nix`, `modules/nixos/matrix.nix`, `modules/home/development/vcs-signing.nix` | P3 | O25 |
+| A6 | No seam for secret consumption; features reach into each other's generators | resolved: every declaration and read goes through `vanixiets.secrets` (`modules/system/secrets.nix`); `checks.x86_64-linux.secrets-seam-confinement` lists the 14 files that may still name clan vars | P3 | O25 |
 | A7 | Ambient `flake` specialArg with an order-dependent merge | `_module.args.flake` in nine hosts; `extraSpecialArgs.flake` in seven files | P1, P3 | O20 |
 | A8 | Home-manager integration block repeated six times | the three user services, `modules/darwin/laptop.nix` (now `modules/darwin/darwin-workstation.nix`), stibnite, blackphos | P1 | O01 |
 | A9 | Magnetite body holds service wiring | `modules/machines/nixos/magnetite/default.nix` | P1 | O26 |
@@ -389,15 +389,15 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Why this matters: P3 — the layout has one owner, clan, but every reader re-derives it.
 - Approach: a `modules/lib/vars.nix` accessor (`public`, `exists`, `isRecipient`, `relPath`) built on the existing `varPath`, keeping each reader's trimming behaviour.
 - Closed by stop-reading-other-hosts-configs.
+- `modules/lib/vars.nix` is the committed-store half of the secret seam (O25), and `checks.x86_64-linux.secrets-seam-confinement` fails on a non-comment `vars/shared/` or `vars/per-machine/` literal in a `.nix` file under `modules/` outside the seam and its list (pull request 4479).
 
 ### O25 [P3] [MEDIUM] No seam for secret consumption; features reach into each other's generators
 
 - Den-readiness finding: **No seam for secret consumption; features reach into each other's generators** (A6).
-- Locations: `modules/nixos/nixbot.nix` reads niks3's generator, `modules/nixos/matrix.nix` reads kanidm's, `modules/home/development/vcs-signing.nix` and `modules/home/ai/omnigent/credentials.nix` read the host's `osConfig.clan`; generator names passed as settings in `modules/clan/services/{hermes-agent,openclaw}/flake-module.nix`.
-- Current shape: about 55 files declare or read `clan.core.vars` directly.
+- Locations at the audit: `modules/nixos/nixbot.nix` read niks3's generator, `modules/nixos/matrix.nix` read kanidm's, `modules/home/development/vcs-signing.nix` and `modules/home/ai/omnigent/credentials.nix` read the host's `osConfig.clan`; generator names passed as settings in `modules/clan/services/{hermes-agent,openclaw}/flake-module.nix`.
 - Why this matters: P3 — secret declaration and consumption have no single resolution site; replacing clan vars would touch every feature.
 - Approach: a `vanixiets.secrets.<name>` option, the only writer and reader of `clan.core.vars`, propagated to homes through the sops bridge, migrated one feature at a time with generator names, owners, modes and sharing unchanged.
-- Closed by seam-secrets-away-from-clan-vars.
+- Status: resolved by seam-secrets-away-from-clan-vars (pull requests 4472 and 4479). Every first-party module declares and reads its secrets through `vanixiets.secrets.<name>` (`modules/system/secrets.nix`), the only module that writes `clan.core.vars`; obligations that judge the backend's own tree read `flake.lib.secretsBackend.generatorsOf`. Homes read a view of the files their user owns, `{ files.<f>.{path,placeholder} }`, set by `hm-sops-bridge`. `checks.x86_64-linux.secrets-seam-confinement` lists the 14 checks and runtime tests that may still name clan vars or the `vars/` layout, each with its reason, and fails on any other.
 
 ### O26 [P1] [MEDIUM] Magnetite body holds service wiring
 
@@ -546,10 +546,10 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 ### O44 [P2] [LOW] `base` and `homeManager.ai` have no named includes
 
 - Den-readiness finding: **`base` and `homeManager.ai` have no named includes** (A30).
-- Locations: the roughly 34 `darwin.base` and 28 `nixos.base` contributors; `homeManager.ai`.
+- Locations: the 37 `darwin.base` contributors; `homeManager.ai`; formerly the 33 `nixos.base` contributors.
 - Why this matters: P2 (C3) — the aggregate's parts have no names a consumer could select.
 - Approach: named sub-aspects of `base`, and one aspect per agent harness with `ai` importing them all; the obligation modules stay in base.
-- Status: not done. compose-hosts-from-cohesive-aspects measured that naming the parts reorders argentum's system packages and every home importing `ai`, so `base` and `ai` stay implicit and named parts are left to a later change (that change's design D11 and Resolved Question 10).
+- Status: done for `nixos.base`: `modules/nixos/base.nix` lists its 33 named parts in `flake.lib.nixosBaseParts` (each a `base-<concern>` module in one file, or an already named module such as `secrets`), and `checks.x86_64-linux.structure-aspect-parts` (`modules/checks/structure/aspect-parts.nix`) fails on a file assigning into `base` or into an existing part and on a part in no list; every host and home kept its drvPath. `darwin.base` and `homeManager.ai` are unchanged and still implicit; naming their parts reorders the Macs' system packages and every home importing `ai`, which name-the-parts-of-base-and-ai declares and deploys in two later steps.
 
 ### O45 [P1] [LOW] `darwin/caches.nix` duplicates `system/caches.nix`
 

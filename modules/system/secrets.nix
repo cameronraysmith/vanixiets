@@ -20,12 +20,14 @@
 # evaluation where clan is present, naming the entry and the field. The
 # read-only `files.<f>.{path,value,exists,placeholder}` are clan's values,
 # read lazily, and null where clan-core is not imported (clan-free fixtures),
-# the one place that tests for it. The read-only `resolved` is the generator
-# as clan evaluated it, in the option's own field names: every writable field
-# with clan's defaults applied (a file's `owner` is "root" when no module set
-# it, where the entry's own `owner` stays null), and every file clan has,
-# also for a provided entry. Judges of custody read `resolved`; it is null
-# without clan.
+# the one place that tests for it. `placeholder` is sops-nix's placeholder
+# for the file, null where sops-nix defines none: it defines one per sops
+# secret, and only on a host with `sops.templates`. The read-only `resolved`
+# is the generator as clan evaluated it, in the option's own field names:
+# every writable field with clan's defaults applied (a file's `owner` is
+# "root" when no module set it, where the entry's own `owner` stays null),
+# and every file clan has, also for a provided entry. Judges of custody read
+# `resolved`; it is null without clan.
 #
 # flake.modules.homeManager.secrets is the home side: a view of
 # `{ files.<f>.{path,placeholder} }` that the hm-sops-bridge modules set
@@ -181,7 +183,10 @@ let
             value = backendValue lib.types.str (if hasBackend then backendFile.value else null);
             exists = backendValue lib.types.bool (if hasBackend then backendFile.exists else null);
             placeholder = backendValue lib.types.str (
-              if hasBackend then hostConfig.sops.placeholder."vars/${backendFile.rel_dir}/${name}" else null
+              if hasBackend then
+                hostConfig.sops.placeholder."vars/${backendFile.rel_dir}/${name}" or null
+              else
+                null
             );
           };
         };

@@ -17,15 +17,16 @@
 # modules/checks/secrets-seam-confinement.nix spell clan vars or the committed
 # layout, each for the reason given there.
 #
-# Exempt from the committed-layout clause, deliberately: the independent
-# judge in modules/checks/sops-correspondence.nix, the literal fixtures of
-# modules/checks/fleet-deployer-obligations.nix,
-# modules/home/ai/omnigent/credentials.nix (it builds the committed
-# ciphertext's path from the backend's rel_dir on purpose, to check what
-# sops-nix installs) and modules/checks/langfuse-query.nix (encrypted files
-# interpolated on purpose). modules/checks/commit-signing-key.nix spells a
-# delivered key path (/run/secrets/vars/shared/…) in a fixture home, not the
-# committed layout.
+# Among the files of that list, the independent judge in
+# modules/checks/sops-correspondence.nix, the literal fixtures of
+# modules/checks/fleet-deployer-obligations.nix and
+# modules/checks/langfuse-query.nix, which interpolates encrypted files on
+# purpose, spell the committed layout; modules/checks/commit-signing-key.nix
+# spells a delivered key path (/run/secrets/vars/shared/…) in a fixture home,
+# not the committed layout. modules/home/ai/omnigent/credentials.nix is not
+# on the list: it builds the committed ciphertext's path from the backend's
+# rel_dir, read through `flake.lib.secretsBackend.generatorsOf`, to check what
+# sops-nix installs, and spells no layout literal.
 { lib, ... }:
 let
   relPath =

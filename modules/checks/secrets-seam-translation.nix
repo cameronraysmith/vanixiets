@@ -3,27 +3,34 @@
 # fields a module defines, nothing for a provided entry, and clan's values read
 # back. The NixOS secrets module is evaluated with lib.evalModules
 # against a stub of clan's generator option that keeps whatever it receives,
-# and a stub of sops-nix's placeholder option:
-#   everyField       every writable field set once reaches the stub as set;
-#   onlySecret       an entry setting only files.<f>.secret reaches it as that
-#                    one field, with no null and no empty list;
-#   provided         a provided entry adds nothing to the generator the stub
-#                    (standing in for a clan service) declares, and its
-#                    declared file reads that generator's value;
-#   providedWritable a provided entry that sets a writable field fails;
-#   providedAbsent   a provided entry whose generator the backend lacks fails
-#                    when its file is read;
-#   readBack         a declared file's path, value, exists and placeholder are
-#                    the backend's, the placeholder under the sops name
-#                    vars/<rel_dir>/<file>;
-#   resolvedBack     `resolved` is the backend's generator in the option's
-#                    field names, the backend's defaults included (a file's
-#                    owner the entry left null reads as the backend's "root"),
-#                    and without the backend's own fields (a file's rel_dir,
-#                    a prompt's name);
-#   noBackend        without the stub options the module defines nothing
-#                    outside `vanixiets`, and every read-only field and
-#                    `resolved` are null.
+# and a stub of sops-nix's placeholder option, which like sops-nix's own
+# defaults to `{ }`:
+#   everyField         every writable field set once reaches the stub as set;
+#   onlySecret         an entry setting only files.<f>.secret reaches it as
+#                      that one field, with no null and no empty list;
+#   provided           a provided entry adds nothing to the generator the stub
+#                      (standing in for a clan service) declares, and its
+#                      declared file reads that generator's value;
+#   providedWritable   a provided entry that sets a writable field fails;
+#   providedAbsent     a provided entry whose generator the backend lacks
+#                      fails when its file is read;
+#   readBack           a declared file's path, value, exists and placeholder
+#                      are the backend's, the placeholder under the sops name
+#                      vars/<rel_dir>/<file>;
+#   placeholderAbsent  a declared file sops-nix has no placeholder for (a
+#                      host without sops.templates, or a file that is no sops
+#                      secret) reads a null placeholder;
+#   homeView           on such a host, a home's whole view, set by the
+#                      hm-sops-bridge view module, evaluates and holds the
+#                      owned file's path and a null placeholder;
+#   resolvedBack       `resolved` is the backend's generator in the option's
+#                      field names, the backend's defaults included (a file's
+#                      owner the entry left null reads as the backend's
+#                      "root"), and without the backend's own fields (a
+#                      file's rel_dir, a prompt's name);
+#   noBackend          without the stub options the module defines nothing
+#                      outside `vanixiets`, and every read-only field and
+#                      `resolved` are null.
 # No host is evaluated; the fixtures are literal, so the check runs on
 # x86_64-linux only.
 { self, lib, ... }:
@@ -201,6 +208,69 @@
                   placeholder
                   ;
               };
+        };
+        placeholderAbsent = {
+          problems = 0;
+          judge =
+            _:
+            let
+              config = eval [
+                clanStub
+                {
+                  clan.core.vars.generators.declared.files.token = {
+                    path = "/run/secrets/vars/per-machine/m/declared/token";
+                    rel_dir = "per-machine/m/declared";
+                  };
+                  vanixiets.secrets.declared.files.token.owner = "alice";
+                }
+              ];
+            in
+            differs "the placeholder" null config.vanixiets.secrets.declared.files.token.placeholder;
+        };
+        homeView = {
+          problems = 0;
+          judge =
+            _:
+            let
+              host = eval [
+                clanStub
+                self.modules.darwin.hm-sops-bridge
+                {
+                  options.home-manager.sharedModules = lib.mkOption {
+                    type = lib.types.listOf lib.types.raw;
+                    default = [ ];
+                  };
+                }
+                {
+                  clan.core.vars.generators.declared.files = {
+                    token = {
+                      path = "/run/secrets/vars/per-machine/m/declared/token";
+                      rel_dir = "per-machine/m/declared";
+                    };
+                    other.rel_dir = "per-machine/m/declared";
+                  };
+                  vanixiets.secrets.declared.files = {
+                    token.owner = "alice";
+                    other.owner = "bob";
+                  };
+                }
+              ];
+              home =
+                (lib.evalModules {
+                  modules = host.home-manager.sharedModules ++ [
+                    {
+                      options.home.username = lib.mkOption { type = lib.types.str; };
+                      config.home.username = "alice";
+                    }
+                  ];
+                }).config;
+            in
+            differs "the home's view" {
+              declared.files.token = {
+                path = "/run/secrets/vars/per-machine/m/declared/token";
+                placeholder = null;
+              };
+            } home.vanixiets.secrets;
         };
         resolvedBack = {
           problems = 0;

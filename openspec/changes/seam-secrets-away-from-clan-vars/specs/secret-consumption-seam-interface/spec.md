@@ -35,7 +35,7 @@ When `options ? clan.core.vars` holds, the secrets module SHALL define, for each
 #### Scenario: The translation fixtures
 
 - **WHEN** the translation judge runs
-- **THEN** it reports that a fixture setting every writable field yields every field, a fixture setting only `files.<f>.secret` yields only that field, a provided entry yields no generator, and an evaluation without the stub clan option yields no `clan` definition
+- **THEN** it reports that a fixture setting every writable field yields every field, a fixture setting only `files.<f>.secret` yields only that field, a provided entry yields no generator, a declared file's `placeholder` is the stub's `sops.placeholder` entry where the stub has one and `null` where it has none, and an evaluation without the stub clan option yields no `clan` definition
 
 #### Scenario: Mutant dropping a field
 
@@ -44,11 +44,16 @@ When `options ? clan.core.vars` holds, the secrets module SHALL define, for each
 
 ### Requirement: Read-only fields come from the backend
 
-For each entry and each declared file, the secrets module SHALL set the read-only fields `files.<f>.path`, `files.<f>.value`, `files.<f>.exists` and `files.<f>.placeholder` from `clan.core.vars.generators.<name>.files.<f>` and from `sops.placeholder."vars/<rel_dir>/<f>"`, and SHALL set each to `null` when clan-core is not imported.
+For each entry and each declared file, the secrets module SHALL set the read-only fields `files.<f>.path`, `files.<f>.value` and `files.<f>.exists` from `clan.core.vars.generators.<name>.files.<f>`, and `files.<f>.placeholder` from `sops.placeholder."vars/<rel_dir>/<f>"` where sops-nix defines it and `null` elsewhere, and SHALL set each to `null` when clan-core is not imported.
 
 **Trust boundary**: these are the backend's evaluated values. Their correspondence to the file a host holds at runtime rests on world assumption `A361 — clan's sops backend installs each secret var under the sops name vars/<rel_dir>/<file>, at that sops secret's path`.
 
-**Discharged by**: the translation judge's absent-backend fixture; at each delivery step, `nix eval` of each moved file's `path` equal to the parent revision's `clan.core.vars.generators.<name>.files.<f>.path`.
+**Discharged by**: the translation judge's read-back fixture (a stub placeholder read back), its absent-placeholder fixture (`null`), and its absent-backend fixture; at each delivery step, `nix eval` of each moved file's `path` equal to the parent revision's `clan.core.vars.generators.<name>.files.<f>.path`; on every NixOS and darwin host, `nix eval` of every declared file's `placeholder`, equal to `sops.placeholder."vars/<rel_dir>/<f>"` where that is defined and `null` elsewhere.
+
+#### Scenario: A file sops-nix has no placeholder for
+
+- **WHEN** a declared file's `placeholder` is evaluated on a host without `sops.templates`, where sops-nix defines no placeholder, or for a file that is no sops secret
+- **THEN** it evaluates to `null`
 
 #### Scenario: A moved secret's path
 
@@ -87,13 +92,15 @@ A module that reads a generator declared by a clan-core service SHALL declare `v
 
 ### Requirement: Homes see a view of the secrets they own
 
-`flake.modules.homeManager.secrets` SHALL declare a home option `vanixiets.secrets` of `{ files.<f>.{path,placeholder} }` entries, default `{ }`, imported by every home configuration. The bridge modules SHALL set it for every home-manager user of the host. No home module SHALL read `osConfig.clan.core.vars` or `osConfig.sops`.
+`flake.modules.homeManager.secrets` SHALL declare a home option `vanixiets.secrets` of `{ files.<f>.{path,placeholder} }` entries, default `{ }`, imported by every home configuration. The bridge modules SHALL set it for every home-manager user of the host. No home-manager module SHALL read `osConfig.clan.core.vars` or `osConfig.sops`.
+
+**Exception**: `modules/home/ai/omnigent/credentials.nix` lives under `modules/home` but is no home-manager module: it defines `flake.lib.mkOmnigentWorkerCredentials` and the omnigent credential policy, functions a host evaluates with its own configuration as `osConfig`, and it reads that host's `sops.secrets` and `sops.templates` to judge what sops-nix installs for each worker.
 
 **Bridge**: `flake.modules.nixos.hm-sops-bridge` and `flake.modules.darwin.hm-sops-bridge`, each keyed `vanixiets/hm-sops-bridge` through `flake.lib.exportAs` and imported by `nixos.base` and `darwin.base`, add to `home-manager.sharedModules` the home option and a module that sets it, in each home, from that home's `home.username` `u` to the host's `vanixiets.secrets` entries that have a file whose `owner` is `u`, whether or not `u` is in `hm-sops-bridge.users`.
 
 **Trust boundary**: the view carries delivered locations, not contents, and only for files the home's user owns. It says nothing about `clan.core.settings`, which `vcs-signing.nix` still reads for the machine name.
 
-**Discharged by**: `nix eval` of the view on cameron's home on cinnabar, crs58's home on stibnite, and a standalone `homeConfigurations` entry; a source search of `modules/home` for `osConfig.clan.core.vars` and `osConfig.sops`.
+**Discharged by**: `nix eval` of the view on cameron's home on cinnabar, crs58's home on stibnite, and a standalone `homeConfigurations` entry; the translation judge's home-view fixture, which evaluates a whole view on a stub host without sops placeholders; a source search of `modules/home` for `osConfig.clan.core.vars`, which finds no file, and for `osConfig.sops`, which finds only the exception above.
 
 #### Scenario: A darwin home's signing key
 
@@ -124,13 +131,13 @@ An obligation SHALL read a secret only through `hostConfig.vanixiets.secrets.<na
 
 ### Requirement: No module outside the seam names the backend
 
-`checks.x86_64-linux.secrets-seam-confinement` SHALL compare, with `flake.lib.mkStructuralCheck`, a literal list against the files the confinement search finds, and SHALL fail when they differ. Before the last delivery step the literal list SHALL only shrink; after it, the list SHALL be exactly the final list below.
+`checks.x86_64-linux.secrets-seam-confinement` SHALL compare a literal list against the files the confinement search finds, and SHALL fail when they differ. It is its own `runCommand`, built from the two lists alone as `flake.lib.mkStructuralCheck` builds, so that a failure prints each list one file per line. Before the last delivery step the literal list SHALL only shrink; after it, the list SHALL be exactly the final list below.
 
 **Trust boundary**: the check reads source text. It cannot see an attribute path built from strings at evaluation time, and it says nothing about what clan does with what the seam hands it.
 
 **Search**: the sorted `.nix` files under `modules/`, `_`-prefixed path components included, that have a non-comment line naming `clan.core.vars`, `vars/shared/` or `vars/per-machine/`, excluding the two seam files `modules/system/secrets.nix` and `modules/lib/vars.nix`, which neither the search nor the literal list ever includes. The search matches text: it does not see `inherit (config.clan.core) vars;`, a quoted attribute name, a path built from strings, or a file outside `modules/`.
 
-**Final list**: `modules/vm-tests/{fleet-ingress,devloop-ingest,greptimedb-oom-order,greptimedb-pipeline,perses-greptimedb}.nix`, `modules/checks/greptimedb-envelope.nix` and `modules/checks/ntfy-provisioning.nix`, which run a generator's recipe; `modules/vm-tests/clan-test-vars-fixture.nix`; `modules/checks/secrets-seam-translation.nix`, an independent judge of the translation whose literal fixture is a stub of clan's generator option; `modules/checks/host-key-obligations.nix`, whose literal fixtures stub clan's generator tree; and the committed-layout exemptions `modules/lib/vars.nix` documents.
+**Final list**: `modules/vm-tests/{fleet-ingress,devloop-ingest,greptimedb-oom-order,greptimedb-pipeline,perses-greptimedb}.nix`, `modules/checks/greptimedb-envelope.nix` and `modules/checks/ntfy-provisioning.nix`, which run a generator's recipe; `modules/vm-tests/clan-test-vars-fixture.nix`; `modules/checks/secrets-seam-translation.nix`, an independent judge of the translation whose literal fixture is a stub of clan's generator option; `modules/checks/host-key-obligations.nix`, whose literal fixtures stub clan's generator tree; and the four files whose vars literals `modules/lib/vars.nix` documents, `modules/checks/{sops-correspondence,fleet-deployer-obligations,langfuse-query}.nix`, which spell the committed layout, and `modules/checks/commit-signing-key.nix`, which spells a delivered key path.
 
 **Discharged by**: the check building at every step; the mutant below.
 
@@ -147,7 +154,7 @@ For each delivery step, the drvPath of every NixOS, darwin and home toplevel and
 
 **Trust boundary**: drvPath identity shows the evaluated outputs are unchanged. It does not show that clan generates or installs the same file at runtime, which no host deploy is made to observe because no host's configuration changes.
 
-**Discharged by**: `just drv-diff <parent> <step commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/<step>.txt` per step, and once over the whole change with `drv-delta/whole-change.txt`.
+**Discharged by**: `just drv-diff <parent> <commit> openspec/changes/seam-secrets-away-from-clan-vars/drv-delta/<file>.txt` for each of the two commits that delivered the change: the seam with `01-seam.txt`, and every remaining move, delivered as one commit, with `02-13-move.txt`. The whole change is covered by those two comparisons together with the generator data of every host, which is identical at the change's base and on `main` after it; no single comparison over the whole change is run, because between the two commits other changes landed that change homes.
 
 #### Scenario: A step's comparison
 
