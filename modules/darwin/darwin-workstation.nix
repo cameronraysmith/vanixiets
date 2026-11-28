@@ -43,6 +43,7 @@ in
         dnscrypt-proxy
         zt-dns
         fleet-services-trust
+        zed-delta
       ]);
 
       config = {

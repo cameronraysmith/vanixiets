@@ -131,3 +131,18 @@ On Linux the operator's home SHALL set `programs.zed-editor.package` to a Zed pa
 
 - **WHEN** the operator's home on pyrite and on stibnite is evaluated
 - **THEN** pyrite has a Zed package and no `dnsreset`, stibnite has a null Zed package and `dnsreset`, and pyrite's `zerotier-join` contains no `launchctl`
+
+### Requirement: Delta is declared under the command zed-delta on every workstation
+
+pyrite's operator home SHALL install `pkgs.zed-delta`, and every Mac importing `darwin-workstation` (stibnite, rosegold, argentum, blackphos) SHALL import the `zed-delta` darwin aspect, which declares the `zed-delta` Homebrew cask with `no_binaries` and a `zed-delta` command.
+Delta's program MUST NOT be on `PATH` as `delta` on any workstation, and jj's `ui.pager` and lazygit's pager MUST name the diff pager by store path.
+
+#### Scenario: Evaluate the Delta declarations
+
+- **WHEN** the nix-darwin configurations of stibnite, rosegold, argentum and blackphos, pyrite's operator home, and the operator's jj and lazygit settings are evaluated
+- **THEN** each Mac's `homebrew.casks` carries `zed-delta` with `args.no_binaries = true` and its system packages carry `zed-delta`, pyrite's home packages carry `zed-delta` with `meta.mainProgram = "zed-delta"`, and jj's `ui.pager` and lazygit's pager command name a store path ending in `/bin/delta`
+
+#### Scenario: Observe Delta on a Mac after activation
+
+- **WHEN** stibnite, rosegold, argentum or blackphos has activated the configuration importing the aspect
+- **THEN** `brew list --cask` lists `zed-delta`, `/opt/homebrew/bin/delta` does not exist, `zed-delta --version` prints Delta's version, and `delta --version` prints the diff pager's

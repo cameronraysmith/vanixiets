@@ -148,11 +148,16 @@ Observed divergences that the slices close:
 ### D9: shared-layer fixes
 
 - **Choice**: pyrite trusts the caddy `.zt` root CA and the local k8s development CA that stibnite already trusts (`modules/darwin/zt-services-trust.nix`, `modules/machines/darwin/stibnite/default.nix:214-233`).
-  Linux gets a Zed binary while the cask keeps supplying stibnite's.
+  Linux gets a Zed binary while the base cask list keeps supplying every Mac's.
   Fonts are declared in Nix on both machines instead of the fifteen Homebrew cask fonts.
   `dnsreset` is installed only on Darwin, and `zerotier-join`'s launchctl hint is printed only on Darwin.
 - **Rationale**: each is a gap or a wrong-platform artifact in the shared layer that the inventory located with file and line.
 - **Boundary**: the CA certificates are first-party values shared by both platforms' trust declarations; font packages are vendored from nixpkgs.
+- **Delta, decided 2026-11-27**: Delta, Zed Industries' agent workspace application (bundle `com.zed-industries.delta`), is declared on pyrite as `pkgs.zed-delta`, an overlay over the `delta` flake input (`github:zed-industries/delta-nix`), and on stibnite, rosegold, argentum and blackphos by the darwin aspect `zed-delta` (`modules/darwin/zed-delta.nix`), which `darwin-workstation` imports, so every workstation Mac has it and no host body repeats the decision.
+  The aspect adds the `zed-delta` cask with its binary link suppressed (`args.no_binaries`) and installs a `zed-delta` command that execs the bundle's `Contents/MacOS/delta`, so the command is `zed-delta` on every workstation.
+  The cask would otherwise link `bin/delta`, the name of the git diff pager; jj's `ui.pager` and lazygit's pager call that pager by store path, as git's `programs.delta` already does, so no `PATH` order can substitute another `delta`.
+  Zed's package rule is unchanged: null on Darwin, where the base cask list supplies Zed on every Mac.
+  Boundary: the cask's application is vendored and updates itself (`auto_updates`), so Homebrew's bundle install adopts an existing hand-installed `/Applications/Delta.app` without comparing versions, and the cleanup mode `uninstall` never zaps its data under `~/Library/Application Support/delta`; the command, the suppression and the overlay are first-party.
 
 ### D10: declarative Zen on both machines
 

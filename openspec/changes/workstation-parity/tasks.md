@@ -89,6 +89,9 @@ Revised 2026-11-16 by the operator's decisions recorded in design.md D5: `bw` re
   `/nix/store/jg6gsxqw0r0rbbrags9wvl8vs41gzfyy-zed-editor-1.28.1` is in magnetite's store and in pyrite's running system, which puts `zeditor` and `zed-delta` in cameron's profile.
 - [ ] 7.3 Declare the fifteen fonts as Nix packages on both laptops and remove them from `caskFonts` — verify: `nix eval` of the font packages on both homes and of stibnite's casks; after activation, `fc-list` on pyrite and Font Book on stibnite show each font.
 - [ ] 7.4 Install `dnsreset` only on Darwin and print `zerotier-join`'s launchctl hint only on Darwin — verify: `nix eval` of both homes' packages, and the built `zerotier-join` on pyrite contains no `launchctl`.
+- [ ] 7.5 Declare Delta under the command `zed-delta` on pyrite through `pkgs.zed-delta` and on every Mac that imports `darwin-workstation` (stibnite, rosegold, argentum, blackphos) through the `zed-delta` darwin aspect, with jj and lazygit calling the diff pager by store path — verify: `nix eval` of `homebrew.casks` and the `environment.systemPackages` names on the four Macs, of pyrite's home packages, and of the operator's jj `ui.pager` and lazygit pager command.
+  After activation on each of stibnite, rosegold and argentum, and on blackphos, which is semi-permanently offline, when it is next activated: `brew list --cask` lists `zed-delta`, `/opt/homebrew/bin/delta` does not exist, `zed-delta --version` prints Delta's version and `delta --version` prints the diff pager's; on stibnite the hand-installed `/Applications/Delta.app` is adopted by the cask and `~/Library/Application Support/delta` keeps its contents.
+  After activation on pyrite: `zed-delta --version` prints Delta's version and the launcher lists Delta from its desktop entry.
 
 ## 8. Declarative Zen on both laptops
 

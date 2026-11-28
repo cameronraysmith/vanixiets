@@ -14,7 +14,7 @@
       {
         programs.zed-editor = {
           enable = true;
-          # Null by default because stibnite's binary comes from the `zed` Homebrew cask and
+          # Null by default because every Mac's binary comes from the `zed` Homebrew cask and
           # headless homes need no editor binary; the linux-workstation module installs the
           # Nix-built Zed, keeping this file the single source of the settings, keymaps and extensions.
           package = lib.mkDefault null;
