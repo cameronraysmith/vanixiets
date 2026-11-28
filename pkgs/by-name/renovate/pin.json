@@ -1,7 +1,7 @@
 {
   "name": "renovate",
-  "version": "44.264.1",
-  "realizedVersion": "44.264.1",
+  "version": "45.3.2",
+  "realizedVersion": "45.3.2",
   "source": {
     "githubRelease": {
       "owner": "renovatebot",
@@ -18,7 +18,7 @@
             "repo": "renovate"
           }
         },
-        "hash": "sha256-1V1l01n4TuLwNUC/IbtUDKB+1Cxvoc/aVAPthmrUyaM=",
+        "hash": "sha256-N8NK+OJVaQ3SapbvH+RcyotdIqsbipZmBMNkAsz9Jpk=",
         "depsHash": {
           "none": {}
         }
@@ -29,7 +29,7 @@
         "fetcher": {
           "derived": {}
         },
-        "hash": "sha256-rlYXeEv/ChA7+LMgoSqvHxewH0kjuIM4GIF2VRvA5PE=",
+        "hash": "sha256-0Iv5sPIczFNDgIPgt+R2IeeGFS/nMrlSBaIVEj0B4FI=",
         "depsHash": {
           "none": {}
         }
