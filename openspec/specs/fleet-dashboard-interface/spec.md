@@ -231,11 +231,11 @@ The machine SHALL provision Perses only from `modules/nixos/perses/resources/`, 
 
 `vmTests.x86_64-linux.perses-greptimedb` SHALL run GreptimeDB, Perses from the magnetite module and nginx with the module's locations, overriding only Perses' authentication providers to a test-only native login and adding a test-only provisioning folder that holds one native user and one datasource without `allowHeaders`, and SHALL fail unless every case and the negative control below behave as stated.
 
-**Discharged by**: the test, run on demand on magnetite before deployment; it does not gate, so it is evidence only when run.
+**Discharged by**: the test, run on demand on pyrite before magnetite's deployment; it does not gate, so it is evidence only when run.
 
 #### Scenario: The test is run before deployment
 
-- **WHEN** the test runs on magnetite before the deploy
+- **WHEN** the test runs on pyrite before magnetite's deploy
 - **THEN** an unauthenticated request is answered 401; the provisioned user logs in; the provisioned set is exact after a planted view and a restart, and a session opened before that restart for a user record outside provisioning still answers `whoami`; dashboard writes are refused; PromQL and SQL reads through the two datasources return data; every committed view's query succeeds and each PromQL query returns series, and a mutant view query fails the case; an `INSERT` through `greptimedb-sql` is refused by the telemetry store; the four out-of-pattern routes, sent as written, are answered 403; `x-greptime-auth` carrying the administrative credential reaches the telemetry store as `perses`, through nginx and sent directly to Perses; `/metrics` through nginx is answered 404; `/api/config` serves the rendered `frontend.information`; and the result is recorded
 
 #### Scenario: The allow-list is bypassed
