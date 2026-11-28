@@ -24,7 +24,7 @@ Boundaries: every file this change edits is first-party (the handler, its tests,
 - Healing the update, repairing `.git/shallow`, or changing what a request does to a repository (D4).
 - Preventing boundaries: fetching tags with their history, or refusing a tag ahead of a branch.
 - Removing the boundaries that already hide held history in existing copies.
-- Telling a branch upstream rewrote from one that moved on: where the rewritten history passes a commit held without its history, the clone shows both alike, so the reply names that commit and the repair, and says that an update still failing after the repair without the line means upstream rewrote its branch. Where no such commit lies between them, the update fails as before, with no boundary line.
+- Telling a branch upstream rewrote from one that moved on: where the rewritten history passes a commit held without its history, the clone shows both alike, so the reply names that commit and the repair, and says that an update still failing after the repair with git's fast-forward refusal and without the line means upstream rewrote its branch. Where no such commit lies between them, the update fails as before, with no boundary line.
 
 ## Decisions
 
@@ -75,7 +75,7 @@ The commits stay out of the main line as a record; this change reports instead (
 - [The named repair fetches the whole history's commits and trees below the boundaries: for a depth-1 copy of nixpkgs 1,131,790 commits, 547 MB as commits alone] → it runs only when an account asks, on the copy the reply names, and `ghq-sync --help` says so; promote, the other repair that hides nothing, also fetches every blob.
 - [A copy stays blocked until an account runs the repair] → every update says so and names the command, and `boundary=blocked` lets the hosts' logs be counted.
 - [A copy whose history ran deeper than 1,000,000 commits below a boundary would keep a boundary there] → A382 records the deepest histories measured; the line appearing again after the deepen shows it, and `ghq-sync --full` repairs that copy.
-- [An update upstream rewrote through a commit held without its history gets the line and a repair that does not make it succeed] → the line says so: an update still failing after the repair without the line was rewritten upstream, and the repair hid nothing.
+- [An update upstream rewrote through a commit held without its history gets the line and a repair that does not make it succeed] → the line says so: an update still failing after the repair with git's fast-forward refusal and without the line was rewritten upstream, and the repair hid nothing.
 
 ## Migration Plan
 

@@ -46,11 +46,12 @@ Options:
                    when a commit the clone holds without its history lies
                    between the local branch and upstream's ("shallow boundary
                    between the local branch and upstream's"); run -u after it.
-                   If -u then fails without that line, upstream rewrote its
-                   branch and the boundary was not the cause. If the line
-                   still appears after a deepen that printed "deepened:
-                   <path>", the history runs deeper than the deepen reaches,
-                   and --full repairs it; after one that printed "failed:
+                   If -u then fails with git's fast-forward refusal and
+                   without that line, upstream rewrote its branch and the
+                   boundary was not the cause. If the line still appears
+                   after a deepen that printed "deepened: <path>", the
+                   history runs deeper than the deepen reaches, and --full
+                   repairs it; after one that printed "failed:
                    <path>", the deepen did not run to its end (see the lock
                    below), and the line says nothing of the depth. The deepen
                    fetches the commits and trees of the whole history below

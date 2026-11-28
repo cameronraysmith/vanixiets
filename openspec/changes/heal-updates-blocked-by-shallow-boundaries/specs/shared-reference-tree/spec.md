@@ -2,7 +2,7 @@
 
 ### Requirement: A refresh that fails with history held in part before upstream's says so and how to repair it
 
-When a refresh fails and a commit the reference repository holds without that commit's history lies between its branch and upstream's, the writer's answer SHALL say so, SHALL name a repair that hides no history the reference repository holds, and SHALL say that a refresh still failing after that repair, without the same words, failed because upstream rewrote its branch; the refresh SHALL change nothing in the reference repository beyond what the failed refresh itself did.
+When a refresh fails and a commit the reference repository holds without that commit's history lies between its branch and upstream's, the writer's answer SHALL say so, SHALL name a repair that hides no history the reference repository holds, and SHALL say that a refresh still refused a fast-forward after that repair, without the same words, failed because upstream rewrote its branch; the refresh SHALL change nothing in the reference repository beyond what the failed refresh itself did.
 
 #### Scenario: Upstream's branch moves onto a commit held without its history
 
@@ -17,7 +17,7 @@ When a refresh fails and a commit the reference repository holds without that co
 #### Scenario: Upstream rewrote its branch through history held in part
 
 - **WHEN** a refresh fails because upstream rewrote its branch onto history passing a commit held without its history
-- **THEN** the answer names that commit and the repair as above; after the repair the refresh still fails, its answer without those words, which tells the reader that upstream rewrote its branch
+- **THEN** the answer names that commit and the repair as above; after the repair the refresh still fails with git's fast-forward refusal, its answer without those words, which tells the reader that upstream rewrote its branch
 
 #### Scenario: Upstream rewrote its branch elsewhere
 
