@@ -24,6 +24,9 @@
         pkgs.gdu
         pkgs.zed-delta
         antigravity-hub
+        # Zed's editor and terminal fonts; the Macs take them from the base cask list.
+        pkgs.jetbrains-mono
+        pkgs.nerd-fonts.jetbrains-mono
       ];
     };
 }
