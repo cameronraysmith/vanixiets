@@ -1,6 +1,6 @@
 ---
 name: preferences-prose-clarity
-description: Sentence-level prose discipline grounded in reader-expectations research (Gopen & Swan, Pinker, Williams, Thomas & Turner, McEnerney). Use when writing or editing any prose — documentation, commit messages, working notes, published AGENTS.md or CLAUDE.md files, reports, PR descriptions — when reviewing text for clarity or AI-writing patterns, when calibrating certainty of claims, or when making the smallest safe repair to someone else's text.
+description: Sentence-level prose discipline grounded in reader-expectations research (Gopen & Swan, Pinker, Williams, Thomas & Turner, McEnerney). Use when writing or editing any prose — documentation, code comments and docstrings, commit messages, working notes, published AGENTS.md or CLAUDE.md files, reports, PR descriptions — when reviewing text for clarity or AI-writing patterns, when calibrating certainty of claims, or when making the smallest safe repair to someone else's text.
 ---
 
 # Prose clarity
@@ -14,7 +14,7 @@ The grounding is Williams, Gopen & Swan, Pinker, Thomas & Turner, and McEnerney;
     Define any term that reader would pause on.
     Give a one-sentence map before a multi-paragraph argument.
     A frequent case is an undefined internal reference: a stage, wave or task number, a conversational code such as Q3, an agent name, "the operator", or "the plan", which the reader has no way to look up.
-    Repair it by stating what the label stood for, and a cited decision by stating its reason; keep a pointer only if the reader can follow it (see the outward-facing writing rule in `agent-context-core`).
+    Repair it by stating what the label stood for, and a cited decision by stating its reason; keep a pointer only if the reader can follow it (see the outward-facing writing rule in `agent-context-core`), and in a code comment keep none (see its code-comments rule).
 2. Old before new: open sentences with information the reader already has (topic position); land the key new information at the end (stress position).
     Reorder before you cut.
 3. Characters as subjects, actions as verbs: repair nominalizations ("the failure of X to act" becomes "X failed to act"), except technical terms and nouns serving as the established topic.

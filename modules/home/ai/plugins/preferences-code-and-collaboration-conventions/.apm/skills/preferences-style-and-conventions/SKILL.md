@@ -35,16 +35,32 @@ State what code does, not speculative narratives about why.
 
 ## Code comments
 
-Write code that explains itself through naming, structure, and types, and add a comment only when the code cannot carry the information on its own.
-This extends the "Factual commentary" stance above: state what the code does through the code itself, and reserve comments for what the code genuinely cannot express.
-Prefer docstrings and language-canonical doc comments over inline comments.
-Doc comments are API-contract documentation and flow into generated `docs/reference/` material, so the language skills' requirements for them (Rust `///` and `//!`, Haskell Haddock, Python and TypeScript docstrings, nix module option descriptions) remain in force and are out of scope for the rule below.
+Write code that explains itself through naming, structure, and types; this extends the "Factual commentary" stance above, and the code-comments rule in `agent-context-core` states the part a check enforces on every commit.
+Doc comments are API-contract documentation and flow into generated `docs/reference/` material, so the language skills' requirements for them (Rust `///` and `//!`, Haskell Haddock, Python and TypeScript docstrings, nix module option descriptions) remain in force; what they may say is limited as for any comment.
 
-An inline comment earns its place only when it records something a competent reader could not recover from the code itself.
-Qualifying circumstances are narrow: a non-obvious *why* behind a choice that is true and not a speculative narrative; a surprising external constraint such as an API quirk, hardware limit, or protocol-mandated ordering not visible locally; a workaround for an external bug, paired with a link to the upstream issue or pull request; a correctness, security, concurrency, or numerical-stability footgun the next editor would plausibly reintroduce; or a deliberate, counterintuitive deviation from the obvious approach, stating why the obvious approach fails.
-The operative test is whether deleting the comment would lose information that the code, its names, and its types do not already provide.
-If nothing is lost, it does not qualify.
-A comment states its reason itself, not the internal id of the decision that holds the reason (`CAM-111 design D9 (a)`, `Q3`); a link to an ADR, an issue or a design file may follow the reason but cannot replace it.
+A comment is read by whoever next edits the lines beneath it, holding the repository and nothing else, and it qualifies only as a constraint on that edit which the code cannot show: an invariant another file depends on; an external constraint such as an API quirk, hardware limit, or protocol-mandated ordering, with its link; a workaround for an external bug, with the upstream issue or pull request; a correctness, security, concurrency, or numerical-stability footgun the next editor would plausibly reintroduce.
+The test is whether an editor who never read the comment would break something.
+A design file's reasoning qualifies only as the constraint it imposes: state that constraint, and leave the alternatives weighed, the evidence and the decision to the design file.
+When the comment would explain surprising behaviour of our own code, change the code instead: a name, a type, an extraction.
+History and evidence belong in the commit message, where `git blame` leads, and behaviour in the option's description or documentation comment; this holds for docstrings and for comments in scripts embedded in Nix strings.
+
+| Written | Instead |
+| --- | --- |
+| `# The hand-off to the ingress (design D14).` above `handoffWithoutClientCa` (`modules/checks/otel-collector-config.nix`, `72f782b86`) | Nothing: the attribute name and `clause.handoff` say it, and the design's reasoning stays in its design file. |
+| `# nixbot: median 130 s, slowest 563 s, 576 runs in 30 days` above `darwin-stibnite.class = "medium";` (`modules/checks/machines.nix`, `165f5945a`) | The class alone; the durations and their window go in the commit message. |
+| `# Size classes (declare-test-size-classes design D1, D2): the median of nixbot's uncached runs of at least 1 s, read 2026-11-24 (logs/tsc-4-durations-runs-20261124-141600.log).` (`modules/checks/shared-vars-obligations.nix`, `165f5945a`) | How a class is chosen, once, in the `testSizes` option's description in `modules/checks/test-sizes.nix`; the date and the log in the commit message. |
+| `# Whether the host runs the ingress.` above the argument `ingress ? false,` (`modules/lib/agent-session-collector.nix`, `705b436c7`) | Rename the argument `runsIngress ? false` and write no comment. |
+| A twelve-line header opening `# Behavioural check of nixbot-upload-local-outputs.patch (F81): in every build …` that retells the cases and the mutants (`modules/checks/nixbot-upload-local.nix`, `2609076c7`) | One line saying what the check fails on; the cases are in `test_upload_local.py`, the mutants in `mutants`, the rest in the commit message. |
+| `# … a standalone check judging every peer cost 454 MB of evaluation for its drvPath and was replaced by it.` (`modules/system/mesh-hosts.nix`, `10aacbc77`) | `# Judge in the machine checks, which already evaluate each configuration; a standalone check over every peer costs far more evaluation.` The figure and the replaced check go in the commit message. |
+
+| What you will tell yourself | The answer |
+| --- | --- |
+| "This records why the design chose X." | The design file records it; the comment states only the constraint the choice leaves on the next edit. |
+| "The next reader will want the benchmark." | The commit message has it, and `git blame` on the line leads there. |
+| "It is only a pointer to the task." | A reader of the file cannot open it; state what it stood for, or nothing. |
+| "Without the date nobody knows if it is still true." | A comment states what holds now; the commit that made it true carries the date. |
+| "It is a docstring, not a comment." | Docstrings, doc comments and embedded-script comments are held to the same limits. |
+| "The code is too subtle to follow without it." | Rename, retype or extract until it is not, then see what is left to say. |
 
 Comments that fail this bar are noise: restating the code in prose, narrating control flow the structure already shows, section-divider banners, commented-out code (delete it; version control retains the history), and TODO or FIXME notes without an issue reference or owner.
 Treat removing such comments as a standing responsibility rather than one gated to the file or change you are currently working on: when you encounter noise comments in the project's own code, remove them, and a comment-only cleanup is a legitimate standalone change.
@@ -63,9 +79,6 @@ Some comments are load-bearing and must never be removed or rewritten as inciden
 - Public-API docstrings and doc comments that generate published documentation. Preserve these even when terse; tighten wording only as a deliberate documentation edit.
 - Rust `// SAFETY:` comments on unsafe blocks, and the per-exclusion "explain why" comments other skills require (for example nix-unit package exclusions); these are the canonical truly-exceptional cases.
 - Code-generation markers (`// Code generated ... DO NOT EDIT.`, `# Generated by ...`, managed-block `BEGIN` and `END` sentinels) and any comment parsed by tooling as a directive (`//go:generate`, `// go:build` and cfg conditional-compilation comments, `cython:` directives, dependency-pin annotations).
-
-This policy is intentionally strong because self-documenting code is the default expectation across the fleet (nix, python, rust, haskell, typescript, shell).
-Ousterhout's calibration applies: comments exist to capture design intent and rationale that genuinely cannot live in the code, so the goal is eliminating redundant comments, not the rationale-bearing ones the qualifying list protects.
 
 ## File organization
 
