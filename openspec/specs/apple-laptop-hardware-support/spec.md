@@ -79,17 +79,21 @@ Every scenario below is decidable by `nix eval` against the built configuration;
 ### Requirement: The stage-1 initrd force-loads the four SPI/SMC modules that make the unlock prompt answerable
 
 The initrd SHALL force-load `applespi`, `spi_pxa2xx_platform`, `intel_lpss_pci`, and `applesmc` via `boot.initrd.kernelModules`, which the imported profile supplies at `apple/macbook-pro/14-1/default.nix:19-24`.
-The facter report MUST NOT be relied upon for these, and the fleet's `base` module MUST NOT be relied upon for these.
-The dependency is at least as strong under a LUKS container as it was under a typed ZFS passphrase, across the pre-enrollment and post-enrollment credential states.
-Between the install and the enrollment of a token (D30), every boot is the committed clan-vars passphrase typed on this keyboard and there is no other credential.
-After both tokens are enrolled, every boot is a FIDO2 client PIN typed on this keyboard followed by a touch, because both tokens carry a client PIN and `systemd-cryptenroll` defaults to `--fido2-with-client-pin=yes`, with the passphrase as the fallback typed on the same keyboard.
-The fallback is reached by pressing Enter on an empty PIN at the token prompt, which is itself a keypress on this keyboard, so no credential path on this machine avoids it.
-The requirement is decidable by `nix eval` of `.#nixosConfigurations.pyrite.config.boot.initrd.kernelModules` against the built configuration and does not require the hardware.
+The facter report MUST NOT be relied upon for these, and modules the fleet shares MUST NOT be relied upon for these.
+The requirement is decidable by `nix eval` of `.#nixosConfigurations.pyrite.config.boot.initrd.kernelModules` and does not require the hardware.
+
+#### Scenario: every credential path passes through this keyboard
+
+- **WHEN** the machine boots to the stage-1 unlock prompt
+- **THEN** the dependency on these modules is at least as strong under a LUKS container as it was under a typed ZFS passphrase, across the pre-enrollment and post-enrollment credential states
+- **AND** between the install and the enrollment of a token (D30), every boot is the committed clan-vars passphrase typed on this keyboard and there is no other credential
+- **AND** after both tokens are enrolled, every boot is a FIDO2 client PIN typed on this keyboard followed by a touch, because both tokens carry a client PIN and `systemd-cryptenroll` defaults to `--fido2-with-client-pin=yes`, with the passphrase as the fallback typed on the same keyboard
+- **AND** the fallback is reached by pressing Enter on an empty PIN at the token prompt, which is itself a keypress on this keyboard, so no credential path on this machine avoids it
 
 #### Scenario: the profile supplies the modules that base does not
 
-- **WHEN** `modules/system/initrd-networking.nix:31-34` contributes only `virtio_pci` and `virtio_net` to `boot.initrd.kernelModules` for every NixOS machine
-- **THEN** the SPI modules arrive from the imported profile instead, which sets `boot.initrd.kernelModules` — the option that force-loads — rather than `availableKernelModules`, which only makes a module present
+- **WHEN** pyrite imports no module the fleet shares that contributes to `boot.initrd.kernelModules`, since `initrd-networking`, which contributes `virtio_pci` and `virtio_net`, is imported only by `modules/nixos/hetzner-cloud.nix` and `modules/nixos/gcp-cloud.nix`
+- **THEN** the SPI modules arrive from the imported profile, which sets `boot.initrd.kernelModules` — the option that force-loads — rather than `availableKernelModules`, which only makes a module present
 - **AND** a two-way evaluation carrying the facter report and differing only by the import gives `["dm_mod" "i915"]` without the profile and `["applesmc" "applespi" "dm_mod" "i915" "intel_lpss_pci" "spi_pxa2xx_platform"]` with it, so all four are the profile's marginal contribution and none is supplied elsewhere
 
 #### Scenario: facter supplies no SPI keyboard modules
@@ -100,22 +104,23 @@ The requirement is decidable by `nix eval` of `.#nixosConfigurations.pyrite.conf
 ### Requirement: boot.initrd.kernelModules is never overridden with mkForce
 
 The pyrite host module MUST NOT set `boot.initrd.kernelModules` with `lib.mkForce`.
-The virtio entries `base` contributes SHALL be left in place.
+Compliance is decidable by `nix eval` of `.#nixosConfigurations.pyrite.config.boot.initrd.kernelModules`, which SHALL contain the four SPI/SMC modules and `i915`.
+Initrd networking SHALL be off on pyrite because no module enables it, and the pyrite host module SHALL assert that `boot.initrd.network.enable` is false.
 
 #### Scenario: mkForce on the module list is a lockout, not a cleanup
 
-- **WHEN** the intent is to drop `base`'s cloud-VM `virtio_pci` and `virtio_net` entries, for which `lib.mkForce [ ... ]` is the natural-looking mechanism
-- **THEN** it MUST NOT be used, because the option accumulates from an open set of sources this specification does not close over — `base`'s virtio pair, the profile's `applespi`/`spi_pxa2xx_platform`/`intel_lpss_pci`/`applesmc`, `common/gpu/intel`'s `i915`, facter's `brcmfmac`, facter's own `i915` (`nixos/modules/hardware/facter/graphics/default.nix:33`), and stock nixpkgs modules that no configuration imports deliberately, among them `dm_mod` (`nixos/modules/system/boot/kernel.nix:379`), `af_packet` (`nixos/modules/system/boot/initrd-network.nix:124`), and `zfs` (`nixos/modules/tasks/filesystems/zfs.nix:726`) — and `mkForce` discards every definition it does not name
+- **WHEN** the intent is to drop an entry another module contributes, for which `lib.mkForce [ ... ]` is the natural-looking mechanism
+- **THEN** it MUST NOT be used, because the option accumulates from an open set of sources this specification does not close over — the profile's `applespi`/`spi_pxa2xx_platform`/`intel_lpss_pci`/`applesmc`, `common/gpu/intel`'s `i915`, facter's own `i915` (`nixos/modules/hardware/facter/graphics/default.nix:33`), and stock nixpkgs modules that no configuration imports deliberately, among them `dm_mod` (`nixos/modules/system/boot/kernel.nix:379`) and `zfs` (`nixos/modules/tasks/filesystems/zfs.nix:726`) — and `mkForce` discards every definition it does not name
 - **AND** the openness of that set is the ground for the prohibition rather than a gap in it, since a prohibition that does not depend on enumerating the contributors cannot be defeated by finding another one
 - **AND** the stock contributions are decidable by `nix eval` without pyrite's hardware: `nix eval --json .#nixosConfigurations.cinnabar.config.boot.initrd.kernelModules` returns `["af_packet","dm_mod","virtio_balloon","virtio_console","virtio_gpu","virtio_net","virtio_pci","virtio_rng","zfs"]` on a machine that imports no nixos-hardware profile
-- **AND** compliance is decidable by `nix eval` of `.#nixosConfigurations.pyrite.config.boot.initrd.kernelModules` against the built configuration, which SHALL contain the four SPI/SMC modules, `i915`, and `base`'s virtio pair
+- **AND** `nix eval --json .#nixosConfigurations.pyrite.config.boot.initrd.kernelModules` returns `["applesmc","applespi","dm_mod","i915","intel_lpss_pci","spi_pxa2xx_platform","zfs"]`
 - **AND** the resulting configuration would evaluate cleanly, build cleanly, and boot to an unlock prompt that is invisible or unanswerable, on a machine with no macOS to fall back to
-- **AND** the virtio entries are left alone because on bare metal they modprobe, find no matching device, and cost a few kilobytes of initrd
 
 #### Scenario: initrd SSH is disabled without touching the module list
 
-- **WHEN** `base` enables `boot.initrd.network.ssh` on port 2222 for remote unlock
-- **THEN** pyrite overrides that option specifically, because its only NIC is `brcmfmac` WiFi which will not associate in initrd, and an advertised remote-unlock path that cannot function is worse than none
+- **WHEN** pyrite imports neither cloud provider aspect, so no module imports `initrd-networking`
+- **THEN** `nix eval .#nixosConfigurations.pyrite.config.boot.initrd.network.enable` returns `false`, its default, and there is no initrd SSH, which suits a machine whose only NIC is `brcmfmac` WiFi that will not associate in initrd
+- **AND** a module enabling it fails pyrite's evaluation on the host module's assertion, because nixpkgs' `hardware/facter/networking/initrd.nix` would then put `brcmfmac` in stage 1, where its per-vendor sub-module cannot load and the failed attach leaves the machine with no network device
 - **AND** this is a distinct option from `boot.initrd.kernelModules` and requires no list override
 
 ---
@@ -238,10 +243,15 @@ That is a decision on the evidence recorded below rather than a permanent exclus
 
 ### Requirement: A panic that outlives the disk is recorded through EFI pstore, because every other channel is unavailable on this machine
 
-The pyrite host module SHALL set `boot.kernel.sysctl."kernel.panic"` to a nonzero timeout, so a panic reboots the machine rather than leaving it dark, and SHALL leave the `pstore` filesystem and `systemd-pstore` archival at the nixpkgs defaults that mount `efi_pstore` and run the archival unit.
-It MUST NOT carry `kernel.hung_task_panic`, `kernel.softlockup_panic`, or `kernel.hardlockup_panic` in the built configuration: those turn a long ZFS scrub or a long nix build into a reboot, which is not a behaviour a daily driver can carry, and they are set by hand for the duration of a supervised test instead.
+The pyrite host module SHALL set `boot.kernel.sysctl."kernel.panic"` to a nonzero timeout and SHALL leave `pstore` and `systemd-pstore` at the nixpkgs defaults that mount `efi_pstore` and run the archival unit.
+It MUST NOT carry `kernel.hung_task_panic`, `kernel.softlockup_panic`, or `kernel.hardlockup_panic`.
 The record MUST reach a medium that does not depend on the NVMe controller, which is the component whose failure it records.
-The operator procedure for reading a captured record back belongs in the runbook rather than here; this requirement covers only what the built configuration carries.
+
+#### Scenario: the panic-on-hang keys are left to supervised tests
+
+- **WHEN** a long ZFS scrub or a long nix build runs on the built configuration
+- **THEN** it does not reboot the machine, because the three panic-on-hang keys are absent, and they are set by hand for the duration of a supervised test instead
+- **AND** the operator procedure for reading a captured record back belongs in the runbook; this requirement covers only what the built configuration carries
 
 #### Scenario: EFI pstore is chosen because the failure destroys every disk-backed channel
 
@@ -260,4 +270,4 @@ The operator procedure for reading a captured record back belongs in the runbook
 
 - **WHEN** automatic reboot on panic is enabled
 - **THEN** it is recorded that the machine does not return to service unattended, because the reboot lands at the stage-1 LUKS unlock, which needs a seated token and a typed client PIN, or the passphrase
-- **AND** this is accepted rather than mitigated, because the machine already cannot be rebooted remotely under any encryption scheme — `boot.initrd.network.enable` is forced false and there is no initrd SSH — so auto-reboot converts an indefinite hang into a machine waiting at a prompt, which is strictly better and claims nothing more
+- **AND** this is accepted rather than mitigated, because the machine already cannot be rebooted remotely under any encryption scheme — `boot.initrd.network.enable` is false and there is no initrd SSH — so auto-reboot converts an indefinite hang into a machine waiting at a prompt, which is strictly better and claims nothing more

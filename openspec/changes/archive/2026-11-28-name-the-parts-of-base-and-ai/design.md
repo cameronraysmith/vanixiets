@@ -152,7 +152,7 @@ Nothing other than order differed.
 
 ## Open Questions
 
-1. Which standalone homes among `crs58@{aarch64-darwin,aarch64-linux,x86_64-linux}` and `cameron@{...}` are activated on some machine today, and where? Their activation task (5.4) names only those; the integrated homes ride the host deploys.
+1. Which standalone homes among `crs58@{aarch64-darwin,aarch64-linux,x86_64-linux}` and `cameron@{...}` are activated on some machine today, and where? Their activation task (5.4) names only those; the integrated homes ride the host deploys. Resolved on 2026-11-28 (Resolved Questions 1).
 2. (2026-11-28) Do the following accept the darwin and `ai` steps without comparisons of their own (D5, "Departure")? As D4 requires, the trace's rejections stopped nothing silently only if they are recorded here:
    - The trace of every changed toplevel and home on the compared pair (`logs/srr-5b-trace-20261127-233754.log`): every order difference is accepted, the thirteen standalone homes without the agent plugins exit 0, and on the ten toplevels and the seven `cameron@*`, `crs58@*` and `claude-sandbox` homes the only rejected leaves are `apm-deps` and `apm-skills-compose`, the two plugin packages that carry the two text edits.
    - The re-trace on the compared pair (`logs/ntp-verify-trace-landed-20261128T054818Z.log`): blackphos, stibnite and `crs58@aarch64-darwin`, whose first trace ran before `fb7b981f1e74`, give the same verdict on the drv-diff's own pairs.
@@ -161,3 +161,17 @@ Nothing other than order differed.
    - A part moved within its list leaves every toplevel and home derivation identical. `logs/srr-verify-mutant-darwin-order-20261128T055245Z.log` moves `base-homebrew` after `base-mosh` in `flake.lib.darwinBaseParts` and records stibnite's and argentum's toplevel drvPaths unchanged; `logs/srr-5b-state2-mut2-20261127-234552.json` equals the commit's `logs/srr-5b-state2-commit2-20261127-234552.json` in all of its 50 recorded derivations. `shape-the-repository-for-its-readers` task 5.4 states that the moves were `base-mosh`, `base-homebrew` and `ai-tuicr` within their lists and `zed-delta` within `darwin-workstation`'s imports; `logs/srr-5-mutant-order-20261127-223407.log`, `logs/srr-5-mutant-homebrew-20261127-225212.log` and `logs/srr-5b-mutant-20261127-233501.log` record only each run's exit status and output size, not which part moved.
 
    The alternative is a trace over a tree holding only this change's edits on the parent; it has not run.
+
+   Open at archive (2026-11-28): no answer is recorded. The change is archived with tasks 3.4, 3.6, 4.4, 4.6 and 6.2 open on this question; the retrospective lists what stands in for the two comparisons.
+
+## Resolved Questions
+
+1. (2026-11-28) No standalone home is known to be activated on a real host. On stibnite the integrated home is the one in use, and `~/.local/state/nix/profiles` there holds no standalone home-manager profile. The evidence for the standalone homes is therefore a test. On 2026-11-28 the five aarch64-linux standalone homes `crs58`, `cameron`, `tara`, `raquel` and `christophersmith` were built from main `709ada4e324b` and activated in a throwaway Ubuntu arm64 virtual machine (`logs/dht-*-20261128T06*.log`):
+   - each built with no package failing;
+   - each activation ran every step through linking the generation, installing packages and reloading systemd, and made generation 1 equal to the evaluated `activationPackage`;
+   - each home's package list is the name-sorted one, entry for entry;
+   - `gh-dash` renders `C`, `m`, `M` in the two homes with the `ai` aspect, crs58's and cameron's;
+   - a repeat activation creates no new generation;
+   - each activation exits 1 at the sops-nix step, because the machine has no age key (`sops-install-secrets: cannot read keyfile`), so the one step after it does not run.
+
+   It does not show secret decryption, an activation that exits 0, the x86_64-linux or aarch64-darwin standalone homes, or any real host. Task 5.4 is ticked on a verify line reworded to what the test shows.

@@ -50,6 +50,8 @@ Tasks left open:
 
 Note (2026-11-28): cinnabar, magnetite and pyrite were since switched to main `d705c39bd6c6` and stibnite activated from it (06:27Z to 06:31Z), each running the system built from that commit with no failed unit and no account or group created or deleted (`logs/fdp-*-20261128T06*.log`, tasks 5.2-5.3). No alert or notice was posted to `fleet-alerts` from 06:15Z to 06:33Z (`logs/fdp-alerts-read-20261128T0633Z.log`). argentum, rosegold and blackphos were offline; electrum, galena and scheelite are disabled; no standalone home was activated. A377 is exercised on stibnite only.
 
+Note (2026-11-28, before archive): a second read of `fleet-alerts` at 06:59Z, 28 minutes after the last switch, returned no message since 06:15Z (`logs/fdp-alerts-read-20261128T0659Z.log`). Tasks 5.1 and 5.4 are closed: no standalone home is known to be activated on a real host, and the five aarch64-linux standalone homes were built from main `709ada4e324b` and activated in a throwaway virtual machine, each making generation 1 the evaluated `activationPackage` and each exiting 1 at the sops-nix step for want of an age key (design Resolved Question 1; `logs/dht-*-20261128T06*.log`).
+
 Trace runs on the compared pair: `logs/srr-5b-trace-20261127-233754.log` ran on pairs whose drvPaths match the drv-diff's for 174 of 186 attribute sides. The 12 that differ are blackphos, stibnite, `crs58@aarch64-darwin` and their `darwin-*` and `home-manager-crs58` checks, before and after: `fb7b981f1e74` (the fonts fix) landed between the two runs. Rerun on the drv-diff's pairs, the trace gives the same verdict. It accepts `chosenOutputs` of `system-path`, `system-applications` and the three home profiles, the gh-dash bindings and the Brewfile, and it rejects only `apm-deps` and `apm-skills-compose` (`logs/ntp-verify-trace-landed-20261128T054818Z.log`).
 
 ---
@@ -235,5 +237,7 @@ The judge log confirms each of these on constructed values. Every rule the spec 
   - task 4.5's profiles are completed (finding 4);
   - the operator tasks are done: 5.1, then 5.2 (six NixOS hosts), 5.3 (four Macs, three now offline), 5.4, and 6.4 after 5.3.
 - [ ] (fail) FAIL
+
+Archive (2026-11-28): archived with 9 of 29 tasks open, each with its reason under it in `tasks.md`: 3.4, 3.6, 4.4, 4.6 and 6.2 on design Open Question 2, which has no recorded answer; 4.5, the profile comparison, not taken up; 5.2 and 5.3, electrum, galena and scheelite disabled and argentum and rosegold offline (blackphos has no machine); 6.4, after 5.3. Findings 1 and 2 have their dated corrections; the requirement "Each step is accepted on its own derivation comparison" is not restated and is recorded as partly discharged in the satisfaction table.
 
 **Next step**: decide how findings 1 and 2 are restated, then deploy the ten hosts.

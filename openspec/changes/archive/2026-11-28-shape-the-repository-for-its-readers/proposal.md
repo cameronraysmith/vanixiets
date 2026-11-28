@@ -3,15 +3,18 @@ linear_story_id: CAM-142
 linear_story_identifier: CAM-142
 linear_story_title: "Shape the repository for the people and agents who read it"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-142/shape-the-repository-for-the-people-and-agents-who-read-it
-linear_story_state: Todo
+linear_story_state: Done
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: Todo
-last_synced_at: "2026-11-28T00:44:46Z"
+last_synced_state: Done
+last_synced_at: "2026-11-28T07:07:16Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-28T00:44:46Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-142 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes, and the bind comment posted; state and project confirmed by read-only view" }
+  - { at: "2026-11-28T07:07:01Z", transition: "archive->mirror", outcome: "posted", note: "Documents in project Den-ready fleet architecture (06049a4f18a4): OpenSpec: repository-shape (db019015) and repository-shape-interface (1cea943b) created, ids stored in openspec/linear.yaml; OpenSpec: apple-laptop-hardware-support (8d697b98), the document openspec/linear.yaml lists for that capability under project pyrite-baremetal-nixos (48b4123d589b), updated in place rather than duplicated in this project" }
+  - { at: "2026-11-28T07:07:01Z", transition: "archive->mirror", outcome: "dropped", note: "world-assumptions (69e977af) not updated: it is listed in defaults.archive_documents.unmirrored, and the synced spec is 290743 characters, over Linear's 250000-character document limit; the document still holds an earlier archive's copy" }
+  - { at: "2026-11-28T07:07:16Z", transition: "In Progress->Done", outcome: "posted", note: "Catch-up in one transition: the intermediate transitions (Todo->In Progress, In Progress->In Review) were not recorded in this ledger, and Linear read In Progress before the transition. Archived with 8 of 60 tasks open and verify.md's Overall Decision checked NOT READY FOR ARCHIVE, its conditions' state recorded under it at archive; the requirement 'Restructuring is accepted on what readers can do' is not met. Synced repository-shape, repository-shape-interface, apple-laptop-hardware-support (three MODIFIED requirements) and world-assumptions (A383-A386 and the requirement 'Designations for the shape of the fleet description' added). Review gates: no review-gate decision is recorded for this change beyond the reviews that ran before each commit landed. Workspace confirmed by linear auth whoami; state confirmed Done by read-only view; archive comment posted" }
 ---
 
 ## Why

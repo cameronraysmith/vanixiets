@@ -144,6 +144,10 @@ projects:
     name: "Den-ready fleet architecture"
     teams: ["CAM"]
     archive_documents:
+      "aspect-parts":
+        id: "49de908d-f552-434c-b270-7c450ee09388"
+      "aspect-parts-interface":
+        id: "438c9648-070b-443b-92c7-cab639d95a29"
       "fleet-ingress-interface":
         id: "e530cb24-f8c6-4034-b1f4-e45e621460c5"
       "fleet-obligation-registry-interface":
@@ -166,6 +170,10 @@ projects:
         id: "8a18c207-3c66-4e84-b5a2-e806a419925a"
       "refactor-identity-oracle-interface":
         id: "55363500-f3fb-4abf-90eb-c06f80c4e400"
+      "repository-shape":
+        id: "db019015-4707-4000-98b6-6cbcf5c8372b"
+      "repository-shape-interface":
+        id: "1cea943b-d43c-456f-ba1e-d9d191b6eacc"
       "secret-consumption-seam":
         id: "0e4ee73d-3bbb-4aca-92d8-f62d6d173141"
       "secret-consumption-seam-interface":

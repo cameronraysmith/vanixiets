@@ -252,6 +252,8 @@ Until the deploy runs, nothing is observed on any host: no `/run/current-system`
 
 Note (2026-11-28): the deploy has since run on cinnabar, magnetite, pyrite and stibnite, to main `d705c39bd6c6` (tasks 8.2, 8.3; `logs/fdp-*-20261128T06*.log`). On each, `/run/current-system` is the system built from that commit and the deploy record names it; stibnite's activation deleted no account or group. No alert or notice was posted to `fleet-alerts` from 06:15Z to 06:33Z (`logs/fdp-alerts-read-20261128T0633Z.log`); a second read is due before the archive. pyrite's new initrd takes effect at its next boot. argentum and rosegold were offline.
 
+Note (2026-11-28, before archive): a second read of `fleet-alerts` at 06:59Z, 28 minutes after the last switch, returned no message since 06:15Z, and `/v1/health` answered 200 (`logs/fdp-alerts-read-20261128T0659Z.log`). No standalone home is known to be activated on a real host; the five aarch64-linux standalone homes were built from main `709ada4e324b` and activated in a throwaway virtual machine, each making generation 1 the evaluated `activationPackage` and each exiting 1 at the sops-nix step for want of an age key (design Resolved Question 14; tasks 8.1, 8.4).
+
 ## 8. Designation Lint and Discharge Coherence
 
 **8a.** The content nouns of `repository-shape` resolve to rows of the world-assumptions delta table: part, route, composition, composition statement, host list, entry-point document, placement rule, fleet-wide setting, hand-entered secret, Mac application, installed packages, review binding, reader measure, lookup, placement, enumeration and impact task, priority step and order step. "operator", "check" and "host" resolve to existing rows.
@@ -281,3 +283,12 @@ Note (2026-11-28): the deploy has since run on cinnabar, magnetite, pyrite and s
   - land the working copy's text corrections and edit the principles document (Leftovers 1-4).
 
 **Next step**: deploy cinnabar, magnetite, pyrite and stibnite, then argentum and rosegold when online. Then run the commands arm.
+
+Archive (2026-11-28): the change is archived with this decision unchanged and 8 of 60 tasks open, each with its reason under it in `tasks.md`. Where each condition above stands:
+- the deploy: run on cinnabar, magnetite, pyrite and stibnite, with a second alert read; 8.1 and 8.4 closed on the test-machine activation; 8.3 open, argentum and rosegold offline;
+- the commands arm (10.1b): not run;
+- F1 and F3: done by pull request 4511 (`709ada4e324b`), compared against `drv-delta-order-items.txt` (`logs/drv-diff-d705c39bd6c6-709ada4e324b-20261128T062913Z`, `result: PASS`), tasks 2.6 and 5.5-5.7;
+- F4 and F9: `repository-shape` restated (pull request 4512);
+- Leftovers 1-4: the text corrections landed in pull request 4512; the principles document still lacks its resolving commits (task 9.2, open).
+
+The requirement "Restructuring is accepted on what readers can do" is not met and is recorded as undischarged in the satisfaction table, with the other requirements this report finds met in part recorded as partly discharged.

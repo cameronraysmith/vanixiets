@@ -359,3 +359,12 @@ The three order items left open after the order step (the gh-dash bindings, the 
 11. The justfile's two host lists are deleted; `just check-uncached-machine` reads the host's class from the registry.
 12. Archived plans are hidden from default searches by an `.ignore` entry `openspec/changes/archive/`; `rg --no-ignore` still reaches them.
 13. (2026-11-28) The fleet deploy switched cinnabar, magnetite, pyrite and stibnite to main `d705c39bd6c6`. electrum, galena and scheelite are disabled and blackphos has no machine: none was deployed, and each takes the new derivations when next provisioned. argentum and rosegold, enabled Macs, were offline and wait for their deploy.
+14. (2026-11-28) No standalone home is known to be activated on a real host. On stibnite the integrated home is the one in use, and `~/.local/state/nix/profiles` there holds no standalone home-manager profile. The evidence for the standalone homes is therefore a test. On 2026-11-28 the five aarch64-linux standalone homes `crs58`, `cameron`, `tara`, `raquel` and `christophersmith` were built from main `709ada4e324b` and activated in a throwaway Ubuntu arm64 virtual machine (`logs/dht-*-20261128T06*.log`):
+    - each built with no package failing;
+    - each activation ran every step through linking the generation, installing packages and reloading systemd, and made generation 1 equal to the evaluated `activationPackage`;
+    - each home's package list is the name-sorted one, entry for entry;
+    - `gh-dash` renders `C`, `m`, `M` in the two homes with the `ai` aspect, crs58's and cameron's;
+    - a repeat activation creates no new generation;
+    - each activation exits 1 at the sops-nix step, because the machine has no age key (`sops-install-secrets: cannot read keyfile`), so the one step after it does not run.
+
+    It does not show secret decryption, an activation that exits 0, the x86_64-linux or aarch64-darwin standalone homes, or any real host. Tasks 8.1 and 8.4 are ticked on verify lines reworded to this.
