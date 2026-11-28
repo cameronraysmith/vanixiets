@@ -15,30 +15,26 @@ attempt_log:
 
 ## Why
 
-A reference copy can silently stop updating: once upstream's branch moves past a commit the copy holds without its history, every refresh fails, and agents go on reading stale source.
-On stibnite on 2026-11-27, 2 of 679 copies failed every refresh, 84 held 8,071 such commits that no branch reaches yet, and upstream's branch already contains one in 2 more, whose next refresh will fail.
-Healing by hand, by deepening a sized number of commits, hid 11 commits of history the copy had held; only a second deepen to the roots brought them back.
+A reference copy can silently stop updating: once upstream's branch moves past a commit the copy holds without its history, every refresh fails with git's `fatal: Not possible to fast-forward, aborting.`, and agents go on reading stale source.
+On stibnite on 2026-11-27, 2 of 679 copies failed every refresh this way, and upstream's branch already contained such a commit in 2 more.
+Nothing in the writer's reply says why, and the repair an account reaches for, `ghq-sync --deepen N` with N sized to the gap, hid 11 commits of history the copy had held on `nixos-hardware`; only a second deepen to the roots brought them back.
+An automatic heal with a crash-safe repair was built and failed verification four times (D4), so this change reports the block and names a repair that hides nothing, and changes nothing the writer does to a repository.
 
 ## What Changes
 
 Decisions tagged `D<n>` are developed in `design.md`.
 
-**A refresh that meets a shallow boundary**
-- From: `ghq get -u` fails with `fatal: Not possible to fast-forward, aborting.`, the writer replies 1, and every later refresh fails the same way until someone deepens the copy by hand.
-- To: when the fast-forward fails because a shallow boundary lies between the local branch and its upstream, the writer fetches the upstream branch to a doubling depth until the local tip is in its history (D1, D2), removes the boundaries that fetch placed on history the copy already held (D3), and fast-forwards; within a bound on the commits a heal may bring in (D4). The reply and the exit log line say whether it healed (D5); a heal that cannot complete leaves the refresh's failure as it was and the copy's history whole (D6).
-- Reason: the copy keeps updating, and no heal hides history it held.
-- Impact: non-breaking; a refresh that heals takes longer and fetches the missing commits and trees; one that does not need a heal costs nothing more.
+**A refresh that a shallow boundary blocks**
+- From: `ghq get -u` fails with git's fast-forward refusal, the writer replies 1, and nothing says why or how to repair it.
+- To: when the fast-forward fails and a shallow boundary lies between the local branch and its upstream (D1), the reply keeps git's refusal and exit status and adds two lines: that the copy holds a commit without its history which upstream's branch has moved past, and the command that repairs it, `ghq-sync --deepen 1000000 <path>` followed by `ghq-sync -u <path>` (D2, D3). The exit log line adds `boundary=blocked`.
+- Reason: the account learns the cause and a repair that hides no history.
+- Impact: non-breaking; finding the boundary reads the clone and writes nothing; an update that succeeds runs nothing more, and one that fails reads `.git/shallow` and, when it lists a boundary, runs three read-only git commands.
 
-**The history a healed refresh brings in**
-- From: n/a.
-- To: the history fetch makes the commits a healed refresh brought in readable, and does not walk the history the copy held before (D7).
+**What ghq-sync and the skill say of `--deepen`**
+- From: `ghq-sync --deepen N` is described as deepening by N commits.
+- To: the usage text and the skill `dependency-source-acquisition` say that a sized `--deepen` can hide history the copy holds, and name `--deepen 1000000` as the form that hides none (D3).
 
-**Deepen**
-- From: `ghq-sync --deepen N` can mark commits whose history the copy holds as boundaries, hiding that history.
-- To: a deepen removes those boundaries as a heal does (D8), so it never hides history a branch reached.
-- Impact: non-breaking; this is a scope choice for review (design, Open Questions 1).
-
-Not in this change: fetching tags with their history or refusing to fetch a tag ahead of a branch (D9); a pass over existing copies to remove boundaries that hide held history, of which stibnite has 1,894 in 70 copies (D10); hydrating the commits a copy fetched before the writer kept its history record; the items of CAM-138.
+Not in this change: any automatic heal, repair of `.git/shallow`, record of a stopped request, or change to what `--deepen N` does (D4); fetching tags with their history; a pass over existing copies whose boundaries hide held history; the items of CAM-138.
 
 ## Capabilities
 
@@ -48,12 +44,13 @@ None.
 
 ### Modified Capabilities
 
-- `shared-reference-tree` (stratum: `behavioral`): adds `A refresh succeeds when upstream's branch has moved past history the reference repository holds only in part`, `Moving past history held in part never hides history a reference repository held` and `A refresh that cannot move past history held in part leaves the reference repository as it was`.
-- `shared-reference-tree-interface` (stratum: `interface`): adds `An update heals a fast-forward a shallow boundary blocks`, `A heal fetches the upstream branch to a doubling depth`, `A heal removes the boundaries its fetch placed on held history`, `A heal checks that every ref still reaches what it reached`, `A heal is bounded by the commits it brings in`, `The writer's reply says what a heal did`, `The writer's exit log line names what a heal did`, `A heal that cannot complete leaves the update's outcome as it was`, `The history walk of a healed update stops at what the clone held before` and `A deepen removes the boundaries it placed on held history`; modifies `A request that brings in no commit runs no history walk`, whose scenario of a branch moving onto a boundary now holds for an update that does not heal. Trust boundary: the properties hold at the writer's handler and the clone it acts on, for upstreams that serve a depth fetch of a branch; they do not make a branch upstream rewrote fast-forward, and say nothing of the content an upstream serves.
-- `world-assumptions` (stratum: `world`): adds A380 to A382, git's shallow-history facts the design relies on.
+- `shared-reference-tree` (stratum: `behavioral`): adds `A refresh that history held in part blocks says why and how to repair it`.
+- `shared-reference-tree-interface` (stratum: `interface`): adds `The writer's reply names a shallow boundary that blocks an update` and `The writer's exit log line marks an update a shallow boundary blocks`.
+- `world-assumptions` (stratum: `world`): adds A380 to A382, the git and upstream facts the report and its named repair rely on.
 
 ## Impact
 
-- Code: `pkgs/by-name/ghq-shared/ghq-writer-handler.py` (the heal, the repair, the walk's exclusion, the status line and token, `healLimit`); `pkgs/by-name/ghq-shared/test_handler_history.py`, and a third handler test script with its own check only if the history check's time on magnetite calls for one; `pkgs/by-name/ghq-sync/ghq-sync.sh` (usage text of `-u` and `--deepen`); `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`; `modules/checks/package-tests.nix` only for a new check.
-- Tests: the existing handler case "A boundary present when a request begins counts as held" changes: the update it describes now heals; its point, that a boundary present when a request begins counts as held, moves to an update whose heal is not allowed to run.
-- Hosts: magnetite, pyrite and stibnite, by their usual deploys; a copy heals at its first refresh that needs it after its host's deploy.
+- Code: `pkgs/by-name/ghq-shared/ghq-writer-handler.py` (the read-only finding, the two reply lines and the log token); `pkgs/by-name/ghq-shared/test_handler_boundary.py`, a third handler test script with its own check `package-ghq-shared-test-handler-boundary` declared in `modules/checks/package-tests.nix`, wired in `package.nix` and `test-handler.nix`; `handler_fixtures.py`'s docstring.
+- Text: `pkgs/by-name/ghq-sync/ghq-sync.sh`'s usage text and `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`.
+- Record: `verify.md`, the four verifications of the automatic heal this change set aside.
+- Hosts: magnetite, pyrite and stibnite, by their usual deploys; a blocked copy is repaired by hand, by the command its reply names.
