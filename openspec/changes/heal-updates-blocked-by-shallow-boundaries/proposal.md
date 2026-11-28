@@ -3,14 +3,15 @@ linear_story_id: CAM-140
 linear_story_identifier: CAM-140
 linear_story_title: "ghq-sync -u fails when the update fast-forwards onto a shallow boundary a tag fetch left"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-140/ghq-sync-u-fails-when-the-update-fast-forwards-onto-a-shallow-boundary
-linear_story_state: Todo
+linear_story_state: In Review
 linear_team: CAM
-last_synced_state: Todo
-last_synced_at: "2026-11-28T00:08:38Z"
+last_synced_state: In Review
+last_synced_at: "2026-11-28T09:02:15Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-28T00:08:32Z", transition: "Backlog->Todo", outcome: "posted", note: "Bound CAM-140 (team CAM, no project) on proposal.md; description seeded from proposal.md, the earlier investigation description saved under logs/; state confirmed Todo by read-only view; milestone comment added" }
+  - { at: "2026-11-28T09:02:12Z", transition: "In Progress->In Review", outcome: "posted", note: "Linear already held In Progress, set outside this ledger; verify.md passed for the narrowed change, so moved to In Review; description re-seeded from the narrowed proposal; milestone comment added" }
 ---
 
 ## Why
