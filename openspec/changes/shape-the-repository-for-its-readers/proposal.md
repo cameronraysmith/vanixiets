@@ -31,7 +31,7 @@ On main `1e8fb9ff6d66`, fresh read-only agents answered 20 of 20 lookups right i
 
 **Placement rules**: the modules README states one rule per kind of addition; the checks README and the checks skill one check ladder with its one exception; the secrets module one shape for a hand-entered secret. Texts that misled lookups are corrected.
 
-**Priority, then order**: equal-priority packages that provide differing files at one path get explicit priorities matching today's winners; then system and home package lists are sorted, the overlay order is one list, and the review bindings are keyed. Every configuration changes priority metadata or order only.
+**Priority, then order**: equal-priority packages that provide differing files at one path were to get explicit priorities matching today's winners; measured on every host, none provides one, so no priority was set. System and home package lists and the Brewfile's taps, brews and casks are sorted, the overlay order is one named list, the review bindings are keyed and the darwin activation snippets take their slots from one table. Every configuration changes order only, apart from two texts delivered into homes and pyrite's loss of one part.
 
 **Parts lists resumed**: the darwin `base` and `ai` steps of `name-the-parts-of-base-and-ai` land after the order step with their names and change no derivation; then the darwin halves leave `nixos/`.
 
@@ -42,7 +42,7 @@ On main `1e8fb9ff6d66`, fresh read-only agents answered 20 of 20 lookups right i
 ## Capabilities
 
 ### New Capabilities
-- `repository-shape` (behavioral): no host list kept by convention alone, each configuration's composition stated on request with known routes, one placement rule per kind of addition, and restructuring that changes nothing delivered beyond declared priority and order.
+- `repository-shape` (behavioral): no host list kept by convention alone, each configuration's composition stated on request with known routes, one placement rule per kind of addition, and restructuring that changes nothing delivered beyond the differences each step declares: order, two texts delivered into homes, and pyrite's loss of one part; no priority pins were needed.
 - `repository-shape-interface` (interface): the derived and checked host lists, the onboarding steps and their checks, the composition command and the route obligation, the priority and order mechanisms, the documented rules, and the reader measure; trust boundary stated.
 
 ### Modified Capabilities
@@ -51,6 +51,6 @@ On main `1e8fb9ff6d66`, fresh read-only agents answered 20 of 20 lookups right i
 ## Impact
 
 - Code: `modules/lib/hosts.nix`, `clan/inventory/machines.nix`, `checks/sops-correspondence.nix`, `home/core/ssh.nix`, `checks/machines.nix`, `checks/structure/flake-shape.nix`, new key checks and route judge, a `just composition` recipe, `modules/README.md`, a new `modules/checks/README.md`, the checks skill source, `system/secrets.nix` and `darwin/darwin-workstation.nix` headers, package priority marks and sort modules, `nixpkgs/compose.nix`, `home/development/gh-dash.nix`, `modules/home/users/**` and `clan/inventory/services/users/*`; open changes touching the same files are named per step in design D5.
-- Derivations: only the priority and order steps change any; every other step is accepted on an empty comparison apart from declared checks.
+- Derivations: the order step changes every host and home (order, and two texts delivered into homes), and the step importing parts only where used changes pyrite; no priority step was needed, since no equal-priority collision was measured; every other step is accepted on a comparison changing only declared checks.
 - Deploy: once, after the last step, to the enabled hosts (cinnabar, magnetite, pyrite, stibnite, argentum, rosegold) and the standalone homes in use; electrum, galena and scheelite are disabled and blackphos has no machine, so their derivations change and nothing is deployed.
 - Plans: `name-the-parts-of-base-and-ai` steps 2 and 3 are held until the order step lands; the overlay seam stays with `migrate-mesh-to-tincr`.

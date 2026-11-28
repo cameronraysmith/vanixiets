@@ -28,8 +28,9 @@ let
   ) memoryNodes;
   physMemBytes = lib.foldl' (total: r: total + r.range) 0 physMemResources;
 
-  # modules/system/zram-swap.nix exports into the `base` namespace, i.e. every
-  # machine. pyrite is a 15 GiB laptop that livelocked under zram pressure on
+  # modules/system/zram-swap.nix defines `base-zram-swap`, which
+  # modules/nixos/base.nix lists, so every NixOS host takes it. pyrite is a
+  # 15 GiB laptop that livelocked under zram pressure on
   # 2026-09-22 (no OOM kill, no userspace recovery, manual reboot), so raising
   # the fleet default would put more compressed data in RAM on exactly the
   # machine with the worst demonstrated failure mode. The headroom is therefore

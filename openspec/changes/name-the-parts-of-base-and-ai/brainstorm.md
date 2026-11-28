@@ -69,6 +69,7 @@ For each change, the list options and the derivations (`logs/ntp-2-lists-2026112
   `nix derivation show`, followed down the changed inputs: `system-path` and `system-applications` differ only in the order of `chosenOutputs` (same entries); `etc` and the toplevel differ only in those paths.
 - `ai`, each reached home (standalone or integrated): `home.packages` keeps its members (320 to 344) and moves eleven, the agent packages `devin-cli`, `omp`, `ocd`, `omnigent`, `moshi-hook-wrapped`, `claude-glm`, `claude-cerebras`, `nodejs-22`, `uv`, `docker` and `atomic`.
   `home-manager-path`, `home-manager-fonts` and `home-manager-applications` differ only in `chosenOutputs` order; `gh-dash-config.yml` differs only in the order of `keybindings.prs` (the same three bindings, keys `m`, `M`, `C`, all distinct).
+  Correction (2026-11-28): main renders the three bindings in the order `C`, `m`, `M`; `home/development/gh-dash.nix` now keys them by key and renders them in that fixed order (`prsOrder`).
   Every other changed derivation (`home-manager-files`, the activation script, `hm-putter.json`, the font config, the generation, `user-environment`, the units, `etc`, the toplevel) differs only in the paths of those.
   Every host's `systemPackages`, users, groups, `knownUsers`, `knownGroups`, uids and gids are equal; every other integrated home (christophersmith, raquel, janettesmith, tara, omnigent-cameron, omnigent-janettesmith) is equal.
 

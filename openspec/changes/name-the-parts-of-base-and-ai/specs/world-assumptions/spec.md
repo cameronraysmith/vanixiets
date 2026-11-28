@@ -439,6 +439,9 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | parts list | — | the one statement in the fleet description naming, in order, every part of the base settings of one kind of host, or of the agent tooling | shared |
 | member order | — | the order in which a host's or home's list of installed packages, accounts or other entries holds its members, as distinct from which members it holds | shared |
 | review binding | — | a key in a person's pull-request dashboard that starts an action on the selected pull request, such as enqueueing it or opening a code review | shared |
+| restatement step | — | one delivery step that rewrites the base settings of one kind of host, or the agent tooling, as a parts list, accepted on its own comparison | shared |
+| Homebrew entry | — | one tap, command-line formula or application that a darwin host's configuration asks Homebrew to install, listed among the entries of its kind | shared |
+| group | — | a named set of accounts on a host, identified by a group id, that grants its members shared access | shared |
 
 #### Scenario: The terms with two senses are read
 

@@ -3,7 +3,7 @@
 changed inputs (`nix-stock derivation show`) and accepts only a derivation whose
 fields are equal once changed paths are substituted, the order of
 structuredAttrs.chosenOutputs (same entries) in the profile builds in PROFILES,
-the order of the three gh-dash `prs` keybindings (m, M, C), and the order of
+the order of the three gh-dash `prs` keybindings (C, m, M), and the order of
 lines within each section of a Brewfile whose sections are the same. Anything
 else, or an input that cannot be paired, is rejected; exits 1 on any. Same-named
 inputs are paired by shared input derivations, then by closure overlap."""

@@ -66,20 +66,21 @@ Top-level files configure the flake itself: `flake-parts.nix`, `formatting.nix`,
 |---|---|---|
 | Host | its record in `lib/hosts.nix`, its composition in `machines/<class>/<host>/default.nix`, and the generated steps of the host-onboarding guide (`packages/docs/src/content/docs/guides/host-onboarding.md`, "Adding a host to the fleet description") | `machines/nixos/magnetite/default.nix` and the `magnetite` record |
 | Person | `home/users/<account>/` (`meta.nix`, `default.nix`), an attachment `flake.fleet.hosts.<host>.users.<account>` in `lib/host-users.nix` per host, and a clan user instance in `clan/inventory/services/users/` when the account exists on NixOS hosts | `home/users/tara/`, `tara`'s attachments, `clan/inventory/services/users/tara.nix` |
-| Setting every machine of a class takes | a named part, its name added to the class's `base` list | `system/nix-download-timeout.nix` defines the NixOS part `base-nix-download-timeout`, listed in `nixos/base.nix`, and its darwin half, which still assigns into darwin `base` until that list exists; a part of one class only lives in that class's directory |
-| Feature for some hosts | a named module in the class directory, imported by each host that takes it | `nixos/greptimedb-server.nix`, `nixos/postgresql-backup.nix` and `nixos/r2-usage.nix`, imported in `machines/nixos/magnetite/default.nix` |
+| Setting every machine of a class takes | a named part, its name added to the class's `base` list: `flake.lib.nixosBaseParts` in `nixos/base.nix`, `flake.lib.darwinBaseParts` in `darwin/base.nix` | `system/nix-download-timeout.nix` defines the part `base-nix-download-timeout` for both classes, listed in both lists; a part of one class only lives in that class's directory |
+| Feature for some hosts | a named module in the class directory, imported by each host that takes it | `nixos/greptimedb-server.nix` and `nixos/r2-usage.nix`, imported in `machines/nixos/magnetite/default.nix`; no module is a PostgreSQL host role: a service that needs PostgreSQL turns it on (`nixos/omnigent.nix`), and `nixos/postgresql-backup.nix` only backs up a PostgreSQL already running |
 | Mac application several hosts take | a named module in `darwin/` (or `system/` with a NixOS half), imported by each host or by `darwin-workstation`, using the nix-darwin service when one exists and a cask otherwise; a host file lists only values that differ by host | `darwin/zeditor.nix`, imported by `darwin/darwin-workstation.nix` |
 | Server service with roles on several hosts | a clan service under `clan/services/<name>/` importing plain named modules, and its instance in `clan/inventory/services/<name>.nix` | `clan/services/otel-collector/`, `clan/inventory/services/otel-collector.nix` |
 | Hand-entered secret | a `vanixiets.secrets.<name>` entry with a hidden prompt, `files.<f>.deploy = false`, and a script rendering the file the service reads (`system/secrets.nix`, "Secrets" below) | the `greptimedb-r2` entry in `nixos/greptimedb-server.nix` |
 | Home tool | a file under `home/<area>/` assigning into that area's aggregate | `home/tools/bottom.nix` into `homeManager.tools` |
-| Check | the cheapest rung of the ladder in `checks/README.md` | `darwin/resolver-reload.nix` (an obligation), `checks/sshd-no-keyboard-interactive.nix` (a standalone check) |
+| Check | the cheapest rung of the ladder in `checks/README.md`; the registry's `checked = false` (scheelite) removes a host's machine check, and a fact that must hold on such a host as well is therefore a standalone check on rung 2, even though it is about one configuration's values | `darwin/resolver-reload.nix` (an obligation), `checks/sshd-no-keyboard-interactive.nix` (a standalone check) |
 
 ## Where order is written
 
 Most definitions merge without an order that matters; where order matters it is written in one place:
 - `nixos/base.nix`: `flake.lib.nixosBaseParts`, whose order is the import order of the NixOS base parts, so list options merge their parts' definitions in that order.
-- `system/deploy-record.nix`: `activationOrder`, the `mkOrder` priority of each first-party darwin `postActivation` snippet, the deploy record last.
-- `nixpkgs/compose.nix`: the overlay stack, the internal overlays of `nixpkgsOverlays` (the files under `nixpkgs/overlays/`, in their import order) composed first and the custom packages over them.
+- `system/deploy-record.nix`: `activationOrder`, the `mkOrder` priority of each first-party darwin `postActivation` and launchd activation snippet, the deploy record last.
+- `nixpkgs/compose.nix`: the overlay stack. Each file under `nixpkgs/overlays/` adds its overlays as `nixpkgsOverlaysByName.<name>`, and `overlayOrder` there is the one list of their names, the order they apply in; the custom packages compose over them. A name missing from the list, or listed and defined by no file, fails evaluation.
+- `home/development/gh-dash.nix`: `prsOrder`, the order the pull-request bindings render in (`C`, `m`, `M`).
 
 ## How a named module reaches a configuration
 
@@ -89,7 +90,12 @@ A named module's node has a `file` ending `, via option flake.modules.<class>.<n
 - `base`: a part of the class's `base` list;
 - `include`: imported by another named module, as `darwin-workstation` imports `zeditor`;
 - `clan`: imported by a clan service's role module, as the otel-collector `agent` role imports `otel-collector-agent`;
-- `generated`: imported by the per-host module `machines/nixos/<host>` that `nixos/mesh-dns.nix` generates, as `mesh-dns/<host>` is.
+- `generated`: imported by the per-host module `machines/nixos/<host>` that `nixos/mesh-dns.nix` generates, as `mesh-dns/<host>` is;
+- `home`: in a standalone home's own list, with no named ancestor.
+
+`just composition` prints every route a name arrives by: a name reached by several routes, as `secrets` reaches magnetite by `clan`, `include` and `base`, is printed once with all of them.
+The `compositionRoutes` fleet obligation (`lib/composition.nix`, where these kinds are written) judges route kinds for the named modules of checked NixOS and darwin hosts, in their machine checks: it fails on a named module whose route is none of these kinds.
+It does not judge unnamed modules (inline modules, srvos, nixos-hardware), scheelite or any other host with `checked = false`, or homes, integrated or standalone; and a named module below another named module is `include` whatever alias form imports it.
 
 A home integrated into a host is a submodule of the host's evaluation and has no graph of its own: its composition is the standalone home of the same account plus the extra imports of its attachment in `lib/host-users.nix`.
 What the commands below report is what the fleet description composes at a commit; what a host runs is that only once it is deployed.

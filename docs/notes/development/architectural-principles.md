@@ -156,7 +156,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 | A27 | otel-collector file holds three units | `modules/clan/services/otel-collector/flake-module.nix` (now `agent.nix`, `ingress.nix`, `service.nix` and `_shared.nix` in that directory) | no principle | O41 |
 | A28 | Untyped envelope and host-facts schemas | `modules/clan/services/otel-collector/flake-module.nix` (the envelope budget now in `_shared.nix`), `modules/lib/observability-hosts.nix` | P2, P4 | O42 |
 | A29 | ZFS boot invariants written fourteen times | `modules/machines/nixos/magnetite/default.nix` | P1 | O43 |
-| A30 | `base` and `homeManager.ai` have no named includes | the `darwin.base`, `nixos.base` and `ai` contributors | P2 | O44 |
+| A30 | `base` and `homeManager.ai` have no named includes (resolved, O44) | the `darwin.base`, `nixos.base` and `ai` contributors | P2 | O44 |
 | A31 | `darwin/caches.nix` duplicates `system/caches.nix` | `modules/darwin/caches.nix` (deleted) | P1 | O45 |
 | A32 | Magnetite-shared facts read from the host in tests | `modules/vm-tests/{greptimedb-pipeline,fleet-ingress}.nix` | P5 | O46 |
 
@@ -278,7 +278,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O12 [P4] [MEDIUM] Structure checks under `modules/checks/structure/` lack negative-control partners
 
-- Status: open for these two pins: a phantom in `structure-fleet` could only repeat what the literal list states, so none was kept; the new `host-list-keys` check carries its own phantoms.
+- Status: resolved for `structure-fleet` by shape-the-repository-for-its-readers: it builds the fleet pin over the fleet and over two mutants of it (a machine dropped, that machine's class flipped) and fails unless the pin fails on each. Open for `structure-home-configurations`; the `host-list-keys` check carries its own phantoms.
 - Locations:
   - `modules/checks/structure/flake-shape.nix:22-63` (2 mkCheck invocations: `structure-fleet`, `structure-home-configurations`)
 - Current shape: two literal pins under `modules/checks/structure/` without a negative control. The other falsifiability controls now live inside their positive checks rather than in `*-neg` siblings: `home-module-exports` compares `_phantomEmpty` and `_phantomAuthored` alongside the real users (`modules/checks/validation.nix:99-110`), and the hm-sops bridge assertion is a bridge-file existence test in `modules/system/hm-sops-bridge.nix:125,132`.
@@ -368,7 +368,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O22 [P1] [LOW] Per-user `aggregates` lists are 90% identical across 5 users but each is restated as a literal
 
-- Status: resolved by shape-the-repository-for-its-readers (first pass). The `aggregates` option defaults to the shared list; the four secondary users omit it and crs58 states its own.
+- Status: resolved by shape-the-repository-for-its-readers (first pass). The `aggregates` option defaults to `[ ]` (`modules/home/users/lib.nix`); the shared list is `flake.lib.defaultAggregates`, which the four secondary users name in their `meta.nix` (`aggregates = config.flake.lib.defaultAggregates;`), and crs58 states its own.
 - Locations:
   - `modules/home/users/christophersmith/meta.nix:14-23`
   - `modules/home/users/janettesmith/meta.nix:14-23`
@@ -587,7 +587,7 @@ They land, and archive, in this order; each rebases onto its predecessor and is 
 6. **compose-hosts-from-cohesive-aspects** (CAM-132): service wiring out of host bodies, cinnabar's features re-keyed, the Hetzner and GCP cloud-server aspects, the darwin workstation aspect, host facts and flags written once, module keys and activation order, the otel-collector split, generated ZFS invariants, named includes. Closes O02, O05, O26, O27, O28, O37, O38, O41, O43, O44, O45 and the template half of O19. Depends on 1, 3 and 5. As landed, O44 was not done, and O02, O05 and the template half of O19 remain open for stibnite's documentation lines and template and the shared-reference-tree flag (see each entry's status).
 7. **seam-secrets-away-from-clan-vars** (CAM-129): one secrets seam, the only writer and reader of clan vars. Closes O25. Depends on 1, 2 and 6.
 
-O03, O06, O11, O12, O17 and O22 are outside the project and stay open.
+O06, O17 and O12's `structure-home-configurations` half are outside the project and stay open; O03, O11 and O22 were resolved by shape-the-repository-for-its-readers, and O12 for `structure-fleet` (see each entry's status).
 
 The preceding nix-0pd epic, from which PR #1938 closed 12 of 24 children, was closed against this document: typed aggregates, the machine-meta cluster, the primary/admin user bindings, the test-collection convention, the nix-unit harness and the expected-error pattern were done or subsumed, and `meta.description` on every check, the strict freeform `meta`, a flake-compat shim and the companion-flake split were deferred; that tracker is retired, and what still matters of it is in the entries above.
 

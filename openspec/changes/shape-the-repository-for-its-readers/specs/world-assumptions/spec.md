@@ -28,7 +28,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: Upstream adds an apply
 
 - **WHEN** an update of nixpkgs, nix-darwin or home-manager gives one of the three options an `apply`, or makes the merge reject a second declaration
-- **THEN** this assumption is void; evaluation fails at the fleet's sort module, and the `repository-shape` requirement `Restructuring delivers nothing but declared priority and order` loses its discharge for every later step until a new mechanism is chosen, since list order would again follow import depth (A344)
+- **THEN** this assumption is void; evaluation fails at the fleet's sort module, and the `repository-shape` requirement `Restructuring delivers nothing but its declared differences` loses its discharge for every later step until a new mechanism is chosen, since list order would again follow import depth (A344)
 
 ### Requirement: A385 — A clan service's per-machine module reaches every machine of any of its instances
 

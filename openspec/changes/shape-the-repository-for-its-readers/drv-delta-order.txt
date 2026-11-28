@@ -25,6 +25,11 @@
 # apm-deps, apm-skills-compose and the checks that copy the plugin sources;
 # and packages/docs' nixos-deployment.md, whose cited path moved to
 # modules/system/hm-sops-bridge.nix (logs/srr-5b-trace-20261127-233754.log).
+# It also rejects, on structuredAttrs.text, leaves that embed a changed store
+# path as text with no string context, which the trace cannot substitute:
+# omnigent-acp-spawn-env's cases, vm-test-evaluates-omnigent-worker-isolation
+# and both omnigent-worker-isolation tests' run-nixos-vm; their lines below
+# name the path each embeds.
 # Every system path, every integrated, worker and standalone home-manager-path
 # and the Macs' system-applications link the same targets at parent and
 # commit, for every member present (logs/srr-5b-profiles-20261127-233804.log).
@@ -100,7 +105,7 @@ checks.x86_64-linux.nixos-electrum  changed  # embeds nixos.electrum's toplevel
 checks.x86_64-linux.nixos-galena  changed  # embeds nixos.galena's toplevel
 checks.x86_64-linux.nixos-magnetite  changed  # embeds nixos.magnetite's toplevel
 checks.x86_64-linux.nixos-pyrite  changed  # embeds nixos.pyrite's toplevel
-checks.x86_64-linux.omnigent-acp-spawn-env  changed  # its cases embed, as text, the home-manager-path of magnetite's and pyrite's omnigent homes, each a declared reorder
+checks.x86_64-linux.omnigent-acp-spawn-env  changed  # omnigent-acp-spawn-env-cases.json embeds, as text with no string context, the home-manager-path of magnetite's and pyrite's omnigent homes, which the sort reorders; the trace rejects that text because it cannot substitute an uncontexted path, not for a difference of its own
 checks.x86_64-linux.omnigent-worker-capabilities  changed  # its fixture worker home takes package-order like the darwin worker homes: home-manager-path order only
 checks.x86_64-linux.package-apm-skills-compose  changed  # builds from apm-plugins: the two home-delivered texts
 checks.x86_64-linux.package-vanixiets-docs  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
@@ -120,6 +125,6 @@ checks.x86_64-linux.pyrite-bitwarden-unlock  changed  # embeds pyrite's system-p
 checks.x86_64-linux.skills-cli-discovery  changed  # copies the plugin sources: the two home-delivered texts
 checks.x86_64-linux.skills-spec-conformance  changed  # copies the plugin sources: the two home-delivered texts
 checks.x86_64-linux.structure-playwright-skill-parity  changed  # builds from apm-plugins: the two home-delivered texts
-checks.x86_64-linux.vm-test-evaluates-omnigent-worker-isolation  changed  # names the omnigent-worker-isolation test's run derivation
-vmTests.aarch64-linux.omnigent-worker-isolation  changed  # its node's homes take the two home-delivered texts; run-nixos-vm names the node closure's closure-info
-vmTests.x86_64-linux.omnigent-worker-isolation  changed  # its node's homes take the two home-delivered texts; run-nixos-vm names the node closure's closure-info
+checks.x86_64-linux.vm-test-evaluates-omnigent-worker-isolation  changed  # its text is the omnigent-worker-isolation test's run derivation path, with no string context, which changes because the node's homes take the sort and the two home-delivered texts; the trace rejects the text because it cannot substitute an uncontexted path
+vmTests.aarch64-linux.omnigent-worker-isolation  changed  # its node's homes take the sort and the two home-delivered texts; run-nixos-vm's script embeds the node closure's closure-info path as text with no string context, which the trace rejects because it cannot substitute it
+vmTests.x86_64-linux.omnigent-worker-isolation  changed  # its node's homes take the sort and the two home-delivered texts; run-nixos-vm's script embeds the node closure's closure-info path as text with no string context, which the trace rejects because it cannot substitute it

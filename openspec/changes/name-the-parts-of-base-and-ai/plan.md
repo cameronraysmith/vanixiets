@@ -206,6 +206,8 @@ diff <(links "$(cat /tmp/sp-parent.path)") <(links "$(cat /tmp/sp-commit.path)")
   The `.drv` paths are the `system-path.drv` and `system-applications.drv` inputs the trace printed for each side; an empty `diff` is required for every pair.
 - [ ] **Step 7:** Write `drv-delta-darwin-base.txt` with a header in the form of `openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-stibnite-workstation.txt` and the eight entries of design D5; return the drv-diff command.
 
+  Not done as written (2026-11-28): Tasks 3 and 4 landed in one commit with `shape-the-repository-for-its-readers`' order step, under that change's `drv-delta-order.txt`; design D5, "Departure", and Open Question 2 record it.
+
 ## Task 4: Pull request 3, ai
 
 **Files:** the 19 ai-contributing files of design D2; new `modules/home/ai/default.nix`; the check.
@@ -216,6 +218,8 @@ diff <(links "$(cat /tmp/sp-parent.path)") <(links "$(cat /tmp/sp-commit.path)")
 - [ ] **Step 4:** Record the reached homes' lists (tasks.md 4.3). Expected: the eleven agent packages move; members equal.
 - [ ] **Step 5:** Run `drv-order-trace.py` over the ten toplevels and six homes (Task 3 Step 5); then build and compare, as in Task 3 Step 6, every `home-manager-path`, `home-manager-fonts` and `home-manager-applications` pair the trace accepted.
 - [ ] **Step 6:** Write `drv-delta-ai.txt` (header form as Task 3, the entries of design D5); return the drv-diff command.
+
+  Not done as written (2026-11-28): see Task 3 Step 7.
 
 ## Task 5: Deploy (operator)
 

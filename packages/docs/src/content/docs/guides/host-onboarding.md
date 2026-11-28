@@ -43,12 +43,12 @@ Every other list that names hosts is one of three kinds, and the table says what
 | `modules/lib/observability-hosts.nix` | hand-written, checked | a row, with `collect = false` until the host's first watched deploy; `host-list-keys` fails until it exists |
 | ssh `logins` (`modules/home/core/ssh.nix`, `flake.lib.sshLogins`) | hand-written, checked | the login used for the host; `host-list-keys` fails until it exists |
 | the `structure-fleet` pin (`modules/checks/structure/flake-shape.nix`) | hand-written, checked | the host and its class; `checks.x86_64-linux.structure-fleet` fails until it is added |
-| machine `testSizes` entries (`modules/checks/machines.nix`) | hand-written, checked | a size class for `nixos-<host>` or `darwin-<host>`; `test-size-classes` fails naming a check with no entry |
+| machine `testSizes` entries (`modules/checks/machines.nix`) | hand-written, checked | `nixos-<host> = { class = "medium"; measured = false; };` (or `darwin-<host>`): a check with fewer than three recorded runs is medium and unmeasured (`modules/checks/README.md`, "What every check here carries"), whatever class the existing hosts' measured entries give; `test-size-classes` fails naming a check with no entry |
 | `.sops.yaml` | hand-written, checked | the machine's anchor and its place in the creation rules; `checks.x86_64-linux.sops-correspondence` fails until it matches `sops/machines/<host>/key.json` |
 | `ztRecords` (`modules/machines/nixos/cinnabar/zt-dns.nix`) | left | the host's `.zt` name, joined by hand; no check fails when it is missing, and the list goes with ZeroTier |
 | the evaluator table in `modules/README.md` | left | a row; no check reads it |
 
-Counted as files outside `modules/lib/hosts.nix` and the host's own directory, a new host's name is written by hand in 8: the six checked rows above (cloud table, observability table, ssh logins, `structure-fleet`, `testSizes`, `.sops.yaml`), `modules/lib/host-users.nix` when the host carries accounts, and `ztRecords`, kept by convention only.
+Counted as files outside `modules/lib/hosts.nix` and the host's own directory, a new host's name is written by hand in 9: the six checked rows above (cloud table, observability table, ssh logins, `structure-fleet`, `testSizes`, `.sops.yaml`), `modules/lib/host-users.nix` when the host carries accounts, and two kept by convention only, `ztRecords` and the evaluator table in `modules/README.md`.
 
 `host-list-keys` reports a missing or extra host as `"<list>": { "<host>": false }` in its diff, where `<list>` is `cloudMachines`, `observabilityHosts` or `sshLogins`.
 

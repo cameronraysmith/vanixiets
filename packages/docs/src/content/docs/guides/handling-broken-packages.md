@@ -216,7 +216,7 @@ If the fix is a nixpkgs PR that changes the package expression rather than the p
 # Date added: YYYY-MM-DD
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.packageName = [
     (final: prev: {
       packageName = prev.packageName.overrideAttrs (old: {
         patches = (old.patches or [ ]) ++ [
@@ -230,6 +230,10 @@ If the fix is a nixpkgs PR that changes the package expression rather than the p
   ];
 }
 ```
+
+Then add `"packageName"` to `overlayOrder` in `modules/nixpkgs/compose.nix`, the one list that orders the overlays: each overlay sees the package set as the overlays listed before it leave it.
+`nixpkgsOverlays` itself is read-only, computed from that list.
+If the name is left out, evaluation fails with `nixpkgsOverlaysByName: packageName missing from overlayOrder in modules/nixpkgs/compose.nix`; a name listed there that no file under `modules/nixpkgs/overlays/` defines fails with `overlayOrder in modules/nixpkgs/compose.nix names packageName, which no file under modules/nixpkgs/overlays/ defines`.
 
 3. Get the hash:
 

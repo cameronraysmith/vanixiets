@@ -229,8 +229,8 @@ Each directory becomes an aggregate through import-tree's auto-discovery and nam
 How it works:
 
 - Each directory import (e.g., `./ai`) triggers import-tree to discover all `*.nix` files inside
-- Files in `ai/` that export to `flake.modules.homeManager.ai` auto-merge into a single aggregate
-- No explicit aggregate definition needed - the directory IS the aggregate boundary
+- Each file in `ai/` defines its own part, `flake.modules.homeManager.ai-<harness>`; `modules/home/ai/default.nix` lists the parts in `flake.lib.homeAiParts` and is the one definition of `flake.modules.homeManager.ai`, importing them in list order
+- `checks.x86_64-linux.structure-aspect-parts` fails on an `ai-` part in no list and on a file assigning into `ai` directly; the NixOS and darwin `base` aspects are lists of the same kind (`modules/nixos/base.nix`, `modules/darwin/base.nix`), while the other home aggregates (`tools`, `development`, ...) still merge every file assigning into them
 - Machine configurations can import entire aggregates or specific parts
 
 Machine configurations import aggregates by referencing the auto-merged namespace:

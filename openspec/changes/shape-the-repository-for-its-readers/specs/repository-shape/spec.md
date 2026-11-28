@@ -47,23 +47,28 @@ The documentation SHALL state, in one entry-point document, one placement rule f
 - **WHEN** a document other than the entry point states a placement rule for a kind the entry point covers, and the two differ
 - **THEN** the review of the change that introduced the difference rejects it, and the entry point's rule stands
 
-### Requirement: Restructuring delivers nothing but declared priority and order
+### Requirement: Restructuring delivers nothing but its declared differences
 
-Each step of restructuring the fleet description SHALL be a refactor. Only the priority step and the order step SHALL name declared differences: the priority step only priority marks that keep each file's provider, the order step only the order of installed packages and of three review bindings; every other step SHALL name none beyond the checks it adds. This relies on A376, A377 and A384.
+Each restructuring step SHALL be compared with its base commit against differences it declared in advance. Steps before the order step SHALL change no host or home configuration; the priority step only priority marks keeping each file's provider; the order step only the order of installed packages, review bindings and Mac applications, and two texts it names delivered into homes; the step importing parts only where used only pyrite, which loses one part. This relies on A376, A377 and A384.
 
-#### Scenario: A move or rename step is compared
+#### Scenario: A step before the order step is compared
 
-- **WHEN** a step that moves or renames parts of the fleet description is compared with its base commit
+- **WHEN** a step that moves or renames parts of the fleet description, landed before the order step, is compared with its base commit
 - **THEN** no host configuration or home configuration differs, and every differing check is one the step declared
 
 #### Scenario: The order step is compared
 
 - **WHEN** the order step's candidate commit is compared with its base commit
-- **THEN** every differing host or home configuration differs only in the order of its installed packages or of the three review bindings, every file its installed packages provide has the same content when built, and on a darwin host the accounts, groups and their identifiers are equal
+- **THEN** every differing host or home configuration differs only in the order of its installed packages, of the three review bindings or of its Mac applications, and in the two texts the step names; every file its installed packages provide has the same content when built; and on a darwin host the accounts, groups and their identifiers are equal
+
+#### Scenario: The step importing parts only where used is compared
+
+- **WHEN** the step that takes parts out of the shared list and imports them only on the hosts that use them is compared with its base commit
+- **THEN** pyrite's host configuration differs only by the one part it no longer takes, and every other host configuration and every home configuration is identical
 
 #### Scenario: Something other than declared difference differs
 
-- **WHEN** a step's comparison shows a difference that is not one it declared, or a declared difference beyond priority or order
+- **WHEN** a step's comparison shows a difference that is not one it declared, or a declared difference this requirement does not allow that step
 - **THEN** the step is not accepted, and the difference is recorded as an open question rather than declared
 
 ### Requirement: Restructuring is accepted on what readers can do

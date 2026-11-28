@@ -121,8 +121,8 @@ modules/
 ```
 
 **Namespace exports**: Modules export to namespaces for consumption by other modules.
-Files in modules/home/ai/ export to flake.modules.homeManager.ai.
-Multiple files in the same directory auto-merge into aggregates.
+Each file in modules/home/ai/ defines its own part, flake.modules.homeManager.ai-<harness>; modules/home/ai/default.nix lists the parts in flake.lib.homeAiParts and defines flake.modules.homeManager.ai as their imports, and checks.x86_64-linux.structure-aspect-parts fails on a part in no list.
+The other home aggregates (tools, development, ...) still merge every file in their directory that assigns into them.
 
 **Machine configuration pattern**: Machine configurations import aggregates from namespaces rather than individual files.
 This enables feature-based organization where capabilities are defined once and consumed everywhere.
@@ -176,10 +176,10 @@ Packages like atuin-format, markdown-tree-parser, starship-jj auto-discovered vi
 **Layer 4 - Per-package overrides (modules/nixpkgs/overlays/overrides.nix)**: The fourth layer applies build modifications using overrideAttrs for test disabling, flag changes, and compilation fixes.
 
 **Layer 5 - External flake overlays (wrapper modules)**: The fifth layer integrates overlays from flake inputs through wrapper modules in modules/nixpkgs/overlays/.
-Each wrapper module (nuenv.nix, nvim-treesitter.nix) appends external overlays to the flake.nixpkgsOverlays list for uniform composition.
+Each wrapper module (nuenv.nix) registers its external overlays under its name in nixpkgsOverlaysByName, as every internal overlay file does.
 
-**Composition order**: All overlays (internal and external) compose via lib.composeManyExtensions on the flake.nixpkgsOverlays list: channels → stable-fallbacks → overrides → external (nuenv, nvim-treesitter) → custom packages.
-Later layers can reference packages from earlier layers.
+**Composition order**: overlayOrder in modules/nixpkgs/compose.nix lists the overlay names, internal and external, in the order they apply (today reverse-alphabetical by file name, zed-delta first and aeneas last); compose.nix turns it into the read-only nixpkgsOverlays, composes that with lib.composeManyExtensions, and merges the custom packages last.
+Each overlay sees the package set as the overlays listed before it leave it; a registered name missing from overlayOrder, or a listed name no file registers, fails evaluation.
 
 ## Function Model
 
@@ -190,8 +190,8 @@ Each subsystem provides distinct capabilities that compose to deliver the comple
 **Module auto-discovery**: The import-tree mechanism scans modules/ recursively and imports every .nix file as flake-parts module.
 Adding new module requires only creating file, no flake.nix updates.
 
-**Namespace aggregation**: Multiple files in same directory export to same namespace and auto-merge.
-The files modules/home/ai/claude-code.nix + modules/home/ai/mcp-servers.nix merge into flake.modules.homeManager.ai.
+**Namespace aggregation**: Most home aggregates merge every file in their directory that exports to the same namespace.
+The `ai` aggregate and the NixOS and darwin `base` aspects are lists instead: each file defines its own part (modules/home/ai/claude-code/ defines flake.modules.homeManager.ai-claude-code), the list file names it (flake.lib.homeAiParts in modules/home/ai/default.nix), and checks.x86_64-linux.structure-aspect-parts fails on a part in no list.
 
 **Cross-platform module sharing**: Home-manager modules work on both darwin and nixos through namespace imports.
 Same flakeModulesHome.ai imported in darwin (stibnite) and nixos (cinnabar) machine configurations.
@@ -420,7 +420,7 @@ Integration point: Terraform output variables consumed in nix configuration.
 
 ### Overlay to system interface
 
-**Composed overlay to machine configuration**: The file modules/nixpkgs/compose.nix composes all overlays from the flake.nixpkgsOverlays list (populated by wrapper modules in overlays/*.nix) into flake.overlays.default.
+**Composed overlay to machine configuration**: The file modules/nixpkgs/compose.nix composes the overlays that files in overlays/*.nix register in nixpkgsOverlaysByName, in the order of its overlayOrder list, into flake.overlays.default.
 Machine configurations import inputs.self.overlays.default.
 
 Integration point: Machine nixpkgs.overlays = [ inputs.self.overlays.default ];
@@ -513,14 +513,14 @@ Machine configurations traverse this structure via config.flake.modules.* to acc
 ```
 inputs (flake inputs)
   ↓
-overlays/*.nix wrapper modules append to flake.nixpkgsOverlays list:
+overlays/*.nix modules register in nixpkgsOverlaysByName.<name>, for example:
   ├─ channels.nix (Layer 1): Export stable/unstable/nixpkgs channels
   ├─ stable-fallbacks.nix (Layer 2): Selective stable fallbacks
   ├─ overrides.nix (Layer 4): Package build modifications
   ├─ nuenv.nix (Layer 5): External nuenv overlay
   └─ nvim-treesitter.nix (Layer 5): External nvim-treesitter overlay
   ↓
-compose.nix: lib.composeManyExtensions config.flake.nixpkgsOverlays
+compose.nix: lib.composeManyExtensions config.nixpkgsOverlays (the names in overlayOrder)
   ↓
 custom packages (Layer 3): pkgs/by-name/ derivations merged via //
   ↓
@@ -529,7 +529,7 @@ composed overlay (flake.overlays.default)
 machine nixpkgs (final package set)
 ```
 
-Internal and external overlays compose uniformly via lib.composeManyExtensions on flake.nixpkgsOverlays.
+Internal and external overlays compose uniformly via lib.composeManyExtensions on nixpkgsOverlays, in overlayOrder.
 Custom packages merge last using attribute set merge (//).
 
 ### Secrets data flow
@@ -684,7 +684,7 @@ Layer 3 custom packages: pkgs/by-name/ with pkgs-by-name-for-flake-parts integra
 
 Layer 4 overrides: modules/nixpkgs/overlays/overrides.nix with overrideAttrs patterns.
 
-Layer 5 external: modules/nixpkgs/overlays/nuenv.nix and nvim-treesitter.nix wrapper modules append external overlays to flake.nixpkgsOverlays.
+Layer 5 external: modules/nixpkgs/overlays/nuenv.nix registers its external overlay in nixpkgsOverlaysByName.nuenv, ordered by overlayOrder in modules/nixpkgs/compose.nix.
 
 Composition: modules/nixpkgs/compose.nix defines flake.overlays.default.
 

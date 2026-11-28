@@ -14,12 +14,12 @@ Trust boundary: this fixes where membership is written and that each part is a s
 #### Scenario: The lists are read
 
 - **WHEN** `flake.lib.nixosBaseParts`, `flake.lib.darwinBaseParts` and `flake.lib.homeAiParts` are evaluated
-- **THEN** they hold the names design D2 lists for each, plus `base-package-order` in both base lists, each an attribute of `flake.modules.nixos`, `flake.modules.darwin` or `flake.modules.homeManager`
+- **THEN** each names every part its aspect imports, each name once and each an attribute of `flake.modules.nixos`, `flake.modules.darwin` or `flake.modules.homeManager`; the list is what the list file holds, and a later change moves a part into or out of an aspect only by editing that list
 
 #### Scenario: Every former contribution has a name
 
 - **WHEN** the modules the aspects held before are looked for
-- **THEN** each is defined as `flake.modules.<class>.base-<concern>`, `flake.modules.homeManager.ai-<harness>`, or under a name it already had, and is in its class's list
+- **THEN** each is defined as `flake.modules.<class>.base-<concern>`, `flake.modules.homeManager.ai-<harness>`, or under a name it already had, and is named once in its class's list; a later change may take one out of the list, by editing the list, and then the hosts or aspects that use it import it by name, under a name without the `base-` or `ai-` prefix
 
 #### Scenario: A part is imported alone
 

@@ -46,10 +46,10 @@ vanixiets/
 │   │   └── services/    # System services
 │   ├── nixpkgs/         # Nixpkgs configuration
 │   │   ├── configuration.nix
-│   │   ├── compose.nix   # Overlay composition into flake.overlays.default
-│   │   ├── overlays-option.nix  # flake.nixpkgsOverlays declaration
+│   │   ├── compose.nix   # overlayOrder; overlay composition into flake.overlays.default
+│   │   ├── overlays-option.nix  # nixpkgsOverlaysByName and the read-only nixpkgsOverlays
 │   │   ├── per-system.nix   # Per-system nixpkgs configuration
-│   │   └── overlays/    # Overlay modules (auto-discovered, appended to list)
+│   │   └── overlays/    # Overlay modules (auto-discovered, each named in overlayOrder)
 │   │       ├── channels.nix  # Multi-channel nixpkgs access
 │   │       ├── stable-fallbacks.nix  # Platform-specific stable fallbacks
 │   │       ├── overrides.nix  # Per-package build modifications
@@ -187,29 +187,22 @@ flake.clan.inventory.instances.zerotier = {
 
 ### Overlay composition
 
-All overlays are collected into `flake.nixpkgsOverlays` via deferred module composition list concatenation, then composed in order using `lib.composeManyExtensions`, followed by merging custom packages:
+Each file under `modules/nixpkgs/overlays/` registers its overlays under a name, `nixpkgsOverlaysByName.<name>`, and `overlayOrder` in `modules/nixpkgs/compose.nix` lists the names in the order they apply.
+`compose.nix` turns that list into the read-only `nixpkgsOverlays`, composes it with `lib.composeManyExtensions`, and merges the custom packages over the result (`// customPackages`).
+Each overlay sees the package set as the overlays listed before it leave it; the order is that list's and no file's import order.
 
-```nix
-# modules/nixpkgs/compose.nix - composed via lib.composeManyExtensions
-[
-  channels.nix              # Multi-channel nixpkgs access (stable, unstable, nixpkgs)
-  stable-fallbacks.nix      # Platform-specific stable fallbacks
-  overrides.nix             # Per-package build modifications
-  nvim-treesitter.nix       # External overlay: nvim-treesitter-main
-  nuenv.nix                 # External overlay: nushell utilities
-  fish-stable-darwin.nix    # External overlay: darwin-specific stable fallback
-] // customPackages         # Merge pkgs-by-name derivations
-```
-
-Each overlay module appends to `flake.nixpkgsOverlays` via:
+An overlay module, internal or from a flake input:
 ```nix
 { inputs, ... }:
 {
-  flake.nixpkgsOverlays = [
+  nixpkgsOverlaysByName.flakeInput = [
     inputs.flakeInput.overlays.exported
   ];
 }
 ```
+
+Its name is then added to `overlayOrder`.
+Evaluation fails with `nixpkgsOverlaysByName: flakeInput missing from overlayOrder in modules/nixpkgs/compose.nix` when it is not, and with `overlayOrder in modules/nixpkgs/compose.nix names <name>, which no file under modules/nixpkgs/overlays/ defines` when the list names an overlay no file registers.
 
 This pattern enables both internal overlays (pure functions) and external overlays (from flake inputs) to be composed together without hardcoding input selection at the point of composition.
 

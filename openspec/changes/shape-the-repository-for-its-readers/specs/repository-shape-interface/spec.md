@@ -18,7 +18,7 @@ Trust boundary: where host facts are written; not that a fact is true of the mac
 
 ### Requirement: Hand-written host lists are checked against the registry, with controls
 
-Fleet checks SHALL fail, naming the host, when `lib/cloud-machines.nix`'s keys differ from the registry's cloud hosts or `observabilityHostsFor`'s keys from the registry's hosts; `structure-fleet` SHALL hold a phantom entry whose `expected` value is what a correct comparison gives it. The machine `testSizes` entries and `.sops.yaml` stay judged as today.
+Fleet checks SHALL fail, naming the host, when `lib/cloud-machines.nix`'s keys differ from the registry's cloud hosts or `observabilityHostsFor`'s keys from the registry's hosts; `structure-fleet` SHALL build its pin over the fleet and over mutants of it, and fail unless the pin fails on each mutant. The machine `testSizes` entries and `.sops.yaml` stay judged as today.
 
 Trust boundary: agreement of names; not the rows' contents.
 
@@ -29,8 +29,8 @@ Trust boundary: agreement of names; not the rows' contents.
 
 #### Scenario: The fleet pin's control is read
 
-- **WHEN** the `structure-fleet` comparison is evaluated
-- **THEN** its phantom entry's actual value equals its expected value, and a mutant that breaks the comparison makes them differ
+- **WHEN** `checks.x86_64-linux.structure-fleet` is built
+- **THEN** it builds the fleet pin over the fleet, where it passes, and over two mutants of it, one machine dropped and that machine's class flipped, and it fails unless the pin's build fails on each mutant
 
 ### Requirement: The host-onboarding guide lists every generated step with the check that enforces it
 
@@ -68,7 +68,7 @@ Trust boundary: what the fleet description composes at a commit; integrated home
 #### Scenario: magnetite's composition is printed
 
 - **WHEN** `just composition magnetite` runs at a commit
-- **THEN** it prints every named module of the graded enumeration key for magnetite, each with one route kind
+- **THEN** it prints every named module of the graded enumeration key for magnetite, each with its route kinds: a name reached by several routes is printed once with all of them
 
 #### Scenario: A home's systems are printed
 
@@ -77,14 +77,19 @@ Trust boundary: what the fleet description composes at a commit; integrated home
 
 ### Requirement: A named module arriving by an unknown route kind fails the machine check
 
-A fleet obligation `composition-routes` SHALL fail, naming the host, the module and its parent's file, when a named module in the host configuration's `graph` has a route kind outside the entry point's list; the machine checks SHALL pass each configuration's `graph` to judges that ask for it. This relies on A383 and A386.
+The fleet obligation `compositionRoutes` SHALL fail, naming the host, the module and its parent's file, when a named module in the host configuration's `graph` has a route kind outside the entry point's list; the machine checks SHALL pass each configuration's `graph` to judges that ask for it. This relies on A383 and A386.
 
-Trust boundary: route kinds of checked hosts; not hosts with `checked = false`, nor integrated homes.
+Trust boundary: named modules of checked NixOS and darwin hosts only.
 
 #### Scenario: A module reaches a host under an unknown parent
 
 - **WHEN** the judge's fixture check gives it a graph with a named module under an unclassified parent
 - **THEN** the judge returns one failure naming the module and the parent's file
+
+#### Scenario: What the obligation does not judge
+
+- **WHEN** an unnamed module, a host with `checked = false` (scheelite) or a home, integrated or standalone, is composed, or a named module is imported below another named module in any alias form
+- **THEN** the obligation does not judge the unnamed module, the host or the home, and the module below another named module has route kind `include`
 
 #### Scenario: Its cost is measured first
 
