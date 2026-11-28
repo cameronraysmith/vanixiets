@@ -20,11 +20,14 @@ The distinguishing question: if we cut releases or land commits upstream it is a
 
 Maintained repositories live under `~/projects/<repo>/` (copies may sit deeper; repo names can have variants such as `<repo>.jl` or `<repo>-rs`).
 
-1. Search the tree: `fd -t d -d 4 '^<repo>$' ~/projects`
-2. Verify the match: `cd <candidate> && git remote -v` to confirm the origin matches the expected forge URL.
+1. Ask zoxide first: `zoxide query -l --base-dir ~/projects <repo>` lists matching directories that still exist, ranked by how often and how recently they were entered.
+   zoxide learns a directory only when an interactive shell `cd`s into it, so a miss here proves nothing.
+2. If no zoxide candidate passes step 3, search the tree: `fd -t d -d 4 '^<repo>$' ~/projects`
+3. Verify each candidate, from either step: `cd <candidate> && git remote -v` to confirm the origin matches the expected forge URL.
    Name collisions are common with single-token repo names, so this step is required, not optional, before treating a candidate as authoritative.
-3. On hit: treat the local path as the source of truth, dispatch research subagents to it, and use that path in prompts and writeups.
-4. On miss: surface the failure to the user and ask them to clone it to `~/projects/<repo>/` (or provide the path if it lives elsewhere) before proceeding; propose the exact command — `git clone <url> ~/projects/<repo>/` for reference-only work, or `gh repo fork <org>/<repo> --clone --remote -- ~/projects/<repo>/` when contribution back upstream is anticipated.
+4. On hit: treat the local path as the source of truth, dispatch research subagents to it, and use that path in prompts and writeups.
+   If step 1 did not list the verified path, register it with `zoxide add <path>` so the next lookup finds it there; agent shells set their working directory without `cd`, so zoxide never learns these paths otherwise.
+5. On miss: surface the failure to the user and ask them to clone it to `~/projects/<repo>/` (or provide the path if it lives elsewhere) before proceeding; propose the exact command — `git clone <url> ~/projects/<repo>/` for reference-only work, or `gh repo fork <org>/<repo> --clone --remote -- ~/projects/<repo>/` when contribution back upstream is anticipated.
    Do not silently fall back to web tools for substantive research when a local copy would be more authoritative; web tools remain appropriate only for genuinely web-native content (release notes, issue discussions, blog posts).
    Pause the work thread until the clone is in place or the user provides an alternative path.
 
@@ -34,7 +37,8 @@ Never ask the user to clone a reference repo into `~/projects/`.
 
 The gate is `ghq list -p <name>` (under "Engine: ghq" below): authoritative because it walks the filesystem directly rather than consulting an index.
 `zoxide query -l <name>` is a fast-path cache only — validate any hit against `ghq list -p` before relying on it.
-On a miss, acquire the repository with `ghq-sync <url>`, which clones shallow and blobless and registers the path with zoxide; a raw `ghq get` clone does not register.
+When `ghq list -p` confirms a copy that zoxide did not list, register it with `zoxide add <path>`.
+On a miss, acquire the repository with `ghq-sync <url>`, which clones shallow and blobless and registers the path with zoxide; a raw `ghq get` clone does not register, so follow it with `zoxide add <path>`.
 Prefer the canonical upstream; acquire a personal fork only when contribution back to upstream is anticipated.
 A shallow clone sits at HEAD, which is usually not the revision we pin — read at the pinned revision or every line anchor you cite will be wrong.
 A blobless clone holds the file contents of its checked-out revision, and on the shared tree below also those that every commit a request brought into its branches and remote-tracking branches, by an update, a deepen or a tag fetch, needs to be read as a diff, merges included, as `git show` and lazygit show them: the writer fetches them before it answers, unless more than 100,000 blobs are missing or the clone records no partial-clone filter, when its answer says `history not hydrated` and why; if that fetch fails, its answer says `history hydrate failed`, and in either case the request itself succeeds or fails as it would without it.
