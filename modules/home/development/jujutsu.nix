@@ -183,7 +183,7 @@ let
             default-command = [ "log" ];
             diff-editor = "oyui";
             diff-formatter = ":git";
-            pager = lib.mkDefault "delta";
+            pager = lib.mkDefault (lib.getExe config.programs.delta.package);
 
             # Show signature status in log output
             show-cryptographic-signatures = true;

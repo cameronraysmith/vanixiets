@@ -154,7 +154,7 @@ let
             diffRenderers = [
               {
                 colorArg = "always";
-                command = "delta --color-only --dark --paging=never";
+                command = "${lib.getExe config.programs.delta.package} --color-only --dark --paging=never";
                 useConfig = false;
               }
             ];
