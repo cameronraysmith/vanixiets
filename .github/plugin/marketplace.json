@@ -94,7 +94,7 @@
     },
     {
       "name": "document-authoring-and-visualization",
-      "description": "Document authoring and visualization skills — doc-to-md, doc-to-md-cmd, web-to-markdown, knowledge graph, scientific visualization, text-to-visual iteration.",
+      "description": "Document authoring and visualization skills — doc-to-md, doc-to-md-cmd, web-to-markdown, scientific visualization, text-to-visual iteration.",
       "version": "0.0.0",
       "source": "./modules/home/ai/plugins/document-authoring-and-visualization"
     },
