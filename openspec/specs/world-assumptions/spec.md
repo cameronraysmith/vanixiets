@@ -469,6 +469,14 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | private settings | — | the part of a person's home configuration that only that person's own accounts may hold, such as the references to that person's secrets and personal choices | shared |
 | fleet description | — | the repository's statement of the fleet's hosts, people, packages and inputs, from which every host and home configuration is built | shared |
 | checked system | — | a platform, x86_64-linux or aarch64-darwin, for which the fleet's checks are built | shared |
+| feature | fleet | a capability the fleet runs on one or more hosts, such as the build service, the forge or the telemetry store, together with the services and secrets it needs, as distinct from the repository files that declare it | shared |
+| secret backend | — | the tool that produces, encrypts, stores and installs the fleet's secrets on its hosts; clan's vars today | shared |
+| secret seam | — | the part of the repository that alone translates what features state about their secrets into the secret backend's terms and reads their delivered locations back | shared |
+| delivered secret | — | a secret installed on a host at a fixed location, which the services its custody names read at runtime | shared |
+| custody | secret | who may read a delivered secret, at which point of a host's activation it is installed, and which units restart when it changes | shared |
+| recipe | secret | the program and prompts that produce a secret's value when it is first generated or regenerated | shared |
+| generator | clan | clan's declaration of one named group of secret and public files: its recipe, its files' custody and whether hosts share it | machine-only |
+| delivery step | — | one change of a refactor that is accepted on its own comparison, so that the refactor lands as several | shared |
 
 #### Scenario: The terms with two senses are read
 
@@ -2238,3 +2246,88 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 - **WHEN** flake-parts or Nix starts transforming outputs between `config.flake` and `self`, so a home reading the same name gets a different value
 - **THEN** this assumption is void; the `host-user-attachment` requirement `A person's home configuration does not depend on the order a host's settings are read` keeps its discharge only after the differing derivations are traced and declared
+
+### Requirement: A360 — clan-core is in maintenance mode
+
+It is true, as the operator stated on 2026-11-26 and independent of what this fleet builds, that clan-core receives maintenance but no further feature development, so that the fleet should expect to replace its secret backend or put another composition layer in front of it.
+Any requirement whose motivation depends on this fact SHALL name it explicitly, and SHALL be re-examined once the violation below is observed.
+
+**Evidence**: the operator's statement on 2026-11-26, recorded in this change's brainstorm. The repository holds no record of it, and nothing in the repository observes it.
+
+#### Scenario: Recorded on 2026-11-26
+
+- **WHEN** the operator opened the secret seam work on 2026-11-26
+- **THEN** the operator stated that clan-core is in maintenance mode
+
+#### Scenario: clan-core resumes development or the operator withdraws the statement
+
+- **WHEN** clan-core announces new feature development, or the operator withdraws the statement at a change's close-out
+- **THEN** this assumption is void; the `secret-consumption-seam` requirement `Replacing the secret backend changes only the seam` loses its motivation, though not its discharge, which rests on the confinement check
+
+### Requirement: A361 — clan's sops backend installs each secret var under the sops name vars/<rel_dir>/<file>, at that sops secret's path
+
+It is true of clan-core at the locked revision 78d5de23, independent of what this fleet builds, that its sops backend installs each secret file as the sops secret `vars/<rel_dir>/<file>`, `rel_dir` being `shared/<generator>` or `per-machine/<machine>/<generator>`, and that the file's evaluated `path` is that secret's path.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: read on 2026-11-27 from a clan-core source in the local Nix store, whose revision was not confirmed against 78d5de23: `nixosModules/clanCore/vars/interface.nix:74-80` (`rel_dir`), `nixosModules/clanCore/vars/secret/sops/default.nix:36` (`path = config.sops.secrets."vars/${rel_dir}/${name}".path`). `modules/home/ai/omnigent/credentials.nix:127,186-195` relies on the same naming. The read is repeated at the locked revision before the first delivery step. Read on 2026-11-28 from sops-nix at the locked revision d5abe5e53200 (`nix-stock eval --raw .#inputs.sops-nix.outPath`): `modules/sops/templates/default.nix:116-127` declares `sops.placeholder` with default `{ }`, and `:130-134` sets `sops.placeholder = mapAttrs (…) config.sops.secrets` under `lib.mkIf (config.sops.templates != { })`; `modules/nix-darwin/templates/default.nix:95-106,109-113` does the same for darwin.
+
+#### Scenario: Read at the source
+
+- **WHEN** the files above are read at the locked revisions
+- **THEN** the sops name and the path are formed as stated, and sops-nix defines the placeholder `sops.placeholder.<name>` of each sops secret `<name>` only on a host with `sops.templates`; elsewhere `sops.placeholder` is `{ }`
+
+#### Scenario: clan changes the sops naming
+
+- **WHEN** a clan-core update changes `rel_dir`'s form, the sops secret name, or where a secret file's `path` comes from, or a sops-nix update changes when or under which name it defines a placeholder; the omnigent credential assertions failing on every host with a worker is how this shows
+- **THEN** this assumption is void; the `secret-consumption-seam-interface` requirement `Read-only fields come from the backend` loses its discharge for `placeholder` and `path` until the seam is restated against the new naming
+
+### Requirement: A362 — Declaring a first-party option changes no system or home derivation
+
+It is true of nixpkgs, nix-darwin and home-manager at their locked revisions, independent of what this fleet builds, that their option manuals document only their own modules, so declaring a first-party option that no other option reads changes no system or home derivation.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: NixOS documents first-party options only when `documentation.nixos.includeAllModules` is set, which a search of `modules/` on main found no module setting; nix-darwin's manual evaluates its own `eval-config.nix` with only its arguments module (`modules/documentation/default.nix:24-45`); home-manager's evaluates its own `modules/modules.nix` (`modules/manual.nix:12-15`, `docs/default.nix:206`). Read on 2026-11-27 from sources in the local Nix store, revisions not confirmed. compose-hosts-from-cohesive-aspects' proposal states the same for the NixOS manual.
+
+#### Scenario: Observed by the first delivery step's comparison
+
+- **WHEN** the first delivery step, which declares `vanixiets.secrets` on every host and in every home, is compared with its parent
+- **THEN** no NixOS, darwin or home toplevel differs, which confirms this assumption for those options
+
+#### Scenario: A manual starts documenting first-party options
+
+- **WHEN** a module sets `documentation.nixos.includeAllModules`, or a nix-darwin or home-manager update builds its manual from the evaluated configuration's options
+- **THEN** this assumption is void; the `secret-consumption-seam` requirement `Moving a feature behind the seam changes no delivered secret` loses its discharge for every toplevel whose manual changes, until those toplevels are declared differences
+
+### Requirement: A363 — A clan generator's result depends only on the definitions it receives, merging list fields in definition order
+
+It is true of the nixpkgs module system and clan-core's generator submodule at the locked revisions, independent of what this fleet builds, that a generator's evaluated fields, `finalScript` and file paths included, depend only on the definitions it receives, not on which module wrote them, and that list fields merge in module order.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: clan-core `modules/clan/export-modules/generic-generator.nix:79-325` (the generator's options, `finalScript` at `:304,325`), read on 2026-11-27 from a clan-core source in the local Nix store whose revision was not confirmed; nixpkgs `lib/modules.nix` merges a definition list in module order. The drvPath diff of every delivery step is its monitor.
+
+#### Scenario: Observed by each delivery step's comparison
+
+- **WHEN** a delivery step moves a generator's definitions into the seam and the comparison is taken
+- **THEN** an unchanged toplevel for every host that declares it confirms this assumption for that generator
+
+#### Scenario: A moved generator changes
+
+- **WHEN** a toplevel differs after a step whose only change to a generator was where its definitions are written, or a generator's list field is found reordered
+- **THEN** this assumption is void for that generator; the `secret-consumption-seam` requirement `Moving a feature behind the seam changes no delivered secret` loses its discharge for that step until every definition of the generator is moved together in its original order
+
+### Requirement: A364 — clan-core's own services declare generators the fleet reads
+
+It is true of clan-core at the locked revision 78d5de23, independent of what this fleet builds, that its own services declare generators first-party modules read but do not declare: sshd's `openssh` and, with certificates enabled, its shared `openssh-ca`; and ZeroTier's `zerotier-network-<instance>`.
+Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
+
+**Evidence**: read on 2026-11-27 from a clan-core source in the local Nix store whose revision was not confirmed: `clanServices/sshd/default.nix:57` (`openssh-ca`), `clanServices/zerotier/default.nix:222` (`zerotier-network-${instanceName}`, whose public `network-id` the controller sets). The `openssh` generator is the one world assumption `A321 — The sshd service's host key generator is per machine and its public half is public` records. On main, `modules/machines/nixos/cinnabar/zt-dns.nix:99,121` reads `zerotier-network-zerotier` and `modules/lib/host-keys.nix:39-40` reads `openssh`. The read is repeated at the locked revision before the first delivery step.
+
+#### Scenario: Read at the source
+
+- **WHEN** the two service files are read at the locked revision
+- **THEN** the generators are declared as stated
+
+#### Scenario: clan renames or stops declaring one of them
+
+- **WHEN** a clan-core update renames `openssh`, `openssh-ca` or `zerotier-network-<instance>`, or stops declaring it
+- **THEN** this assumption is void; the `secret-consumption-seam-interface` requirement `A generator clan's own service declares is read as a provided entry` loses its discharge for that generator, and its provided entry fails when read

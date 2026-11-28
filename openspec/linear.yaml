@@ -174,5 +174,9 @@ projects:
         id: "8a18c207-3c66-4e84-b5a2-e806a419925a"
       "refactor-identity-oracle-interface":
         id: "55363500-f3fb-4abf-90eb-c06f80c4e400"
+      "secret-consumption-seam":
+        id: "0e4ee73d-3bbb-4aca-92d8-f62d6d173141"
+      "secret-consumption-seam-interface":
+        id: "dd3e50dc-f162-4eca-aa64-2118d67522bc"
       "world-assumptions":
         id: "69e977af-c46d-48c4-9208-138bbd795ab1"

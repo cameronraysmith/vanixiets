@@ -397,7 +397,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | approval card | — | the prompt the platform shows the operator before it applies a change to a cloud environment that a cloud session proposes | shared |
 | operator action | — | an act the operator performs by hand, such as starting a cloud session with a prompt, as distinct from accepting an approval card | world-only |
 | Linear workspace | — | a named organisation on Linear in which the operator's issues, projects and documents live, reached with a key that workspace issues | world-only |
-| disk | — | the persistent storage of a cloud session's container, which survives into the environment snapshot, as distinct from memory-backed storage that does not | shared |
+| disk | cloud session | the persistent storage of a cloud session's container, which survives into the environment snapshot, as distinct from memory-backed storage that does not | shared |
 | interactive terminal | — | a terminal screen a person watches and types into while a program runs, as distinct from a shell that only runs commands and returns their output | world-only |
 | clipboard | — | the copy-and-paste buffer of a person's desktop session | world-only |
 | main branch | — | this repository's default branch on the forge, whose newest commits the build service builds and publishes, and which a cloud environment that is not pinned follows | shared |
@@ -420,6 +420,53 @@ A term found to denote two distinct phenomena within this repository's vocabular
 | evaluation cost | — | the processor time, memory and work an evaluator spends computing one derivation, or the names of a set of them, from a commit's declarations | shared |
 | cost measurement | — | one computation, by a fresh evaluator process, whose evaluation cost is recorded together with the evaluator, host and other work running at the time | shared |
 | baseline | evaluation cost | the cost measurements of an unchanged commit, kept in the repository, against which a later claim about evaluation cost is compared | shared |
+| fleet member | — | an apparatus enrolled by name in the fleet's overlay network and recorded in the host registry: a host, or a phone | shared |
+| phone | — | a fleet member a person carries that runs no configuration this fleet builds | world-only |
+| host kind | — | whether a fleet member is a NixOS host, a nix-darwin host or a phone, which decides how it is built and reached | shared |
+| system | — | the processor architecture and operating system pair a host's configuration is built for, such as x86_64-linux or aarch64-darwin | shared |
+| host registry | — | the one record per fleet member, kept in the repository, of its name, system and the other facts about it | shared |
+| host fact | — | one property of a fleet member that the host registry records, such as its system, its memory or the account it is deployed as | shared |
+| derived fact | — | a host fact computed from other host facts rather than written down | shared |
+| fleet pin | — | the literal list of hosts and their kinds kept in the repository apart from the host registry, against which the registry's derived kinds are compared | shared |
+| checked host | — | a host whose configuration the fleet's per-host checks evaluate before a change merges | shared |
+| enrolled host | — | a host whose name a machine has taken, holding a machine key the fleet's secret store recognises | shared |
+| cloud server | — | a rented virtual server at a cloud provider on which a host runs, which exists or not by the operator's decision | world-only |
+| cloud machine type | — | a provider's named size of cloud server, which fixes its processors and memory | world-only |
+| service role | — | the part a service gives one host or device, such as controller, peer, server or agent, which decides what that member does for the service | shared |
+| role membership | — | the set of hosts that play one service role | shared |
+| inventory tag | — | a label the operator gives hosts to select them as a group, both for a service role and for deploying several hosts in one command | shared |
+| externally joined member | — | a fleet member that joins the overlay network with its own client rather than through the fleet's configuration, today the nix-darwin hosts and the phones | shared |
+| state version | — | the release a host's stateful defaults were first set from, fixed when the host is installed and not changed afterwards | shared |
+| graph store | — | the program on a host that keeps the fleet's graphs and answers queries and changes to them over the network, OmniGraph on magnetite | shared |
+| graph | — | one named body of entities and their relations that the graph store keeps and answers questions about | shared |
+| example graph | — | a graph whose content is example data recreated from its published seed, so its loss costs no one's work | world-only |
+| seed | — | the published file of example data loaded once into a new example graph | shared |
+| graph data | — | everything the graph store keeps for its graphs across restarts: the graphs, their history, their policies and the record of which writer holds them | shared |
+| graph data name | — | the name that identifies one body of graph data in either storage location and records the storage format its graphs were created at | shared |
+| storage format | — | the version of the on-disk layout the graph store wrote a graph in, which every later release that serves the graph must read | shared |
+| entity count | — | the number of entities of a graph as the graph store reports it for its current version | shared |
+| stored query | — | a named question declared with a graph, which the graph store answers on request | shared |
+| writer | graph store | a running program that holds graph data open for change; the graph store admits one at a time | shared |
+| direct writer | — | a writer the operator runs by hand against graph data, outside the graph store's own service | shared |
+| writer claim | — | the record a writer leaves in graph data naming itself as its one writer, which any later writer must find absent before it starts | shared |
+| stale writer claim | — | a writer claim left behind by a writer that is no longer running | shared |
+| crash | — | the end of the graph store's run without its own orderly shutdown, by a kill, a fault or a loss of power | shared |
+| boot | — | one period of a host's running between two starts of its operating system | shared |
+| serving | — | the state in which the graph store answers for every graph it is configured with and none is blocked | shared |
+| blocked graph | — | a graph the graph store is configured with but could not open at its last start | shared |
+| storage location | — | where a host's graph store keeps its graph data: that host's disk or a bucket, one at a time | shared |
+| bucket | — | a named container of objects at the fleet's object storage provider, Cloudflare R2, reached over the network with a credential | shared |
+| disk | host | the storage attached to one host, which survives its reboots and is lost with the host | shared |
+| local snapshot | — | a read-only image of graph data as it stood at one instant, kept on the host's disk and lost with it | shared |
+| graph backup | — | a copy of graph data made from one local snapshot and held in a bucket away from the host, which survives the loss of the host and its disk | shared |
+| runbook | — | the written procedure in the repository's operations docs that the operator follows for a named task | shared |
+| recovery notice | — | a low-priority message on the fleet's notification service telling the operator that the graph store cleared a stale writer claim on a named host | shared |
+| primary user | — | the person a host belongs to and is set up around, at most one per host, whose account on it is that person's own | shared |
+| admin account | — | the one account on a darwin host through which the operator administers it and under which its system-wide steps that act for a user run, which may or may not belong to the host's primary user | shared |
+| person-account correspondence | — | the fixed pairing between a person and the one account name under which the fleet keeps that person's home configuration and keys, which for cameron is crs58 and for every other person is the person's own name | world-only |
+| private settings | — | the part of a person's home configuration that only that person's own accounts may hold, such as the references to that person's secrets and personal choices | shared |
+| fleet description | — | the repository's statement of the fleet's hosts, people, packages and inputs, from which every host and home configuration is built | shared |
+| checked system | — | a platform, x86_64-linux or aarch64-darwin, for which the fleet's checks are built | shared |
 | feature | fleet | a capability the fleet runs on one or more hosts, such as the build service, the forge or the telemetry store, together with the services and secrets it needs, as distinct from the repository files that declare it | shared |
 | secret backend | — | the tool that produces, encrypts, stores and installs the fleet's secrets on its hosts; clan's vars today | shared |
 | secret seam | — | the part of the repository that alone translates what features state about their secrets into the secret backend's terms and reads their delivered locations back | shared |
@@ -432,7 +479,7 @@ A term found to denote two distinct phenomena within this repository's vocabular
 #### Scenario: The terms with two senses are read
 
 - **WHEN** the table is read for terms that carry two senses in this repository
-- **THEN** twenty-six terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, and `closure`, of which `probe`, `release`, `credential` and `evaluator` carry three and every other term two
+- **THEN** twenty-seven terms carry more than one sense today and are disambiguated by separate rows rather than left to context: `session`, `package`, `policy`, `@`, `mutation`, `activation`, `probe`, `machine`, `host`, `interface`, `repository`, `build service`, `database`, `hostname`, `evaluator`, `person`, `writer`, `account`, `build`, `path`, `credential`, `identifier`, `browser`, `release`, `reader`, `closure`, and `disk`, of which `probe`, `release`, `credential`, `evaluator` and `writer` carry three and every other term two
 
 #### Scenario: A term resolves to two phenomena
 

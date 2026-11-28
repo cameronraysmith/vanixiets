@@ -3,15 +3,18 @@ linear_story_id: CAM-129
 linear_story_identifier: CAM-129
 linear_story_title: "Confine clan secrets to one seam so features and homes stop reading clan vars"
 linear_story_url: https://linear.app/cameronraysmith/issue/CAM-129/confine-clan-secrets-to-one-seam-so-features-and-homes-stop-reading
-linear_story_state: Todo
+linear_story_state: Done
 linear_team: CAM
 linear_project: den-ready-fleet
-last_synced_state: Todo
-last_synced_at: "2026-11-26T22:58:21Z"
+last_synced_state: Done
+last_synced_at: "2026-11-28T01:53:09Z"
 review_round: 0
 max_review_rounds: 3
 attempt_log:
   - { at: "2026-11-26T22:58:21Z", transition: "Backlog->Todo", outcome: "posted", note: "Issue CAM-129 created in Todo in project 06049a4f18a4 (Den-ready fleet architecture), no label, with description seeded from proposal.md's Why and What Changes; state and project confirmed by read-only view; bind comment posted" }
+  - { at: "2026-11-28T01:52:30Z", transition: "archive->mirror", outcome: "posted", note: "Documents in project Den-ready fleet architecture (06049a4f18a4): OpenSpec: secret-consumption-seam (0e4ee73d) and secret-consumption-seam-interface (dd3e50dc) created; ids stored in openspec/linear.yaml" }
+  - { at: "2026-11-28T01:52:30Z", transition: "archive->mirror", outcome: "dropped", note: "world-assumptions (69e977af) not updated: it is listed in defaults.archive_documents.unmirrored, and the synced spec is 273373 characters, over Linear's 250000-character document limit; the document still holds an earlier archive's copy" }
+  - { at: "2026-11-28T01:53:09Z", transition: "In Progress->Done", outcome: "posted", note: "Catch-up in one transition: the intermediate transitions (Todo->In Progress, In Progress->In Review) were not recorded in this ledger, and Linear read In Progress before the transition. Archived after all 81 tasks were done and secret-consumption-seam, secret-consumption-seam-interface and world-assumptions were synced (8 designation rows added to main's 369-row table, A360-A364 added); verify.md records no In Review gate decision; no review.md. Workspace confirmed by linear auth whoami; state confirmed Done by read-only view; catch-up comment posted" }
 ---
 
 ## Why
