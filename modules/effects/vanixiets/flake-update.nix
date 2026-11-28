@@ -8,7 +8,8 @@
 # of the vanixiets-flake-updater App and runs nixbot's vendored flakeUpdate
 # script (inputs.nixbot, herculesCI/nixbot-flake-update.py) with it: one
 # branch `update-<input>` and pull request per moved root input, every input
-# but playwright-web-flake, no auto-merge, commits by the App's bot user.
+# but playwright-web-flake and nixpkgs, no auto-merge, commits by the App's
+# bot user.
 #
 # The rehearsal, after nixbot's checks/effects-lib-flake-update.nix: a bare
 # repository behind git's smart HTTP and a fake GitHub API on 127.0.0.1
@@ -17,14 +18,14 @@
 # build, and a stand-in nix that rewrites flake.lock and commits as
 # `nix flake update <input> --commit-lock-file` does, deterministically, so a
 # second run sees no input move.
-#   case 1: two runs over a lock with nixpkgs, utils and playwright-web-flake.
-#     Each signs a JWT the forge verifies against the test key and App id,
-#     logs the installation it found, mints a token restricted to the
+#   case 1: two runs over a lock with nixpkgs, playwright-web-flake, systems
+#     and utils. Each signs a JWT the forge verifies against the test key and
+#     App id, logs the installation it found, mints a token restricted to the
 #     repository and two permissions, makes every later API and git request
-#     with it and revokes it at exit. After the first, update-nixpkgs and
+#     with it and revokes it at exit. After the first, update-systems and
 #     update-utils are one bot-authored commit ahead of main and have pull
-#     requests, and no update-playwright-web-flake exists; the second changes
-#     no branch head.
+#     requests, and no update-nixpkgs or update-playwright-web-flake exists;
+#     the second changes no branch head.
 #   case 2: the installation lookup answers 404: the program fails, names no
 #     installation, and makes no push and no pull request call.
 #   case 3, after every run: no file in the checkout, its git objects, the
@@ -46,7 +47,11 @@ let
       update = (inputs.nixbot.lib.effects { inherit pkgs; }).flakeUpdate {
         perInput = true;
         updateBranch = "update";
-        excludeInputs = [ "playwright-web-flake" ];
+        excludeInputs = [
+          "playwright-web-flake"
+          # Removed when the held nixpkgs update is unblocked.
+          "nixpkgs"
+        ];
         forgeType = "github";
         createPullRequest = true;
         autoMergeMethod = null;
@@ -125,10 +130,12 @@ let
           root.inputs = {
             nixpkgs = "nixpkgs";
             playwright-web-flake = "playwright-web-flake";
+            systems = "systems";
             utils = "utils";
           };
           nixpkgs.locked.rev = "base";
           playwright-web-flake.locked.rev = "base";
+          systems.locked.rev = "base";
           utils.locked.rev = "base";
         };
         root = "root";
@@ -167,7 +174,7 @@ let
           auth = "jwt";
           body = mintRequest;
         }
-        (pull "nixpkgs")
+        (pull "systems")
         (pull "utils")
         {
           method = "DELETE";
@@ -341,11 +348,11 @@ let
           grep -q '"request":"POST git-receive-pack?"' git-requests || fail "case 1 run 1: nothing was pushed"
           for branch in $(git -C "$bare" for-each-ref --format='%(refname:short)' refs/heads); do
             case "$branch" in
-              main | update-nixpkgs | update-utils) ;;
+              main | update-systems | update-utils) ;;
               *) fail "case 1 run 1: unexpected branch $branch" ;;
             esac
           done
-          for input in nixpkgs utils; do
+          for input in systems utils; do
             branch="update-$input"
             git -C "$bare" rev-parse -q --verify "refs/heads/$branch" >/dev/null ||
               fail "case 1 run 1: missing branch $branch"

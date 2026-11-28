@@ -75,17 +75,18 @@ It SHALL write the key only to such a file, and remove it and unset both secret 
 
 ### Requirement: The update script runs one input at a time with fixed arguments
 
-The program SHALL run nixbot's `flakeUpdate` script configured with `perInput = true`, `updateBranch = "update"`, `excludeInputs = [ "playwright-web-flake" ]`, `forgeType = "github"`, `createPullRequest = true`, `autoMergeMethod = null`, `pullRequestTitle = null` and `pullRequestBody = null`, taken from the nixbot flake input the repository locks.
+The program SHALL run nixbot's `flakeUpdate` script configured with `perInput = true`, `updateBranch = "update"`, `excludeInputs = [ "playwright-web-flake" "nixpkgs" ]`, `forgeType = "github"`, `createPullRequest = true`, `autoMergeMethod = null`, `pullRequestTitle = null` and `pullRequestBody = null`, taken from the nixbot flake input the repository locks.
+`nixpkgs` SHALL stay in `excludeInputs` only while its held update (Linear CAM-125: kernel 6.18.65 breaks pyrite's out-of-tree audio and Bluetooth modules) is blocked, because each run rebuilds and force-pushes every open update branch and would rebuild the held pull request; it SHALL be removed when that update is unblocked.
 
 #### Scenario: The configuration is evaluated
 
 - **WHEN** the configuration file the program passes to nixbot's script is read
-- **THEN** it holds `perInput: true`, `updateBranch: "update"`, `flakes."."."excludeInputs": ["playwright-web-flake"]`, `forgeType: "github"`, `createPullRequest: true` and `autoMergeMethod: null`
+- **THEN** it holds `perInput: true`, `updateBranch: "update"`, `flakes."."."excludeInputs": ["playwright-web-flake", "nixpkgs"]`, `forgeType: "github"`, `createPullRequest: true` and `autoMergeMethod: null`
 
-#### Scenario: A rehearsal run with three inputs
+#### Scenario: A rehearsal run with four inputs
 
-- **WHEN** the rehearsal runs the program twice against a base whose lock file has the inputs `nixpkgs`, `utils` and `playwright-web-flake`
-- **THEN** after the first run the fake forge has branches `update-nixpkgs` and `update-utils`, each one commit ahead of the base, and pull-request calls for those two, and no `update-playwright-web-flake`; the second run, with no input moved, changes no branch head
+- **WHEN** the rehearsal runs the program twice against a base whose lock file has the inputs `nixpkgs`, `playwright-web-flake`, `systems` and `utils`
+- **THEN** after the first run the fake forge has branches `update-systems` and `update-utils`, each one commit ahead of the base, and pull-request calls for those two, and no `update-nixpkgs` or `update-playwright-web-flake`; the second run, with no input moved, changes no branch head
 
 ### Requirement: Commits carry the forge application's bot identity
 
@@ -93,7 +94,7 @@ The program SHALL set the git author and committer of every commit nixbot's scri
 
 #### Scenario: A rehearsal commit is read
 
-- **WHEN** the rehearsal reads the head commit of `update-nixpkgs`
+- **WHEN** the rehearsal reads the head commit of `update-utils`
 - **THEN** its author and committer are both that name and address
 
 ### Requirement: The rehearsal is part of the pre-merge effects gate

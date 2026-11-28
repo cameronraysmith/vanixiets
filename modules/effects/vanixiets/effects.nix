@@ -43,8 +43,8 @@
 #
 # flake-update refreshes the branch-tracking flake inputs on Tuesdays and
 # Fridays at 10:00 UTC, one `update-<input>` branch and pull request per
-# moved input, playwright-web-flake excluded (./flake-update.nix). nixbot
-# matches `when` against the UTC clock and knows no time zone
+# moved input, playwright-web-flake and nixpkgs excluded (./flake-update.nix).
+# nixbot matches `when` against the UTC clock and knows no time zone
 # (nixbot/schedules.py), so the run starts at 05:00 New York time in winter
 # and 06:00 in summer, on the same Tuesday and Friday: its burst of builds
 # lands hours before the working day. magnetite's store collection
