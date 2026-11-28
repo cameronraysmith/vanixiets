@@ -1,7 +1,7 @@
 {
   "name": "worktrunk-bin",
-  "version": "0.81.0",
-  "realizedVersion": "0.81.0",
+  "version": "0.83.0",
+  "realizedVersion": "0.83.0",
   "source": {
     "githubRelease": {
       "owner": "max-sixty",
@@ -28,15 +28,15 @@
           }
         },
         "hashes": {
-          "x86_64-linux": "sha256-DCU/IWmFzpzXsgKhFga1zmqpNLEBn9H7ubfOK0exx0o=",
-          "aarch64-linux": "sha256-ejNNLmTFd6/QJH4kEe/2czYKsfGIl1ZPLS5dU3T710s=",
-          "x86_64-darwin": "sha256-IR+jWFr6DOJD3g8Af74ti4bFyIyF7aF9CTEbMuhTNxQ=",
-          "aarch64-darwin": "sha256-ucPy+AcVVM+IUARm1l014YrV7a1XYkeaHxS83dWreII="
+          "x86_64-linux": "sha256-4N1eXrNliQ3ceyVRg8In5EH7t9oEyrW3LlT6gP0hgYs=",
+          "aarch64-linux": "sha256-ksaIJ6GLA3xgi3covPfOHVlHcayBS+x0EqNRKfJ21K4=",
+          "x86_64-darwin": "sha256-nn+SoDe33IyyFqDzI+zhHX7oE1cqd2LWL7NsiPM7qRc=",
+          "aarch64-darwin": "sha256-XkiQiWcrVTtid1lYde80ed8BF1UVMCHITe+Q7dru97g="
         }
       }
     }
   },
-  "rev": "e42f0f6fef2fdbd98fc92e5cd6c3cbea55b65b38",
+  "rev": "da19a7ac8fc58b33e49ae840e5bb24f4de0661cc",
   "companions": [
     {
       "path": "modules/home/ai/plugins/version-control-and-forge/apm.yml",
