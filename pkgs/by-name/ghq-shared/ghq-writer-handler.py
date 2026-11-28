@@ -47,6 +47,13 @@ status stays as its other commands set it, and the exit log line adds
 history=hydrated:<n>, history=not-hydrated or history=failed, on every path
 after the history fetch.
 
+An update whose fast-forward fails while a shallow boundary lies between the
+local branch and its upstream keeps git's refusal and exit status; two lines
+after it say that the copy holds a commit without its history, which upstream's
+branch has moved past, and name the deepen that fetches the history below every
+boundary without hiding any. Finding that reads the clone and writes nothing,
+and the exit log line adds boundary=blocked.
+
 Usage: ghq-writer-handler CONFIG.json, where CONFIG holds "root", "group",
 "allowedProtocols", "lockDir" and optionally "lockTimeout", "commandTimeout"
 and "historyLimit".
@@ -606,6 +613,35 @@ def boundaries(path):
         return set()
 
 
+# git counts a commit at exactly the requested depth below a boundary as a new
+# boundary, which hides held history when it lands on a commit the clone holds;
+# no copy's history is as deep as the largest depth a request accepts.
+FULL_DEEPEN = 1_000_000
+
+
+def blocking_boundary(path, env):
+    """The boundary blocking a failed fast-forward and the upstream ref it blocks, or None.
+
+    A boundary blocks when the local branch is not an ancestor of its upstream
+    and upstream's commits past it reach that boundary. Reads only.
+    """
+    start = boundaries(path)
+    if not start:
+        return None
+    quiet = {**env, "GIT_NO_LAZY_FETCH": "1"}
+    tracking = git(path, quiet, "rev-parse", "--symbolic-full-name", "@{upstream}")
+    upstream_ref = tracking.stdout.strip().decode(errors="replace")
+    if tracking.returncode or not upstream_ref:
+        return None
+    if git(path, quiet, "merge-base", "--is-ancestor", "HEAD", upstream_ref).returncode != 1:
+        return None
+    gap = git(path, quiet, "rev-list", upstream_ref, "^HEAD")
+    if gap.returncode:
+        return None
+    held = [commit for commit in gap.stdout.decode().split() if commit in start]
+    return (held[0], upstream_ref.removeprefix("refs/remotes/")) if held else None
+
+
 def branch_refs(path, env):
     """The commit each of the clone's branches and remote-tracking branches names, by ref name, both as bytes.
 
@@ -871,6 +907,16 @@ def run_get(request, argv, config, env, session):
     if update and full:
         results.append(git(path, env, "fetch", "--tags", "origin"))
     results.append(run(argv, env))
+    blocked = update and results[-1].returncode and blocking_boundary(path, env)
+    if blocked:
+        session.boundary = True
+        commit, branch = blocked
+        results.append(subprocess.CompletedProcess([], 0, b"", (
+            f"shallow boundary blocks the update: {path} (the copy holds {commit} without its history, and"
+            f" upstream's {branch} has moved past it, so git cannot fast-forward)\n"
+            f"to repair it: ghq-sync --deepen {FULL_DEEPEN} {path} fetches the history below every boundary of"
+            f" this copy and hides none of it, then ghq-sync -u {path}; a smaller --deepen can hide history the"
+            " copy holds\n").encode()))
     shallow = None
     if request.get("tags") is True:
         tagged = repo_dir(request["target"], config["root"])
@@ -918,6 +964,7 @@ class Session:
         self.target = self.reason = None
         self.gone = self.notes = False
         self.history = None
+        self.boundary = False
 
     def log(self, event):
         try:
@@ -1043,8 +1090,10 @@ def main():
     session.send(reply)
     session.conn.close()
     history = f" history={session.history.outcome}" if session.history else ""
+    boundary = " boundary=blocked" if session.boundary else ""
     reason = f" reason: {session.reason}" if session.reason else ""
-    session.log(f"exit status={reply['exit']} duration={time.monotonic() - session.started:.3f}s{history}{reason}")
+    session.log(f"exit status={reply['exit']} duration={time.monotonic() - session.started:.3f}s{history}{boundary}"
+                f"{reason}")
     sys.exit(status)
 
 

@@ -87,6 +87,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       ghq-shared = finalAttrs.finalPackage;
       script = "test_handler_history.py";
     };
+    tests.handler-boundary = callPackage ./test-handler.nix {
+      ghq-shared = finalAttrs.finalPackage;
+      script = "test_handler_boundary.py";
+    };
     tests.wrapper = callPackage ./test-wrapper.nix { ghq-shared = finalAttrs.finalPackage; };
     tests.acl = callPackage ./test-acl.nix { ghq-shared = finalAttrs.finalPackage; };
   };

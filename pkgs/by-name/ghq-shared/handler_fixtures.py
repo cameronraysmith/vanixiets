@@ -1,4 +1,4 @@
-"""Fixtures shared by the handler's two test scripts, test_handler.py and test_handler_history.py.
+"""Fixtures shared by the handler's test scripts, test_handler.py, test_handler_history.py and test_handler_boundary.py.
 
 Importing this module reads the handler's path from the command line and makes
 a scratch root; each script drives ghq-writer-handler over a socket pair, as its

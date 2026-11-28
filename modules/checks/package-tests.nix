@@ -24,6 +24,7 @@
         ghq-shared = [
           "acl"
           "handler"
+          "handler-boundary"
           "handler-history"
           "wrapper"
         ];
@@ -101,6 +102,11 @@
               class = "small";
               measured = false;
             };
+            # The cases of an update a shallow boundary blocks; no run yet, too few to class.
+            package-ghq-shared-test-handler-boundary = {
+              class = "small";
+              measured = false;
+            };
             package-ghq-shared-test-handler-history = {
               class = "small";
               measured = false;
@@ -164,6 +170,11 @@
             # Split in two on 2026-11-27, the whole having a median of 125 s; no
             # run of either half yet, too few to class (design D4).
             package-ghq-shared-test-handler = {
+              class = "medium";
+              measured = false;
+            };
+            # The cases of an update a shallow boundary blocks; no run yet, too few to class.
+            package-ghq-shared-test-handler-boundary = {
               class = "medium";
               measured = false;
             };

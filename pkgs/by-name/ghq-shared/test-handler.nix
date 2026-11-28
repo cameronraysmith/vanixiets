@@ -1,7 +1,8 @@
-# One of the handler's two test scripts, which share handler_fixtures.py: script
-# names it, test_handler.py (request protocol, refusals, tags, LFS, hydrate,
-# default branch, locks, time limits, failure logging and maintenance) or
-# test_handler_history.py (the history fetch).
+# One of the handler's three test scripts, which share handler_fixtures.py:
+# script names it, test_handler.py (request protocol, refusals, tags, LFS,
+# hydrate, default branch, locks, time limits, failure logging and
+# maintenance), test_handler_history.py (the history fetch) or
+# test_handler_boundary.py (the report of an update a shallow boundary blocks).
 {
   lib,
   runCommand,
