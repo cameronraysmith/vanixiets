@@ -1,0 +1,86 @@
+{ pkgs, lib, ... }:
+let
+  # A plain comment needs no marker.
+  a = 1;
+
+  # Isolation (design D14): the collector runs none of it.
+  c = 3;
+
+  # Read 2026-11-24 from the CI history.
+  e = 5;
+
+  # The evaluation measured 240 s on pyrite.
+  f = 6;
+
+  # This used to call the old wrapper. ~keep
+  g = 7;
+
+  # The duration samples are in logs/eval-cost-20261124.log.
+  n = 14;
+
+  # -------------------------------------------------------------
+  j = 10;
+
+  # Tracked in CAM-111, which this comment names in place of a reason.
+  d = 4;
+
+  # Per the operator, the limit stays at four.
+  h = 8;
+
+  # The account's R2 endpoint, as Cloudflare names it.
+  k = 11;
+
+  # oauth2-proxy cannot run two providers in one process (upstream #926).
+  l = 12;
+
+  # Drop the patch once upstream no longer mirrors a check.
+  m = 13;
+
+  # Pins the previously tagged image, which the registry still serves.
+  p = 16;
+
+  # The service writes its own logs/.
+  q = 17;
+
+  # Accepts dates in the form YYYY-MM-DD and waits 30 s for the socket.
+  r = 18;
+
+  # Arguments after -- go to the wrapped tool; see ADR-003 item 16.
+  t = 19;
+
+  /**
+    Returns the host's address (finding F86).
+  */
+  addressOf = host: host.address;
+
+  ## A double-hash comment is a plain comment in Nix (wave 3).
+  o = 15;
+
+  s = "# not a comment, a string (design D1)";
+
+  options.enable = lib.mkOption {
+    type = lib.types.bool;
+    description = "Whether to run the collector.";
+  };
+  options.port = lib.mkOption {
+    type = lib.types.port;
+    description = ''
+      The port the collector listens on.
+      Chosen in decision D7.
+    '';
+  };
+  meta.description = "A collector, measured at 3 s on stibnite";
+
+  script = pkgs.writeShellApplication {
+    name = "x";
+    text = ''
+      # Restart the unit (stage 2).
+      echo "$1"
+      # Wait for the socket before the first request.
+      echo done ''${HOME}
+    '';
+  };
+in
+{
+  inherit a c d e f g h k l m n o p q r s t j script addressOf;
+}

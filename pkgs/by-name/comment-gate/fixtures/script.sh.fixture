@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
+set -eu
+# The operator restarts the service by hand, as agreed in PR 412.
+echo '# not a comment (wave 2)'
+x=1 # the median request took 40 ms on stibnite
+cat <<'DOC'
+# inside a heredoc, text the shell prints (2026-01-02)
+DOC
+echo "$x"

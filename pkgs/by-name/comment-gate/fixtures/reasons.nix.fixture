@@ -1,0 +1,21 @@
+# The renderer's output is the input of the
+# checker, so it must be stable:
+# keys are sorted,
+# lists keep their order,
+# and strings are not reflowed.
+# A changed byte is a changed hash,
+# and a changed hash rebuilds
+# every check that reads it.
+{
+  # A comment of ten lines in the body is not a run:
+  # the first line states the constraint,
+  # the second gives its cause,
+  # the third names the input,
+  # the fourth the output,
+  # the fifth the reader,
+  # the sixth the writer,
+  # the seventh the failure,
+  # the eighth its symptom,
+  # and the tenth closes it.
+  a = 1;
+}

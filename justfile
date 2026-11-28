@@ -930,6 +930,19 @@ agents-context:
 agents-context-full:
   {{nix_cmd}} run .#apm-context-compile -- --full
 
+# Judge the comments one jj change adds, as the commit hook judges a staged commit: the
+# revision resolves to its commit, which is compared with its first parent.
+# Usage: just comment-gate @-
+[group('agents')]
+comment-gate rev:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  head=$(jj --ignore-working-copy log -r '{{rev}}' --no-graph -T 'commit_id ++ "\n"')
+  case "$head" in
+    "" | *$'\n'*) echo "comment-gate: {{rev}} must name exactly one change" >&2; exit 2 ;;
+  esac
+  {{nix_cmd}} run .#comment-gate -- --base "$head^" --head "$head"
+
 # Refresh the generated openwiki wiki against the current tree via the openwiki CLI; metered against the configured model provider.
 [group('agents')]
 openwiki-refresh:

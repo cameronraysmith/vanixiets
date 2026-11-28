@@ -101,6 +101,10 @@
               class = "medium";
               measured = false;
             };
+            package-comment-gate = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 32 s, slowest 91 s, all 10 runs 2026-09-04..2026-11-11
             package-dbt-fusion.class = "small";
             # nixbot: median 4.0 s, slowest 33 s, all 7 runs 2026-09-04..2026-11-11
@@ -326,6 +330,10 @@
             package-claude-code.class = "small";
             # nixbot: 1 run, too few to class (design D4)
             package-claude-sandbox-setup = {
+              class = "medium";
+              measured = false;
+            };
+            package-comment-gate = {
               class = "medium";
               measured = false;
             };

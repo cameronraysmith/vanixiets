@@ -1,0 +1,13 @@
+# The module sets up the table renderer.
+# It does so in three steps.
+# The first step reads the table.
+# The second step renders it.
+# The third step writes it.
+# Each step is idempotent.
+# A rerun changes nothing.
+# The table lives in lib.
+# It reads no network.
+# It writes one file.
+# It logs one line.
+# ~keep
+{ }

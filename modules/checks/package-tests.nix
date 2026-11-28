@@ -20,6 +20,7 @@
     let
       declared = {
         atomic = [ "help" ];
+        comment-gate = [ "self-test" ];
         ghq-shared = [
           "acl"
           "handler"
@@ -83,6 +84,10 @@
           x86_64-linux = {
             # nixbot: median 8.1 s, slowest 48 s, 3 runs in 30 days
             package-atomic-test-help.class = "small";
+            package-comment-gate-test-self-test = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 8.5 s, slowest 18 s, all 6 runs 2026-10-21..2026-11-11
             package-ghq-shared-test-acl.class = "small";
             # The handler's test split in two on 2026-11-27, the whole having run
@@ -141,6 +146,10 @@
           aarch64-darwin = {
             # nixbot: median 26 s, slowest 92 s, 6 runs in 30 days
             package-atomic-test-help.class = "small";
+            package-comment-gate-test-self-test = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 65 s, slowest 649 s, 4 runs in 30 days
             package-ghq-shared-test-acl.class = "medium";
             # Split in two on 2026-11-27, the whole having a median of 125 s; no

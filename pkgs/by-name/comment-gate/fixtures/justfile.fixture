@@ -1,0 +1,7 @@
+# Build the docs site with the pinned toolchain.
+build:
+    nix build .#docs
+
+# Deploy after the build (decision D3).
+deploy: build
+    echo deploy

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Mirrors the forge's rate limit; see PR 512 for the upstream discussion.
+echo ok

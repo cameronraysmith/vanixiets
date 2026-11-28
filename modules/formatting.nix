@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, lib, ... }:
 {
   imports = [
     inputs.treefmt-nix.flakeModule
@@ -6,7 +6,7 @@
   ];
 
   perSystem =
-    { pkgs, ... }:
+    { pkgs, self', ... }:
     {
       treefmt = {
         projectRootFile = "flake.nix";
@@ -28,6 +28,17 @@
         package = pkgs.prek;
         hooks.treefmt.enable = true;
         hooks.gitleaks.enable = true;
+        hooks.comment-gate = {
+          enable = true;
+          name = "comment-gate";
+          entry = "${lib.getExe self'.packages.comment-gate} --staged";
+          pass_filenames = false;
+          verbose = true;
+          after = [
+            "treefmt"
+            "gitleaks"
+          ];
+        };
       };
 
     };
