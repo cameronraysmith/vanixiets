@@ -92,8 +92,8 @@
     nixbot.inputs.nixpkgs.follows = "nixpkgs";
     nixbot.inputs.treefmt-nix.follows = "treefmt-nix";
 
-    # nixbot's production evaluator: a bump takes effect at magnetite's next
-    # deploy, unmeasured against nix-eval-jobs (A147 held at 9157ca1a only).
+    # nixbot's production evaluator, changed by a bump at magnetite's next
+    # deploy; a bump is merged only after `just eval-identity` passes on it.
     # No follows: its build is substituted from cache.numtide.com.
     iets.url = "github:numtide/iets";
 

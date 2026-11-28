@@ -32,7 +32,9 @@ The Macs have no evaluation lock, and several agents run at once on them, so the
 By default both are the evaluators the host's configuration has at that commit, built with stock Nix, so an `iets` bump is tested with the iets the commit's lock pins rather than the one deployed; `evaluators=path` runs the deployed names on PATH, to check a host as it is.
 The run prints the evaluator store paths and the pinned iets revision.
 It needs a host with iets and queues on the lock where there is one.
-Run it on every bump of the `iets` flake input and on any change to how a host chooses, bounds, locks or wraps its evaluator, and name the result in the change description.
+Run it on any change to how a host chooses, bounds, locks or wraps its evaluator, and name the result in the change description.
+A bump of the `iets` flake input is merged only after `just eval-identity` passes on it, with its result named in the bump's pull request.
+That pull request is the one on branch `update-iets`, opened by the scheduled flake-update effect (`modules/effects/vanixiets/flake-update.nix`): fetch the branch, run `just eval-identity` at its head commit (the `rev` argument), and post the result as a comment on the pull request; it is never enqueued into gitea-mq before that comment is on it.
 A difference is a finding: report the attribute and both drvPaths to the operator, and do not pin, exclude or rewrite anything to make the two agree.
 
 An evaluation-cost number is evidence only with its conditions, so every one you record or compare names the evaluator (iets or stock, and its version or input revision), the host, the worker count and memory limit, the attribute scope, and whether another evaluation was running at the time.

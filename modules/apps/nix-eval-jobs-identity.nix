@@ -8,7 +8,8 @@
 # NixOS those are lock-wrapped, so both runs stay behind the host's
 # evaluation lock. `--evaluators path` runs the names on PATH instead.
 # `just eval-identity` runs it. It is the evidence behind evaluating with
-# iets: run it after an iets bump or before widening iets' use.
+# iets: an iets bump is merged only after it passes, and it runs before
+# widening iets' use.
 { config, ... }:
 let
   flakeLib = config.flake.lib;

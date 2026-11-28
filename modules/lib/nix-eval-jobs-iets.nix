@@ -21,9 +21,9 @@
 # options.services.nixbot.packages.nix-eval-jobs.default. Magnetite's
 # instance is vanixiets.nixbot.ietsEvaluator, which modules/nixos/nixbot.nix
 # selects, lock-wrapped, as nixbot's evaluator (CAM-111 task 5.2);
-# checks.x86_64-linux.nix-eval-jobs-iets pins its shape. Parity with the
-# stock evaluator (world assumption A147) was measured at iets 9157ca1a and
-# is not re-measured per bump (operator decision, 2026-11-20).
+# checks.x86_64-linux.nix-eval-jobs-iets pins its shape. An iets bump is
+# merged only after `just eval-identity` finds it gives the stock
+# evaluator's drvPaths.
 { lib, ... }:
 {
   flake.lib.mkNixEvalJobsIets =

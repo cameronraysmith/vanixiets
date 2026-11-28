@@ -29,4 +29,4 @@ iets' tracing cache is off by default (`IETS_CACHE=1` turns it on for one run): 
 Do not set `IETS_CACHE` in a shell profile, recipe or environment file to make repeated calls faster.
 
 `just eval-identity` also runs `apps/nix-classic-identity`, which evaluates every host system, every home activation package and the default dev shell with stock Nix and with classic and fails unless drvPaths and whole `.drv` closures agree; one run took about 13 minutes on stibnite on 2026-11-23.
-Run it on every bump of the `iets` input before the trial continues, and treat a difference as a finding to report, as for the `nix-eval-jobs` oracle (§Evaluators).
+It is part of the check an `iets` bump passes before it is merged (§Evaluators), and a difference is a finding to report, as for the `nix-eval-jobs` oracle.

@@ -443,7 +443,8 @@ check-ifd systems="x86_64-linux aarch64-linux aarch64-darwin" workers="4" mem="4
 # 2. Stock nix against iets' classic mode (flake.lib.nixClassic) over every host system, every
 #    home activationPackage and this system's default devShell: drvPath and whole .drv
 #    closure, with both evaluation times.
-# Run it on every iets input bump and before widening where iets evaluates.
+# An iets input bump is merged only after it passes, its result named in the pull request;
+# run it too before widening where iets evaluates.
 # Usage: just eval-identity                          (x86_64-linux and aarch64-darwin)
 #        just eval-identity "aarch64-darwin" <rev> 2
 #        just eval-identity "aarch64-darwin" <rev> 2 path

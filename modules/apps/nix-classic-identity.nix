@@ -1,9 +1,9 @@
 # The identity oracle for iets' classic mode as `nix` (flake.lib.nixClassic):
 # stock nix and classic evaluate the configurations people evaluate, at one
 # commit, and each must give the same drvPath and the same .drv closure.
-# `just eval-identity` runs it after the nix-eval-jobs oracle. Re-run it on
-# every iets input bump; stock is the fleet's nix (flake.lib.fleetNix), the
-# one classic wraps.
+# `just eval-identity` runs it after the nix-eval-jobs oracle, and an iets
+# input bump is merged only after it passes; stock is the fleet's nix
+# (flake.lib.fleetNix), the one classic wraps.
 { config, ... }:
 let
   flakeLib = config.flake.lib;
