@@ -1,0 +1,325 @@
+{
+ "commit": "1e8fb9ff6d661dbb55caa664c3d23a26843a7d22",
+ "lookup": [
+  {
+   "n": 1,
+   "files": 4,
+   "searches": 8,
+   "confidence": "medium-high (I did not check the darwin hosts for postgres; the NixOS service modules that enable it are only imported by magnetite)",
+   "misled": "cinnabar's `matrix-server` (modules/machines/nixos/cinnabar/matrix.nix:55) looked like a second PostgreSQL host, but it is tuwunel, not synapse on postgres.",
+   "right": true
+  },
+  {
+   "n": 2,
+   "files": 1,
+   "searches": 3,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 3,
+   "files": 3,
+   "searches": 1,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 4,
+   "files": 1,
+   "searches": 1,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 5,
+   "files": 2,
+   "searches": 3,
+   "confidence": "high (the source and the owner); medium (the exact file mode)",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 6,
+   "files": 0,
+   "searches": 2,
+   "confidence": "high",
+   "misled": "packages/docs/src/content/docs/development/operations/fleet-observability.md:607 (says \"deployed to magnetite and cinnabar\")",
+   "right": true
+  },
+  {
+   "n": 7,
+   "files": 2,
+   "searches": 1,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 8,
+   "files": 2,
+   "searches": 3,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 9,
+   "files": 1,
+   "searches": 1,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 10,
+   "files": 2,
+   "searches": 1,
+   "confidence": "high",
+   "misled": "none (the many inventory, sops and machine-config references could suggest it is a live host, but I checked the cloud enable flag)",
+   "right": true
+  },
+  {
+   "n": 11,
+   "files": 3,
+   "searches": 3,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 12,
+   "files": 1,
+   "searches": 1,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 13,
+   "files": 2,
+   "searches": 3,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 14,
+   "files": 1,
+   "searches": 1,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 15,
+   "files": 1,
+   "searches": 1,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  },
+  {
+   "n": 16,
+   "files": 3,
+   "searches": 3,
+   "confidence": "high",
+   "misled": "none. Side note: effects.nix:50-51 says magnetite's harmonia-gc runs \"hourly\", but ci-cd-setup.md:256 says it runs daily at 04:00 New York time, so the two disagree.",
+   "right": true
+  },
+  {
+   "n": 17,
+   "files": 0,
+   "searches": 2,
+   "confidence": "high",
+   "misled": "The first `find` returned only openspec/ archive plans, which I was told not to read.",
+   "right": true
+  },
+  {
+   "n": 18,
+   "files": 3,
+   "searches": 2,
+   "confidence": "medium",
+   "misled": "The compose.nix:39 comment gives an order (channels, stable-fallbacks, overrides, nvim-treesitter, nuenv) that no code enforces, and it names overrides/nvim-treesitter overlays that don't exist in the overlays/ directory.",
+   "right": true
+  },
+  {
+   "n": 19,
+   "files": 2,
+   "searches": 2,
+   "confidence": "high",
+   "misled": "modules/machines/darwin/stibnite/default.nix. The machine file says who the user is but not the uid, which is in modules/lib/host-users.nix.",
+   "right": true
+  },
+  {
+   "n": 20,
+   "files": 1,
+   "searches": 2,
+   "confidence": "high",
+   "misled": "none",
+   "right": true
+  }
+ ],
+ "hard": [
+  {
+   "id": "PL1",
+   "runs": 3,
+   "files": [
+    15,
+    18,
+    11
+   ],
+   "searches": [
+    7,
+    12,
+    7
+   ],
+   "agree": "file sets identical; macOS mechanism split",
+   "complete": 3
+  },
+  {
+   "id": "PL2",
+   "runs": 3,
+   "files": [
+    28,
+    27,
+    27
+   ],
+   "searches": [
+    14,
+    18,
+    17
+   ],
+   "agree": "Jaccard 0.70-0.77",
+   "complete": 0
+  },
+  {
+   "id": "PL3",
+   "runs": 3,
+   "files": [
+    19,
+    11,
+    13
+   ],
+   "searches": [
+    18,
+    13,
+    17
+   ],
+   "agree": "Jaccard 0.75-1.0; two prompt shapes",
+   "complete": 3
+  },
+  {
+   "id": "PL4",
+   "runs": 3,
+   "files": [
+    8,
+    7,
+    8
+   ],
+   "searches": [
+    8,
+    4,
+    5
+   ],
+   "agree": "file sets identical",
+   "complete": 3
+  },
+  {
+   "id": "PL5",
+   "runs": 3,
+   "files": [
+    7,
+    14,
+    6
+   ],
+   "searches": [
+    5,
+    13,
+    6
+   ],
+   "agree": "Jaccard 0-0.5",
+   "complete": 1
+  },
+  {
+   "id": "E1",
+   "runs": 2,
+   "files": [
+    33,
+    26
+   ],
+   "searches": [
+    27,
+    27
+   ],
+   "agree": "79 versus 80 names",
+   "complete": 1
+  },
+  {
+   "id": "E2",
+   "runs": 3,
+   "files": [
+    22,
+    29,
+    19
+   ],
+   "searches": [
+    13,
+    12,
+    20
+   ],
+   "agree": "same mechanisms",
+   "complete": 3
+  },
+  {
+   "id": "E3",
+   "runs": 3,
+   "files": [
+    7,
+    7,
+    7
+   ],
+   "searches": [
+    2,
+    5,
+    4
+   ],
+   "agree": "unanimous",
+   "complete": 3
+  },
+  {
+   "id": "I1",
+   "runs": 3,
+   "files": [
+    19,
+    16,
+    14
+   ],
+   "searches": [
+    12,
+    9,
+    14
+   ],
+   "agree": "unanimous",
+   "complete": 0
+  },
+  {
+   "id": "I2",
+   "runs": 3,
+   "files": [
+    0,
+    0,
+    3
+   ],
+   "searches": [
+    17,
+    21,
+    21
+   ],
+   "agree": "Jaccard 0.97-0.99",
+   "complete": 3
+  }
+ ]
+}

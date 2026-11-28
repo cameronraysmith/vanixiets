@@ -32,12 +32,6 @@ in
       # Disko disk configuration extracted to disko.nix
       # Auto-merged via import-tree
 
-      # Bootloader: UEFI with systemd-boot (CCX23 has native UEFI support)
-      # GRUB off: the hetzner-cloud aspect's srvos module sets only grub.devices (mkDefault)
-      boot.loader.grub.enable = false;
-      boot.loader.systemd-boot.enable = true;
-      boot.loader.efi.canTouchEfiVariables = true;
-
       # Hostname configuration
       networking.hostName = "electrum";
 

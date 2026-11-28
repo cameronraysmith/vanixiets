@@ -193,6 +193,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O03 [P1] [HIGH] Per-user content `default.nix` recipe is 90% identical across 5 users; sopsFile path hardcodes attribute key
 
+- Status: resolved by shape-the-repository-for-its-readers (first pass; commit recorded at merge). `flake.lib.mkUserContent <name> <module>` (`modules/home/users/lib.nix`) adds each person's `home.stateVersion` and `sops.defaultSopsFile`; the five `default.nix` files state only what is particular to the person, and every home kept its drvPath.
 - Locations:
   - `modules/home/users/christophersmith/default.nix:1-56`
   - `modules/home/users/janettesmith/default.nix:1-54`
@@ -206,6 +207,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O04 [P1, P3] [HIGH] `clan/inventory/services/users/{cameron,crs58,tara}.nix` are three near-clones of the same `extraModules` recipe
 
+- Status: resolved by shape-the-repository-for-its-readers (first pass). `flake.lib.mkUserInstance { user; groups; shellAndKeys; extraModules; }` builds the three clan user instances; each file states its user, groups and extra modules, and every host's users and groups are unchanged.
 - Locations:
   - `modules/clan/inventory/services/users/cameron.nix:36-71`
   - `modules/clan/inventory/services/users/crs58.nix:31-58`
@@ -235,6 +237,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O09 [P3] [MEDIUM] Per-host SSH `users.users.<u>.openssh.authorizedKeys.keys` re-resolves `inputs.self.users.<u>.meta.sshKeys` instead of being centralized
 
+- Status: resolved by shape-the-repository-for-its-readers (first pass). The four remaining sites (`clan/inventory/services/users/{cameron,tara}.nix` through `mkUserInstance`, `darwin/darwin-workstation.nix`, `system/admins.nix`) read `config.flake.users.<u>.meta.sshKeys`, not `inputs.self`.
 - Locations:
   - `modules/machines/darwin/argentum/default.nix:116`
   - `modules/machines/darwin/blackphos/default.nix:123, 131`
@@ -262,6 +265,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O11 [P1] [MEDIUM] Per-user `meta.nix` redundantly sets `meta.username = "<attribute-key>"`
 
+- Status: resolved by shape-the-repository-for-its-readers (first pass). `meta.username` defaults to the attribute key; the five literals are gone.
 - Locations:
   - `modules/home/users/crs58/meta.nix:5` (`username = "crs58"`)
   - `modules/home/users/christophersmith/meta.nix:5` (`username = "christophersmith"`)
@@ -274,6 +278,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O12 [P4] [MEDIUM] Structure checks under `modules/checks/structure/` lack negative-control partners
 
+- Status: open for these two pins: a phantom in `structure-fleet` could only repeat what the literal list states, so none was kept; the new `host-list-keys` check carries its own phantoms.
 - Locations:
   - `modules/checks/structure/flake-shape.nix:22-63` (2 mkCheck invocations: `structure-fleet`, `structure-home-configurations`)
 - Current shape: two literal pins under `modules/checks/structure/` without a negative control. The other falsifiability controls now live inside their positive checks rather than in `*-neg` siblings: `home-module-exports` compares `_phantomEmpty` and `_phantomAuthored` alongside the real users (`modules/checks/validation.nix:99-110`), and the hm-sops bridge assertion is a bridge-file existence test in `modules/nixos/hm-sops-bridge.nix:79-80`.
@@ -304,6 +309,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O17 [P2] [LOW] `flake.users.<u>.meta.fullname` consumed by 5 sites; `meta.email` consumed by 9 sites — verify intentional
 
+- Status: unchanged; `mkUserContent` does not read `fullname` or `email`, so the fields keep their local readers.
 - Location: `modules/home/users/lib.nix:51-58`
 - Current shape: `meta.fullname` referenced from 5 user `default.nix` files only (each user reads their own); `meta.email` from each user's `default.nix` and `templates."allowed_signers"`. Real consumers but only via per-user-self-references — the cross-cutting consumer is missing.
 - Why this matters: P2 (very mild) — fields used only locally hint that the typed registry is doing less work than its surface area suggests. WATCH: this might be intentional if the centralization is *for future consumers* but expressed at the registry layer first.
@@ -362,6 +368,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 
 ### O22 [P1] [LOW] Per-user `aggregates` lists are 90% identical across 5 users but each is restated as a literal
 
+- Status: resolved by shape-the-repository-for-its-readers (first pass). The `aggregates` option defaults to the shared list; the four secondary users omit it and crs58 states its own.
 - Locations:
   - `modules/home/users/christophersmith/meta.nix:14-23`
   - `modules/home/users/janettesmith/meta.nix:14-23`

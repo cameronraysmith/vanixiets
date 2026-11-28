@@ -27,6 +27,52 @@ Configuration files live in `modules/machines/darwin/` and `modules/machines/nix
 
 For detailed learning-oriented walkthroughs, see the [Darwin Deployment Tutorial](/tutorials/darwin-deployment/) for macOS or [NixOS Deployment Tutorial](/tutorials/nixos-deployment/) for servers.
 
+## Adding a host to the fleet description
+
+A host is declared once, as its record `flake.fleet.hosts.<host>` in `modules/lib/hosts.nix`, and composed once, in `modules/machines/<class>/<host>/default.nix`.
+Its people's accounts are attachments in `modules/lib/host-users.nix`.
+Every other list that names hosts is one of three kinds, and the table says what each needs for a new host.
+
+### Host lists by treatment
+
+| List | Treatment | For a new host |
+|------|-----------|----------------|
+| clan inventory machines, with tags and description (`modules/clan/inventory/machines.nix`) | derived from the registry | nothing; tags and description are fields of the record |
+| `machineAnchors` (`modules/checks/sops-correspondence.nix`) | derived from the registry's enrolled hosts | nothing |
+| `modules/lib/cloud-machines.nix` | hand-written, checked | a row for a host tagged `cloud`; `checks.x86_64-linux.host-list-keys` fails on a host tagged `cloud` without a row, and on a row for a name no such host has |
+| `modules/lib/observability-hosts.nix` | hand-written, checked | a row, with `collect = false` until the host's first watched deploy; `host-list-keys` fails until it exists |
+| ssh `logins` (`modules/home/core/ssh.nix`, `flake.lib.sshLogins`) | hand-written, checked | the login used for the host; `host-list-keys` fails until it exists |
+| the `structure-fleet` pin (`modules/checks/structure/flake-shape.nix`) | hand-written, checked | the host and its class; `checks.x86_64-linux.structure-fleet` fails until it is added |
+| machine `testSizes` entries (`modules/checks/machines.nix`) | hand-written, checked | a size class for `nixos-<host>` or `darwin-<host>`; `test-size-classes` fails naming a check with no entry |
+| `.sops.yaml` | hand-written, checked | the machine's anchor and its place in the creation rules; `checks.x86_64-linux.sops-correspondence` fails until it matches `sops/machines/<host>/key.json` |
+| `ztRecords` (`modules/machines/nixos/cinnabar/zt-dns.nix`) | left | the host's `.zt` name, joined by hand; no check fails when it is missing, and the list goes with ZeroTier |
+| the evaluator table in `modules/README.md` | left | a row; no check reads it |
+
+Counted as files outside `modules/lib/hosts.nix` and the host's own directory, a new host's name is written by hand in 8: the six checked rows above (cloud table, observability table, ssh logins, `structure-fleet`, `testSizes`, `.sops.yaml`), `modules/lib/host-users.nix` when the host carries accounts, and `ztRecords`, kept by convention only.
+
+`host-list-keys` reports a missing or extra host as `"<list>": { "<host>": false }` in its diff, where `<list>` is `cloudMachines`, `observabilityHosts` or `sshLogins`.
+
+### The record's fields
+
+- `zerotier.address` and `zerotier.memberId`: for a NixOS host, written after its first `clan vars generate`, from `vars/shared/zerotier-ip-<host>-zerotier/ip/value` and the node id of `vars/shared/zerotier-identity-<host>`; for a Mac, from `zerotier-cli info` after it joins the network by hand. They go with ZeroTier.
+- `tags`: the clan services select machines by `nixos` (sshd and tor), `peer` (the ZeroTier peers) and `all` (emergency access), and `host-list-keys` reads `cloud`. A host without `peer` joins no mesh, and no check fails. The other tags (`darwin`, `hetzner`, `gcp`, `gpu`, `laptop`, `workstation`, `fleet`, `controller`, `deployer-workstation`) select hosts only on the command line.
+- `description`: free text, the clan inventory machine's description.
+
+### Generated steps, in order
+
+No declaration produces these; each is done once, in this order, and a check fails until it is done.
+
+1. **The machine key and vars.** `clan vars generate <host>` writes the machine's age key under `sops/machines/<host>/` and its vars under `vars/per-machine/<host>/`. Until the generated `openssh` public key is committed, the host-key obligation fails the host's machine check, naming the file to commit.
+2. **The bridge files re-encrypted for the new recipient.** With the machine's anchor in `.sops.yaml`, re-encrypt each file under `secrets/` its rules now reach, among them the `secrets/bridge/<identity>-age-key.enc` file of every account bridged on the host (`sops updatekeys <file>`). `sops-correspondence` fails on a file whose recipients differ from its rule's anchors, and `hm-sops-bridge` fails the host's evaluation when its machine key is not a recipient of a bridged account's file.
+3. **The `fleet-deployers` link, for an enabled deploy target.** Every enabled NixOS or darwin machine other than the operator's workstations is a target of the fleet deployer with no edit in `modules/lib/fleet-deployer.nix`, so its machine key must name the group: `sops/secrets/<host>-age.key/groups/fleet-deployers`, a symbolic link to `../../../groups/fleet-deployers`. `sops-correspondence` fails with `<host>-age.key does not name the fleet-deployers group` until it exists.
+4. **The topology files.** `just topology-generate` rewrites `packages/docs/diagrams/topology/`; `checks.x86_64-linux.fleet-topology-fresh` fails naming each stale file until they are committed.
+
+### A new server's facts
+
+- `serverType` (the Hetzner `serverType` or GCP `machineType` of its row in `modules/lib/cloud-machines.nix`) and `stateVersion` (in the record) are required and have no default, so a new host fails evaluation until both are written; a cloud row with neither type fails naming the host. A server type costs money and is chosen per host.
+- `stateVersion` is the NixOS release of the locked nixpkgs when the host is first installed (`nix eval --raw .#nixosConfigurations.<existing-host>.config.system.nixos.release`), and it never changes afterwards.
+- The boot mode is not chosen per host: it follows the server type, in `flake.modules.nixos.hetzner-cloud`. Shared-vCPU `cx*` types boot BIOS with GRUB; dedicated `ccx*` and ARM `cax*` types boot UEFI with systemd-boot. A host file that overrides the boot loader its type gives fails the host's machine check.
+
 ## Darwin host onboarding (macOS)
 
 Use this for Apple Silicon Macs: stibnite, blackphos, rosegold, argentum.
@@ -81,7 +127,7 @@ Check that a darwin configuration exists for this hostname:
 ls modules/machines/darwin/
 ```
 
-Expected: A file named `<hostname>.nix` (e.g., `stibnite.nix`, `blackphos.nix`).
+Expected: a directory named after the host, holding `default.nix` (e.g., `modules/machines/darwin/stibnite/default.nix`), and the host's record in `modules/lib/hosts.nix`.
 
 If your host configuration doesn't exist, create one following the pattern in existing files.
 
@@ -282,11 +328,10 @@ Check that the machine is registered in clan:
 clan machines list
 
 # Verify specific machine configuration exists
-ls modules/machines/nixos/<hostname>.nix
+ls modules/machines/nixos/<hostname>/default.nix
 ```
 
-Machine configurations live in `modules/machines/nixos/`.
-Clan machine registry is in `modules/clan/machines.nix`.
+Each machine's configuration is `modules/machines/nixos/<hostname>/default.nix`, and its record (system, class, inventory tags) is in `modules/lib/hosts.nix`; `modules/clan/machines.nix` derives the clan machines from those records.
 
 ### Step 3: Generate secrets (clan vars)
 
@@ -635,18 +680,7 @@ Shared features are defined in aspect-based modules (`darwin/`, `nixos/`, `home/
 
 ## Clan inventory integration
 
-NixOS hosts are registered in the clan inventory for multi-machine coordination:
-
-```nix
-# modules/clan/machines.nix
-flake.clan.machines = {
-  cinnabar = {
-    nixpkgs.hostPlatform = "x86_64-linux";
-    imports = [ config.flake.modules.nixos."machines/nixos/cinnabar" ];
-  };
-  # ... other machines
-};
-```
+Each host's record in `modules/lib/hosts.nix` is the source of its clan machine: `modules/clan/machines.nix` builds `flake.clan.machines.<host>` from the record's `system` and imports `modules/machines/<class>/<host>/default.nix`, and `modules/clan/inventory/machines.nix` builds the inventory machine from the record's tags and description; neither file names a host.
 
 Service instances assign machines to roles:
 

@@ -33,6 +33,15 @@ in
             type = types.functionTo (types.functionTo (types.listOf types.str));
             description = "The judge: `name: hostConfig: [ message ]`, empty when the host meets it.";
           };
+          graphFailures = lib.mkOption {
+            type = types.functionTo (
+              types.functionTo (types.functionTo (types.functionTo (types.listOf types.str)))
+            );
+            default =
+              _: _: _: _:
+              [ ];
+            description = "Failures judged from the host's module import graph: `class: name: hostConfig: graph: [ message ]`, empty when the host meets it.";
+          };
         };
       }
     );

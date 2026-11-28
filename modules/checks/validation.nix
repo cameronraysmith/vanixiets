@@ -20,13 +20,16 @@
       # Resolve a deferred module to its post-merge config attrset.
       # `_module.check = false` and a permissive freeform type let the
       # eval succeed without re-declaring every option the slot might
-      # set; we only care whether the slot produced any config keys.
+      # set; we only care whether the slot produced any config keys. The
+      # defaults flake.lib.mkUserContent adds are set aside, so only the
+      # person's own module counts.
       evalSlot =
         slot:
         (lib.evalModules {
           modules = [
             slot
             {
+              disabledModules = [ { key = self.lib.userContentDefaultsKey; } ];
               _module.check = false;
               freeformType = lib.types.lazyAttrsOf lib.types.raw;
             }
@@ -110,6 +113,7 @@
             controls = {
               _phantomEmpty = hasContent { contentPrivate = { }; };
               _phantomAuthored = hasContent { contentPrivate.home.stateVersion = "23.11"; };
+              _phantomConstructedEmpty = hasContent { contentPrivate = self.lib.mkUserContent "phantom" { }; };
             };
           in
           mkCheck {
@@ -118,6 +122,7 @@
             expected = lib.mapAttrs (_: _: true) primaryUsers // {
               _phantomEmpty = false;
               _phantomAuthored = true;
+              _phantomConstructedEmpty = false;
             };
           };
 

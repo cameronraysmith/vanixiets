@@ -40,7 +40,8 @@ in
       ];
 
       # crs58 is both admin and primary user on stibnite; system.primaryUser
-      # follows the admin attachment (modules/lib/host-users.nix).
+      # follows the admin attachment, and crs58's uid here is that attachment's
+      # `uid`, both in modules/lib/host-users.nix.
 
       # Nix-managed macOS apps via ditto (modules/darwin/casks.nix)
       environment.casks = [

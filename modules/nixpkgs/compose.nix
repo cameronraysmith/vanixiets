@@ -35,8 +35,9 @@
         withSystem system ({ config, ... }: config.packages or { })
       );
     in
-    # Compose all (order matters!)
-    # 1. Internal overlays (channels, stable-fallbacks, overrides, nvim-treesitter, nuenv) via composeManyExtensions
+    # Compose all, in this order:
+    # 1. Internal overlays via composeManyExtensions, in the import order of the
+    #    files under nixpkgs/overlays/ (nixpkgsOverlays is their merged list)
     # 2. Custom packages (standalone derivations), minus any withheld via
     #    config.customPackageExcludes so upstream nixpkgs provides them instead
     (internalOverlays final prev) // (removeAttrs customPackages config.customPackageExcludes);

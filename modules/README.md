@@ -6,32 +6,98 @@ created: 2026-08-25
 ## Nix module tree
 
 Every `.nix` file under this directory is a flake-parts module, discovered automatically by `import-tree` rather than listed in an import set.
-Files are organised by aspect — what a module configures — rather than by host, and a module assigns `deferredModule` values into class-organised namespaces such as `flake.modules.darwin.*`, `flake.modules.homeManager.*`, and `flake.modules.nixos.*`.
+A module assigns `deferredModule` values into class-organised namespaces, `flake.modules.nixos.*`, `flake.modules.darwin.*` and `flake.modules.homeManager.*`, and host compositions import those named modules.
 
-The consequence worth knowing before editing here is that adding a file is enough to activate it.
-There is no registration step, so a file placed in this tree takes effect on the next evaluation whether or not that was intended.
+Adding a file is enough to activate it: there is no registration step, so a file placed in this tree takes effect on the next evaluation whether or not that was intended.
 A file must also be tracked by git before a flake build can see it, because flake sources are git-tracked only and an untracked file is absent from the build rather than an error.
 
-## Children
+This document is the map: what kinds of thing the tree holds and where each lives, where a new addition goes, where order is written, how a named module reaches a configuration, and the read-only commands that answer what a configuration is composed of.
 
-- `apps/` — flake apps, invoked as `nix run .#<name>`.
-- `brand/` — shared brand assets and palette definitions.
-- `checks/` — flake checks; see `preferences-nix-checks-architecture` for the check taxonomy.
-- `clan/` — clan inventory, services, and machine registration.
-- `containers/` — OCI image definitions.
-- `darwin/` — nix-darwin system aspects.
-- `devshells/` — development shells surfaced through direnv.
-- `effects/` — deployment effects run outside the build sandbox.
-- `home/` — home-manager aspects; the largest subtree, indexed by its own README.
-- `lib/` — helper functions shared across modules.
-- `machines/` — per-machine composition, binding aspects to hosts.
-- `nixos/` — NixOS system aspects.
-- `nixpkgs/` — channel selection and the overlay stack.
-- `system/` — cross-platform system aspects.
-- `terranix/` — cloud resource definitions rendered to OpenTofu.
-- `vm-tests/` — on-demand runtime tests exported as `vmTests.<system>.<name>`, outside PR gating: QEMU VM tests needing `kvm`, and systemd-nspawn container tests needing `uid-range`.
+## The unit: a named module, grouped by concern
+
+A named module, `flake.modules.<class>.<name>`, is the unit hosts and homes compose.
+A concern is one named thing the fleet does; its modules for each class share one name and are written in one file or one directory whose path ends in that name, under the class directory of its classes, or under `system/` when it spans several.
+`system/zt-dns.nix` is the pattern: one file defining `flake.modules.nixos.zt-dns` and `flake.modules.darwin.zt-dns` over values both halves read.
+A part of a concern is named `<name>-<part>` and lives in the concern's file or directory, as `otel-collector-agent` and `omnigent-host` do.
+A module exported through `flake.lib.exportAs` (`lib/export-as.nix`) carries the key `vanixiets/<key>`, so a configuration that imports it under several names applies it once.
+
+## Kinds of thing and where each lives
+
+| Kind | Where | Rule |
+|---|---|---|
+| Entity registries: hosts, cloud machines, observability rows | `lib/hosts.nix`, `lib/cloud-machines.nix`, `lib/observability-hosts.nix` | one typed record per host; every other host list is derived from the registry or checked against it |
+| Relations: an account on a host, a worker on a host | `lib/host-users.nix` (`flake.fleet.hosts.<host>.users.<account>`), `lib/fleet-workers.nix` (`flake.fleet.workers.<owner>.hosts.<host>`) | one record per pair, keyed by both; views from the other end (`flake.lib.hostsOfAccount`, `flake.lib.workerAccountsOn`) |
+| People | `home/users/<account>/` | one meta record per account, and the account's home content |
+| Settings every machine of a class takes | the `base` aspects: `nixos/base.nix` (the `flake.lib.nixosBaseParts` list), `darwin/base.nix` | one part per concern |
+| Kinds of machine | `nixos/hetzner-cloud.nix`, `nixos/gcp-cloud.nix`, `darwin/darwin-workstation.nix` | an import list plus the settings of that kind |
+| Features | `nixos/`, `darwin/`, `system/`, `home/<area>/` | one concern per file or directory |
+| Judges and obligations | beside the concern they judge, registered as `fleetObligations.<key>` | see `checks/README.md` |
+| Glue for clan, home-manager, sops and secrets | `clan/`, `system/home-manager-integration.nix`, `system/secrets.nix` | the only readers of the external system each wraps |
+| Checks | `checks/` | the check ladder in `checks/README.md` |
+| Runtime tests | `vm-tests/` | outside pull-request gating |
+
+## The directory principle
+
+A module lives under the class directory of the classes it defines: `nixos/`, `darwin/`, `home/`, or `system/` when it defines more than one.
+The exceptions are registries and pure functions (`lib/`), clan glue (`clan/`), host composition (`machines/<class>/<host>/`), the package set (`nixpkgs/`) and flake outputs (`apps/`, `checks/`, `containers/`, `devshells/`, `effects/`, `terranix/`, `vm-tests/`).
+
+- `apps/`: flake apps, invoked as `nix run .#<name>`.
+- `brand/`: shared brand assets and palette definitions.
+- `checks/`: flake checks; `checks/README.md` gives the check ladder.
+- `clan/`: clan inventory, services, and machine registration.
+- `containers/`: OCI image definitions.
+- `darwin/`: nix-darwin system aspects.
+- `devshells/`: development shells surfaced through direnv.
+- `effects/`: deployment effects run outside the build sandbox.
+- `home/`: home-manager aspects; the largest subtree, indexed by its own README.
+- `lib/`: registries, relations and helper functions shared across modules.
+- `machines/`: per-machine composition, binding aspects to hosts.
+- `nixos/`: NixOS system aspects.
+- `nixpkgs/`: channel selection and the overlay stack.
+- `system/`: aspects defined for more than one class.
+- `terranix/`: cloud resource definitions rendered to OpenTofu.
+- `vm-tests/`: on-demand runtime tests exported as `vmTests.<system>.<name>`, outside PR gating: QEMU VM tests needing `kvm`, and systemd-nspawn container tests needing `uid-range`.
 
 Top-level files configure the flake itself: `flake-parts.nix`, `formatting.nix`, `systems.nix`, `debug.nix`, `kubernetes.nix`, `nixidy.nix`, and `k3d-cluster-config.nix` (the ctlptl configuration of the local k3d cluster, whose node image follows nixpkgs' `k3s`).
+
+## Where an addition goes
+
+| Addition | Where | Example to follow |
+|---|---|---|
+| Host | its record in `lib/hosts.nix`, its composition in `machines/<class>/<host>/default.nix`, and the generated steps of the host-onboarding guide (`packages/docs/src/content/docs/guides/host-onboarding.md`, "Adding a host to the fleet description") | `machines/nixos/magnetite/default.nix` and the `magnetite` record |
+| Person | `home/users/<account>/` (`meta.nix`, `default.nix`), an attachment `flake.fleet.hosts.<host>.users.<account>` in `lib/host-users.nix` per host, and a clan user instance in `clan/inventory/services/users/` when the account exists on NixOS hosts | `home/users/tara/`, `tara`'s attachments, `clan/inventory/services/users/tara.nix` |
+| Setting every machine of a class takes | a named part, its name added to the class's `base` list | `system/nix-download-timeout.nix` defines the NixOS part `base-nix-download-timeout`, listed in `nixos/base.nix`, and its darwin half, which still assigns into darwin `base` until that list exists; a part of one class only lives in that class's directory |
+| Feature for some hosts | a named module in the class directory, imported by each host that takes it | `nixos/greptimedb-server.nix`, imported in `machines/nixos/magnetite/default.nix` |
+| Mac application several hosts take | a named module in `darwin/` (or `system/` with a NixOS half), imported by each host or by `darwin-workstation`, using the nix-darwin service when one exists and a cask otherwise; a host file lists only values that differ by host | `darwin/zeditor.nix`, imported by `darwin/darwin-workstation.nix` |
+| Server service with roles on several hosts | a clan service under `clan/services/<name>/` importing plain named modules, and its instance in `clan/inventory/services/<name>.nix` | `clan/services/otel-collector/`, `clan/inventory/services/otel-collector.nix` |
+| Hand-entered secret | a `vanixiets.secrets.<name>` entry with a hidden prompt, `files.<f>.deploy = false`, and a script rendering the file the service reads (`system/secrets.nix`, "Secrets" below) | the `greptimedb-r2` entry in `nixos/greptimedb-server.nix` |
+| Home tool | a file under `home/<area>/` assigning into that area's aggregate | `home/tools/bottom.nix` into `homeManager.tools` |
+| Check | the cheapest rung of the ladder in `checks/README.md` | `darwin/resolver-reload.nix` (an obligation), `checks/sshd-no-keyboard-interactive.nix` (a standalone check) |
+
+## Where order is written
+
+Most definitions merge without an order that matters; where order matters it is written in one place:
+- `nixos/base.nix`: `flake.lib.nixosBaseParts`, whose order is the import order of the NixOS base parts, so list options merge their parts' definitions in that order.
+- `system/deploy-record.nix`: `activationOrder`, the `mkOrder` priority of each first-party darwin `postActivation` snippet, the deploy record last.
+- `nixpkgs/compose.nix`: the overlay stack, the internal overlays of `nixpkgsOverlays` (the files under `nixpkgs/overlays/`, in their import order) composed first and the custom packages over them.
+
+## How a named module reaches a configuration
+
+Every configuration the module system evaluates records its import tree as `graph`, one node per module with `key`, `file`, `imports` and `disabled`; `nixosConfigurations.<host>.graph`, `darwinConfigurations.<host>.graph` and `homeConfigurations.<name>.graph` all exist.
+A named module's node has a `file` ending `, via option flake.modules.<class>.<name>`, and its route is the kind of its nearest named or host ancestor:
+- `host`: imported by the host's own module, `machines/<class>/<host>/default.nix`;
+- `base`: a part of the class's `base` list;
+- `include`: imported by another named module, as `darwin-workstation` imports `zeditor`;
+- `clan`: imported by a clan service's role module, as the otel-collector `agent` role imports `otel-collector-agent`;
+- `generated`: imported by the per-host module `machines/nixos/<host>` that `nixos/mesh-dns.nix` generates, as `mesh-dns/<host>` is.
+
+A home integrated into a host is a submodule of the host's evaluation and has no graph of its own: its composition is the standalone home of the same account plus the extra imports of its attachment in `lib/host-users.nix`.
+What the commands below report is what the fleet description composes at a commit; what a host runs is that only once it is deployed.
+
+## Read-only commands
+
+- `just composition <host-or-home>` prints each named module of a host's or a standalone home's configuration with its route, and for a home the systems it is built for.
+- `nix eval` reads one value: `nix eval --raw .#lib.hosts.<host>.class`, `nix eval --json .#lib.hosts.<host>.cloud`, `nix eval .#nixosConfigurations.<host>.config.<option>` or `.#darwinConfigurations.<host>.config.<option>`.
 
 ## Shared CLI capabilities
 
@@ -48,8 +114,12 @@ Its build confirms that the harness executables exist in the generated profile a
 ## Host registry
 
 Each fleet member is one typed record, `flake.fleet.hosts.<name>` (`lib/hosts.nix`), and `flake.lib.hosts` is its read-only alias.
-A record declares the host's `system` (null for a phone), endpoints, deploy user, services, ZeroTier address, memory, `nixClassic`, `checked` and `stateVersion`; `class`, `fqdn`, `address`, `targetHost`, `memoryGiB`, `enrolled` (its clan machine key is committed), `cloud` (from `flake.lib.cloudMachines`) and `primaryUser` are derived.
-`flake.lib.machineSystems`, the inventory's `machineClass` and NixOS `deploy.targetHost`, `flake.clan.machines` with its `nixpkgs.hostPlatform`, the collector rows' `platform`, the NixOS names of `flake.lib.hostKeys` and the ZeroTier controller's external members are generated from it; the inventory keeps each host's tags and description.
+A record declares the host's `system` (null for a phone), endpoints, deploy user, services, ZeroTier address, memory, `nixClassic`, `checked`, `stateVersion`, and its inventory `tags` and `description`; `class`, `fqdn`, `address`, `targetHost`, `memoryGiB`, `enrolled` (its clan machine key is committed), `cloud` (from `flake.lib.cloudMachines`) and `primaryUser` are derived.
+`flake.lib.machineSystems`, the inventory's machines with their tags, description, `machineClass` and NixOS `deploy.targetHost`, `flake.clan.machines` with its `nixpkgs.hostPlatform`, the collector rows' `platform`, the NixOS names of `flake.lib.hostKeys` and the ZeroTier controller's external members are generated from it.
+Every other list of hosts is either derived from the registry, written by hand and checked against it, or left as written; the host-onboarding guide lists them by treatment.
+`checks.x86_64-linux.host-list-keys` compares the hand-written cloud table, observability table and ssh logins (`flake.lib.sshLogins`) with the registry's hosts.
+A cloud row's `serverType` (Hetzner) or `machineType` (GCP) and a record's `stateVersion` have no default; a Hetzner host's boot loader follows its server type in `nixos/hetzner-cloud.nix`, and the `hetznerBootLoader` fleet obligation fails a host that overrides it.
+The users' content and clan user instances are built by `flake.lib.mkUserContent` and `flake.lib.mkUserInstance` (`home/users/lib.nix`).
 A service role's members are `flake.lib.inventoryMembers` (`lib/inventory-members.nix`), clan's own rule over the declared inventory.
 
 The accounts people hold on a host are declared once, as `flake.fleet.hosts.<name>.users.<account>` (`lib/host-users.nix`): whether the account is the host's primary person or nix-darwin's admin, its darwin uid, whether its age key is bridged (NixOS), and the pair's extra home modules and overrides.
@@ -63,6 +133,7 @@ A module declares the secrets it owns and reads the ones it uses through one opt
 The secrets module translates each entry into clan vars with only the fields a module set, so clan's defaults decide the rest, and reads clan's values back; `resolved` is the generator as clan evaluated it, for judges of custody.
 A generator that one of clan's own services declares, such as sshd's `openssh`, is read as a provided entry: `provided = true` and its files by name only.
 `nixos.base` and `darwin.base` import the secrets module; a module also imports it itself when something evaluates it without the base aspect, as clan service modules and the modules runtime tests import directly do.
+A hand-entered credential takes one shape, a hidden prompt, `files.<f>.deploy = false` and a script rendering the file the service reads (the `greptimedb-r2` entry in `nixos/greptimedb-server.nix`); a script that only exits 1, its file filled by `clan vars set`, is the superseded shape, kept by the generators written that way because changing a generator changes its vars and can prompt again.
 Homes see a view of the host's secrets with a file their user owns, `config.vanixiets.secrets.<name>.files.<f>.{path,placeholder}`, set by `nixos/hm-sops-bridge.nix`; a standalone home sees `{ }`.
 Committed public values are read through `flake.lib.vars` (`lib/vars.nix`), and judges that need clan's whole generator tree read `flake.lib.secretsBackend.generatorsOf`.
 `checks.x86_64-linux.secrets-seam-confinement` fails when a module outside these two files names `clan.core.vars` or spells the committed `vars/` layout; its list holds the checks and runtime tests that must pin clan itself, each with its reason.

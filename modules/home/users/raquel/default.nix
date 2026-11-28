@@ -1,17 +1,8 @@
+{ config, ... }:
 {
-  # OUTER: Flake-parts module signature
-  ...
-}:
-let
-  content =
+  flake.users.raquel.contentPrivate = config.flake.lib.mkUserContent "raquel" (
+    { pkgs, ... }:
     {
-      # INNER: Home-manager module signature
-      pkgs,
-      ...
-    }:
-    {
-      home.stateVersion = "23.11";
-
       home.packages = with pkgs; [
         just # Command runner
         ripgrep # Fast grep alternative
@@ -20,21 +11,15 @@ let
         eza # Modern ls replacement
       ];
 
-      # sops-nix configuration for raquel user
-      # 4 secrets: development + shell aggregates (NO AI)
-      sops = {
-        defaultSopsFile = ../../../../secrets/home-manager/users/raquel/secrets.yaml;
-        secrets = {
-          github-token = { };
-          ssh-signing-key = {
-            mode = "0400";
-          };
-          bitwarden-email = { };
-          atuin-key = { };
+      # The development and shell aggregates' secrets; raquel takes no AI tools.
+      sops.secrets = {
+        github-token = { };
+        ssh-signing-key = {
+          mode = "0400";
         };
+        bitwarden-email = { };
+        atuin-key = { };
       };
-    };
-in
-{
-  flake.users.raquel.contentPrivate = content;
+    }
+  );
 }

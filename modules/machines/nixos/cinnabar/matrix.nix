@@ -9,6 +9,9 @@
 # then writes the configured name into the marker, so it acts once.
 # checks.x86_64-linux.matrix-server-name-reset exercises the script and
 # vmTests.x86_64-linux.tuwunel-server-name-guard the units.
+#
+# Cinnabar's Matrix homeserver is tuwunel, which keeps its database in RocksDB
+# under its own state directory; this host runs no PostgreSQL.
 { config, ... }:
 let
   inherit (config.flake.lib) fleet matrixServerName tuwunelServerNameGuard;

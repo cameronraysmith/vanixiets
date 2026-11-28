@@ -13,8 +13,8 @@ Trust boundary: where host facts are written; not that a fact is true of the mac
 
 #### Scenario: A list left by design is read
 
-- **WHEN** `ztRecords` and the justfile's `nixos_hosts` are read
-- **THEN** both are unchanged, and the onboarding guide names each as a list a new host is added to by hand
+- **WHEN** `ztRecords` and the justfile's `check-uncached-machine` recipe are read
+- **THEN** `ztRecords` is unchanged and named in the onboarding guide as the one list a new host joins by hand, and the recipe reads the host's class from `lib.hosts` with no host list
 
 ### Requirement: Hand-written host lists are checked against the registry, with controls
 
@@ -42,6 +42,22 @@ Trust boundary: the list and its checks; not the key material itself.
 
 - **WHEN** a throwaway tree adds an enabled host with key and vars but without its `fleet-deployers` link
 - **THEN** `sops-correspondence` fails naming the host, and the guide's section names that step and that check
+
+### Requirement: A new Hetzner host's boot loader follows its server type
+
+`nixos.hetzner-cloud` SHALL set UEFI with systemd-boot for `ccx*` and `cax*` server types and leave BIOS with GRUB for `cx*`; `flake.fleet.hosts.<host>.cloud.type` SHALL fail evaluation naming the host when its row has no type; a fleet obligation SHALL fail when a Hetzner host's boot loader differs from its type's.
+
+Trust boundary: the configured loader; not the firmware of the provisioned server.
+
+#### Scenario: A host forces the other loader
+
+- **WHEN** a throwaway tree makes electrum force GRUB on
+- **THEN** the machine check fails naming electrum and its server type
+
+#### Scenario: electrum's hand-written lines are removed
+
+- **WHEN** electrum's three boot-loader lines are removed after the mapping lands
+- **THEN** electrum's toplevel drvPath equals the parent's, or the lines stay
 
 ### Requirement: A command prints any configuration's composition from its import tree
 

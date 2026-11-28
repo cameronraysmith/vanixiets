@@ -1,7 +1,7 @@
-{
-  inputs,
-  ...
-}:
+{ config, ... }:
+let
+  people = config.flake.users;
+in
 {
   flake.modules.nixos.base-admins =
     {
@@ -16,7 +16,7 @@
           isNormalUser = true;
           shell = pkgs.zsh;
           extraGroups = [ "wheel" ];
-          openssh.authorizedKeys.keys = inputs.self.users.crs58.meta.sshKeys;
+          openssh.authorizedKeys.keys = people.crs58.meta.sshKeys;
         };
 
         # Root inherits SSH keys from all wheel users

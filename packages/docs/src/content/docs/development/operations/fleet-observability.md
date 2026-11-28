@@ -604,7 +604,7 @@ R7.4 does not cover this credential; a store that cannot reach R2 shows up in R6
 
 ### The alerter token
 
-The `alerter` token comes from the shared generator `ntfy-alerter`, whose `token` file is deployed to magnetite and cinnabar.
+The `alerter` token comes from the shared generator `ntfy-alerter`, whose `token` file is deployed to every host the otel-collector `agent` role reaches, which is every row of `flake.lib.observabilityHosts` (`modules/clan/services/otel-collector/README.md`, "Agent hosts and the host table"), and not to magnetite and cinnabar alone.
 cinnabar's per-machine generator `ntfy-alerter-env` derives ntfy's provisioning file `ntfy-env` from that token and a password it hashes and discards.
 Regenerating the token also reruns `ntfy-alerter-env`, because it depends on `ntfy-alerter`:
 

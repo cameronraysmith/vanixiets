@@ -9,6 +9,9 @@ let
 
   # Login per member reachable over ssh: every NixOS and darwin host, plus
   # each phone's Termux sshd (port 8022; Termux accepts any username).
+  # Written by hand, since a NixOS host has no admin attachment to derive a
+  # login from; checks.x86_64-linux.host-list-keys compares its keys with
+  # the registry's hosts through flake.lib.sshLogins.
   logins = {
     cinnabar.User = "cameron";
     electrum.User = "cameron";
@@ -54,6 +57,8 @@ let
   meshBlocks = blocksNamed (name: hosts.${name}.fqdn) (host: host.address);
 in
 {
+  flake.lib.sshLogins = logins;
+
   flake.modules.homeManager.core =
     {
       pkgs,

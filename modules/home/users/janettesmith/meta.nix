@@ -1,8 +1,8 @@
 { config, ... }:
 {
   flake.users.janettesmith = {
+    aggregates = config.flake.lib.defaultAggregates;
     meta = {
-      username = "janettesmith";
       fullname = "Janette Smith";
       email = "janette.a.smith@gmail.com";
       gitEmail = "125711642+janetteasmith@users.noreply.github.com";
@@ -18,21 +18,5 @@
         }
       ];
     };
-    aggregates = with config.flake.modules.homeManager; [
-      base-sops
-      agents
-      bioinformatics
-      compute
-      core
-      database
-      development
-      languages
-      publishing
-      security
-      shell
-      terminal
-      tools
-      agents-md
-    ];
   };
 }

@@ -1,8 +1,8 @@
 { config, ... }:
 {
   flake.users.christophersmith = {
+    aggregates = config.flake.lib.defaultAggregates;
     meta = {
-      username = "christophersmith";
       fullname = "Christopher Smith";
       email = "christophersmith@example.com";
       githubUser = null;
@@ -17,21 +17,5 @@
         }
       ];
     };
-    aggregates = with config.flake.modules.homeManager; [
-      base-sops
-      agents
-      bioinformatics
-      compute
-      core
-      database
-      development
-      languages
-      publishing
-      security
-      shell
-      terminal
-      tools
-      agents-md
-    ];
   };
 }

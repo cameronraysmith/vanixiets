@@ -1,0 +1,162 @@
+[
+ {
+  "n": 1,
+  "readers": "R1",
+  "question": "Which hosts run PostgreSQL, and what decides it?",
+  "key": "Magnetite only. No single site decides it: it follows from the modules magnetite takes. gitea (`modules/nixos/gitea.nix:56-60`), niks3 and nixbot (`database.createLocally`), gitea-mq and matrix (shared instance) come from magnetite's host module; omnigent comes from the omnigent clan service, which imports `nixos.omnigent` into every machine of its instance (`modules/clan/services/omnigent/flake-module.nix:20-23`) and whose server role on magnetite (`modules/clan/inventory/services/omnigent.nix:62`) sets `services.omnigent.enable`, which turns PostgreSQL on (`modules/nixos/omnigent.nix:61-70`)",
+  "pathToday": "1 grep, then 5 files",
+  "trap": "cinnabar's `matrix-server` is tuwunel, not a PostgreSQL host"
+ },
+ {
+  "n": 2,
+  "readers": "R1, R3",
+  "question": "What do I edit to give tara a home on pyrite?",
+  "key": "Add `pyrite.users.tara` in `modules/lib/host-users.nix:152-170`. On NixOS this also needs `meta.sopsAgeKeyId` and a bridge key (`guides/home-manager-onboarding.md:179`)",
+  "pathToday": "README, then host-users.nix, then the guide (3)",
+  "trap": "`home-manager.users` must not be written in the host body"
+ },
+ {
+  "n": 3,
+  "readers": "R5",
+  "question": "What changes if I edit `modules/system/zram-swap.nix`?",
+  "key": "It defines `nixos.base-zram-swap` (`:3`), which is listed at `nixos/base.nix:39` and so reaches all six NixOS hosts; magnetite overrides it (`memoryPercent` 150)",
+  "pathToday": "4 to 8",
+  "trap": "README:22 calls `system/` \"cross-platform\", but this file is NixOS-only"
+ },
+ {
+  "n": 4,
+  "readers": "R4, R5",
+  "question": "In what order do darwin postActivation steps run?",
+  "key": "`activationOrder` at `modules/system/deploy-record.nix:197-212`: resolver 500, default 1000, sops 1500, casks 1502, dnscrypt 1503, trust 1504, record 1900",
+  "pathToday": "2",
+  "trap": "The table is in `system/`, not `darwin/`"
+ },
+ {
+  "n": 5,
+  "readers": "R4",
+  "question": "Where does nixbot's GitHub App key come from, and who can read it?",
+  "key": "Declared at `modules/nixos/nixbot.nix:116-125` (owner `nixbot`; the generator script exits 1, so it is set by hand with `clan vars set`). Recipients: `vars/per-machine/magnetite/nixbot-github-app-secret-key/key.pem/{machines/magnetite,users/cameron}`",
+  "pathToday": "3 plus a glob",
+  "trap": "`system/secrets.nix` translates the declaration into clan vars"
+ },
+ {
+  "n": 6,
+  "readers": "R4",
+  "question": "Which hosts can decrypt the ntfy-alerter token?",
+  "key": "`share = true` at `modules/nixos/ntfy-alerter.nix:23-25`; recipients are the 9 hosts plus cameron under `vars/shared/ntfy-alerter/token/`; judged by `lib/shared-vars-recipients.nix:1-15`",
+  "pathToday": "3",
+  "trap": "Darwin hosts read it through `darwin/otel-collector-agent.nix:319`"
+ },
+ {
+  "n": 7,
+  "readers": "R4",
+  "question": "A darwin deploy fails with \"0 successful groups required\". Why?",
+  "key": "The host deploys a shared secret it is not a recipient of (`lib/shared-vars-recipients.nix:1-15`)",
+  "pathToday": "1 grep, then 1 file",
+  "trap": "–"
+ },
+ {
+  "n": 8,
+  "readers": "R1, R2",
+  "question": "Which evaluator does pyrite get?",
+  "key": "memory 16 (`lib/hosts.nix:313`) matches the NixOS 15 GiB rule (`lib/nix-eval-jobs-host.nix:58-62`): iets, 1 worker × 2048 MiB",
+  "pathToday": "README table, or 2 files",
+  "trap": "–"
+ },
+ {
+  "n": 9,
+  "readers": "R2",
+  "question": "Which host builds `checks.aarch64-darwin` for nixbot?",
+  "key": "Stibnite only. Magnetite excludes pyrite, rosegold and argentum (`clan/inventory/services/nix-builders.nix:73-80,112-119`)",
+  "pathToday": "1 to 2",
+  "trap": "–"
+ },
+ {
+  "n": 10,
+  "readers": "R2",
+  "question": "Is galena provisioned?",
+  "key": "No: `enabled = false` at `modules/lib/cloud-machines.nix:55`",
+  "pathToday": "2 to 4",
+  "trap": "`40-fleet-and-user-conventions.instructions.md:7-8` says `modules/terranix/`"
+ },
+ {
+  "n": 11,
+  "readers": "R1",
+  "question": "Who may ask the fleet deployer to deploy argentum?",
+  "key": "Cameron. The policy also reaches christophersmith, argentum's primary user (`host-users.nix:203-207`), but he holds no request credential (`lib/fleet-deployer.nix:11-15,36-49`)",
+  "pathToday": "3",
+  "trap": "–"
+ },
+ {
+  "n": 12,
+  "readers": "R1",
+  "question": "Which worker accounts run on pyrite?",
+  "key": "omnigent-cameron and omnigent-janettesmith (`lib/fleet-workers.nix:58-80`)",
+  "pathToday": "2",
+  "trap": "They are not in host-users"
+ },
+ {
+  "n": 13,
+  "readers": "R3",
+  "question": "What decides a host's system and class?",
+  "key": "`system` in `lib/hosts.nix:232-365`; `clan/machines.nix:6-9` derives `hostPlatform` from it, and `class` is derived in `hosts.nix:185-191`",
+  "pathToday": "2 to 3",
+  "trap": "`guides/host-onboarding.md:283-289` names `<host>.nix` and `modules/clan/machines.nix` as the registry"
+ },
+ {
+  "n": 14,
+  "readers": "R3",
+  "question": "Where is a host's machine module?",
+  "key": "`modules/machines/<class>/<name>/default.nix`",
+  "pathToday": "1",
+  "trap": "The agent context's `10-repository-overview.instructions.md` says `machines/`, which holds only `facter.json`; the onboarding guide (`host-onboarding.md:85`) says `<hostname>.nix`"
+ },
+ {
+  "n": 15,
+  "readers": "R2",
+  "question": "Where is the ntfy server defined?",
+  "key": "`modules/machines/nixos/cinnabar/ntfy.nix:3`, as `nixos.ntfy-server`, imported at `cinnabar/default.nix:47`",
+  "pathToday": "2 or more",
+  "trap": "It is not under `modules/nixos/`"
+ },
+ {
+  "n": 16,
+  "readers": "R1",
+  "question": "Who bumps flake inputs, and when?",
+  "key": "The scheduled nixbot effect `flake-update`, Tuesday and Friday per its comments, as App `vanixiets-flake-updater` (`modules/effects/vanixiets/effects.nix:44-56,156-169`)",
+  "pathToday": "2",
+  "trap": "Its secrets are in `effects/vanixiets/secrets.nix:84-102`, outside `vanixiets.secrets`"
+ },
+ {
+  "n": 17,
+  "readers": "R2",
+  "question": "What must a new check declare before it can merge?",
+  "key": "A `testSizes.checks` entry beside its definition (for example `checks/deploy-record-order.nix:66`); the option is in `checks/test-sizes.nix`",
+  "pathToday": "2",
+  "trap": "–"
+ },
+ {
+  "n": 18,
+  "readers": "R5",
+  "question": "In what order are nixpkgs overlays applied?",
+  "key": "Internal overlays first, then `pkgs/by-name` (`nixpkgs/compose.nix:38-43`). Within the internal list, no file declares an order; it is module merge order (`overlays-option.nix:13`)",
+  "pathToday": "3",
+  "trap": "The comment at compose.nix:38 says \"order matters!\""
+ },
+ {
+  "n": 19,
+  "readers": "R1",
+  "question": "What are stibnite's primary user and uid?",
+  "key": "crs58, primary and admin, uid 501 (`lib/host-users.nix:174-178`)",
+  "pathToday": "1 to 2",
+  "trap": "–"
+ },
+ {
+  "n": 20,
+  "readers": "R1, R2",
+  "question": "What is a host's deploy address?",
+  "key": "`<deployUser>@<name>.zt` (`lib/hosts.nix:203`). The overlay address is a separate field (`:195`)",
+  "pathToday": "1",
+  "trap": "–"
+ }
+]

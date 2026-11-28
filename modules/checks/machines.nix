@@ -37,9 +37,11 @@
       # removing one is a deliberate edit here as well as at its registration.
       registeredObligations = [
         "commitSigningObligations"
+        "compositionRoutes"
         "deployRecordObligations"
         "fleetDeployer"
         "harmoniaGcObligations"
+        "hetznerBootLoader"
         "meshHostsObligations"
         "networkTargetObligations"
         "nixEvalJobsObligations"
@@ -54,14 +56,20 @@
       # Every registered judge whose classes contain the configuration's class,
       # folded into one assertion that names each unmet judge. The class is
       # the configuration set being mapped, never the host's system string.
+      # A judge reads the host's config and, through graphFailures, the
+      # configuration's import graph.
       withFleetObligations =
-        class: name: machineConfig: toplevel:
+        class: name: configuration: toplevel:
         let
+          machineConfig = configuration.config;
           unmet = lib.concatLists (
             lib.mapAttrsToList (
               key: entry:
               lib.optionals (lib.elem class entry.classes) (
-                map (message: "${key}: ${message}") (entry.failures name machineConfig)
+                map (message: "${key}: ${message}") (
+                  entry.failures name machineConfig
+                  ++ entry.graphFailures class name machineConfig configuration.graph
+                )
               )
             ) config.fleetObligations
           );
@@ -75,8 +83,6 @@
         );
         toplevel;
     in
-    assert lib.assertMsg (builtins.attrNames machineSystems == builtins.attrNames inventory)
-      "flake.lib.machineSystems names must match clan.inventory.machines; only in machineSystems: [${lib.concatStringsSep ", " (lib.subtractLists (builtins.attrNames inventory) (builtins.attrNames machineSystems))}]; only in the inventory: [${lib.concatStringsSep ", " (lib.subtractLists (builtins.attrNames machineSystems) (builtins.attrNames inventory))}]";
     assert lib.assertMsg (
       inventoryNamesFor "nixos" == builtins.attrNames self.nixosConfigurations
     ) "NixOS inventory names must match nixosConfigurations";
@@ -134,14 +140,14 @@
         (lib.mapAttrs' (
           name: _:
           lib.nameValuePair "nixos-${name}" (
-            withFleetObligations "nixos" name self.nixosConfigurations.${name}.config
+            withFleetObligations "nixos" name self.nixosConfigurations.${name}
               self.nixosConfigurations.${name}.config.system.build.toplevel
           )
         ) nixosForSystem)
         // (lib.mapAttrs' (
           name: _:
           lib.nameValuePair "darwin-${name}" (
-            withFleetObligations "darwin" name self.darwinConfigurations.${name}.config
+            withFleetObligations "darwin" name self.darwinConfigurations.${name}
               self.darwinConfigurations.${name}.system
           )
         ) darwinForSystem);

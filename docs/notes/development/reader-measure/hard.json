@@ -1,0 +1,52 @@
+[
+ {
+  "id": "PL1",
+  "task": "Placement. Tailscale's client is to be installed and enabled on every workstation: the Macs stibnite, rosegold and argentum, and the NixOS laptop pyrite (a cask or service on macOS, the NixOS service on pyrite), with one shared setting (the login server URL). Which files do you create or edit, and what do you name what you add?",
+  "key": "Create one cross-class module (darwin and nixos halves) under modules/system/ and import it in the four host files (stibnite, rosegold, argentum, pyrite); not darwin-workstation, which blackphos also takes. The macOS mechanism follows the placement rule for Mac applications: the nix-darwin service where one exists, else a cask."
+ },
+ {
+  "id": "PL2",
+  "task": "Placement. A new NixOS server on Hetzner Cloud named basalt is to be added, running nothing but what every server here gets, administered by the usual admin. List every file you would create or edit, in order.",
+  "key": "Hand edits outside the host directory: modules/lib/hosts.nix (record, with tags and description), modules/lib/cloud-machines.nix (row with serverType), modules/lib/host-users.nix (the admin attachment), modules/checks/structure/flake-shape.nix (structure-fleet), modules/checks/machines.nix (testSizes nixos-<host>, medium, measured = false), .sops.yaml (anchor and bridge rule), modules/lib/observability-hosts.nix (row), modules/home/core/ssh.nix (login), and ztRecords until the mesh migration; the host directory's default.nix and disko.nix. Generated steps: machine key and vars, both bridge files re-encrypted, sops/secrets/<host>-age.key/groups/fleet-deployers for an enabled host, topology regenerated (fleet-topology-fresh). Boot mode follows the server type."
+ },
+ {
+  "id": "PL3",
+  "task": "Placement. A new service `foo` on magnetite needs an API token entered by hand once, readable only by the service's user `foo`, and the service restarted when it changes. Where do you declare the token, how does the service module read its path, and what else must change for the pull request to pass its checks?",
+  "key": "Declare the token in modules/nixos/foo.nix through vanixiets.secrets with a hidden persisted prompt, files.<p>.deploy = false and a script rendering the file the service reads (owner foo, restartUnits); import foo in magnetite's host module; no check file changes."
+ },
+ {
+  "id": "PL4",
+  "task": "Placement. A Nix daemon setting (say `keep-going = true`) is to apply to every machine in the fleet, NixOS and macOS alike. Where exactly does it go?",
+  "key": "One module defining a base part for both classes (as modules/system/nix-download-timeout.nix does), listed in the NixOS base list and in darwin base."
+ },
+ {
+  "id": "PL5",
+  "task": "Placement. A new check is to assert that every NixOS host has `services.fstrim.enable` set. Which files do you create or edit, on which system does the check live, and what must it declare to be mergeable?",
+  "key": "A standalone check under modules/checks/ with its testSizes entry and a negative control, because the fact must hold on every NixOS host and fleet obligations skip hosts with checked = false; no setting is added, since nixpkgs enables services.fstrim by default."
+ },
+ {
+  "id": "E1",
+  "task": "Enumeration. List every named module (everything registered as `flake.modules.nixos.<name>`) that ends up in the host magnetite's configuration, whether imported in its host file, pulled in by an aggregate such as `base`, or attached by the clan inventory. Give the names, grouped by how they arrive.",
+  "key": "80 named modules in five routes: the host module (and mesh-dns/magnetite), 34 named in magnetite's host file, the 33 base parts, five nested imports (magnetite-memory-budget, cache-completeness, omnigraph-backup, omnigraph-probe, shared-reference-tree-options), and the clan-attached omnigent, omnigent-host, omnigent-worker-options, otel-collector-agent, observability-notify, otel-collector-ingress, zerotier-mss-clamp."
+ },
+ {
+  "id": "E2",
+  "task": "Enumeration. Name everything that is configured on the Mac argentum but NOT on the Mac blackphos, and the mechanism that makes each differ.",
+  "key": "nix.conf knownSha256Hashes; enrolment (machine key); tincr peer; generated commit-signing keys (blackphos is a legacy machine); fleet-deployer target; nix-builders builder role; otel agent (collect); iets evaluator (memory 8); christophersmith and cameron accounts with homes; the user-cameron clan instance."
+ },
+ {
+  "id": "E3",
+  "task": "Enumeration. Which hosts have dnscrypt-proxy active, and for each, what makes it so (an import, a flag, a role, a tag)?",
+  "key": "argentum, rosegold, blackphos and stibnite (darwin-workstation imports it, each host sets services.localDnscryptProxy.enable) and pyrite (direct import and flag); no role or tag."
+ },
+ {
+  "id": "I1",
+  "task": "Impact. If `modules/home/development/git.nix` is edited, which machines' system configurations and which standalone homes change? Explain the chain from the file to each.",
+  "key": "All ten hosts through their integrated homes (development aggregate), the worker homes on magnetite, pyrite and stibnite (the git export), and 20 standalone homes: cameron, christophersmith, crs58, janettesmith, raquel and tara on aarch64-darwin, aarch64-linux and x86_64-linux, plus claude-sandbox@x86_64-linux and ubuntu@x86_64-linux."
+ },
+ {
+  "id": "I2",
+  "task": "Impact. ZeroTier is to be removed from the fleet entirely. List every file that must change or be deleted.",
+  "key": "91 non-Markdown files under modules/ (rg -l -i 'zerotier|\\.zt\\b|ztRecords|zt-dns' modules --glob '!*.md'), plus checks/darwin-resolver-reload.nix, 13 vars/shared/zerotier-* directories, the justfile, scripts, READMEs, docs-site pages and skill files."
+ }
+]

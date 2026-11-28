@@ -27,11 +27,15 @@ let
 
   # Each cloud machine's provider, machine type and whether its server
   # exists, read from the terraform table, which stays their only writer.
+  # A row must name its machine type: it decides the server's price, memory
+  # and boot mode, so it has no default.
   cloudRecords = lib.concatMapAttrs (
     provider: machines:
-    lib.mapAttrs (_: m: {
+    lib.mapAttrs (name: m: {
       inherit provider;
-      type = m.serverType or m.machineType;
+      type =
+        m.serverType or m.machineType
+          or (throw "flake.fleet.hosts.${name}.cloud.type: flake.lib.cloudMachines.${provider}.${name} sets neither serverType nor machineType");
       inherit (m) enabled;
     }) machines
   ) cloudMachines;
@@ -64,6 +68,28 @@ let
         services = lib.mkOption {
           type = types.listOf types.str;
           description = "Service labels published under the fleet domain at the host's address.";
+        };
+        tags = lib.mkOption {
+          type = types.nullOr (types.listOf types.str);
+          default = null;
+          apply =
+            v:
+            assert lib.assertMsg (
+              (v == null) == (config.class == "android")
+            ) "${where}.tags: a host that runs Nix states its tags, a phone none";
+            v;
+          description = "The clan inventory tags of a host that runs Nix; clan services select machines by them. null for a phone.";
+        };
+        description = lib.mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          apply =
+            v:
+            assert lib.assertMsg (
+              (v == null) == (config.class == "android")
+            ) "${where}.description: a host that runs Nix states its description, a phone none";
+            v;
+          description = "The clan inventory description of a host that runs Nix. null for a phone.";
         };
         zerotier = {
           address = lib.mkOption {
@@ -247,6 +273,13 @@ in
       memory = null; # cloud
       nixClassic = false;
       stateVersion = "25.05";
+      tags = [
+        "nixos"
+        "cloud"
+        "hetzner"
+        "controller"
+      ];
+      description = "Primary VPS, zerotier controller";
     };
     electrum = {
       system = "x86_64-linux";
@@ -260,6 +293,13 @@ in
       memory = null; # cloud
       nixClassic = false;
       stateVersion = "25.05";
+      tags = [
+        "nixos"
+        "cloud"
+        "hetzner"
+        "peer"
+      ];
+      description = "Secondary test VM, zerotier peer";
     };
     galena = {
       system = "x86_64-linux";
@@ -273,6 +313,13 @@ in
       memory = null; # cloud
       nixClassic = false;
       stateVersion = "25.05";
+      tags = [
+        "nixos"
+        "cloud"
+        "gcp"
+        "peer"
+      ];
+      description = "GCP CPU node (e2-standard-8), zerotier peer";
     };
     scheelite = {
       system = "x86_64-linux";
@@ -287,6 +334,14 @@ in
       nixClassic = false;
       checked = false;
       stateVersion = "25.05";
+      tags = [
+        "nixos"
+        "cloud"
+        "gcp"
+        "gpu"
+        "peer"
+      ];
+      description = "GCP GPU node (n1-standard-8, T4), zerotier peer";
     };
     magnetite = {
       system = "x86_64-linux";
@@ -300,6 +355,13 @@ in
       memory = null; # cloud
       nixClassic = false;
       stateVersion = "25.05";
+      tags = [
+        "nixos"
+        "cloud"
+        "hetzner"
+        "peer"
+      ];
+      description = "Build infrastructure server (niks3, nixbot, Gitea)";
     };
     pyrite = {
       system = "x86_64-linux";
@@ -313,6 +375,12 @@ in
       memory = 16;
       nixClassic = false;
       stateVersion = "26.05";
+      tags = [
+        "nixos"
+        "laptop"
+        "peer"
+      ];
+      description = "Apple MacBookPro14,1 bare-metal NixOS laptop, zerotier peer";
     };
     stibnite = {
       system = "aarch64-darwin";
@@ -326,6 +394,13 @@ in
       memory = 64;
       nixClassic = true;
       stateVersion = 4;
+      tags = [
+        "darwin"
+        "workstation"
+        "laptop"
+        "deployer-workstation"
+      ];
+      description = "crs58's primary workstation, deployment controller";
     };
     blackphos = {
       system = "aarch64-darwin";
@@ -339,6 +414,13 @@ in
       memory = "unknown";
       nixClassic = false;
       stateVersion = 4;
+      tags = [
+        "darwin"
+        "workstation"
+        "laptop"
+        "fleet"
+      ];
+      description = "raquel's laptop (primary user), crs58 admin";
     };
     argentum = {
       system = "aarch64-darwin";
@@ -352,6 +434,13 @@ in
       memory = 8;
       nixClassic = false;
       stateVersion = 4;
+      tags = [
+        "darwin"
+        "workstation"
+        "laptop"
+        "fleet"
+      ];
+      description = "christophersmith's laptop (primary user), cameron admin";
     };
     rosegold = {
       system = "aarch64-darwin";
@@ -365,6 +454,13 @@ in
       memory = 8;
       nixClassic = false;
       stateVersion = 4;
+      tags = [
+        "darwin"
+        "workstation"
+        "laptop"
+        "fleet"
+      ];
+      description = "janettesmith's laptop (primary user), cameron admin";
     };
     pixel7 = {
       system = null;

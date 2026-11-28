@@ -1,15 +1,8 @@
+{ config, ... }:
 {
-  ...
-}:
-let
-  content =
+  flake.users.janettesmith.contentPrivate = config.flake.lib.mkUserContent "janettesmith" (
+    { pkgs, ... }:
     {
-      pkgs,
-      ...
-    }:
-    {
-      home.stateVersion = "23.11";
-
       home.packages = with pkgs; [
         just # Command runner
         ripgrep # Fast grep alternative
@@ -18,19 +11,14 @@ let
         eza # Modern ls replacement
       ];
 
-      sops = {
-        defaultSopsFile = ../../../../secrets/home-manager/users/janettesmith/secrets.yaml;
-        secrets = {
-          github-token = { };
-          ssh-signing-key = {
-            mode = "0400";
-          };
-          bitwarden-email = { };
-          atuin-key = { };
+      sops.secrets = {
+        github-token = { };
+        ssh-signing-key = {
+          mode = "0400";
         };
+        bitwarden-email = { };
+        atuin-key = { };
       };
-    };
-in
-{
-  flake.users.janettesmith.contentPrivate = content;
+    }
+  );
 }

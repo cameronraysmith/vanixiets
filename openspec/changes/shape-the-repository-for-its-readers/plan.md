@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Implementation starts after the owner answers the design's Open Questions or accepts their recommendations, and approves the priority and order steps' deploy.
+- The design's questions are resolved (design Resolved Questions); implementation starts with the steps that change no machine, then the second pass (5a, 5b, 6, 6b, 6c) and the deploy.
 - One commit per pull request; land groups 1, 2, 4 and 7 in any order, 3 after 2, then 5a, 5b, then 6, then the deploy (8).
 - `just drv-diff` (about 16 minutes) is run by the operator; the implementer returns the command and the allow-list.
 - Code comments carry no design, task or assumption identifiers, dates, measurements, log paths or change history; `just comment-gate <rev>` passes before each publish.

@@ -1,8 +1,8 @@
 { config, ... }:
 {
   flake.users.tara = {
+    aggregates = config.flake.lib.defaultAggregates;
     meta = {
-      username = "tara";
       fullname = "Tara Chari";
       email = "17519396+tarachari3@users.noreply.github.com";
       githubUser = "tarachari3";
@@ -17,21 +17,5 @@
         }
       ];
     };
-    aggregates = with config.flake.modules.homeManager; [
-      base-sops
-      agents
-      bioinformatics
-      compute
-      core
-      database
-      development
-      languages
-      publishing
-      security
-      shell
-      terminal
-      tools
-      agents-md
-    ];
   };
 }

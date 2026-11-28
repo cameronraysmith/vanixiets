@@ -1,0 +1,52 @@
+# Declared drvPath differences of the first pass of
+# shape-the-repository-for-its-readers (the steps that change no machine),
+# from main 96a3c1ef8a8d to its tip:
+#   just drv-diff <parent> <tip> openspec/changes/shape-the-repository-for-its-readers/drv-delta-first-pass.txt
+# Each check below changes because one of its inputs or its compared values
+# changed; the cause is on its line. Checks built from the whole flake source
+# (gitleaks, treefmt, ntfy-tls-verification) are covered by
+# modules/apps/drv-diff-base-allow.txt. Every NixOS, darwin and home
+# configuration, every machine check and every vmTests attribute keeps its
+# drvPath: all 49 toplevel and home drvPaths were evaluated equal before and
+# after in a scratch copy.
+
+checks.x86_64-linux.host-list-keys  added  # the hand-written host lists compared with the registry
+checks.x86_64-linux.composition-routes  added  # the route classifier and the compositionRoutes judge over fixture graphs
+checks.x86_64-linux.hetzner-boot-loader  added  # the hetznerBootLoader judge over fixtures
+checks.x86_64-linux.fleet-alert  changed  # its size-rule clause renders every testSizes.checks entry; the three checks above add one each
+checks.x86_64-linux.sops-correspondence  changed  # its compared machineAnchors are derived from the registry: the same six hosts, now in attribute-name order
+checks.x86_64-linux.eval-users-lib  changed  # its input modules/home/users/lib.nix (imported by store path in lib.test.nix) gains the username default, the two constructors and flake.lib.defaultAggregates
+checks.x86_64-linux.home-module-exports  changed  # its compared values gain the phantom of an emptied mkUserContent body
+checks.x86_64-linux.deploy-stock-nix  changed  # its input, the justfile, changed: its check-uncached-machine recipe reads the host class from flake.lib.hosts, and it gains the composition recipe
+
+# Their input, the docs package, changed: the host-onboarding and
+# fleet-observability guides under packages/docs are its source. apps-build
+# changes only through its deploy-docs input, which takes the package.
+checks.x86_64-linux.agent-skills-index  changed
+checks.x86_64-linux.apps-build  changed
+checks.x86_64-linux.deploy-docs-rehearsal  changed
+checks.x86_64-linux.package-vanixiets-docs  changed
+checks.x86_64-linux.package-vanixiets-docs-payload  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-report  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.x86_64-linux.package-vanixiets-docs-test-linkcheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-typecheck  changed
+checks.x86_64-linux.package-vanixiets-docs-test-unit  changed
+checks.aarch64-darwin.apps-build  changed
+checks.aarch64-darwin.package-vanixiets-docs  changed
+checks.aarch64-darwin.package-vanixiets-docs-payload  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-action-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-report  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-runner-controls  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-topology-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-webkit-negative-control  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-linkcheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-typecheck  changed
+checks.aarch64-darwin.package-vanixiets-docs-test-unit  changed

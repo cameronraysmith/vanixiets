@@ -39,6 +39,12 @@
 # locally, whether the backend declares a generator at all (a retired one
 # must be absent, sshd's `openssh` may be), and the backend's own location
 # of a file's ciphertext.
+#
+# A new hand-entered secret is a hidden, persisted prompt with
+# `files.<p>.deploy = false` and a `script` rendering the file the service
+# reads, as greptimedb-r2 in modules/nixos/greptimedb-server.nix does. A
+# script that only exits 1, filled by `clan vars set`, is superseded; the
+# generators written that way keep it, since changing one can prompt again.
 { config, lib, ... }:
 let
   inherit (config.flake.lib) exportAs;

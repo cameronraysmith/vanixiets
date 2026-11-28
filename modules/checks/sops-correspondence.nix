@@ -49,15 +49,12 @@ let
     "janettesmith"
     "christophersmith"
   ];
-  # anchor = clan machine name
-  machineAnchors = [
-    "cinnabar"
-    "electrum"
-    "galena"
-    "scheelite"
-    "magnetite"
-    "pyrite"
-  ];
+  # anchor = clan machine name: every enrolled NixOS host. A darwin host's
+  # machine key is no .sops.yaml recipient; its anchor, where it has one, is
+  # its pinned host key below.
+  machineAnchors = lib.attrNames (
+    lib.filterAttrs (_: host: host.enrolled && host.class == "nixos") config.flake.lib.hosts
+  );
   # anchor -> host in flake.lib.darwinHostKeys
   hostKeyAnchors = {
     blackphos = "blackphos";

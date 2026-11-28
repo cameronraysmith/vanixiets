@@ -29,10 +29,101 @@ let
 
   flakeSystems = config.systems;
   flakeLib = config.flake.lib;
+  people = config.flake.users;
+  homeModules = config.flake.modules.homeManager;
   signingKeyLine = lib.types.strMatching "ssh-ed25519 [A-Za-z0-9+/]+=*( .*)?";
+
+  # A person's home content: `module` is a home-manager module holding what
+  # is particular to the person, left as written, and the person's state
+  # version and sops file are added as an import keyed
+  # userContentDefaultsKey, so a check can set them aside.
+  userContentDefaultsKey = "vanixiets/user-content-defaults";
+  mkUserContent =
+    name: module:
+    let
+      userModule = lib.toFunction module;
+    in
+    lib.setFunctionArgs (
+      args:
+      let
+        m = userModule args;
+      in
+      m
+      // {
+        imports = (m.imports or [ ]) ++ [
+          {
+            key = userContentDefaultsKey;
+            home.stateVersion = "23.11";
+            sops.defaultSopsFile = ../../../secrets/home-manager/users/${name}/secrets.yaml;
+          }
+        ];
+      }
+    ) (lib.functionArgs userModule);
+
+  # A clan `users` instance for `user` on every host with an attachment of
+  # that account (modules/lib/host-users.nix). The password is generated and
+  # shared among the account's hosts. With `shellAndKeys` the service also
+  # sets the login shell and the person's SSH keys, which the host modules
+  # then leave alone (flake.lib.shellAndKeysFromUserService).
+  mkUserInstance =
+    {
+      user,
+      groups,
+      shellAndKeys ? false,
+      extraModules ? [ ],
+    }:
+    {
+      module = {
+        name = "users";
+        input = "clan-core";
+      };
+
+      roles.default = {
+        machines = lib.genAttrs (flakeLib.hostsOfAccount user) (_: { });
+
+        settings = {
+          inherit user groups;
+          share = true;
+          prompt = false;
+        };
+      }
+      // lib.optionalAttrs (shellAndKeys || extraModules != [ ]) {
+        extraModules =
+          lib.optional shellAndKeys (
+            { pkgs, ... }:
+            {
+              users.users.${user} = {
+                shell = pkgs.zsh;
+                openssh.authorizedKeys.keys = people.${user}.meta.sshKeys;
+              };
+              programs.zsh.enable = true;
+            }
+          )
+          ++ extraModules;
+      };
+    };
 in
 {
   config.flake.lib.mkUserIdentity = mkUserIdentity;
+  config.flake.lib.mkUserContent = mkUserContent;
+  config.flake.lib.userContentDefaultsKey = userContentDefaultsKey;
+  config.flake.lib.defaultAggregates = with homeModules; [
+    base-sops
+    agents
+    bioinformatics
+    compute
+    core
+    database
+    development
+    languages
+    publishing
+    security
+    shell
+    terminal
+    tools
+    agents-md
+  ];
+  config.flake.lib.mkUserInstance = mkUserInstance;
   config.flake.lib.vcsAuthor = meta: {
     name = meta.fullname;
     email = meta.gitEmail;
@@ -58,7 +149,9 @@ in
             meta = {
               username = lib.mkOption {
                 type = lib.types.str;
-                description = "Login username for this user.";
+                default = name;
+                defaultText = lib.literalExpression "<name>";
+                description = "Login username for this user; the attribute key unless the account's name differs.";
               };
               fullname = lib.mkOption {
                 type = lib.types.str;
@@ -162,8 +255,10 @@ in
               description = ''
                 Home-manager aggregate modules to include for this user, given
                 as direct references against `config.flake.modules.homeManager.<name>`
-                (e.g. `with config.flake.modules.homeManager; [ core development shell ]`).
-                An empty list signals that no `homeConfigurations` entry should
+                (e.g. `with config.flake.modules.homeManager; [ core development shell ]`),
+                or `config.flake.lib.defaultAggregates`, the list most people take.
+                The order of the list is the order of the home's modules. An
+                empty list signals that no `homeConfigurations` entry should
                 be emitted for this user.
               '';
             };

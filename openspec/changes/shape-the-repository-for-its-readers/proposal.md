@@ -22,7 +22,7 @@ On main `1e8fb9ff6d66`, fresh read-only agents answered 20 of 20 lookups right i
 
 **Host lists derived or checked**
 - From: a host is written in 12 lists outside its own directory, 4 kept by convention only, and the generated steps (keys, bridge re-encryption, deployer group link, topology) are listed nowhere.
-- To: tags, description, inventory machines, sops anchors and ssh logins derived from the registry; the cloud and observability tables keep their data and gain key checks; the onboarding guide lists each generated step with the check that fails until it is done; the two lists left (`ztRecords`, removed by the mesh migration, and the justfile's list) are named there.
+- To: tags, description, inventory machines, sops anchors and ssh logins derived from the registry; the cloud and observability tables keep their data and gain key checks; the onboarding guide lists each generated step with the check that fails until it is done; the justfile's two host lists are deleted in favour of the registry's class; the one list left (`ztRecords`, removed by the mesh migration) is named there; a new server's `serverType` and `stateVersion` are required, and its boot mode follows its server type.
 - Impact: no host or home changes.
 
 **Composition on request**

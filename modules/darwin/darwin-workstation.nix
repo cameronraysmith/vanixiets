@@ -5,12 +5,15 @@
 }:
 let
   flakeModules = config.flake.modules.darwin;
+  people = config.flake.users;
   inherit (config.flake.lib) hosts shellAndKeysFromUserService;
 in
 {
   # The shape of a Mac in the fleet: a host imports it and states only its
   # delta (hostName, casks, dnscrypt-proxy). argentum, rosegold, blackphos
-  # and stibnite import it.
+  # and stibnite import it. A Mac application several hosts take is a named
+  # module imported by each such host or by this aspect, using the nix-darwin
+  # service when one exists and a Homebrew cask otherwise.
   flake.modules.darwin.darwin-workstation =
     {
       config,
@@ -79,7 +82,7 @@ in
           }
           // lib.optionalAttrs (!shellAndKeysFromUserService account) {
             shell = pkgs.zsh;
-            openssh.authorizedKeys.keys = inputs.self.users.${account}.meta.sshKeys;
+            openssh.authorizedKeys.keys = people.${account}.meta.sshKeys;
           }
         );
 

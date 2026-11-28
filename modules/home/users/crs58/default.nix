@@ -28,8 +28,6 @@ let
       };
     in
     {
-      home.stateVersion = "23.11";
-
       home.packages = [
         flake.inputs.niks3.packages.${pkgs.stdenv.hostPlatform.system}.niks3
       ]
@@ -163,7 +161,6 @@ let
       # sops-nix configuration for crs58/cameron user
       # 22 secrets: development + ai + shell aggregates
       sops = {
-        defaultSopsFile = ../../../../secrets/home-manager/users/crs58/secrets.yaml;
         secrets = {
           github-token = { };
           ssh-signing-key = {
@@ -399,5 +396,5 @@ let
     };
 in
 {
-  flake.users.crs58.contentPrivate = content;
+  flake.users.crs58.contentPrivate = config.flake.lib.mkUserContent "crs58" content;
 }

@@ -47,26 +47,19 @@ check-cached package:
         echo "$output"
     fi
 
-# Preview uncached derivations for a machine (auto-detects darwin vs nixos)
+# Preview uncached derivations for a machine (its class read from flake.lib.hosts)
 [group('nix')]
 check-uncached-machine hostname:
     #!/usr/bin/env bash
     set -euo pipefail
-    darwin_hosts=(argentum blackphos rosegold stibnite)
-    nixos_hosts=(cinnabar electrum galena scheelite)
-    for h in "${darwin_hosts[@]}"; do
-        if [[ "$h" == "{{hostname}}" ]]; then
-            exec just check-uncached "darwinConfigurations.{{hostname}}.system"
-        fi
-    done
-    for h in "${nixos_hosts[@]}"; do
-        if [[ "$h" == "{{hostname}}" ]]; then
-            exec just check-uncached "nixosConfigurations.{{hostname}}.config.system.build.toplevel"
-        fi
-    done
-    echo "unknown hostname: {{hostname}}" >&2
-    echo "darwin: ${darwin_hosts[*]}" >&2
-    echo "nixos: ${nixos_hosts[*]}" >&2
+    class=$({{nix_stock}} eval --raw .#lib.hosts --apply 'hosts: (hosts."{{hostname}}" or { class = ""; }).class')
+    case "$class" in
+        darwin) exec just check-uncached "darwinConfigurations.{{hostname}}.system" ;;
+        nixos) exec just check-uncached "nixosConfigurations.{{hostname}}.config.system.build.toplevel" ;;
+        "") echo "unknown hostname: {{hostname}} is not in flake.lib.hosts" >&2 ;;
+        *) echo "{{hostname}} is a $class host and has no system configuration" >&2 ;;
+    esac
+    {{nix_stock}} eval --raw .#lib.hosts --apply 'hosts: builtins.concatStringsSep "" (map (class: "${class}: ${toString (builtins.filter (n: hosts.${n}.class == class) (builtins.attrNames hosts))}\n") [ "darwin" "nixos" ])' >&2
     exit 1
 
 # List derivations that would be built (not cached) for a system configuration
@@ -86,6 +79,12 @@ check-uncached config:
         echo "$output" | grep 'will be fetched'
         echo "$output" | grep -A9999 'will be fetched' | tail -n+2 | sed 's|.*/[a-z0-9]*-||'
     fi
+
+# Print each named module a host or home composes, with its route and importing file
+# (modules/lib/composition.nix); for a home, also the systems it is built for
+[group('nix')]
+composition name:
+    {{nix_stock}} eval --raw .#lib.renderComposition --apply 'render: render "{{name}}"'
 
 ## activation
 # Unified activation commands using nh via flake apps
