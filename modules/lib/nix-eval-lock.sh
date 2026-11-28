@@ -1,6 +1,7 @@
 # shellcheck shell=bash
 # Body of the host-evaluation-lock wrapper around nix-eval-jobs. The Nix side
-# (modules/lib/nix-eval-lock.nix) prepends `lock_file` and `evaluator`.
+# (modules/lib/nix-eval-lock.nix) prepends `lock_file` and `evaluator` and
+# lock-holder.sh's describe_holder.
 #
 # One evaluation runs per host at a time. The wrapper takes an exclusive
 # flock(2) on lock_file, waits (reporting the holder every 30 s) while another
@@ -24,10 +25,9 @@
 # lock files only through a read-only bind mount; a flock is on the inode, so
 # it is shared across mount and PID namespaces.
 #
-# Holder details come from /proc/locks rather than from anything the holder
-# writes: a sandboxed holder cannot write outside its sandbox, and kernel
-# state cannot go stale. From inside a PID namespace the holder may not be
-# visible; the waiting line then says so instead of naming it.
+# The holder is named from /proc/locks (lock-holder.sh). From inside a PID
+# namespace it may not be visible; the waiting line then says so instead of
+# naming it.
 
 owner_file=$lock_file.owner
 report_interval=30
@@ -41,47 +41,11 @@ for file in "$lock_file" "$owner_file"; do
 done
 exec {lock_fd}<"$lock_file"
 
-# Prints the owner-lock holder as "<user> pid <pid> since <ISO time> (<argv>)",
-# or fails when no holder is visible from this PID namespace (or this host has
-# no /proc/locks).
-describe_holder() {
-  [ -r /proc/locks ] || return 1
-  local dev ino key pid
-  read -r dev ino < <(stat -L -c '%d %i' "$owner_file")
-  # /proc/locks prints the superblock device as major:minor in hex, using the
-  # kernel's dev_t split (glibc gnu_dev_major/gnu_dev_minor).
-  key=$(printf '%02x:%02x:%s' \
-    $(((dev >> 8) & 0xfff)) $(((dev & 0xff) | ((dev >> 12) & 0xfff00))) "$ino")
-  local type mode lock_pid lock_key
-  pid=
-  # Waiters are listed as "N: -> FLOCK ...", which shifts "->" into the type
-  # field, so only granted locks match.
-  while read -r _ type _ mode lock_pid lock_key _; do
-    if [ "$type" = FLOCK ] && [ "$mode" = WRITE ] && [ "$lock_key" = "$key" ]; then
-      pid=$lock_pid
-      break
-    fi
-  done </proc/locks
-  [ -n "$pid" ] && [ "$pid" != 0 ] && [ -d "/proc/$pid" ] || return 1
-  local user started argv argv0
-  user=$(stat -c %U "/proc/$pid") || return 1
-  started=$(LC_ALL=C ps -o lstart= -p "$pid") || return 1
-  started=$(date -d "$started" --iso-8601=seconds) || return 1
-  argv=$(tr '\0' ' ' <"/proc/$pid/cmdline") || return 1
-  argv=${argv% }
-  argv0=${argv%% *}
-  argv=${argv0##*/}${argv#"$argv0"}
-  if [ "${#argv}" -gt 120 ]; then
-    argv="${argv:0:117}..."
-  fi
-  printf '%s pid %s since %s (%s)' "$user" "$pid" "$started" "$argv"
-}
-
 status=0
 flock -n -E "$conflict" "$lock_fd" || status=$?
 while [ "$status" -ne 0 ]; do
   [ "$status" -eq "$conflict" ] || exit "$status"
-  if holder=$(describe_holder); then
+  if holder=$(describe_holder "$owner_file"); then
     echo "nix-eval-jobs: waiting for the host evaluation lock held by $holder; evaluations on this host run one at a time to avoid exhausting memory" >&2
   else
     echo "nix-eval-jobs: waiting for the host evaluation lock held by another evaluation on this host (its process is not visible from here); evaluations on this host run one at a time to avoid exhausting memory" >&2

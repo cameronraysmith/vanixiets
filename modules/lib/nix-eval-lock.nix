@@ -29,6 +29,7 @@ let
         lock_file=${lib.escapeShellArg lockFile}
         evaluator=${lib.escapeShellArg evaluator}
       ''
+      + builtins.readFile ./lock-holder.sh
       + builtins.readFile ./nix-eval-lock.sh;
       inherit passthru;
     };

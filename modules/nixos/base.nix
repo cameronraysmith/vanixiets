@@ -10,6 +10,7 @@
     "base-shared-vars-recipients"
     "base-source-context-obligations"
     "hm-sops-bridge"
+    "nix-build-lock"
     "nix-eval-lock"
     "node-exporter-textfile"
     "postgresql-backup"

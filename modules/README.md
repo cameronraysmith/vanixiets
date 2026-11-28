@@ -198,6 +198,17 @@ iets prints that notice unconditionally (`log::line`, no quiet setting), so a ca
 `just eval-identity` also runs `apps/nix-classic-identity`, which evaluates every host system, every home activation package and the default dev shell with stock Nix and with classic and fails unless drvPaths and whole `.drv` closures agree, so an `iets` bump passes it too before it is merged.
 Upstream's open numtide/iets#359 lists evaluation differences: in each, iets either fails where Nix succeeds, which the oracle would report, or succeeds where Nix fails, on constructs (`${''…''}` names in `rec`, `<nix/derivation.nix>`, `__json`, `fetchClosure`, `nix-instantiate`'s walk) that this repository's modules do not use and that the classic wrapper does not reach (it takes over `nix` only), so for configurations stock Nix evaluates without error none changes a result.
 
+Builds have a lock of their own beside the evaluation lock.
+On every NixOS host with the evaluation lock (magnetite, pyrite, cinnabar and electrum today, galena and scheelite once provisioned), `nixos/nix-build-lock.nix` installs `nix-build-locked`, and a build started in a shell on such a host runs through it: `nix-build-locked nix build -L --no-link .#checks.x86_64-linux.<name>`, `nix-build-locked nix-fast-build …`, for root and ordinary users alike.
+It enforces the host's two build rules and is where they are stated: one build at a time, under an exclusive flock on `/etc/nix/build.lock`, and no build started while `some avg60` in `/proc/pressure/memory` is 20 or more.
+It checks pressure, takes the lock, checks pressure again and releases the lock if it has risen, so a build waiting on pressure does not hold up the queue; it prints `nix-build-locked: waiting for the host build lock held by <user> pid <pid> since <time> (<command>)` or `nix-build-locked: waiting for memory pressure to fall: some avg60 … is <value>, at or above 20` every 30 seconds while it waits.
+After an hour of waiting it exits 75 without running the build; otherwise it execs the build, whose exit status is its own, and the lock is released when the build and everything it forked exit.
+`services.nixBuildLock` holds the lock path, the threshold (`pressureThreshold`) and the bound (`maxWait`, seconds).
+The lock files are tmpfiles `f` lines at 0444 root, like the evaluation lock's, so every user can take the lock on a read-only descriptor and none can truncate, replace or remove it, and the wrapper never creates or deletes them.
+On magnetite `/tmp/cam124-build.lock`, which sessions took with `flock` directly before the command existed, is a root-owned symlink to `/etc/nix/build.lock` (`services.nixBuildLock.legacyLockFile`, excluded from the /tmp age cleanup), so a session still doing `exec 9</tmp/cam124-build.lock; flock 9` and `nix-build-locked` wait for each other; such a session is named in the waiting line only as another build whose process is not visible, and it checks no pressure, so new sessions use the command.
+Only builds started through the command take the lock: nixbot's builds, builds dispatched to the host as a remote builder and `nix build --store ssh-ng://…` from another host go to its daemon directly.
+`checks.x86_64-linux.nix-build-lock-rehearsal` (`checks/nix-build-lock-rehearsal.nix`) runs the wrapper against a stub build and a pressure fixture.
+
 ## On-demand VM tests
 
 `nixbot.toml` evaluates `checks`, which nixbot scopes to `checks.x86_64-linux` and `checks.aarch64-darwin`, both required; VM tests instead live under `vmTests`, and nixbot never runs them.

@@ -457,6 +457,10 @@ in
       # modules/nixos/memory-pressure-guards.nix.
       services.nixEvalLock.enable = true;
 
+      # Sessions here take this path with flock(1) directly; the link puts
+      # them on the same lock as nix-build-locked.
+      services.nixBuildLock.legacyLockFile = "/tmp/cam124-build.lock";
+
       # Permit binding magnetite's ZeroTier-assigned IPv6 before zerotierone
       # settles on cold boot (mirrors modules/machines/nixos/cinnabar/caddy.nix).
       boot.kernel.sysctl."net.ipv6.ip_nonlocal_bind" = 1;

@@ -25,6 +25,10 @@ The lock serialises only the evaluations that go through it, and only the lock-w
 On a NixOS host, run a many-attribute evaluation (nix-eval-jobs or iets over a check set or a host set) only through the host's `nix-eval-jobs` or `nix-eval-jobs-stock` as PATH resolves them, as `just check-fast` does, or through `just eval-identity`, never an unwrapped evaluator called by its store path or built from a flake, which takes no lock and runs beside nixbot's evaluation.
 On magnetite a many-attribute evaluation needs 14 to 18 GiB of the host's 30 GiB, so two at once do not fit: on 2026-11-27 one called by its store path ran beside nixbot's and the host reset.
 
+Builds have their own lock: on a NixOS host with the evaluation lock, run every build you start in a shell there, as root or as yourself, through `nix-build-locked`, e.g. `nix-build-locked nix build -L --no-link .#checks.x86_64-linux.<name>`.
+It runs one build at a time and starts none while the host's memory is under pressure, printing why it waits every 30 seconds and exiting 75 without building once its wait bound passes; its rules, threshold and lock are in `modules/README.md` §Evaluators.
+On magnetite the older `exec 9</tmp/cam124-build.lock; flock 9` still serialises with it but checks no memory pressure, so do not use it in new work.
+
 Plan memory from these peaks, measured on 2026-11-23 with nixbot's arguments: on argentum (8 GiB) at 1 worker, `checks.aarch64-darwin` reached a 4.8 GiB footprint and both systems 12.8 GiB with 5.3 GiB in swap; on stibnite (64 GiB) at 5 workers, 10.2-10.5 GiB and 17.1 GiB, with 2.2-3.8 GiB per worker; on magnetite, user evaluations stop at the 10.1 GiB `MemoryHigh` of `user.slice` and are throttled there.
 The Macs have no evaluation lock, and several agents run at once on them, so their evaluations add up: before starting a many-attribute evaluation on a Mac, check `pgrep -fl 'nix-eval-jobs|iets'` and wait for a running one rather than start a second.
 
