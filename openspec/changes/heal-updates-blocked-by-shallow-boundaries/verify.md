@@ -352,3 +352,73 @@ The check's false failure on such a root has stood since §3's build; until this
 
 - F5's remedy and its case (the root script, failing now), then a run of this section's scripts.
 - §6's host checks.
+
+---
+
+## 10. Verification of the narrowed design: reporting an update a shallow boundary blocks, 2026-11-28
+
+**Verified at**: `2026-11-28 07:55` UTC, against the chain from `main` (`ttwswrpq`, `31d1365a`): `yvkksumm` (`ec6b068c`, the change's text), `uqwluspr` (`feb46ef2`, the handler, `test_handler_boundary.py`, the check's wiring and the fixtures' docstring), `tpotloxy` (`77889cc0`, `ghq-sync.sh`'s usage and the skill `dependency-source-acquisition`) and `mmyynooo` (`bb9b7516`, this record carried).
+§1 to §9 verified the automatic heal this change set aside; this section verifies the report alone, against the rewritten proposal, design, tasks and delta specs.
+
+**Verdict**: FAIL.
+The report writes nothing, keeps git's output and exit status, and the repair it names hid nothing in any shape staged here.
+But on an update that fails because upstream rewrote its branch onto history that passes a commit the copy holds without its history, the reply says a boundary blocks the fast-forward and names a repair that does not repair it (F6), against the behavioral requirement that a refresh failing for another reason says nothing of history held in part.
+
+### Method
+
+The handler of `feb46ef2` and `main`'s handler (`31d1365a`, the source of the `trunk()` store build used throughout), each with that build's store paths substituted, driven over a socket pair with the change's fixtures, on stibnite with git 2.56.0; nothing was run inside `/private/var/lib/ghq`.
+
+- Six shapes, each with a twin clone updated by `main`'s handler: the tag commit fetched at depth 1 that `master` moves onto; a non-shallow blobless clone with a later commit fetched by id; §9's root-as-boundary shape; a clone with boundaries on two refs (`master` and `side`, each from a by-id fetch); a depth-5 clone whose gap merges a branch forked below its floor (§3's shape); and upstream force-pushing `master` onto a side branch forked below the local tip, past a commit of that branch fetched by id. For each: the reply, the state of `.git` beyond the objects, logs and remote-tracking refs against the twin's, then `deepen` 1,000,000 and an update through the handler, with every ref's reachable set (tags and `HEAD` included) compared with its set before (`logs/cam140-reverify4-shapes-20261128-024731.log`, script `logs/cam140-reverify4-shapes.py`; the run at `024721` stopped on a fixture error of mine).
+- Edges: a tag fetched at depth 1 on a branch no fetched ref reaches, under the named deepen; a blocked update after a commit of its gap was removed from the pack; a branch with no upstream (`logs/cam140-reverify4-edges-20261128-024823.log`, script `logs/cam140-reverify4-edges.py`).
+- The boundary script against both handlers, and the history and request scripts against `feb46ef2` (`logs/cam140-reverify4-suite-*-20261128-024837.log`).
+
+Read only: the builder's red, green and magnetite logs (`logs/cam140-report-*`).
+
+### F6 (FAIL): a rewritten branch that passes a boundary gets the report and a repair that cannot work
+
+`blocking_boundary` (`ghq-writer-handler.py`, the function after `boundaries`) reports when `HEAD` is not an ancestor of the upstream and a boundary lies in `rev-list <upstream> ^HEAD`.
+Locally that cannot tell a branch that moved past a boundary from one upstream rewrote onto history passing a boundary: in both, the boundary hides where the two histories meet.
+Reproduction (shape `s-diverged`): a blobless clone holding `master` whole fetched by id at depth 1 a commit of a branch `far` forked three commits below its tip; upstream force-pushed `master` to one commit past it and deleted `far`.
+The update exits 1 with git's refusal and the two lines (`… upstream's origin/master has moved past it, so git cannot fast-forward` and `to repair it: ghq-sync --deepen 1000000 … then ghq-sync -u …`); after the named deepen (exit 0, nothing hidden) the update still exits 1, now with no boundary line, because upstream's branch no longer contains the local one.
+The behavioral requirement "A refresh that history held in part blocks says why and how to repair it" (`specs/shared-reference-tree/spec.md`) says of a refresh that fails because upstream rewrote its branch: "the answer says nothing of history held in part"; and the reply's claims, the cause and the repair, are false there.
+The interface requirement's condition, which the code meets word for word, admits this case; the design's non-goal (`design.md`, "Updates of a branch upstream rewrote: they fail as before, with no boundary line") and D1's rationale cover only a rewrite whose one boundary is `HEAD`'s commit, the case the script tests.
+The trigger is an ordinary upstream: a force-push of the default branch onto a line that passes a commit the copy fetched by id or as a tag at depth 1, as the 1.4 shape of the first design had it.
+The copy is not made worse: the deepen hides nothing and the copy is as `main`'s handler leaves it.
+Smallest remedy: the reply says what it can know, that a boundary lies between the local branch and upstream's, and that if the update still fails after the named repair with no boundary line, upstream rewrote its branch; the interface requirement, the behavioral scenario, the design's non-goal and the skill and usage text say the same, and the case gains this shape.
+
+### Completeness
+
+- Tasks: 1.1 to 3.1 are `- [x]` with their evidence; 4.1, after the deploys, is open.
+- Requirements: the interface delta's two, the behavioral delta's one and A380 to A382 each map to the handler, `ghq-sync.sh`, the skill or the boundary script, as below.
+
+### Correctness
+
+| Requirement or scenario | Evidence | Result |
+|---|---|---|
+| The reply names a boundary that blocks an update: output and exit status kept, two lines, reading only | in every shape the reply's standard error is `main`'s twin's with the two lines added and the exit the same (1); `.git` beyond objects, logs and remote-tracking refs is identical to the twin's; the detection runs `rev-parse`, `merge-base --is-ancestor` and `rev-list` with `GIT_NO_LAZY_FETCH=1`, writes nothing, and returns no report when any exits otherwise than expected (read) | PASS, except F6 |
+| Its scenarios: the lines' text, the tag shape, the by-id shapes, an update failing for another reason, the named repair, a sized deepen | the quoted text matches the handler's strings; the script's four shapes pass, and fail against `main`'s handler on the lines and token (6 assertions, as the builder's red log); my six shapes repeat them | PASS |
+| The exit log line marks an update a boundary blocks | ` boundary=blocked` after the history token and before ` reason:` in every blocked update; none on the updates after the repair, the shapes' twins or the branch with no upstream | PASS |
+| A refresh that history held in part blocks says why and how to repair it (behavioral) | true of five shapes; the rewritten branch passing a boundary gets the report | FAIL (F6) |
+| The named repair hides nothing | in all six shapes, after `deepen` 1,000,000 no ref (tags and `HEAD` included) lost a commit, no boundary had a held parent, the filter stayed, and the update fast-forwarded except in `s-diverged`, as above; the root shape ended with no boundary | PASS |
+| A380 | relied on by the warning in the reply, usage and skill; observed in the script's sized-deepen case (master's commit reaches fewer commits after `deepen` 2) and in §3's logs | PASS |
+| A381 | relied on by D1; the red run shows git's refusal in each blocked shape | PASS |
+| A382 | relied on by D3 and the reply's "hides none"; its evidence is four measured repositories; it does not collide with `main`'s A383 to A386 | PASS as an assumption; unverified beyond those four (W17) |
+
+### Coherence
+
+- Nothing of the heal remains in the handler, the boundary script, the delta specs, the proposal, the tasks, `ghq-sync.sh` or the skill; `design.md` keeps it only in the section that records the set-aside design. No `healLimit`, repair record or pending state remains.
+- The carried `verify.md` differs from `wvoqwttx`'s only by its new first line and the blank line after it.
+- `package-ghq-shared-test-handler-boundary` is declared in `testSizes.checks` as its neighbours are, `small` and `medium` with `measured = false`; it ran 6.2 s twice on magnetite (builder's log) and 6.5 s here, which `small` supports. `uqwluspr` changes no file of the request or history scripts; the request check ran 47.3 to 47.6 s on magnetite, and 47.6 s here.
+
+### Warnings
+
+- W15: the reply says the deepen "fetches the history below every boundary of this copy"; a boundary on a tag's commit that no fetched ref reaches stays (edges log: 2 boundaries, 1 left, the tag's). It hides nothing the copy holds, but the sentence is not true of it; "below every boundary on the branches it fetches" is.
+- W16: neither the reply nor the usage text says what the repair costs: every commit and tree below each boundary, for a depth-1 copy of a large repository its whole history (the design's own figure for nixpkgs is 1,131,790 commits, 547 MB as commits alone), under the writer's 3,600 s command limit. A deepen the limit stops is plain git: a `SIGTERM`ed git rolls `shallow.lock` back, so `.git/shallow` and the refs are as before and a rerun starts again (§7's runs); a `SIGKILL`ed one leaves `shallow.lock`, which blocks every later update, as with `main`'s handler. A copy too large to deepen within the limit stays blocked, and the reply could name promote as the other repair that hides nothing.
+- W17: A382 claims no repository the tree holds has a parent path of 1,000,000 commits below a boundary; the evidence is four repositories, and upstream histories of depth-1 copies are not visible locally. A cheap read-only survey of held history is possible (`git --no-lazy-fetch rev-list --count` per copy: the first run's survey, §5, found nixpkgs at 1,131,674 commits and the next at 69,861), but it bounds only held history, not upstream depth, and was not run here, the tree being out of bounds for this run. Unverified; the reply could say that a boundary left after the named deepen means a history deeper than it reaches.
+- W18: `blocking_boundary` runs outside any `try`: a git that cannot start, or a `rev-list` past the command limit, would end the request with 70 or 124 instead of git's status, against "SHALL keep the update's output and exit status". Neither is reachable on a working host; the gap walk is bounded by the boundaries and `HEAD`. A gap commit the clone lacks could not be staged, the update's own fetch bringing it back; by reading, `rev-list` then exits non-zero and no report is made.
+- Paths in the named commands are unquoted; `TARGET` admits no space or shell metacharacter that splits a word, and the hosts' roots have none, so the commands paste as printed.
+
+### What remains
+
+- F6's remedy and its case.
+- Task 4.1 after the deploys.
