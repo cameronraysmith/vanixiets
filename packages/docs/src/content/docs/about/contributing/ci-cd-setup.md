@@ -291,7 +291,8 @@ npm `playwright` and `@playwright/test` are never updated on their own; they fol
 Renovate may run only the commands in its `allowedCommands` (`flake.lib.renovateSettings`, `modules/lib/renovate-settings.nix`), and a command it refuses still yields a pushed, incomplete commit, so `checks.x86_64-linux.renovate-allowed-commands` fails when any task command in `.github/renovate.json` is not on that list.
 
 Flake inputs are split between two updaters, so no input has two.
-Renovate updates the inputs pinned to a revision (its `nix` manager, which re-locks the input itself) or to a version tag (the regex managers above); lock file maintenance is off, so it never refreshes the rest.
+Renovate updates the inputs pinned to a version tag (the regex managers above); lock file maintenance is off, so it never refreshes the rest.
+Its built-in `nix` manager is off, because Renovate before 44.258.1 passes its GitHub token to `nix` as a command-line argument, readable by any process on magnetite (renovatebot/renovate#48289); until it is turned back on, no updater proposes the two inputs pinned to a revision, `catppuccin-bottom` and `catppuccin-starship`.
 Inputs that track a branch are refreshed one pull request per input by the scheduled [`flake-update` effect](#flake-update), which excludes `playwright-web-flake`, and `nixpkgs` while its held update is blocked.
 
 ### Package pins

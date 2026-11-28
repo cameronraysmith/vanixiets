@@ -6,7 +6,7 @@
   ],
   "rangeStrategy": "bump",
   "nix": {
-    "enabled": true
+    "enabled": false
   },
   "labels": ["dependencies"],
   "customManagers": [
