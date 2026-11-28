@@ -437,8 +437,7 @@
         #     -c 'ALTER DATABASE "<db>" REFRESH COLLATION VERSION'
         # The refresh alone hides the drift without repairing the indexes,
         # so reindex first. The instance resolves 5 min after the receiver
-        # reports 0. Reviving cognee needs pgvector in PostgreSQL's
-        # extensions first (F63), then this reindex.
+        # reports 0.
         {
           alert = "PostgresqlCollationDrift";
           expr = "vanixiets_postgresql_collation_drift == 1";

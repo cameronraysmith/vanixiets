@@ -80,11 +80,6 @@
               };
               mountpoint = "/var/lib/containers";
             };
-            "root/cognee" = {
-              type = "zfs_fs";
-              options.mountpoint = "/var/lib/cognee";
-              mountpoint = "/var/lib/cognee";
-            };
             # Telemetry store WAL and caches (ADR-007; design D5). Created by hand
             # on the installed host (tasks.md 8.3); this declaration covers a
             # reinstall, and the zfs-*-root-greptimedb-* oneshots in default.nix

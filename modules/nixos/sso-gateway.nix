@@ -118,8 +118,8 @@
                 proxy_set_header X-Forwarded-Proto $scheme;
 
                 # recommendedProxySettings sets `proxy_redirect off;` http-wide,
-                # so a backend that ignores X-Forwarded-Proto (cognee's uvicorn
-                # is started without --proxy-headers/FORWARDED_ALLOW_IPS) emits
+                # so a backend that ignores X-Forwarded-Proto (uvicorn started
+                # without --proxy-headers/FORWARDED_ALLOW_IPS, for one) emits
                 # its trailing-slash 307 Location as `http://<host>/...`, which
                 # an https page cannot follow (mixed-content block). Rewrite any
                 # http:// Location from the upstream back to https:// so the

@@ -222,7 +222,7 @@
       };
 
       # A parked service has no record: the sso-gateway's auth. was removed
-      # while it is off on magnetite, as was kb. with the cognee server.
+      # while it is off on magnetite.
       # Restore the CNAME (unproxied, so ACME issuance works) when reviving
       # the gateway (modules/machines/nixos/magnetite/default.nix).
 

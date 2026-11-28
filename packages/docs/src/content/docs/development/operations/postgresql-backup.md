@@ -17,7 +17,7 @@ Not backed up:
 - synapse's media store and signing key;
 - niks3's NARs, which are already in R2;
 - the services' clan vars, which are already in the repository;
-- a parked service's database (cognee) while it stays parked.
+- a parked service's database while it stays parked.
 
 Losing magnetite therefore still loses every gitea repository that is not mirrored elsewhere.
 The recovery point is up to 24 h: there is no WAL archiving.

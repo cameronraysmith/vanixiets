@@ -132,12 +132,6 @@ in
       # that commit's parent.
       sso.enable = false;
 
-      # The removed cognee server's database and root/cognee dataset are kept.
-      # The database is unreadable without pgvector (F63), so the collector's
-      # collation drift receiver and the backup set leave it out. Drop this
-      # together with that database.
-      vanixiets.postgresqlCollation.parkedDatabases = [ "cognee" ];
-
       # Tune ZFS auto-snapshot retention for a single-disk cloud VPS without
       # off-site snapshot replication. The nixpkgs defaults (frequent=4,
       # hourly=24, daily=7, weekly=4, monthly=1 via srvos mkDefault) are
