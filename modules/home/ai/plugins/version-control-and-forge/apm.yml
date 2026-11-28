@@ -15,7 +15,7 @@ dependencies:
     # trusting the table on a future bump). This pin instead tracks v0.81.0,
     # the release actually reachable from main at bump time.
     - git: max-sixty/worktrunk
-      ref: e42f0f6fef2fdbd98fc92e5cd6c3cbea55b65b38
+      ref: da19a7ac8fc58b33e49ae840e5bb24f4de0661cc
       skills: [worktrunk, wt-switch-create]
     # gh-stack is a Go CLI repo that also ships one agent skill under
     # skills/gh-stack/. apm types it SKILL_BUNDLE (nested skills/<name>/SKILL.md,
