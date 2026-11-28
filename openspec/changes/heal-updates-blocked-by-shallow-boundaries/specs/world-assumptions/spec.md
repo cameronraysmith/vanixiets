@@ -15,7 +15,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: git stops marking held commits
 
 - **WHEN** a git release leaves a commit whose parents the repository holds out of `.git/shallow` after a depth fetch
-- **THEN** this assumption is void; the warning in the `shared-reference-tree-interface` requirement `The writer's reply names a shallow boundary that blocks an update`, `ghq-sync`'s usage text and the skill `dependency-source-acquisition` are re-examined, a sized deepen then being safe
+- **THEN** this assumption is void; the warning in the `shared-reference-tree-interface` requirement `The writer's reply names a shallow boundary between a failed update's branch and its upstream`, `ghq-sync`'s usage text and the skill `dependency-source-acquisition` are re-examined, a sized deepen then being safe
 
 ### Requirement: A381 — A shallow boundary hides a commit's parents from a fast-forward
 
@@ -32,11 +32,11 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 #### Scenario: git fetches through a boundary
 
 - **WHEN** a git release, fetching a branch with no depth into a shallow repository, removes a boundary the fetched history reaches or fetches its parents
-- **THEN** this assumption is void; the `shared-reference-tree-interface` requirement `The writer's reply names a shallow boundary that blocks an update` stops being reached, and its condition is re-examined
+- **THEN** this assumption is void; the `shared-reference-tree-interface` requirement `The writer's reply names a shallow boundary between a failed update's branch and its upstream` stops being reached, and its condition is re-examined
 
 ### Requirement: A382 — No reference repository's history runs 1,000,000 commits below a boundary
 
-It is true of the repositories the shared tree holds, independent of what this fleet builds, that from any commit no path of parents to a root commit is as long as 1,000,000 commits, so a deepen of 1,000,000 below any boundary reaches every root and leaves no boundary.
+It is true of the repositories the shared tree holds, independent of what this fleet builds, that from any commit no path of parents to a root commit is as long as 1,000,000 commits, so a deepen of 1,000,000 below the boundaries of the branches it fetches reaches their roots and leaves no boundary on them.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
 **Evidence**: measured on stibnite on 2026-11-27 in scratch treeless clones (`logs/agent-reports-20261126/Cam140Plan.md`, "Depth to the roots"): a deepen to the roots needs depth 7,237 for home-manager, 3,903 for BAML, 10,240 for dfinity/ic and 7,667 for nixpkgs, whose 1,131,790 commits are the most of any copy measured; `ghq-sync --deepen 793` reached the roots of `nixos-hardware`.
@@ -48,5 +48,5 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 
 #### Scenario: A copy deeper than the named depth
 
-- **WHEN** a reference repository's history from a boundary to a root is found to run 1,000,000 commits or more
-- **THEN** this assumption is void; the repair the `shared-reference-tree-interface` requirement `The writer's reply names a shallow boundary that blocks an update` names may leave a boundary on held history, and the named depth is re-examined
+- **WHEN** a reference repository's history from a boundary to a root is found to run 1,000,000 commits or more, as an update whose reply still names a shallow boundary after the named deepen shows
+- **THEN** this assumption is void; the repair the `shared-reference-tree-interface` requirement `The writer's reply names a shallow boundary between a failed update's branch and its upstream` names may leave a boundary on held history, that copy is repaired with `ghq-sync --full`, as `ghq-sync`'s usage text tells the reader, and the named depth is re-examined

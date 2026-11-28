@@ -24,15 +24,15 @@ An automatic heal with a crash-safe repair was built and failed verification fou
 
 Decisions tagged `D<n>` are developed in `design.md`.
 
-**A refresh that a shallow boundary blocks**
+**A refresh that fails with a shallow boundary between the branches**
 - From: `ghq get -u` fails with git's fast-forward refusal, the writer replies 1, and nothing says why or how to repair it.
-- To: when the fast-forward fails and a shallow boundary lies between the local branch and its upstream (D1), the reply keeps git's refusal and exit status and adds two lines: that the copy holds a commit without its history which upstream's branch has moved past, and the command that repairs it, `ghq-sync --deepen 1000000 <path>` followed by `ghq-sync -u <path>` (D2, D3). The exit log line adds `boundary=blocked`.
-- Reason: the account learns the cause and a repair that hides no history.
+- To: when the fast-forward fails and a shallow boundary lies between the local branch and its upstream (D1), the reply keeps git's refusal and exit status and adds two lines: that the copy holds a commit without its history that lies between the local branch and upstream's, and the command that repairs it, `ghq-sync --deepen 1000000 <path>` followed by `ghq-sync -u <path>`, with how to read an update still failing after it (D2, D3). The lines state no cause the clone cannot show: a branch upstream rewrote through such a commit looks there like one that moved past it. The exit log line adds `boundary=blocked`; a failure while finding the commit adds nothing.
+- Reason: the account learns what the clone shows and a repair that hides no history.
 - Impact: non-breaking; finding the boundary reads the clone and writes nothing; an update that succeeds runs nothing more, and one that fails reads `.git/shallow` and, when it lists a boundary, runs three read-only git commands.
 
 **What ghq-sync and the skill say of `--deepen`**
 - From: `ghq-sync --deepen N` is described as deepening by N commits.
-- To: the usage text and the skill `dependency-source-acquisition` say that a sized `--deepen` can hide history the copy holds, and name `--deepen 1000000` as the form that hides none (D3).
+- To: the usage text and the skill `dependency-source-acquisition` say that a sized `--deepen` can hide history the copy holds, name `--deepen 1000000` as the form that hides none, and say what it costs, what a stopped one leaves, how to read the update after it, and that `ghq-sync --full` is the other repair (D3).
 
 Not in this change: any automatic heal, repair of `.git/shallow`, record of a stopped request, or change to what `--deepen N` does (D4); fetching tags with their history; a pass over existing copies whose boundaries hide held history; the items of CAM-138.
 
@@ -44,8 +44,8 @@ None.
 
 ### Modified Capabilities
 
-- `shared-reference-tree` (stratum: `behavioral`): adds `A refresh that history held in part blocks says why and how to repair it`.
-- `shared-reference-tree-interface` (stratum: `interface`): adds `The writer's reply names a shallow boundary that blocks an update` and `The writer's exit log line marks an update a shallow boundary blocks`.
+- `shared-reference-tree` (stratum: `behavioral`): adds `A refresh that fails with history held in part before upstream's says so and how to repair it`.
+- `shared-reference-tree-interface` (stratum: `interface`): adds `The writer's reply names a shallow boundary between a failed update's branch and its upstream` and `The writer's exit log line marks an update the shallow boundary line names`.
 - `world-assumptions` (stratum: `world`): adds A380 to A382, the git and upstream facts the report and its named repair rely on.
 
 ## Impact
@@ -53,4 +53,4 @@ None.
 - Code: `pkgs/by-name/ghq-shared/ghq-writer-handler.py` (the read-only finding, the two reply lines and the log token); `pkgs/by-name/ghq-shared/test_handler_boundary.py`, a third handler test script with its own check `package-ghq-shared-test-handler-boundary` declared in `modules/checks/package-tests.nix`, wired in `package.nix` and `test-handler.nix`; `handler_fixtures.py`'s docstring.
 - Text: `pkgs/by-name/ghq-sync/ghq-sync.sh`'s usage text and `modules/home/ai/plugins/version-control-and-forge/.apm/skills/dependency-source-acquisition/SKILL.md`.
 - Record: `verify.md`, the four verifications of the automatic heal this change set aside.
-- Hosts: magnetite, pyrite and stibnite, by their usual deploys; a blocked copy is repaired by hand, by the command its reply names.
+- Hosts: magnetite, pyrite and stibnite, by their usual deploys; a copy the reply names is repaired by hand, by the command its reply names.
