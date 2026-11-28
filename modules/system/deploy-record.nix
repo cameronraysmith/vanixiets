@@ -194,21 +194,27 @@ let
         };
   };
 
-  # The mkOrder priority of each first-party darwin postActivation snippet
-  # (types.lines concatenates definitions by ascending priority, equal
-  # priorities in definition order): configd's resolver reread first (500,
-  # lib.mkBefore's priority), the host's plain snippets and home-manager's
-  # activation at the default 1000, sops-nix's secret installation at
-  # lib.mkAfter's 1500, then casks, dnscrypt-proxy's health check and
-  # fleet-services-trust's keychain import, and the deploy record last, above
-  # every other contributor, so a later lib.mkAfter snippet still comes before
-  # it. deployRecordObligations fails a Mac on which anything follows it.
+  # The mkOrder priority of each first-party darwin activation snippet, by
+  # script (types.lines joins definitions by ascending priority, equal ones in
+  # import order). A new snippet takes its priority here. The values keep the
+  # sequence import order would give among nix-darwin's, home-manager's and
+  # sops-nix's own snippets (500, 1000, 1500); the deploy record comes last in
+  # postActivation, and deployRecordObligations fails a Mac on which anything
+  # follows it. `launchd` orders the snippets that run after users are created
+  # and before nix-darwin's own launchd text loads the jobs.
   activationOrder = {
     resolverReload = 500;
+    localDevelopmentCa = 999;
     casks = 1502;
     dnscryptProxy = 1503;
     fleetServicesTrust = 1504;
     deployRecord = 1900;
+    launchd = {
+      omnigentHost = 400;
+      otelAgentSession = 401;
+      otelCollector = 402;
+      sharedReferenceTree = 403;
+    };
   };
 in
 {

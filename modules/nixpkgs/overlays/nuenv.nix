@@ -6,7 +6,7 @@
 #
 { inputs, ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.nuenv = [
     inputs.nuenv.overlays.nuenv
   ];
 }

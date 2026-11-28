@@ -1,0 +1,12 @@
+# Declared drvPath differences of the three order items and the fleet pin's
+# negative controls, from their parent to their commit:
+#   just drv-diff <parent> <commit> openspec/changes/shape-the-repository-for-its-readers/drv-delta-order-items.txt
+# programs.gh-dash.settings.keybindings.prs is keyed by key and rendered in
+# the order modules/home/development/gh-dash.nix writes (C, m, M, the
+# parent's order); the nixpkgs overlays are named and applied in the order
+# modules/nixpkgs/compose.nix writes (the parent's order); the four darwin
+# launchd snippets and stibnite's local development CA snippet take slots in
+# flake.lib.activationOrder (modules/system/deploy-record.nix) that reproduce
+# the parent's rendered activation scripts. None of the three changes a
+# configuration, home, check or VM test.
+checks.x86_64-linux.structure-fleet changed  # modules/checks/structure/flake-shape.nix: the fleet pin is built over the fleet and over two mutants of it (a machine dropped, its class flipped), and the check fails unless the pin fails on each

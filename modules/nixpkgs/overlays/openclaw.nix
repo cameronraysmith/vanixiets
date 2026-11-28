@@ -10,7 +10,7 @@
 #
 { inputs, ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.openclaw = [
     (final: prev: {
       openclaw-gateway =
         let

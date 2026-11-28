@@ -276,7 +276,7 @@ in
         # newsyslog gives it mode 640 only when it rotates, so activation creates
         # it 0640 first and corrects an existing one through setLogMode, which
         # leaves alone and reports a log that is not a regular file with one link.
-        system.activationScripts.launchd.text = lib.mkBefore ''
+        system.activationScripts.launchd.text = lib.mkOrder flakeConfig.flake.lib.activationOrder.launchd.sharedReferenceTree ''
           /usr/bin/install -d -m 0750 -o ${cfg.writer} -g ${cfg.writer} ${logDir}
           ${setLogMode} ${logDir}/writer.log
           /usr/bin/install -d -m 0700 -o ${cfg.writer} -g ${cfg.writer} ${lockDir}

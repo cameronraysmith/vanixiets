@@ -41,7 +41,7 @@
 # rust-toolchain file, which disappears with the removed aeneas flake input).
 { inputs, ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.aeneas = [
     (
       final: prev:
       let

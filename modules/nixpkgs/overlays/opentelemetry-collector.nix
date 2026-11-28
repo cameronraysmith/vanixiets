@@ -1,6 +1,6 @@
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.opentelemetry-collector = [
     # Go 1.27 removed runtime internals that cockroachdb/swiss links to, so
     # otelcol-contrib 0.155.0 fails to compile once nixpkgs' default Go is 1.27.
     # The override applies only to 0.155.0: while nixpkgs' default Go is still

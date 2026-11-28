@@ -1,24 +1,30 @@
-# Declare nixpkgsOverlays as a typed internal accumulator option
-#
-# Sibling overlay files in modules/nixpkgs/overlays/ contribute via
-# `nixpkgsOverlays = [ (final: prev: { ... }) ];`. The composition step in
-# modules/nixpkgs/compose.nix folds the list into flake.overlays.default.
-#
-# This option lives at the top level (not under `flake.*`) and is marked
-# `internal = true` so it does not surface as a flake output. The pattern
-# mirrors the precedent set by flake-parts core for `allSystems`
-# (modules/perSystem.nix lines 141-145 in nix-workspace/flake-parts).
+# The internal overlay options. Overlay files in modules/nixpkgs/overlays/
+# contribute `nixpkgsOverlaysByName.<name> = [ (final: prev: { ... }) ];`;
+# modules/nixpkgs/compose.nix orders the names, defines nixpkgsOverlays and
+# folds it into flake.overlays.default. These options live at the top level
+# (not under `flake.*`) and are `internal = true`, so they are no flake
+# outputs, after flake-parts core's `allSystems` (modules/perSystem.nix lines
+# 141-145 in nix-workspace/flake-parts).
 { lib, ... }:
 {
-  options.nixpkgsOverlays = lib.mkOption {
-    type = lib.types.listOf lib.types.unspecified;
-    default = [ ];
+  options.nixpkgsOverlaysByName = lib.mkOption {
+    type = lib.types.attrsOf (lib.types.uniq (lib.types.listOf lib.types.unspecified));
+    default = { };
     internal = true;
     description = ''
-      Internal accumulator for nixpkgs overlays composed into
-      flake.overlays.default by modules/nixpkgs/compose.nix. Sibling overlay
-      files in modules/nixpkgs/overlays/ contribute via
-      `nixpkgsOverlays = [ (final: prev: { ... }) ];`. Not a flake output.
+      The nixpkgs overlays of each file in modules/nixpkgs/overlays/, under a
+      name that modules/nixpkgs/compose.nix places in the overlay order. Not a
+      flake output.
+    '';
+  };
+
+  options.nixpkgsOverlays = lib.mkOption {
+    type = lib.types.listOf lib.types.unspecified;
+    readOnly = true;
+    internal = true;
+    description = ''
+      nixpkgsOverlaysByName in the order modules/nixpkgs/compose.nix writes,
+      which defines it. Not a flake output.
     '';
   };
 

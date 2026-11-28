@@ -5,7 +5,7 @@
 # and the apm.yml ref move together.
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.gh-stack = [
     (_final: prev: {
       gh-stack = prev.gh-stack.overrideAttrs (old: {
         passthru = (old.passthru or { }) // {

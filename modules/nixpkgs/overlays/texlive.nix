@@ -1,6 +1,6 @@
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.texlive = [
     (final: prev: {
       texliveWithPackages = prev.texliveSmall.withPackages (
         ps: with ps; [

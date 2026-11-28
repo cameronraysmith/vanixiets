@@ -1,5 +1,5 @@
 _: {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.clipboard-jh = [
     # Upstream builds clipboard-jh with gcc15Stdenv on every platform
     # (nixpkgs pkgs/by-name/cl/clipboard-jh/package.nix), but its Darwin
     # sources are Objective-C++ compiled with -fobjc-arc, which GCC does not

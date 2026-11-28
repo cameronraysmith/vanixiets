@@ -1,6 +1,6 @@
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.typst = [
     (final: prev: {
       # Typst with pre-fetched packages and font paths baked in for
       # reproducible rendering across devshell and nix-sandbox builds.

@@ -7,7 +7,7 @@
 # Date added: 2026-01-10
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.mactop = [
     (final: prev: {
       mactop = prev.mactop.overrideAttrs (old: {
         doCheck = false;

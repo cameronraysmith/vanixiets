@@ -10,7 +10,7 @@
 # applies fleet-wide via base-defaults.nix, so darwin laptops keep stock 0.4.4.
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.nixos-facter = [
     (
       final: prev:
       prev.lib.optionalAttrs prev.stdenv.hostPlatform.isLinux {

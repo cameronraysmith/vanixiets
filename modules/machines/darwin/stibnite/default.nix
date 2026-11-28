@@ -4,12 +4,13 @@
 }:
 let
   flakeModules = config.flake.modules.darwin;
-  inherit (config.flake.lib) vars workerAccountsOn;
+  inherit (config.flake.lib) activationOrder vars workerAccountsOn;
 in
 {
   flake.modules.darwin."machines/darwin/stibnite" =
     {
       config,
+      lib,
       pkgs,
       ...
     }:
@@ -161,7 +162,7 @@ in
       # Trust local k8s development CA in macOS Keychain (for browsers)
       # Uses security add-trusted-cert which requires the cert to already be in keychain
       # or adds it with trust settings
-      system.activationScripts.postActivation.text = ''
+      system.activationScripts.postActivation.text = lib.mkOrder activationOrder.localDevelopmentCa ''
         echo "Adding local k8s development CA to macOS Keychain..."
         CERT_PATH="${../../../../kubernetes/clusters/local/pki/root_ca.crt}"
         CERT_NAME="Local Development Root CA"

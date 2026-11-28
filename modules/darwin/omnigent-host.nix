@@ -476,28 +476,30 @@ in
             }
           ) workers;
           # launchd opens log files before invoking the worker's unprivileged launcher.
-          system.activationScripts.launchd.text = lib.mkBefore (
-            lib.concatStringsSep "\n" (
-              lib.mapAttrsToList (
-                _: worker:
-                lib.escapeShellArgs [
-                  "/usr/bin/sudo"
-                  "-u"
-                  worker.user
-                  "--set-home"
-                  "--"
-                  (toString prepareHome)
-                  worker.user
-                  (toString (account worker).uid)
-                  (toString (account worker).gid)
-                  (homeFor worker)
-                ]
-              ) workers
-            )
-            + lib.optionalString (credentialDeliveries != { }) (
-              "\n" + config.launchd.daemons.sops-install-secrets.command + " || exit 1\n"
-            )
-          );
+          system.activationScripts.launchd.text =
+            lib.mkOrder flakeConfig.flake.lib.activationOrder.launchd.omnigentHost
+              (
+                lib.concatStringsSep "\n" (
+                  lib.mapAttrsToList (
+                    _: worker:
+                    lib.escapeShellArgs [
+                      "/usr/bin/sudo"
+                      "-u"
+                      worker.user
+                      "--set-home"
+                      "--"
+                      (toString prepareHome)
+                      worker.user
+                      (toString (account worker).uid)
+                      (toString (account worker).gid)
+                      (homeFor worker)
+                    ]
+                  ) workers
+                )
+                + lib.optionalString (credentialDeliveries != { }) (
+                  "\n" + config.launchd.daemons.sops-install-secrets.command + " || exit 1\n"
+                )
+              );
           launchd.daemons = lib.mapAttrs' (
             name: worker:
             lib.nameValuePair "omnigent-host-${name}" {

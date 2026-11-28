@@ -8,7 +8,43 @@
 # Split across two aggregates because the tuicr review binding calls `tuicr` and
 # `htab`, which only the ai aggregate delivers: every user gets gh-dash itself,
 # and the ai user alone gets the binding.
-{ ... }:
+{ lib, ... }:
+let
+  # keybindings.prs is written as an attribute set keyed by key, so two parts
+  # defining bindings merge key by key, and prsKeyed renders it as the list
+  # gh-dash reads, in prsOrder, whatever order the parts are imported in.
+  prsOrder = [
+    "C"
+    "m"
+    "M"
+  ];
+  # Imported by both parts; the key makes the module system include it once.
+  prsKeyed = {
+    key = "vanixiets:gh-dash-prs-keyed";
+    options.programs.gh-dash.settings = lib.mkOption {
+      apply =
+        settings:
+        let
+          prs = settings.keybindings.prs or null;
+          unplaced = lib.subtractLists prsOrder (lib.attrNames prs);
+        in
+        if prs == null then
+          settings
+        else if !lib.isAttrs prs then
+          throw "programs.gh-dash.settings.keybindings.prs: write bindings as an attribute set keyed by key, not a list, so prsOrder (modules/home/development/gh-dash.nix) orders them"
+        else
+          lib.throwIf (unplaced != [ ])
+            "gh-dash: prs bindings ${lib.concatStringsSep ", " unplaced} have no place in prsOrder (modules/home/development/gh-dash.nix)"
+            (
+              lib.recursiveUpdate settings {
+                keybindings.prs = map (key: { inherit key; } // prs.${key}) (
+                  lib.filter (key: prs ? ${key}) prsOrder
+                );
+              }
+            );
+    };
+  };
+in
 {
   flake.modules.homeManager = {
     # Landing in this repository is queue-mediated, and gh-dash's built-in `m`
@@ -26,26 +62,26 @@
     # forbidden and the merge-queue label on the topmost PR is the authorization.
     # Both are non-interactive: one keystroke is a merge authorization.
     #
-    # mkDefault on both this list and the tuicr list below keeps them at equal
-    # priority so the module system concatenates them; a plain list here would
-    # outrank the mkDefault one and silently drop the review binding.
+    # mkDefault on both this set and the tuicr set below keeps them at equal
+    # priority so the module system merges them key by key; a plain set here
+    # would outrank the mkDefault one and silently drop the review binding.
     development =
       { lib, ... }:
       {
+        imports = [ prsKeyed ];
+
         programs.gh-dash.enable = lib.mkDefault true;
 
-        programs.gh-dash.settings.keybindings.prs = lib.mkDefault [
-          {
-            key = "m";
+        programs.gh-dash.settings.keybindings.prs = lib.mkDefault {
+          m = {
             name = "enqueue";
             command = "gh pr merge --auto --rebase --repo {{.RepoName}} {{.PrNumber}}";
-          }
-          {
-            key = "M";
+          };
+          M = {
             name = "enqueue stack";
             command = "gh pr edit --repo {{.RepoName}} {{.PrNumber}} --add-label merge-queue";
-          }
-        ];
+          };
+        };
       };
 
     # Review the selected PR in tuicr, in a new herdr tab.
@@ -69,14 +105,15 @@
     ai-gh-dash =
       { lib, config, ... }:
       {
+        imports = [ prsKeyed ];
+
         programs.gh-dash.settings.keybindings.prs = lib.mkIf config.programs.tuicr.enable (
-          lib.mkDefault [
-            {
-              key = "C";
+          lib.mkDefault {
+            C = {
               name = "code review";
               command = "htab --label PR-{{.PrNumber}} tuicr pr {{.RepoName}}#{{.PrNumber}}";
-            }
-          ]
+            };
+          }
         );
       };
   };

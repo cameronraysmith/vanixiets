@@ -1,10 +1,10 @@
 # Multi-channel nixpkgs access layer
 #
-# Flake-parts module exporting channel overlays via list concatenation
+# Flake-parts module exporting channel overlays through nixpkgsOverlaysByName
 #
 # Adapted from _overlays/inputs.nix
 #
-# Exports to nixpkgsOverlays list:
+# Adds to the package set:
 #   - inputs: Raw flake inputs reference
 #   - nixpkgs: Main nixpkgs (unstable) - for reference
 #   - stable: OS-specific stable nixpkgs (parked: commented out below)
@@ -15,7 +15,7 @@
 #
 { inputs, ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.channels = [
     (
       final: prev:
       let

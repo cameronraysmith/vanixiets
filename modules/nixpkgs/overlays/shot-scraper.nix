@@ -1,6 +1,6 @@
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.shot-scraper = [
     (final: prev: {
       shot-scraper = prev.shot-scraper.overridePythonAttrs (old: {
         makeWrapperArgs = (old.makeWrapperArgs or [ ]) ++ [

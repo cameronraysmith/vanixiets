@@ -1,6 +1,6 @@
 # Platform-specific stable fallbacks for broken unstable packages
 #
-# flake-parts module exporting stable fallback overlays via list concatenation
+# flake-parts module exporting stable fallback overlays through nixpkgsOverlaysByName
 #
 # Selectively inherits from final.stable when unstable packages break
 #
@@ -12,7 +12,7 @@
 #
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.stable-fallbacks = [
     (
       final: prev:
       {

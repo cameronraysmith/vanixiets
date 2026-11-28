@@ -16,21 +16,11 @@
     { pkgs, system, ... }:
     let
       mkCheck = self.lib.mkStructuralCheck pkgs;
-    in
-    {
-      # Size classes (declare-test-size-classes design D1, D2): the median of
-      # nixbot's uncached runs of at least 1 s, read 2026-11-24
-      # (logs/tsc-4-durations-runs-20261124-141600.log).
-      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
-        # nixbot: median 8.7 s, slowest 71 s, all 3 runs 2026-10-07..2026-11-11
-        structure-fleet.class = "small";
-        # nixbot: median 2.8 s, slowest 30 s, all 10 runs 2026-09-04..2026-11-11
-        structure-home-configurations.class = "small";
-      };
-      checks = lib.optionalAttrs (system == "x86_64-linux") {
-        structure-fleet = mkCheck {
-          name = "fleet";
-          actual = lib.mapAttrs (_: m: m.machineClass) self.clan.inventory.machines;
+      fleetPin =
+        actual:
+        mkCheck {
+          name = "fleet-pin";
+          inherit actual;
           expected = {
             argentum = "darwin";
             blackphos = "darwin";
@@ -44,6 +34,39 @@
             stibnite = "darwin";
           };
         };
+      fleetClasses = lib.mapAttrs (_: m: m.machineClass) self.clan.inventory.machines;
+      # structure-fleet also builds the pin over two mutants of the fleet, one
+      # machine dropped and that machine's class flipped, and fails unless the
+      # pin fails on each.
+      mutated = lib.head (lib.attrNames fleetClasses);
+      fleetMutants = {
+        dropped = removeAttrs fleetClasses [ mutated ];
+        flipped = fleetClasses // {
+          ${mutated} = if fleetClasses.${mutated} == "darwin" then "nixos" else "darwin";
+        };
+      };
+    in
+    {
+      testSizes.checks = lib.optionalAttrs (system == "x86_64-linux") {
+        structure-fleet.class = "small";
+        structure-home-configurations.class = "small";
+      };
+      checks = lib.optionalAttrs (system == "x86_64-linux") {
+        structure-fleet =
+          pkgs.runCommand "structure-fleet"
+            { meta.description = "structural check: fleet, and its failure on mutants of the fleet"; }
+            ''
+              : ${fleetPin fleetClasses}
+              ${lib.concatStringsSep "\n" (
+                lib.mapAttrsToList (mutant: actual: ''
+                  if ! grep -qF "structural check 'fleet-pin' failed" ${pkgs.testers.testBuildFailure (fleetPin actual)}/testBuildFailure.log; then
+                    echo "structure-fleet: the pin did not fail on the ${mutant} mutant (${mutated})"
+                    exit 1
+                  fi
+                '') fleetMutants
+              )}
+              touch $out
+            '';
 
         structure-home-configurations = mkCheck {
           name = "home-configurations";

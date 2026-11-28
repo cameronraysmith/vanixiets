@@ -9,7 +9,7 @@
 # punycode warning is accepted there as the price of the cache hit.
 { ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.bitwarden-cli = [
     (
       final: prev:
       prev.lib.optionalAttrs (prev.stdenv.hostPlatform.system != "aarch64-darwin") {

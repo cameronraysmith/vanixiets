@@ -226,7 +226,7 @@ in
           # Ordered as omnigent-host's: after users are created, before launchd
           # loads the jobs. /run is emptied at boot on darwin, so state lives
           # under /var (design D2).
-          system.activationScripts.launchd.text = lib.mkBefore ''
+          system.activationScripts.launchd.text = lib.mkOrder flakeLib.activationOrder.launchd.otelCollector ''
             install -d -m 0700 -o _otelcol -g _otelcol /var/lib/opentelemetry-collector /var/lib/opentelemetry-collector/queue /var/lib/otel-envelope /var/log/otelcol
             install -d -m 0755 -o _prometheus-node-exporter -g _prometheus-node-exporter /var/lib/prometheus-node-exporter/textfile
           '';
@@ -423,7 +423,7 @@ in
           vanixiets.otelCollector.darwin.agentSessionEnvelopeMemoryLimits."org.nixos.${agentSessionLabel}" =
             mib 640;
 
-          system.activationScripts.launchd.text = lib.mkBefore ''
+          system.activationScripts.launchd.text = lib.mkOrder flakeLib.activationOrder.launchd.otelAgentSession ''
             install -d -m 0700 -o _otelagent -g _otelagent ${agentSessionStateDir} ${agentSessionStateDir}/queue ${agentSessionLogDir}
             install -d -m 0700 -o _otelcol -g _otelcol ${agentSessionEnvelopeStateDir}
           '';

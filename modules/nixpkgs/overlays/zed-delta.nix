@@ -4,7 +4,7 @@
 # entry execs Delta's own store path, so the package does not need bin/delta.
 { inputs, ... }:
 {
-  nixpkgsOverlays = [
+  nixpkgsOverlaysByName.zed-delta = [
     (
       _final: prev:
       prev.lib.optionalAttrs prev.stdenv.hostPlatform.isLinux {
