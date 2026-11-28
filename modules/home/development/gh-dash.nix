@@ -20,7 +20,7 @@ let
   ];
   # Imported by both parts; the key makes the module system include it once.
   prsKeyed = {
-    key = "vanixiets:gh-dash-prs-keyed";
+    key = "vanixiets/gh-dash-prs-keyed";
     options.programs.gh-dash.settings = lib.mkOption {
       apply =
         settings:

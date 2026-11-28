@@ -139,7 +139,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of ZFS, independent of what this fleet builds, that `zfs set <property>=<value> <dataset>` succeeds and changes nothing when the dataset already has that value, and that disko applies dataset options only when it creates the dataset.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: the comment above magnetite's oneshots (`machines/nixos/magnetite/default.nix:222-228` at the time of writing) and the oneshots' runs at each boot, which succeed.
+**Evidence**: the comment above magnetite's oneshots (`machines/nixos/magnetite/default.nix:152-161` on main at `31d1365a10c3`; `machines/nixos/magnetite/default.nix:222-228` at `ccc1a8db1932`), the table's header (`lib/zfs-boot-invariants.nix:9-12`), and the oneshots' runs at each boot, which succeed.
 
 #### Scenario: A boot oneshot fails on an unchanged value
 
@@ -151,7 +151,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of argentum, blackphos, rosegold and stibnite, independent of what this repository declares, that each was first activated with nix-darwin state version 4, which fixed defaults (among them the `nixbld` group id) that existing state depends on.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: the three `mkForce 4` lines this change removes and the registry's values (`modules/lib/hosts.nix:328-367`); `darwin/base.nix:43-52`'s note that every host was installed with the 350 `nixbld` gid.
+**Evidence**: the registry's values (`modules/lib/hosts.nix:396,416,436,456` on main at `31d1365a10c3`), which replaced the three `mkForce 4` lines this change removed; `darwin/base-essentials.nix:44-54`'s note that every host was installed with the 350 `nixbld` gid.
 
 #### Scenario: A Mac is reinstalled
 
@@ -163,7 +163,7 @@ Any requirement whose discharge depends on this fact SHALL name it explicitly, a
 It is true of the fleet, independent of what this repository declares, that cinnabar, electrum and magnetite run on Hetzner Cloud and galena and scheelite on Google Cloud, and that each provider names its servers' uplink interfaces so that `en*` (Hetzner) and `en* eth*` (Google) match them.
 Any requirement whose discharge depends on this fact SHALL name it explicitly, and SHALL lose its discharge once the violation below is observed.
 
-**Evidence**: `flake.lib.cloudMachines` and the registry's derived `cloud.provider`; the hosts' working uplinks; the comments at galena's and scheelite's imports.
+**Evidence**: `flake.lib.cloudMachines` (`lib/cloud-machines.nix:19`, galena and scheelite under `gcp` at `:53-70`) and the registry's derived `cloud.provider` (`lib/hosts.nix:28-38`), which `gcp-cloud`'s assertion (`nixos/gcp-cloud.nix:24-31`) and `hetzner-cloud`'s compare with the import; the hosts' working uplinks. The import comments once cited here were removed by `1bc9415a6` (pull request 4453).
 
 #### Scenario: A server moves provider
 

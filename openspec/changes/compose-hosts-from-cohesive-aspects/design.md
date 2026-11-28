@@ -69,6 +69,7 @@ The operator, who reads this before any code and deploys the four Macs. The sess
 - The otel-collector file split; magnetite's ZFS invariants generated from a dataset table.
 - One copy of each darwin cache.
 - Seven pull requests, each accepted on its own `just drv-diff`; only the last changes any host toplevel, and only the four Macs'.
+  - **As landed**: ten pull requests, each passing its own `just drv-diff` with its own `drv-delta-*.txt`. Three change host toplevels, each by declaration and only darwin ones: 4452 (caches) and 4454 (record last) the four Macs', 4468 stibnite's.
 
 **Non-Goals:**
 - Renaming `machines/<class>/<host>` keys, person or account keys, or the stibnite `controller` inventory tag.
@@ -259,3 +260,10 @@ Each was resolved on 2026-11-27 as recommended; none changes the tasks.
 Raised at apply on 2026-11-27; each needs the operator and carries the recommended answer.
 
 11. **stibnite and `darwin-workstation`.** Applied: stibnite imports `darwin-workstation` (D5), and its toplevel and `checks.aarch64-darwin.darwin-stibnite` change, declared in `drv-delta-stibnite-workstation.txt`; argentum's, rosegold's and blackphos's toplevels keep their drvPaths. The module system collects modules breadth-first and merges list definitions in that order (Context, "Import depth decides list order"), and the aspect sits one level below stibnite's body, so two lists keep their members and change order (measured 2026-11-27, `logs/chca-stibnite-workstation-before-20261127-160531.log` and `-after-20261127-160658.log`): (1) `users.knownUsers`: the aspect's `[ "crs58" ]` now merges before nix-grpc's `[ "nix-grpc-daemon" ]` (nix-grpc `nixos/darwin.nix`), where stibnite's body definition merged after it: before `[ "_ghq" "nix-grpc-daemon" "crs58" "omnigent-cameron" "_otelcol" … ]`, after `[ "_ghq" "crs58" "nix-grpc-daemon" "omnigent-cameron" "_otelcol" … ]`; (2) `environment.systemPackages`: colima's four packages (`colima`, `colima-init`, `colima-stop`, `colima-restart`, from `darwin/colima.nix`) move from between `dnscrypt-pin-dns` and `mosh` to between `tmux` and `tincd`, because `base` and its siblings now sit one level below `colima`. The same 72 names are in `users.knownUsers` before and after, the same 9 in `users.knownGroups` (in the same order), and every uid and gid is the same (`_ghq` 460/460, `crs58` 501/20, `nix-grpc-daemon` 450/450, `omnigent-cameron` 551/551), so activation deletes no account or group. `nix derivation show` of the two toplevels, followed down the changed inputs, finds `system-path` and `system-applications` differing only in the order of their `chosenOutputs` (the same entries), and `etc`, the activation script and the toplevel's build command differing only in those two store paths; the `users.knownUsers` order reaches no derivation. `lib.mkOrder` cannot place a default-priority definition between two others of the same priority, so the order is taken as it falls rather than pinned.
+
+## Follow-ups
+
+Not done in this change:
+
+- galena and scheelite still write `networking.useNetworkd = true` and `networking.useDHCP = false` in their own files (`machines/nixos/galena/default.nix:54-55`, `machines/nixos/scheelite/default.nix:65-66`). They belong in `gcp-cloud`, moved in a change accepted on its own drvPath diff (D3 "As applied").
+- Nothing enforces that `flake.nix`'s `nixConfig` equals `lib/caches.nix`; only comments link them (`lib/caches.nix:1`, `system/caches.nix:2`). They match as sets today, in a different order.

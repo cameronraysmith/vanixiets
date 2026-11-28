@@ -23,7 +23,7 @@ A host should read as the list of capabilities it runs plus what is particular t
 ## What Changes
 
 **Service wiring leaves the host bodies**
-- From: magnetite's `default.nix` declares the omnigraph, GreptimeDB, Perses and fleet-alert generators, credentials and host settings (`machines/nixos/magnetite/default.nix:536-1058`); cinnabar's eight feature files are all keyed `flake.modules.nixos."machines/nixos/cinnabar"`.
+- From: magnetite's `default.nix` declares the omnigraph, GreptimeDB, Perses and fleet-alert generators, credentials and host settings (`machines/nixos/magnetite/default.nix:527-1050` at `ccc1a8db1932`, the parent of the commit that moved them); cinnabar's eight feature files are all keyed `flake.modules.nixos."machines/nixos/cinnabar"`.
 - To: new `<svc>-server` aspects beside each site-neutral feature, which magnetite imports; cinnabar's features under their own `flake.modules.nixos.<feature>` keys, which cinnabar imports. The site-neutral keys the runtime tests import stay clan-free, and the store's credential-holder and unit-relation assertions stay in magnetite's body.
 - Impact: non-breaking; drvPaths unchanged.
 

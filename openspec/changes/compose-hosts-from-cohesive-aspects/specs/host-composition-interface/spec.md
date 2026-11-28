@@ -27,7 +27,7 @@
 #### Scenario: A host imports perses-server without greptimedb-server
 
 - **WHEN** a host imports `perses-server` or `fleet-alert-server` and not `greptimedb-server`
-- **THEN** evaluation fails naming the `greptimedb-users` generator
+- **THEN** evaluation fails naming the missing `vanixiets.secrets` entry: `greptimedb-users`, or for `perses-server` on a host without kanidm (pyrite) first `kanidm-oauth2-perses`
 
 ### Requirement: The provider aspects
 
@@ -115,7 +115,7 @@ The modules memory-pressure-guards, colima, shared-reference-tree, greptimedb, `
 #### Scenario: The generated units are compared
 
 - **WHEN** each of the fourteen `zfs-*` units' derivations is compared before and after
-- **THEN** each is identical, and the omnigraph quota unit is absent when the root store is `r2`
+- **THEN** each is identical, and when the root store is `r2` the omnigraph quota unit is empty (no `ExecStart`, no `wantedBy`), as before
 
 ### Requirement: One cache writer per class
 
@@ -137,7 +137,7 @@ The modules memory-pressure-guards, colima, shared-reference-tree, greptimedb, `
 
 ### Requirement: Only the declared derivations change
 
-Each of the change's seven commits SHALL pass `just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/drv-delta-<n>.txt`, and only the seventh SHALL name a host toplevel: `darwin.{argentum,blackphos,rosegold,stibnite}` and `checks.aarch64-darwin.darwin-{argentum,blackphos,rosegold,stibnite}` as `changed`.
+Each of the change's ten pull requests SHALL pass `just drv-diff <parent> <commit> openspec/changes/compose-hosts-from-cohesive-aspects/<allow-list>` against its own `drv-delta-*.txt`. Only 4452, 4454 and 4468 SHALL name a host toplevel, each a darwin one, by declaration: `drv-delta-darwin-caches.txt`, `drv-delta-record-last.txt` and `drv-delta-stibnite-workstation.txt` declare those toplevels and their `checks.aarch64-darwin.darwin-<host>` as `changed`.
 
 #### Scenario: A commit's diff runs
 
