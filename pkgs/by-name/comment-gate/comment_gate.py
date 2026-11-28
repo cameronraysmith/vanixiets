@@ -59,6 +59,27 @@ HOSTS = r"(?:argentum|blackphos|rosegold|stibnite|cinnabar|electrum|galena|magne
 MONTHS = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?"
 UNIT = r"\d+(?:\.\d+)?\s?(?:ms|µs|us|ns|s|sec|seconds?|min(?:utes?)?|h|hours?|[KMGT]i?B|[KMGT]B/s|%|x|cores?|CPUs?|req/s|ops/s)\b"
 
+# A letter and a number alone is as often a GPU, an instance type or a product
+# name as an id, so a bare one counts only with evidence: a word that
+# introduces ids earlier in the same sentence, a change slug or tracker key just
+# before it, a run of ids sharing the letter, parentheses around it, a lettered
+# part after it, or its use as a label that opens a comment or a clause.
+ID_TOKEN = r"(?<![\w/.-])(?:D|Q|F|A|T|W|G)\d{1,4}[a-z]?(?![\w-])"
+ID_INTRODUCER = (
+    r"(?i:\b(?:design|decision|question|finding|task|stage|wave|round|phase|step|assumption|requirement|risk|option|warning"
+    r"|clause|gap|criteri(?:on|a)|story|epic|review|orchestrator|operator|openspec|regulator)s?\b)"
+)
+ID_EVIDENCE = [
+    ID_INTRODUCER + r"(?:[^.!?;]|\.(?!\s)){0,60}?" + ID_TOKEN,
+    r"\b[a-z][a-z0-9]*(?:-[a-z0-9]+){2,}(?:\.md)?\s+" + ID_TOKEN,
+    r"\b[A-Z]{2,}-\d+\s+" + ID_TOKEN,
+    r"(?<![\w/.-])(?P<idletter>[DFQ])\d{1,4}[a-z]?(?:\s*(?:,|/|-|–|\.\.|\band\b|\bor\b|\bto\b)\s*(?P=idletter)\d{1,4}[a-z]?)+(?![\w-])",
+    r"\(\s*[DFQA]\d{1,4}[a-z]?\s*(?:\)|[,;:]\s|'s\b)",
+    r"(?<![\w/.-])(?:D|Q|F|A|T|W|G)\d{1,4}[a-z]?\s?\([a-z0-9]\)",
+    r"(?<![\w/.-])(?:AC|OQ|CAM|DEC)\d{1,4}[a-z]?(?![\w-])",
+    r"(?m:(?:^[ \t]*(?:#+|//+|--|\*|/\*\*?)?[ \t]*|[;.][ \t]+)[DFQ]\d{1,4}[a-z]?[:,]\s)",
+]
+
 COMMIT_MESSAGE = "it belongs in the commit message"
 
 
@@ -77,9 +98,9 @@ def rule(rid, blocking, pattern, flags, what, belongs):
 
 RULES = [
     rule("B-ID", True,
-         r"\b(?:design|decision|question|finding|task|stage|wave|round|phase|clause|gap|assumption|requirement|criterion|story|epic)\s+[A-Z]{0,3}\d+[a-z]?\b"
+         r"(?i:\b(?:design|decision|question|finding|task|stage|wave|round|phase|clause|gap|assumption|requirement|criterion|story|epic)\s+[A-Z]{0,3}\d+[a-z]?\b)"
          r"|\b(?:design|decision|question|finding|task|stage|wave|round|phase|clause|gap|assumption)s?\s+[A-Z]{1,3}\d*(?:[,/ ]+(?:and\s+)?[A-Z]{1,3}\d+)*\b(?=[\s,.;:)])"
-         r"|(?<![\w/.-])(?:D|Q|F|A|T|W|G|AC|OQ|CAM|DEC)\d{1,4}[a-z]?(?![\w-])",
+         r"|" + "|".join(ID_EVIDENCE),
          0, "an id that resolves only inside one change's files",
          "state the reason itself; the id belongs in the design file, the ADR or the commit message"),
     rule("B-DATE", True,

@@ -1,0 +1,43 @@
+{ lib, ... }:
+{
+  # T4 GPU nodes need the proprietary driver.
+  a = 1;
+  # An A100 or H100 for training, an L4 or a T4 for inference.
+  b = 2;
+  # The P2, M5, S3, K8s, V2, X1, E5, C7 and G5 names are the vendors' own.
+  c = 3;
+  # Cloudflare's R2 speaks the S3 protocol.
+  d = 4;
+  # The node is a GPU node (n1-standard-8, T4).
+  e = 5;
+  # The D2 diagrams render to SVG.
+  f = 6;
+  # The cache holds every output (F81).
+  g = 7;
+  # Two hosts read it, as D4, D5 require.
+  h = 8;
+  # It stops the session before it starts, which the review raised as F4.
+  i = 9;
+  # D4(b): the cookie keeps its own name.
+  j = 10;
+  # bound-fleet-garbage-collection D7: one collector per host.
+  k = 11;
+  # Tracked under CAM-113 F58 for the shared token.
+  l = 12;
+  # F64: a process that rewrites its title name.
+  m = 13;
+  # Unreadable keys stop the session (A172).
+  n = 14;
+  # The plan settles it in Design D6 for every package.
+  o = 15;
+  # Blocked until OQ3 is settled.
+  p = 16;
+  options.gpu = lib.mkOption {
+    type = lib.types.str;
+    description = "GCP GPU node (n1-standard-8, T4), zerotier peer";
+  };
+  options.peer = lib.mkOption {
+    type = lib.types.str;
+    description = "The peer the collector reports to (design D3).";
+  };
+}
