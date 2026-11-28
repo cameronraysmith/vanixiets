@@ -422,3 +422,55 @@ Smallest remedy: the reply says what it can know, that a boundary lies between t
 
 - F6's remedy and its case.
 - Task 4.1 after the deploys.
+
+---
+
+## 11. Verification that the report says only what the clone shows, 2026-11-28
+
+**Verified at**: `2026-11-28 08:10` UTC, against `nqwsolml` (`7f907421`, `fix(ghq-shared): report only what the clone shows of a shallow boundary on a failed update`) and `nulololo` (`39d0bdd6`, the proposal, design, tasks, three delta specs, `ghq-sync.sh`'s usage and the skill).
+Only what these two commits change is checked; §10 is not repeated.
+
+**Verdict**: PASS WITH WARNINGS.
+F6 is closed: every sentence of the two lines is true in the six shapes run, the rewritten branch among them, and the specs and design agree with the code. W15, W16 and W18 are closed; W17 stands as a stated assumption whose violation the reader is now told how to see and repair. Two conditional sentences of the reader's text can mislead in cases outside the ones they name (W19, W20).
+
+### Method
+
+The handler of `7f907421` and `main`'s (`31d1365a`), store paths substituted from the `trunk()` build, over a socket pair with the change's fixtures, on stibnite with git 2.56.0; nothing ran inside `/private/var/lib/ghq`.
+
+- §10's shapes script, unchanged but for the fixtures' path (`logs/cam140-reverify5-shapes-20261128-030412.log`, script `logs/cam140-reverify5-shapes.py`).
+- The finding's two faults, a git that cannot start and a listing that times out; a leftover `.git/shallow.lock` under `main`'s handler for a deepen, a get with tags needing a depth-1 fetch, and an update that moves no boundary; the named deepen stopped by a 5 s command limit after a stalled upload-pack, then rerun (`logs/cam140-reverify5-faults-20261128-030454.log`, script `logs/cam140-reverify5-faults.py`).
+- The boundary script against `7f907421` and against `uqwluspr`'s handler (`logs/cam140-reverify5-suite-*-boundary-20261128-030514.log`).
+
+Read only: the builder's red, green and magnetite logs (`logs/cam140-say-less-*`).
+
+### F6 and the two lines
+
+- `s-diverged`, rerun: the reply holds `shallow boundary between the local branch and upstream's: <path> (the copy holds <commit> without its history, and it lies between the local branch and upstream's origin/master)` and the repair line; after the named deepen (nothing hidden) the update exits 1 with no line and no token, which the repair line's "if the update still fails without this line, upstream rewrote its branch and this boundary was not the cause" tells the reader to expect.
+- In the other five shapes the same lines appear, and after the deepen the update fast-forwards with no line; no ref lost a commit, no boundary is left, the filter stays, and `.git` beyond the fetch matches `main`'s twin in all six.
+- Read with nothing else known: "the copy holds <commit> without its history" and "it lies between the local branch and upstream's" are true in every shape; "that deepen hides none of the history the copy holds, where a smaller one can" is true in every shape and in the script's sized-deepen case; the pointer to `ghq-sync --help` names text that exists in `nulololo`'s usage. Each command ends at the path, followed by ` then` or ` (`, so it pastes as printed.
+- The behavioral requirement, now conditioned on a commit lying between the branches, its scenario for a rewrite through such a commit and its scenario for a rewrite elsewhere; the interface requirement's "stating no cause the clone cannot show" and its new scenarios; the design's non-goal and D1 to D3: each says what the code does, and they agree with one another.
+
+### The warnings of §10
+
+| Warning | Now | Evidence |
+|---|---|---|
+| W15, "below every boundary" | Closed: no "every boundary" or "every root" remains in the reply, the usage text, the skill, the design or A382; each says the deepen reaches the roots below the boundaries of the branches it fetches, and that a tag's boundary no fetched branch reaches can remain and hides nothing | grep of the five texts |
+| W16, the repair's cost and limit | Closed: the usage text and the skill state the commits and trees fetched, the one-hour limit, `--full` as the other repair at the cost of every blob, and what a leftover `shallow.lock` does. Staged: a deepen stopped by the limit exits 124 with `.git/shallow` as before and no `shallow.lock`, and a rerun reaches the roots and the update fast-forwards; with a leftover lock, `main`'s handler answers a deepen with only `failed: <path>` (exit 0, as `ghq-sync` continues past per-repository errors), fails a get with tags needing a depth-1 fetch with git's `fatal: Unable to create '<path>/.git/shallow.lock': File exists.` (exit 128), and fast-forwards an update that moves no boundary; all three as the texts say | faults log |
+| W17, A382 | Stands as an assumption; its void scenario now names the sign (the line again after the named deepen) and the repair (`ghq-sync --full`), as the usage text tells the reader | read |
+| W18, a failure while finding | Closed: `blocking_boundary` catches `Exception`, so both staged faults leave exit 1, git's refusal, ` reason: ghq get exited 1`, no line and no token. The wrap does not catch `KeyboardInterrupt` or `SystemExit`; a `TimedOut` it catches has already had its git stopped by `run`, and the request's own time-out accounting is per command, so nothing the request must report is swallowed; a defect in the function would also be silent, which the requirement ("a failure while finding it SHALL add nothing") asks for | faults log; read |
+
+### Warnings
+
+- W19: the usage text and the skill say that if the line still appears after the deepen, the history runs deeper than the deepen reaches, and `--full` repairs it. That holds after a deepen that printed `deepened:`; after one that printed `failed:`, as a leftover `shallow.lock` makes it, the line appears again for that reason, and `--full` would meet the same lock (not staged). Remedy: "if the line still appears after a deepen that printed `deepened:`".
+- W20: the repair line, the usage text and the skill say that an update still failing after the repair without the line means upstream rewrote its branch. An update failing for another reason, the remote unreachable for one, also fails without the line (not staged). Remedy: "still fails with git's fast-forward refusal and without this line".
+
+### Tests and sizes
+
+- The boundary script fails against `uqwluspr`'s handler on six assertions, each of four shapes' lines (the tag, held history, root and rewritten shapes) and both staged faults, as the builder's red log does, and passes against `7f907421` (7.3 s; 7.7 to 8.0 s on magnetite in the builder's logs).
+- `nqwsolml` and `nulololo` change no file of the request or history scripts; the request check ran 47.6 to 47.8 s on magnetite (builder's log).
+- No false statement to a reader beyond W19 and W20 was found in these two commits, and no path in them leaves a copy other than `main`'s handler leaves it.
+
+### What remains
+
+- W19 and W20, a clause each in three texts.
+- Task 4.1 after the deploys.
