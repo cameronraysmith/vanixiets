@@ -281,7 +281,7 @@ let
     "9-extraLocation" = set [ "vhost" "locations" "/dashboard/" ] {
       proxyPass = "http://127.0.0.1:4000";
     };
-    "10-secondGroup" = set [ "client" "scopeMaps" "cognee_access" ] [ "openid" ];
+    "10-secondGroup" = set [ "client" "scopeMaps" "other_access" ] [ "openid" ];
     "11-pluginsOnTmpfs" = set [ "settings" "plugin" "path" ] "/run/perses/plugins";
     "11-noWipe" = set [ "unit" "preStart" ] "";
     "11-noPluginWipe" = set [
