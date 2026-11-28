@@ -46,6 +46,10 @@
           "typecheck"
           "unit"
         ];
+      }
+      # pkgs/by-name/renovate is packaged for x86_64-linux only.
+      // lib.optionalAttrs (system == "x86_64-linux") {
+        renovate = [ "version" ];
       };
 
       blacklist = [
@@ -120,6 +124,11 @@
             };
             # nixbot: median 39 s, slowest 68 s, all 6 runs 2026-10-01..2026-11-11
             package-playwright-cli-test-smoke.class = "small";
+            # no nixbot runs yet, too few to class
+            package-renovate-test-version = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 25 s, slowest 49 s, 5 runs in 30 days
             package-stack-land-test-integration.class = "small";
             # nixbot: median 2.1 s, slowest 306 s, 152 runs in 30 days

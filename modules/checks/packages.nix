@@ -232,6 +232,11 @@
               class = "small";
               measured = false;
             };
+            # no nixbot runs yet, too few to class
+            package-renovate = {
+              class = "medium";
+              measured = false;
+            };
             # nixbot: median 5.2 s, slowest 1734 s, all 14 runs 2026-08-29..2026-11-11
             package-repo-sync.class = "small";
             # nixbot: median 7.0 s, slowest 33 s, all 8 runs 2026-09-05..2026-11-11

@@ -1,0 +1,40 @@
+{
+  "name": "renovate",
+  "version": "44.264.1",
+  "realizedVersion": "44.264.1",
+  "source": {
+    "githubRelease": {
+      "owner": "renovatebot",
+      "repo": "renovate",
+      "tagTemplate": "{version}"
+    }
+  },
+  "artifacts": {
+    "src": {
+      "sourceBuild": {
+        "fetcher": {
+          "fetchFromGitHub": {
+            "owner": "renovatebot",
+            "repo": "renovate"
+          }
+        },
+        "hash": "sha256-1V1l01n4TuLwNUC/IbtUDKB+1Cxvoc/aVAPthmrUyaM=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    },
+    "pnpmDeps": {
+      "sourceBuild": {
+        "fetcher": {
+          "derived": {}
+        },
+        "hash": "sha256-rlYXeEv/ChA7+LMgoSqvHxewH0kjuIM4GIF2VRvA5PE=",
+        "depsHash": {
+          "none": {}
+        }
+      }
+    }
+  },
+  "companions": []
+}

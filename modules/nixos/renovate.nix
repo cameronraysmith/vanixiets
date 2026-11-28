@@ -39,6 +39,13 @@
 # one the default dev shell carries), asserted equal to package.json's
 # packageManager, since a different bun can rewrite bun.lock differently.
 #
+# Token on argv: Renovate before 44.258.1 hands the token to `nix` as a
+# command-line argument, readable by every local user through
+# /proc/<pid>/cmdline, so an assertion refuses any older package. The service
+# runs pkgs/by-name/renovate, which follows upstream releases through its pin
+# and is withheld from the fleet overlay so no other consumer of
+# pkgs.renovate moves with it.
+#
 # Hazard if the key is ever removed: `clan machines update` runs every
 # missing generator for every machine before deploying anything, and this
 # script exits non-zero, so deploys fail until the key is set again.
@@ -47,6 +54,8 @@ let
   inherit (config.flake.lib) renovateSettings;
 in
 {
+  customPackageExcludes = [ "renovate" ];
+
   flake.modules.nixos.renovate =
     {
       config,
@@ -77,6 +86,9 @@ in
         '';
       };
       repoBun = withSystem pkgs.stdenv.hostPlatform.system ({ pkgs, ... }: pkgs.bun);
+      serviceRenovate = withSystem pkgs.stdenv.hostPlatform.system (
+        { config, ... }: config.packages.renovate
+      );
       packageManagerBun = lib.removePrefix "bun@" (lib.importJSON ../../package.json).packageManager;
     in
     {
@@ -90,6 +102,7 @@ in
 
       services.renovate = {
         enable = true;
+        package = serviceRenovate;
         schedule = "*-*-* *:17:00";
         runtimePackages = [
           config.nix.package
@@ -115,6 +128,10 @@ in
         {
           assertion = repoBun.version == packageManagerBun;
           message = "renovate: task bun ${repoBun.version} differs from package.json packageManager bun@${packageManagerBun}; a different bun can rewrite bun.lock";
+        }
+        {
+          assertion = lib.versionAtLeast cfg.package.version "44.258.1";
+          message = "renovate: ${cfg.package.version} passes the GitHub token to nix on the command line; the service needs 44.258.1 or later";
         }
       ];
 
