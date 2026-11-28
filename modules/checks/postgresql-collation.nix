@@ -28,12 +28,15 @@
       sql = builtins.readFile ../nixos/postgresql-collation/drift.sql;
 
       configWith =
-        text:
+        {
+          text,
+          parked ? [ "parked" ],
+        }:
         pkgs.writeText "postgresql-collation-collector.json" (
           builtins.toJSON {
             receivers.sqlquery = collation.receiver {
               datasource = "host=\${env:PGHOST} dbname=postgres user=probe sslmode=disable";
-              parked = [ "parked" ];
+              inherit parked;
               sql = text;
               collectionInterval = "1s";
             };
@@ -70,9 +73,9 @@
         | (.attributes | map({ (.key): .value.stringValue }) | add) as $a
         | "\($name){datname=\($a.datname | tojson),collversion_recorded=\($a.collversion_recorded | tojson),collversion_actual=\($a.collversion_actual | tojson)} \(.asInt // "0")"
       '';
-      run = text: output: ''
+      run = config: output: ''
         rm -f export.jsonl
-        ${lib.getExe' collector "otelcol-contrib"} --config ${configWith text} > collector.log 2>&1 &
+        ${lib.getExe' collector "otelcol-contrib"} --config ${configWith config} > collector.log 2>&1 &
         pid=$!
         for _ in $(seq 60); do
           [ -s export.jsonl ] && [ "$(wc -l < export.jsonl)" -ge 1 ] && break
@@ -89,6 +92,22 @@
       '';
 
       expected = pkgs.replaceVars ./postgresql-collation/expected.prom { inherit glibc; };
+      unparkedLine = ''vanixiets_postgresql_collation_drift{datname="parked",collversion_recorded="1.0",collversion_actual="${glibc}"} 1'';
+
+      # With nothing parked the query is the file's text with an empty array:
+      # the substitution touches nothing else, its comments included.
+      renderedUnparked =
+        (collation.receiver {
+          datasource = "";
+          parked = [ ];
+        }).queries;
+      unparkedSqlIntact =
+        lib.assertMsg
+          (
+            map (q: q.sql) renderedUnparked
+            == [ (builtins.replaceStrings [ "ARRAY[@parked@]" ] [ "ARRAY[]" ] sql) ]
+          )
+          "postgresql-collation check: with no parked databases the query differs from drift.sql beyond its array";
     in
     {
       # Size classes (declare-test-size-classes design D1, D2): the median of
@@ -102,45 +121,54 @@
         };
       };
       checks = lib.optionalAttrs (system == "x86_64-linux") {
-        postgresql-collation = pkgs.stdenvNoCC.mkDerivation {
-          name = "postgresql-collation";
-          dontUnpack = true;
-          dontConfigure = true;
-          dontBuild = true;
-          dontInstall = true;
-          doCheck = true;
-          nativeCheckInputs = [
-            postgresql
-            pkgs.postgresqlTestHook
-            pkgs.diffutils
-            pkgs.jq
-          ];
-          # initdb's own databases in the C locale, which records no
-          # version; the server finds en_US.UTF-8 in the archive.
-          LANG = "C";
-          LOCALE_ARCHIVE = "${magnetite.pkgs.glibcLocales}/lib/locale/locale-archive";
-          meta.description = "behavioural check: the collector's PostgreSQL collation drift receiver against a real server, with three mutants";
-          checkPhase = ''
-            runHook preCheck
-            psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres -f ${./postgresql-collation/setup.sql}
-            ${run sql "got.prom"}
-            diff -u ${expected} got.prom
-            echo "ok: the receiver's points"
-            ${lib.concatStrings (
-              lib.mapAttrsToList (name: text: ''
-                ${run text "mutant.prom"}
-                if diff -u ${expected} mutant.prom; then
-                  echo "FAIL: mutant ${name} was accepted" >&2
-                  exit 1
-                fi
-                echo "mutant ${name} rejected"
-              '') mutants
-            )}
-            mkdir -p "$out"
-            cp got.prom "$out/"
-            runHook postCheck
-          '';
-        };
+        postgresql-collation =
+          assert unparkedSqlIntact;
+          pkgs.stdenvNoCC.mkDerivation {
+            name = "postgresql-collation";
+            dontUnpack = true;
+            dontConfigure = true;
+            dontBuild = true;
+            dontInstall = true;
+            doCheck = true;
+            nativeCheckInputs = [
+              postgresql
+              pkgs.postgresqlTestHook
+              pkgs.diffutils
+              pkgs.jq
+            ];
+            # initdb's own databases in the C locale, which records no
+            # version; the server finds en_US.UTF-8 in the archive.
+            LANG = "C";
+            LOCALE_ARCHIVE = "${magnetite.pkgs.glibcLocales}/lib/locale/locale-archive";
+            meta.description = "behavioural check: the collector's PostgreSQL collation drift receiver against a real server, with three mutants";
+            checkPhase = ''
+              runHook preCheck
+              psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres -f ${./postgresql-collation/setup.sql}
+              ${run { text = sql; } "got.prom"}
+              diff -u ${expected} got.prom
+              echo "ok: the receiver's points"
+              ${run {
+                text = sql;
+                parked = [ ];
+              } "unparked.prom"}
+              { cat ${expected}; echo ${lib.escapeShellArg unparkedLine}; } | LC_ALL=C sort -u > expected-unparked.prom
+              diff -u expected-unparked.prom unparked.prom
+              echo "ok: with nothing parked every database is reported"
+              ${lib.concatStrings (
+                lib.mapAttrsToList (name: text: ''
+                  ${run { inherit text; } "mutant.prom"}
+                  if diff -u ${expected} mutant.prom; then
+                    echo "FAIL: mutant ${name} was accepted" >&2
+                    exit 1
+                  fi
+                  echo "mutant ${name} rejected"
+                '') mutants
+              )}
+              mkdir -p "$out"
+              cp got.prom "$out/"
+              runHook postCheck
+            '';
+          };
       };
     };
 }

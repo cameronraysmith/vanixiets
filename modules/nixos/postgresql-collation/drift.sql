@@ -4,8 +4,10 @@
 -- PostgreSQL's own connection-time check compares them, which skips a
 -- database with no recorded version (postgres/postgres@REL_16_15:
 -- src/backend/utils/init/postinit.c, CheckMyDatabase); template0 has none.
--- @parked@ is replaced by the parked names as SQL literals. A missing
--- version is '' rather than NULL, which the receiver would warn about.
+-- The parked names are written into the array in the WHERE clause as SQL
+-- literals; with none parked it is empty and leaves out no database. A
+-- missing version is '' rather than NULL, which the receiver would warn
+-- about.
 WITH db AS (
   SELECT datname::text AS datname,
          datcollversion AS recorded,

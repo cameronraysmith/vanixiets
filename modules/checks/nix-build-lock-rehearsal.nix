@@ -100,8 +100,27 @@
 
             echo "--- no command is a usage error"
             status=0
-            $locked 2> run/usage.err || status=$?
+            $locked > run/usage.out 2> run/usage.err || status=$?
             [ "$status" = 2 ] || fail "no command: exit status $status, expected 2"
+            [ ! -s run/usage.out ] || fail "no command wrote to stdout"
+            expect_line run/usage.err "usage: nix-build-locked COMMAND [ARGUMENT...]"
+
+            echo "--- --help and -h print the usage and build nothing"
+            for flag in --help -h; do
+              status=0
+              $locked "$flag" > run/help.out 2> run/help.err || status=$?
+              [ "$status" = 0 ] || { cat run/help.err; fail "$flag: exit status $status, expected 0"; }
+              [ ! -s run/help.err ] || { cat run/help.err; fail "$flag wrote to stderr"; }
+              expect_line run/help.out "usage: nix-build-locked COMMAND [ARGUMENT...]"
+              expect_line run/help.out "lock/build.lock, once some avg60 in run/pressure is below 20."
+            done
+
+            echo "--- any other leading option is a usage error"
+            status=0
+            $locked --verbose build-stub > run/option.out 2> run/option.err || status=$?
+            [ "$status" = 2 ] || fail "--verbose: exit status $status, expected 2"
+            grep -q '^BUILD' run/option.out && fail "an unknown option ran the build"
+            expect_line run/option.err "nix-build-locked: unknown option --verbose; the build command comes first"
 
             echo "--- missing lock file refuses to build"
             status=0

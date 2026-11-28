@@ -21,6 +21,21 @@ let
 
   literal = s: "'${builtins.replaceStrings [ "'" ] [ "''" ] s}'";
 
+  # The placeholder is replaced as the whole array expression, and must occur
+  # nowhere else, so text around it (a comment naming it) is never rewritten.
+  parkedArray = "ARRAY[@parked@]";
+  withParked =
+    parked: sql:
+    assert lib.assertMsg (
+      builtins.length (lib.splitString "@parked@" sql) == 2 && lib.hasInfix parkedArray sql
+    ) "postgresqlCollation.receiver: the query must contain @parked@ exactly once, as ${parkedArray}";
+    builtins.replaceStrings
+      [ parkedArray ]
+      [
+        "ARRAY[${lib.concatMapStringsSep ", " literal (lib.naturalSort parked)}]"
+      ]
+      sql;
+
   # The receiver, with the query as an argument so the check can build its
   # mutants from the same text. The parked names are SQL literals in the
   # query, so the receiver needs no parameter.
@@ -37,13 +52,7 @@ let
       collection_interval = collectionInterval;
       queries = [
         {
-          sql =
-            builtins.replaceStrings
-              [ "@parked@" ]
-              [
-                (lib.concatMapStringsSep ", " literal (lib.naturalSort parked))
-              ]
-              sql;
+          sql = withParked parked sql;
           metrics = [
             {
               metric_name = seriesName;

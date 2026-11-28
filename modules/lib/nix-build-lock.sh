@@ -10,10 +10,29 @@ owner_file=$lock_file.owner
 conflict=75
 deadline=$((SECONDS + max_wait))
 
-if [ "$#" -eq 0 ]; then
-  echo "usage: nix-build-locked COMMAND [ARGUMENT...]" >&2
-  exit 2
-fi
+usage() {
+  echo "usage: nix-build-locked COMMAND [ARGUMENT...]"
+  echo "Runs COMMAND as this host's one build at a time, under an exclusive flock on"
+  echo "$lock_file, once some avg60 in $pressure_file is below $pressure_threshold."
+  echo "Waits at most ${max_wait}s, then exits 75 without running COMMAND; otherwise"
+  echo "exits with COMMAND's status."
+}
+
+case "${1-}" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "")
+    usage >&2
+    exit 2
+    ;;
+  -*)
+    echo "nix-build-locked: unknown option $1; the build command comes first" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
 
 for file in "$lock_file" "$owner_file"; do
   if [ ! -r "$file" ]; then
