@@ -8,6 +8,6 @@ let
     };
 in
 {
-  flake.modules.nixos.base = nixPackage;
+  flake.modules.nixos.base-nix-package = nixPackage;
   flake.modules.darwin.base = nixPackage;
 }

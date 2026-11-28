@@ -43,8 +43,6 @@ in
   # Every NixOS host imports the capability; it is enabled where the host
   # table gives the host iets (flake.lib.nixEvalJobsBound) or where the host
   # enables it itself.
-  flake.modules.nixos.base.imports = [ config.flake.modules.nixos.nix-eval-lock ];
-
   flake.modules.nixos.nix-eval-lock =
     {
       config,

@@ -56,7 +56,7 @@ in
   # but with other keys, counts as matching, because the evaluation cannot
   # tell. NetworkManager's unmanaged entry for the link is the tincr service's
   # (modules/clan/services/tincr/flake-module.nix).
-  flake.modules.nixos.base =
+  flake.modules.nixos.base-mesh-dns =
     { config, lib, ... }:
     let
       unitName = "40-tincr-${mesh.instance}";

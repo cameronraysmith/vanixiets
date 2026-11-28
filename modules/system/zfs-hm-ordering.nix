@@ -5,7 +5,7 @@
   # Without this, a race condition on cloud VMs causes /home to briefly
   # fail to mount (ZFS pool import is slow), which cascades to the
   # home-manager service failing with "Dependency failed".
-  flake.modules.nixos.base =
+  flake.modules.nixos.base-zfs-hm-ordering =
     { config, lib, ... }:
     {
       systemd.services = lib.mkIf config.boot.zfs.enabled (

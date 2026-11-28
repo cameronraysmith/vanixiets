@@ -1,6 +1,5 @@
 {
-  # Flake-parts module exporting to base namespace (merged with other base modules)
-  flake.modules.nixos.base =
+  flake.modules.nixos.base-zram-swap =
     { lib, ... }:
     {
       # Compressed in-memory swap: no disk I/O, no ZFS deadlock risk, and 4.2-4.5x

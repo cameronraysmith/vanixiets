@@ -26,7 +26,6 @@ in
         home.packages = packages pkgs;
       };
 
-    nixos.base.imports = [ modules.nixos.cli-host-inspection ];
     darwin.base.imports = [ modules.darwin.cli-host-inspection ];
     homeManager.engineering-tools.imports = [ modules.homeManager.cli-host-inspection ];
   };

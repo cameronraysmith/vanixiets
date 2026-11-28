@@ -15,10 +15,8 @@
 # sets while it is off, so reviving it brings its database back under the
 # alert. checks.x86_64-linux.postgresql-collation runs the receiver against
 # a real PostgreSQL with its mutants.
-{ config, lib, ... }:
+{ lib, ... }:
 let
-  inherit (config.flake) modules;
-
   seriesName = "vanixiets_postgresql_collation_drift";
 
   literal = s: "'${builtins.replaceStrings [ "'" ] [ "''" ] s}'";
@@ -78,5 +76,4 @@ in
   };
 
   flake.modules.nixos.postgresql-collation = module;
-  flake.modules.nixos.base.imports = [ modules.nixos.postgresql-collation ];
 }

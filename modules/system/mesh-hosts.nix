@@ -110,7 +110,6 @@ in
     {
       networking.hosts = hostsOf (lib.filter (r: r.name != config.networking.fqdnOrHostName) records);
     };
-  flake.modules.nixos.base.imports = [ modules.nixos.mesh-hosts ];
 
   flake.modules.darwin.mesh-hosts = {
     vanixiets.hosts = hostsOf records;

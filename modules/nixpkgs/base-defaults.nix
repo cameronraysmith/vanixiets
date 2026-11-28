@@ -67,5 +67,5 @@ in
       };
     };
   flake.modules.darwin.base = defaults;
-  flake.modules.nixos.base = defaults;
+  flake.modules.nixos.base-nixpkgs = defaults;
 }

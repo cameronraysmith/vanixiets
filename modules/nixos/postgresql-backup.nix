@@ -415,5 +415,4 @@ in
     config.flake.lib.postgresqlBackupObligations.failures;
 
   flake.modules.nixos.postgresql-backup = module;
-  flake.modules.nixos.base.imports = [ modules.nixos.postgresql-backup ];
 }

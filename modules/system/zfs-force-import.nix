@@ -16,7 +16,7 @@
   # while satisfying the warning's "set explicitly to silence" condition.
   # Revisit if/when shared block storage or volume re-attach workflows
   # enter the architecture.
-  flake.modules.nixos.base = {
+  flake.modules.nixos.base-zfs-force-import = {
     boot.zfs.forceImportRoot = true;
   };
 }

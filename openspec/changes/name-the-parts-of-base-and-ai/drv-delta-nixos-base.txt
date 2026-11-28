@@ -1,0 +1,15 @@
+# Declared drvPath differences of naming the parts of the NixOS base
+# (flake.modules.nixos.base becomes modules/nixos/base.nix's list of 33 named
+# parts, and checks.x86_64-linux.structure-aspect-parts keeps it one list),
+# from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/name-the-parts-of-base-and-ai/drv-delta-nixos-base.txt
+# Every NixOS and darwin toplevel and every home activation package keeps its
+# drvPath (logs/ntp-pr1-before-20261127-194303.log and
+# logs/ntp-pr1-after-20261127-194303.log), and so does every check on both
+# systems other than the two below and the base allow-list's
+# (logs/ntp-pr1-checks-{before,after}-*-20261127-194303.jsonl). Checks that
+# embed the whole flake source or every .nix file under modules/ are covered
+# by the base allow-list (modules/apps/drv-diff-base-allow.txt).
+
+checks.x86_64-linux.structure-aspect-parts  added  # the structure check of the NixOS base list
+checks.x86_64-linux.fleet-alert  changed  # its fleet-alert-size-rule-clause input renders every testSizes.checks entry; this change adds one

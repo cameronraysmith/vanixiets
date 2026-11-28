@@ -293,9 +293,7 @@ let
   darwin = exportSecrets module;
 in
 {
-  flake.modules.nixos = nixos // {
-    base.imports = [ nixos.secrets ];
-  };
+  flake.modules.nixos = nixos;
   flake.modules.darwin = darwin // {
     base.imports = [ darwin.secrets ];
   };

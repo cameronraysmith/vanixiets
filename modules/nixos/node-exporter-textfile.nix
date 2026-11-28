@@ -31,7 +31,6 @@
 # shared key loads it once on a host holding both.
 { config, lib, ... }:
 let
-  inherit (config.flake) modules;
   hosts = config.flake.lib.observabilityHosts;
 
   flag = "--collector.textfile.directory";
@@ -128,5 +127,4 @@ in
   };
 
   flake.modules.nixos.node-exporter-textfile = module;
-  flake.modules.nixos.base.imports = [ modules.nixos.node-exporter-textfile ];
 }

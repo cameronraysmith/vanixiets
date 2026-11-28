@@ -3,7 +3,7 @@
 # so the garbage collector alone cannot reclaim them.
 # The "-" ExecStart prefix ignores a non-zero exit, so one failing find does not skip the rest.
 {
-  flake.modules.nixos.base =
+  flake.modules.nixos.base-nix-cleanup-gcroots =
     { pkgs, ... }:
     {
       systemd.timers.nix-cleanup-gcroots = {

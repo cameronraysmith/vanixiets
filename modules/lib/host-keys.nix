@@ -72,5 +72,5 @@ in
   flake.lib = {
     inherit hostKeys hostKeyObligations;
   };
-  flake.modules.nixos.base.imports = [ assertionsModule ];
+  flake.modules.nixos.base-host-keys.imports = [ assertionsModule ];
 }

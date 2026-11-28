@@ -15,7 +15,7 @@
       };
     };
 
-  flake.modules.nixos.base =
+  flake.modules.nixos.base-nix-optimization =
     { pkgs, lib, ... }:
     {
       # Automatic store optimization via hardlinking

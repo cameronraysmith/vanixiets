@@ -126,7 +126,7 @@ in
       };
     };
 
-  flake.modules.nixos.base = {
+  flake.modules.nixos.base-harmonia-gc = {
     imports = [ inputs.harmonia.nixosModules.harmonia ];
 
     # Jitter keeps fleet hosts from collecting in lockstep. A host may set

@@ -1,6 +1,5 @@
 {
-  # Flake-parts module exporting to base namespace (merged with other base modules)
-  flake.modules.nixos.base =
+  flake.modules.nixos.base-initrd-networking =
     { config, pkgs, ... }:
     {
       # The initrd SSH host key

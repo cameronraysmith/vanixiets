@@ -3,8 +3,7 @@ let
   inherit (config.flake.lib) hosts;
 in
 {
-  # Flake-parts module exporting to base namespace (merged with other base modules)
-  flake.modules.nixos.base =
+  flake.modules.nixos.base-nix-settings =
     { config, ... }:
     {
       # Nix settings for all machines

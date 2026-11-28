@@ -1,6 +1,5 @@
 {
-  # Flake-parts module exporting to base namespace (merged with other base modules)
-  flake.modules.nixos.base =
+  flake.modules.nixos.base-command-not-found =
     { lib, ... }:
     {
       # TODO: remove this entire modules/system/srvos/ directory once either srvos
@@ -10,7 +9,7 @@
       # default from mkOptionDefault to mkDefault, colliding with srvos's
       # nixos/server/default.nix line 39 (also lib.mkDefault false). mkForce false
       # (priority 50) overrides both, preserving the srvos intent on every NixOS
-      # host that imports flake.modules.nixos.base.
+      # host, each of which imports this part through the NixOS base.
       programs.command-not-found.enable = lib.mkForce false;
     };
 }

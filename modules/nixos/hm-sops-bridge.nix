@@ -181,9 +181,7 @@ let
   darwin = exportBridge homeView;
 in
 {
-  flake.modules.nixos = nixos // {
-    base.imports = [ nixos.hm-sops-bridge ];
-  };
+  flake.modules.nixos = nixos;
   flake.modules.darwin = darwin // {
     base.imports = [ darwin.hm-sops-bridge ];
   };

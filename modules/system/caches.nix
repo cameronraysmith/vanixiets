@@ -10,7 +10,7 @@ in
     nix.settings.trusted-public-keys = cacheConfig.publicKeys;
   };
 
-  flake.modules.nixos.base = {
+  flake.modules.nixos.base-caches = {
     nix.settings.substituters = cacheConfig.substituters;
     nix.settings.trusted-public-keys = cacheConfig.publicKeys;
   };

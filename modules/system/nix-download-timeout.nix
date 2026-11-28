@@ -14,6 +14,6 @@ let
     };
 in
 {
-  flake.modules.nixos.base = downloadTimeout;
+  flake.modules.nixos.base-nix-download-timeout = downloadTimeout;
   flake.modules.darwin.base = downloadTimeout;
 }

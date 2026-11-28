@@ -57,6 +57,6 @@ let
     };
 in
 {
-  flake.modules.nixos.base = module;
+  flake.modules.nixos.base-commit-signing-key = module;
   flake.modules.darwin.base = module;
 }

@@ -7,7 +7,7 @@ let
 in
 {
   flake.modules = {
-    nixos.base =
+    nixos.base-mosh =
       { config, ... }:
       {
         programs.mosh = {

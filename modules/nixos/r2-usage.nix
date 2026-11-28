@@ -35,7 +35,6 @@
 # Imported by every NixOS base.
 { config, lib, ... }:
 let
-  inherit (config.flake) modules;
   schema = config.flake.lib.otelCollectorSchema;
   inherit (config.flake.lib) vars;
   inherit (config.flake.lib.nodeExporterTextfile) flag;
@@ -437,5 +436,4 @@ in
   fleetObligations.r2UsageObligations.failures = config.flake.lib.r2UsageObligations.failures;
 
   flake.modules.nixos.r2-usage = module;
-  flake.modules.nixos.base.imports = [ modules.nixos.r2-usage ];
 }

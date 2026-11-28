@@ -95,7 +95,6 @@ let
 in
 {
   flake.modules.nixos.fleet-deploy-target = target;
-  flake.modules.nixos.base.imports = [ modules.nixos.fleet-deploy-target ];
 
   flake.modules.darwin.fleet-deploy-target.imports = [
     target

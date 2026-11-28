@@ -57,7 +57,6 @@
 # that stops writing.
 { config, lib, ... }:
 let
-  inherit (config.flake) modules;
   schema = config.flake.lib.otelCollectorSchema;
   hosts = config.flake.lib.observabilityHosts;
   inherit (config.flake.lib.nodeExporterTextfile) flag;
@@ -220,5 +219,4 @@ in
   };
 
   flake.modules.nixos.zpool-probe = module;
-  flake.modules.nixos.base.imports = [ modules.nixos.zpool-probe ];
 }

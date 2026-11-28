@@ -94,6 +94,6 @@ in
   flake.lib.sourceContextObligations = {
     inherit failures homeModule;
   };
-  flake.modules.nixos.base.imports = [ hostModule ];
+  flake.modules.nixos.base-source-context-obligations.imports = [ hostModule ];
   flake.modules.darwin.base.imports = [ hostModule ];
 }
