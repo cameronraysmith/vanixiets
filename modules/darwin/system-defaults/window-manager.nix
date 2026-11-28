@@ -1,7 +1,7 @@
 # macOS Window Manager (Stage Manager) settings
 { ... }:
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-system-defaults =
     {
       config,
       lib,

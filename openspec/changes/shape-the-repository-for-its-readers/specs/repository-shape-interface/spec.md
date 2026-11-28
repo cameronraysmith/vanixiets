@@ -104,14 +104,24 @@ Trust boundary: the measured collisions; not packages added later.
 
 ### Requirement: Package list order is irrelevant in every host and home
 
-`environment.systemPackages` (NixOS, darwin) and `home.packages` SHALL each be re-declared once with only `apply = lib.sort` by `lib.getName`, then `outPath`; the gh-dash `keybindings.prs` SHALL be attributes keyed by key; the nixpkgs overlays SHALL apply in one named list. This relies on A376 and A384.
+`environment.systemPackages` (NixOS, darwin), `home.packages` and nix-darwin's `homebrew.taps`, `homebrew.brews` and `homebrew.casks` SHALL each be re-declared once with only `apply = lib.sort`; the gh-dash `keybindings.prs` SHALL be attributes keyed by key; the nixpkgs overlays SHALL apply in one named list. This relies on A376 and A384.
 
 Trust boundary: list order in evaluation; profile contents by the built comparison only.
+
+#### Scenario: The sorted lists' keys are read
+
+- **WHEN** the re-declarations of `environment.systemPackages`, `home.packages`, `homebrew.taps`, `homebrew.brews` and `homebrew.casks` are read
+- **THEN** each holds only `apply = lib.sort`, the package lists comparing the name alone (`lib.getName` of a derivation, else its string), so same-named entries keep their definition order, and the Homebrew lists comparing `name`
 
 #### Scenario: The home sort reaches every home
 
 - **WHEN** the integrated homes' `home-manager.sharedModules` and `flake.lib.mkHome` are read
 - **THEN** both include the module that sorts `home.packages`
+
+#### Scenario: A darwin part moves in its list
+
+- **WHEN** `base-homebrew`, or a module adding a cask, takes another position in the darwin base list or the import tree
+- **THEN** every darwin toplevel's drvPath is unchanged, the `Brewfile` included
 
 #### Scenario: The sort changes a file's content
 

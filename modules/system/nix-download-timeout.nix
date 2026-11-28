@@ -15,5 +15,5 @@ let
 in
 {
   flake.modules.nixos.base-nix-download-timeout = downloadTimeout;
-  flake.modules.darwin.base = downloadTimeout;
+  flake.modules.darwin.base-nix-download-timeout = downloadTimeout;
 }

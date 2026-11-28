@@ -10,7 +10,7 @@
 # definition collision.
 { ... }:
 {
-  flake.modules.homeManager.ai =
+  flake.modules.homeManager.ai-tuicr =
     {
       config,
       pkgs,

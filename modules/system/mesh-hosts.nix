@@ -41,7 +41,6 @@ let
     meshRecords
     ztRecords
     ;
-  inherit (config.flake) modules;
 
   records = meshRecords ++ ztRecords;
   hostsOf = records: lib.mapAttrs (_: map (r: r.name)) (lib.groupBy (r: r.address) records);
@@ -114,5 +113,4 @@ in
   flake.modules.darwin.mesh-hosts = {
     vanixiets.hosts = hostsOf records;
   };
-  flake.modules.darwin.base.imports = [ modules.darwin.mesh-hosts ];
 }

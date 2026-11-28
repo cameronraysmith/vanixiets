@@ -80,6 +80,6 @@ let
     };
 in
 {
-  flake.modules.homeManager.ai = content true;
+  flake.modules.homeManager.ai-omnigent = content true;
   flake.modules.homeManager.omnigent = content false;
 }

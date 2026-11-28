@@ -16,5 +16,5 @@ From an agent session on a Mac, reach fleet services by their `*.vanixiets.inter
 Two admin-username conventions coexist: older machines force the username `crs58`, and newer ones use `cameron` as a home-manager alias for the same account.
 Modules that hardcode a username are following one convention or the other, and which one is a property of the machine.
 
-The authoritative fleet inventory is `modules/clan/inventory/machines.nix`, one entry per machine with its tags and description; the authoritative user list is the set of directories under `modules/home/users/`.
+The authoritative fleet inventory is the host registry, `modules/lib/hosts.nix`, one record per machine whose fields include its tags and description; the clan inventory (`modules/clan/inventory/machines.nix`) is computed from those records, and the authoritative user list is the set of directories under `modules/home/users/`.
 This file intentionally does not reproduce either inventory as a table — consult those paths directly rather than a snapshot that will drift.

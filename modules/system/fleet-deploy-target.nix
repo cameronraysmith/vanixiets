@@ -28,7 +28,6 @@
 # is not a root job in the system domain that runs the watcher once.
 { config, lib, ... }:
 let
-  inherit (config.flake) modules;
   inherit (config.flake.lib) fleetDeployer hosts;
   provisioned = fleetDeployer.keys != null;
 
@@ -100,5 +99,4 @@ in
     target
     darwinWatcher
   ];
-  flake.modules.darwin.base.imports = [ modules.darwin.fleet-deploy-target ];
 }

@@ -66,6 +66,6 @@ in
         overlays = [ config.flake.overlays.default ];
       };
     };
-  flake.modules.darwin.base = defaults;
+  flake.modules.darwin.base-nixpkgs = defaults;
   flake.modules.nixos.base-nixpkgs = defaults;
 }

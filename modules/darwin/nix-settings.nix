@@ -4,7 +4,7 @@
 { ... }:
 {
   flake.modules = {
-    darwin.base =
+    darwin.base-nix-settings =
       {
         config,
         inputs,

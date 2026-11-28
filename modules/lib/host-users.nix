@@ -160,10 +160,7 @@ in
       overrides =
         { pkgs, lib, ... }:
         {
-          # mkAfter places these after the person's own packages: modules are collected
-          # breadth-first and merged in reverse, so a module's own list definitions
-          # follow only those of its direct imports (world assumption A344).
-          home.packages = lib.mkAfter [
+          home.packages = [
             pkgs.aeneas
             (lib.hiPrio pkgs.charon)
             pkgs.elan

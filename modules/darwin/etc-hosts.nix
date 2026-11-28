@@ -20,7 +20,7 @@ let
   inherit (config.flake.lib) etcHostsSplice;
 in
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-etc-hosts =
     {
       config,
       lib,

@@ -43,7 +43,7 @@
   "n": 6,
   "readers": "R4",
   "question": "Which hosts can decrypt the ntfy-alerter token?",
-  "key": "`share = true` at `modules/nixos/ntfy-alerter.nix:23-25`; recipients are the 9 hosts plus cameron under `vars/shared/ntfy-alerter/token/`; judged by `lib/shared-vars-recipients.nix:1-15`",
+  "key": "`share = true` at `modules/system/ntfy-alerter.nix:23-25`; recipients are the 9 hosts plus cameron under `vars/shared/ntfy-alerter/token/`; judged by `lib/shared-vars-recipients.nix:1-15`",
   "pathToday": "3",
   "trap": "Darwin hosts read it through `darwin/otel-collector-agent.nix:319`"
  },

@@ -3,7 +3,7 @@
 # so the garbage collector alone cannot reclaim them.
 # The launchd environment has a minimal PATH, so find is referenced by store path.
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-nix-cleanup-gcroots =
     { pkgs, ... }:
     {
       launchd.daemons.nix-cleanup-gcroots = {

@@ -1,0 +1,76 @@
+{ config, ... }:
+let
+  inherit (config.flake.lib) hosts;
+in
+{
+  flake.modules.darwin.base-essentials =
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+    {
+      # Passwordless sudo for primary admin user
+      security.sudo.extraConfig = ''
+        ${config.system.primaryUser} ALL=(ALL) NOPASSWD: ALL
+      '';
+
+      security.pam.services.sudo_local.touchIdAuth = lib.mkDefault true;
+
+      # Default of 6 is exhausted by agent forwarding before the right key is
+      # offered: the Bitwarden SSH agent commonly holds 10+ keys.
+      services.openssh.extraConfig = lib.mkDefault ''
+        MaxAuthTries 20
+      '';
+
+      # The nix features and trusted users every Mac shares.
+      nix.settings = {
+        experimental-features = [
+          "nix-command"
+          "flakes"
+        ];
+        trusted-users = [
+          "root"
+          "@admin" # darwin's wheel equivalent
+          # macOS ships group wheel (gid 0) with root as its only member, so
+          # this grants nothing beyond "root" above. It is kept fleet-wide so
+          # every darwin host states one trust set rather than three hosts
+          # carrying it and a fourth silently omitting it.
+          "@wheel"
+        ];
+      };
+
+      # Match GID to a fresh Nix installation: the DeterminateSystems installer,
+      # which installed every darwin host here, gives nixbld gid 350. See
+      # https://github.com/DeterminateSystems/nix-installer/pull/1123
+      #
+      # Plain rather than lib.mkDefault: nix-darwin's modules/misc/ids.nix sets
+      # `lib.mkDefault (if stateVersion < 5 then 30000 else 350)`, and every
+      # host here has stateVersion 4 in the registry, so a second mkDefault
+      # ties with it and fails evaluation. A host whose nixbld group really is
+      # 30000 must say so with lib.mkForce; a mismatch surfaces as an
+      # activation error, not silently.
+      ids.gids.nixbld = 350;
+
+      # The host's state version, from its registry record
+      # (flake.fleet.hosts.<host>.stateVersion, modules/lib/hosts.nix): the
+      # version the Mac was first set up with.
+      system.stateVersion = hosts.${config.networking.hostName}.stateVersion;
+
+      # Timezone for all darwin machines
+      time.timeZone = "America/New_York";
+
+      # Basic packages
+      environment.systemPackages = with pkgs; [
+        vim
+        git
+      ];
+
+      # Zsh configuration (system-level)
+      programs.zsh.enable = true;
+
+      # Note: zsh completions for nix-installed packages are configured
+      # per-user in home-manager
+    };
+}

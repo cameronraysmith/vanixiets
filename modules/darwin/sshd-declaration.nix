@@ -21,7 +21,7 @@
 # users.users.<name>.openssh.authorizedKeys.keys wiring (meta.sshKeys).
 { lib, ... }:
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-sshd-declaration =
     { config, ... }:
     {
       options.declaredSshd.serving = lib.mkOption {

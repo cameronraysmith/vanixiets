@@ -9,5 +9,5 @@ let
 in
 {
   flake.modules.nixos.base-nix-package = nixPackage;
-  flake.modules.darwin.base = nixPackage;
+  flake.modules.darwin.base-nix-package = nixPackage;
 }

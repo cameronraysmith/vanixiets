@@ -138,7 +138,7 @@
   # definition in the tools module would fail to evaluate for them.
   # Marketplace consumers install it directly from upstream instead (see the
   # companion skills in the consuming-marketplace-plugins guide).
-  flake.modules.homeManager.ai =
+  flake.modules.homeManager.ai-omnigraph =
     {
       config,
       options,

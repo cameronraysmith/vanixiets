@@ -93,6 +93,6 @@ let
     };
 in
 {
-  flake.modules.homeManager.ai = content;
+  flake.modules.homeManager.ai-pi = content;
   flake.modules.homeManager.pi = content;
 }

@@ -4,7 +4,7 @@
 # AC never sleeps so every darwin host stays reachable for deployment and remote builds.
 { ... }:
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-pmset =
     { config, lib, ... }:
     let
       cfg = config.custom.pmset;

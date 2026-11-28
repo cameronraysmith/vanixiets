@@ -98,7 +98,7 @@ in
     inherit (config.flake.lib.sopsBootInstallObligations) failures;
   };
 
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-sops-boot-install =
     { config, ... }:
     {
       launchd.daemons = lib.mapAttrs' (

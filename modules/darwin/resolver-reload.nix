@@ -90,7 +90,7 @@ in
     inherit (config.flake.lib.resolverReloadObligations) failures;
   };
 
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-resolver-reload =
     { config, ... }:
     let
       targets = resolverTargets config.environment.etc;

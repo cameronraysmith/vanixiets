@@ -30,7 +30,7 @@ in
         });
       };
 
-    darwin.base =
+    darwin.base-mosh =
       { pkgs, ... }:
       {
         # macOS has no declarative packet filter here: pf loads only Apple's

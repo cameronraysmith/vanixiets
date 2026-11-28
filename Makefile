@@ -118,7 +118,7 @@ bootstrap: install-nix install-direnv
 # 'make verify' runs 'nix flake --help'.
 #
 # nix-command and flakes is also the set every host declares
-# (modules/system/nix-settings.nix:9-12 for NixOS, modules/darwin/base.nix:17-20
+# (modules/system/nix-settings.nix:9-12 for NixOS, modules/darwin/base-essentials.nix:29-32
 # for darwin), so bootstrap and the fleet agree. auto-allocate-uids, which
 # modules/darwin/nix-settings.nix:55-59 merges into the darwin set, is
 # deliberately omitted. The experimental feature only makes Nix accept the

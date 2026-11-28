@@ -3,7 +3,7 @@ let
   managedConfigsModule = config.flake.modules.homeManager.managedConfigs;
 in
 {
-  flake.modules.homeManager.ai =
+  flake.modules.homeManager.ai-codex =
     {
       pkgs,
       config,

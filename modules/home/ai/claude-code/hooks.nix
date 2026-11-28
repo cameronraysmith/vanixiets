@@ -8,7 +8,7 @@ let
 in
 {
   flake.modules = {
-    homeManager.ai.imports = [ config.flake.modules.homeManager.claude-code-hooks ];
+    homeManager.ai-claude-code.imports = [ config.flake.modules.homeManager.claude-code-hooks ];
 
     homeManager.claude-code-hooks =
       {

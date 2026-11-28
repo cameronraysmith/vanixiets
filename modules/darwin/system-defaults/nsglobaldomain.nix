@@ -1,7 +1,7 @@
 # macOS NSGlobalDomain settings (system-wide preferences)
 { ... }:
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-system-defaults =
     {
       config,
       lib,

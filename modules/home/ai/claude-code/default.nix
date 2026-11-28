@@ -6,7 +6,7 @@ let
 in
 {
   flake.modules = {
-    homeManager.ai =
+    homeManager.ai-claude-code =
       {
         pkgs,
         config,

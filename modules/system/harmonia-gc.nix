@@ -96,7 +96,7 @@ in
 
   fleetObligations.harmoniaGcObligations.failures = harmoniaGcObligations.failures;
 
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-harmonia-gc =
     { config, pkgs, ... }:
     {
       imports = [ inputs.harmonia.darwinModules.harmonia ];

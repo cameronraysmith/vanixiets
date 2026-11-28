@@ -1,8 +1,8 @@
 # The one definition of the NixOS base: the parts every NixOS host imports.
 # A part is a flake.modules.nixos module defined in one file and named here.
-# The order is significant: list options such as nix substituters and system
-# packages merge their parts' definitions in import order, so reordering the
-# entries changes the hosts.
+# A list option that two parts define, such as nix substituters, merges their
+# definitions in import order, so reordering the entries can change the hosts;
+# system packages are sorted instead (system/package-order.nix).
 { config, ... }:
 {
   flake.lib.nixosBaseParts = [
@@ -34,6 +34,7 @@
     "base-nix-package"
     "base-nix-settings"
     "base-nix-tarmac"
+    "base-package-order"
     "secrets"
     "base-command-not-found"
     "base-sshd-max-auth-tries"

@@ -35,12 +35,17 @@ A host's configuration, a home configuration or a check SHALL be able to take on
 
 ### Requirement: Restating the base settings or the agent tooling changes nothing delivered beyond declared order
 
-When the base settings or the agent tooling are restated as parts lists, every host and home configuration SHALL deploy or activate the same members in every list it holds, with the same accounts and groups and the same uid and gid for each; the only differences delivered SHALL be the member order of its installed packages and of the agent tooling's three review bindings, declared in advance with the hosts and homes they reach. This relies on A344, A375, A376 and A377.
+When the base settings or the agent tooling are restated as parts lists, every host and home configuration SHALL deploy or activate the same members in every list it holds, with the same accounts and groups and the same uid and gid for each, and SHALL differ only in member order declared in advance. This relies on A344, A375, A376 and A377.
+
+#### Scenario: A restatement step's declared differences are read
+
+- **WHEN** the differences a restatement step declares in advance are read
+- **THEN** each is the member order of a configuration's installed packages, of the agent tooling's three review bindings or of a kind of Homebrew entry a Mac installs, and each names the hosts and homes it reaches
 
 #### Scenario: A restatement step is compared with its base commit
 
 - **WHEN** a restatement step's host and home configurations and checks are set beside those of its base commit
-- **THEN** every difference is one the step declared, every declared difference occurred, and each differing configuration differs only in the member order of its installed packages or of the three review bindings
+- **THEN** every difference is one the step declared, every declared difference occurred, and each differing configuration differs only in the member order of its installed packages, of the three review bindings or of a kind of Homebrew entry
 
 #### Scenario: A Mac is deployed after the restatement
 
@@ -54,5 +59,5 @@ When the base settings or the agent tooling are restated as parts lists, every h
 
 #### Scenario: Something other than declared member order differs
 
-- **WHEN** the comparison of a restatement step finds a configuration whose lists differ in their members, whose accounts, groups or identifiers differ, or anything delivered that differs other than in the member order of its installed packages or of the three review bindings, including a reordered activation step or configuration file
+- **WHEN** the comparison of a restatement step finds a configuration whose lists differ in their members, whose accounts, groups or identifiers differ, or anything delivered that differs other than in the member order of its installed packages, of the three review bindings or of a kind of Homebrew entry, including a reordered activation step or configuration file
 - **THEN** the step is not accepted, the difference is reported and recorded as an open question, and it is never declared as an accepted difference

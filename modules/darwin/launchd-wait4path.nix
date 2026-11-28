@@ -4,7 +4,7 @@
 # nix-darwin's `command` and `script` start the job through /bin/wait4path;
 # a job starting at load or kept alive must use them or prefix it itself.
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-launchd-wait4path =
     { config, lib, ... }:
     let
       exposed =

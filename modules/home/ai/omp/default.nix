@@ -521,7 +521,7 @@ let
     };
 in
 {
-  flake.modules.homeManager.ai =
+  flake.modules.homeManager.ai-omp =
     { lib, ... }:
     {
       imports = [ content ];

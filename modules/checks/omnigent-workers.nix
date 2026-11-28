@@ -23,6 +23,7 @@
           extraSpecialArgs.osConfig = null;
           modules = [
             config.flake.modules.homeManager.omnigent-worker
+            config.flake.modules.homeManager.package-order
             {
               home.username = "omnigent-fixture";
               home.homeDirectory =

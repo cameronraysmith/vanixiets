@@ -5,7 +5,7 @@
 # screen is unlocked, and again if that holder then exits.
 { ... }:
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-secure-input-watch =
     { pkgs, ... }:
     let
       thresholdSeconds = 600;

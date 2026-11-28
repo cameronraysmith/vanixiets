@@ -17,7 +17,7 @@ A `mkStructuralCheck` pair classifies each check by the string context of its ow
 - The allow-list is declared once at `flake.lib.checkSourceAllowList` as a list of `{ name; reason; }` attrsets and ends this change holding exactly `gitleaks`.
 - The classifier uses only `builtins.getContext`, `builtins.toJSON`, `builtins.unsafeDiscardStringContext`, and `drvAttrs`; it never calls `builtins.readFile` on a `.drv` path or `builtins.storePath`.
 - No check's behaviour changes; each edited check prints the same `OK:` lines after its edit as before.
-- Path literals are relative to the module file: `../../../../secrets/...` from `modules/home/users/<user>/default.nix`, `../../secrets/bridge` from `modules/nixos/hm-sops-bridge.nix`, `./assets` from `modules/home/ai/openspec/default.nix`, `../..` as the fileset root from `modules/checks/validation.nix`, `../.` from `modules/formatting.nix`.
+- Path literals are relative to the module file: `../../../../secrets/...` from `modules/home/users/<user>/default.nix`, `../../secrets/bridge` from `modules/system/hm-sops-bridge.nix`, `./assets` from `modules/home/ai/openspec/default.nix`, `../..` as the fileset root from `modules/checks/validation.nix`, `../.` from `modules/formatting.nix`.
 - Verification of nix-managed outputs is by `nix eval` for evaluation-only edits and `nix build` for derivations, never by reading the source; each step below names which.
 - No edit to gitea-mq, `landing.toml`, nixbot configuration, `.github/workflows/`, `apm.lock.yaml`, or any upstream project; no upstream filing.
 - Every new file must be tracked by git before a flake evaluation can see it (`modules/README.md`); the orchestrator commits, and workers stage nothing.
@@ -29,7 +29,7 @@ A `mkStructuralCheck` pair classifies each check by the string context of its ow
 - Modify `modules/checks/validation.nix`: `srcOf` helper and five check bodies.
 - Modify `modules/formatting.nix`: `treefmt.projectRoot` from the enabled formatters' `includes`.
 - Modify `modules/home/users/{christophersmith,crs58,janettesmith,raquel,tara,ubuntu}/default.nix`: `defaultSopsFile` path literal.
-- Modify `modules/nixos/hm-sops-bridge.nix`: `sopsFile` path literal.
+- Modify `modules/system/hm-sops-bridge.nix`: `sopsFile` path literal.
 - Modify `modules/home/ai/openspec/default.nix`: `assetsDir = ./assets` and `defaultText`.
 - Create `scripts/check-source-audit.sh`; modify `justfile` with the `check-source-audit` recipe.
 
@@ -286,7 +286,7 @@ Expected: build exit 0; the JSON is a one-element list naming `gitleaks`.
 **Files:**
 
 - Modify: `modules/home/users/{christophersmith,crs58,janettesmith,raquel,tara,ubuntu}/default.nix`
-- Modify: `modules/nixos/hm-sops-bridge.nix`
+- Modify: `modules/system/hm-sops-bridge.nix`
 - Modify: `modules/home/ai/openspec/default.nix`
 
 - [ ] **Step 1: Rewrite the six `defaultSopsFile` values.**
@@ -299,7 +299,7 @@ Expected: a store path ending in `-secrets.yaml` with no `-source/` component.
 
 - [ ] **Step 2: Rewrite the bridge `sopsFile`.**
 
-In `modules/nixos/hm-sops-bridge.nix` replace `inputs.self + "/secrets/bridge/${userCfg.sopsIdentity}-age-key.enc"` with `../../secrets/bridge + "/${userCfg.sopsIdentity}-age-key.enc"`.
+In `modules/system/hm-sops-bridge.nix` replace `inputs.self + "/secrets/bridge/${userCfg.sopsIdentity}-age-key.enc"` with `../../secrets/bridge + "/${userCfg.sopsIdentity}-age-key.enc"`.
 
 Run: `nix eval --json .#nixosConfigurations.magnetite.config.sops.secrets --apply 'ss: map (s: s.sopsFile) (builtins.attrValues ss)'`.
 

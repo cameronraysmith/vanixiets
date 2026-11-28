@@ -1,25 +1,12 @@
 #!/usr/bin/env python3
-"""drv-order-trace.py BEFORE.drv AFTER.drv
-
-Follows two derivations down their changed inputs with `nix-stock derivation
-show` and judges every difference against the declared reorders of the
-change name-the-parts-of-base-and-ai (design D4):
-
-  - a derivation whose own fields are equal once its changed inputs' paths
-    (and its own output paths) are substituted: accepted;
-  - structuredAttrs.chosenOutputs holding the same entries in another order,
-    in system-path, system-applications, home-manager-path,
-    home-manager-fonts or home-manager-applications: accepted;
-  - structuredAttrs.value.keybindings.prs holding the same three bindings
-    (m "enqueue", M "enqueue stack", C "code review") in another order, in
-    gh-dash-config.yml: accepted;
-  - anything else (another field, another derivation, an input present on one
-    side only, same-named inputs that cannot be paired): rejected.
-
-Prints one line per changed derivation and exits 1 if anything is rejected.
-Same-named inputs (one user-environment per account, say) are paired by the
-number of input derivations they share.
-"""
+"""drv-order-trace.py BEFORE.drv AFTER.drv: follows both derivations down their
+changed inputs (`nix-stock derivation show`) and accepts only a derivation whose
+fields are equal once changed paths are substituted, the order of
+structuredAttrs.chosenOutputs (same entries) in the profile builds in PROFILES,
+the order of the three gh-dash `prs` keybindings (m, M, C), and the order of
+lines within each section of a Brewfile whose sections are the same. Anything
+else, or an input that cannot be paired, is rejected; exits 1 on any. Same-named
+inputs are paired by shared input derivations, then by closure overlap."""
 import json
 import re
 import subprocess
@@ -35,6 +22,7 @@ PROFILES = {
 }
 GH_DASH = "gh-dash-config.yml.drv"
 GH_DASH_BINDINGS = Counter({("m", "enqueue"): 1, ("M", "enqueue stack"): 1, ("C", "code review"): 1})
+BREWFILE = "Brewfile.drv"
 
 cache = {}
 
@@ -48,6 +36,16 @@ def show(p):
         d = d.get("derivations", d)
         cache[p] = next(iter(d.values()))
     return cache[p]
+
+
+closures = {}
+
+
+def closure(p):
+    if p not in closures:
+        out = subprocess.run(["nix-store", "-qR", p], capture_output=True, text=True, check=True).stdout
+        closures[p] = set(out.split())
+    return closures[p]
 
 
 def full(p):
@@ -80,6 +78,18 @@ def same_entries(x, y):
     return isinstance(x, list) and isinstance(y, list) and Counter(map(json.dumps, x)) == Counter(map(json.dumps, y))
 
 
+def brewfile_sections(text):
+    sections = []
+    for line in text.split("\n"):
+        if line.startswith("# "):
+            sections.append((line, Counter()))
+        elif sections:
+            sections[-1][1][line] += 1
+        else:
+            return None
+    return sections
+
+
 def judge(drv, field, x, y):
     if drv in PROFILES and field == "structuredAttrs.chosenOutputs" and same_entries(x, y):
         return "accepted", f"{field}: same {len(x)} entries, order differs"
@@ -87,6 +97,10 @@ def judge(drv, field, x, y):
         got = Counter((b.get("key"), b.get("name")) for b in x)
         if got == GH_DASH_BINDINGS:
             return "accepted", f"{field}: the three declared bindings, order differs"
+    if drv == BREWFILE and field == "structuredAttrs.text" and isinstance(x, str) and isinstance(y, str):
+        sx, sy = brewfile_sections(x), brewfile_sections(y)
+        if sx is not None and sx == sy:
+            return "accepted", f"{field}: the same lines in each of the same {len(sx)} sections, order differs"
     return "REJECTED", f"{field}: {str(x)[:200]!r} -> {str(y)[:200]!r}"
 
 
@@ -113,7 +127,10 @@ def walk(a, b, depth=0):
         while xs and ys:
             x, y = max(
                 ((x, y) for x in xs for y in ys),
-                key=lambda p: len(set(inputs(show(p[0]))) & set(inputs(show(p[1])))),
+                key=lambda p: (
+                    len(set(inputs(show(p[0]))) & set(inputs(show(p[1])))),
+                    len(closure(p[0]) & closure(p[1])),
+                ),
             )
             xs.remove(x)
             ys.remove(y)

@@ -2,7 +2,7 @@
 
 ### Requirement: Each aspect is one definition importing its listed parts
 
-`flake.modules.nixos.base`, `flake.modules.darwin.base` and `flake.modules.homeManager.ai` SHALL each have exactly one definition, in its list file, importing the class's modules named by `flake.lib.nixosBaseParts`, `flake.lib.darwinBaseParts` or `flake.lib.aiParts`, in list order.
+`flake.modules.nixos.base`, `flake.modules.darwin.base` and `flake.modules.homeManager.ai` SHALL each have exactly one definition, in its list file, importing the class's modules named by `flake.lib.nixosBaseParts`, `flake.lib.darwinBaseParts` or `flake.lib.homeAiParts`, in list order.
 
 Trust boundary: this fixes where membership is written and that each part is a separately importable module. It does not fix the order list options take, which import depth decides (A344, A375).
 
@@ -13,8 +13,8 @@ Trust boundary: this fixes where membership is written and that each part is a s
 
 #### Scenario: The lists are read
 
-- **WHEN** `flake.lib.nixosBaseParts`, `flake.lib.darwinBaseParts` and `flake.lib.aiParts` are evaluated
-- **THEN** they hold 33, 29 and 15 names, each an attribute of `flake.modules.nixos`, `flake.modules.darwin` or `flake.modules.homeManager`
+- **WHEN** `flake.lib.nixosBaseParts`, `flake.lib.darwinBaseParts` and `flake.lib.homeAiParts` are evaluated
+- **THEN** they hold the names design D2 lists for each, plus `base-package-order` in both base lists, each an attribute of `flake.modules.nixos`, `flake.modules.darwin` or `flake.modules.homeManager`
 
 #### Scenario: Every former contribution has a name
 
@@ -59,19 +59,29 @@ Trust boundary: definition sites and listing only; not whether a part belongs, n
 
 ### Requirement: Each step is accepted on its own derivation comparison
 
-Each step SHALL be one commit accepted by `just drv-diff` against an allow-list naming exactly the attributes it changes, and by `drv-order-trace.py` over every changed toplevel and home, which accepts at a leaf only `chosenOutputs` order of a named profile build or the order of the three `gh-dash` bindings.
+Each step SHALL be one commit accepted by `just drv-diff` against an allow-list naming exactly the attributes it changes, and by `drv-order-trace.py` over every changed toplevel and home.
 
 Trust boundary: no attribute moves undeclared and no other field differs; what profiles link is compared on builds before landing (A376).
 
+#### Scenario: A leaf differs only in an accepted order
+
+- **WHEN** `drv-order-trace.py` compares a leaf derivation that differs between the step's parent and its commit
+- **THEN** it accepts the leaf only when the difference is the `chosenOutputs` order of a named profile build, the order of the three `gh-dash` bindings, or the order of lines within the sections of a `Brewfile` whose sections hold the same lines
+
 #### Scenario: A leaf differs in another field
 
-- **WHEN** `drv-order-trace.py` finds a leaf derivation differing in any field other than `structuredAttrs.chosenOutputs` of `system-path`, `system-applications`, `home-manager-path`, `home-manager-fonts` or `home-manager-applications`, or `structuredAttrs.value.keybindings.prs` of `gh-dash-config.yml` holding exactly the three measured bindings, even when it holds the same entries, words or lines
+- **WHEN** `drv-order-trace.py` finds a leaf derivation differing in any field other than `structuredAttrs.chosenOutputs` of `system-path`, `system-applications`, `home-manager-path`, `home-manager-fonts` or `home-manager-applications`, `structuredAttrs.value.keybindings.prs` of `gh-dash-config.yml` holding exactly the three measured bindings, or `structuredAttrs.text` of `Brewfile` with the same section headings in the same order and the same lines in each section, even when it holds the same entries, words or lines
 - **THEN** it exits non-zero naming the field, the step is not accepted, and the field is never added to an allow-list
 
 #### Scenario: The reordered profiles are built
 
 - **WHEN** every build the trace accepts under `chosenOutputs` order is built at the step's parent and at its commit
 - **THEN** every symlink, listed without following links, has the same path and the same `readlink` target in both
+
+#### Scenario: A Brewfile's lines move within a section
+
+- **WHEN** `drv-order-trace.py` compares a `Brewfile.drv` whose sections have the same headings in the same order and the same multiset of lines in each, in another order within a section
+- **THEN** it accepts the difference; a line that moves to another section, a heading that differs or moves, or a line added or removed is rejected
 
 #### Scenario: The NixOS step
 

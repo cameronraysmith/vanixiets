@@ -20,7 +20,7 @@
 # both platforms.
 { ... }:
 {
-  flake.modules.homeManager.ai =
+  flake.modules.homeManager.ai-moshi =
     {
       config,
       lib,

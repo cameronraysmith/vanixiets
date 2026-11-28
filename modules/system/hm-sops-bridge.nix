@@ -182,7 +182,5 @@ let
 in
 {
   flake.modules.nixos = nixos;
-  flake.modules.darwin = darwin // {
-    base.imports = [ darwin.hm-sops-bridge ];
-  };
+  flake.modules.darwin = darwin;
 }

@@ -1,77 +1,43 @@
+# The one definition of the darwin base: the parts every Mac imports.
+# A part is a flake.modules.darwin module defined in one file and named here.
+# A list option that two parts define merges their definitions in import
+# order, so reordering the entries can change the hosts; package lists and the
+# Brewfile's taps, brews and casks are sorted instead (system/package-order.nix).
 { config, ... }:
-let
-  inherit (config.flake.lib) hosts;
-in
 {
-  flake.modules.darwin.base =
-    {
-      config,
-      pkgs,
-      lib,
-      ...
-    }:
-    {
-      # Passwordless sudo for primary admin user
-      security.sudo.extraConfig = ''
-        ${config.system.primaryUser} ALL=(ALL) NOPASSWD: ALL
-      '';
-
-      security.pam.services.sudo_local.touchIdAuth = lib.mkDefault true;
-
-      # Default of 6 is exhausted by agent forwarding before the right key is
-      # offered: the Bitwarden SSH agent commonly holds 10+ keys.
-      services.openssh.extraConfig = lib.mkDefault ''
-        MaxAuthTries 20
-      '';
-
-      # Nix configuration (from test-clan nixos base patterns)
-      nix.settings = {
-        experimental-features = [
-          "nix-command"
-          "flakes"
-        ];
-        trusted-users = [
-          "root"
-          "@admin" # darwin's wheel equivalent
-          # macOS ships group wheel (gid 0) with root as its only member, so
-          # this grants nothing beyond "root" above. It is kept fleet-wide so
-          # every darwin host states one trust set rather than three hosts
-          # carrying it and a fourth silently omitting it.
-          "@wheel"
-        ];
-      };
-
-      # Match GID to a fresh Nix installation; the DeterminateSystems installer
-      # has used 350 since Aug 2024 and every darwin host here was installed
-      # with it. See
-      # https://github.com/DeterminateSystems/nix-installer/pull/1123
-      #
-      # Plain rather than lib.mkDefault: nix-darwin's modules/misc/ids.nix sets
-      # `lib.mkDefault (if stateVersion < 5 then 30000 else 350)`, and every
-      # host here has stateVersion 4 in the registry, so a second mkDefault
-      # ties with it and fails evaluation. A host whose nixbld group really is
-      # 30000 must say so with lib.mkForce; a mismatch surfaces as an
-      # activation error, not silently.
-      ids.gids.nixbld = 350;
-
-      # The host's state version, from its registry record
-      # (flake.fleet.hosts.<host>.stateVersion, modules/lib/hosts.nix): the
-      # version the Mac was first set up with.
-      system.stateVersion = hosts.${config.networking.hostName}.stateVersion;
-
-      # Timezone for all darwin machines
-      time.timeZone = "America/New_York";
-
-      # Basic packages
-      environment.systemPackages = with pkgs; [
-        vim
-        git
-      ];
-
-      # Zsh configuration (system-level)
-      programs.zsh.enable = true;
-
-      # Note: zsh completions for nix-installed packages are configured
-      # per-user in home-manager
-    };
+  flake.lib.darwinBaseParts = [
+    "base-essentials"
+    "base-etc-hosts"
+    "base-homebrew"
+    "base-launchd-wait4path"
+    "base-nix-cleanup-gcroots"
+    "base-nix-eval-jobs"
+    "base-nix-settings"
+    "base-pmset"
+    "base-resolver-reload"
+    "base-secure-input-watch"
+    "base-sops-boot-install"
+    "base-sshd-declaration"
+    "base-system-defaults"
+    "base-shared-vars-recipients"
+    "base-source-context-obligations"
+    "hm-sops-bridge"
+    "base-nixpkgs"
+    "base-caches"
+    "cli-host-inspection"
+    "base-commit-signing-key"
+    "fleet-deploy-target"
+    "base-harmonia-gc"
+    "base-mesh-dns"
+    "mesh-hosts"
+    "base-mosh"
+    "base-nix-download-timeout"
+    "base-nix-optimization"
+    "base-nix-package"
+    "base-package-order"
+    "secrets"
+  ];
+  flake.modules.darwin.base.imports = map (
+    name: config.flake.modules.darwin.${name}
+  ) config.flake.lib.darwinBaseParts;
 }

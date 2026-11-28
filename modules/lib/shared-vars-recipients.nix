@@ -77,5 +77,5 @@ in
     inherit sharedVarsObligations;
   };
   flake.modules.nixos.base-shared-vars-recipients.imports = [ assertionsModule ];
-  flake.modules.darwin.base.imports = [ assertionsModule ];
+  flake.modules.darwin.base-shared-vars-recipients.imports = [ assertionsModule ];
 }

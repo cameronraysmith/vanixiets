@@ -13,6 +13,4 @@ in
       "playwright-cli"
     ];
   };
-
-  flake.modules.homeManager.ai.imports = [ modules.ai-capabilities ];
 }

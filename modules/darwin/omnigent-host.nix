@@ -107,6 +107,7 @@ in
           extraSpecialArgs.osConfig = null;
           modules = [
             flakeConfig.flake.modules.homeManager.omnigent-worker
+            flakeConfig.flake.modules.homeManager.package-order
             deliveries.${name}.homeModule
             flakeConfig.flake.lib.sourceContextObligations.homeModule
             { vcs.author = flakeConfig.flake.lib.vcsAuthor flakeConfig.flake.users.${worker.owner}.meta; }

@@ -3,7 +3,7 @@
 { ... }:
 {
   flake.modules = {
-    darwin.base =
+    darwin.base-homebrew =
       {
         config,
         lib,

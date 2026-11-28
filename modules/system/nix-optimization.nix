@@ -1,8 +1,7 @@
 {
   # Advanced nix settings: store optimization, platforms
-  # Auto-merges into base namespace
   # Garbage collection lives in modules/system/harmonia-gc.nix
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-nix-optimization =
     { pkgs, lib, ... }:
     {
       # Additional nix settings

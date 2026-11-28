@@ -29,6 +29,7 @@
       modules = config.flake.users.${user}.modules ++ [
         config.flake.lib.sourceContextObligations.homeModule
         config.flake.modules.homeManager.secrets
+        config.flake.modules.homeManager.package-order
         { _module.args.flake = config.flake.lib.homeFlake; }
       ];
     };

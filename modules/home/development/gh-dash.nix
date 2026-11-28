@@ -66,7 +66,7 @@
     #
     # Custom keybindings are matched before built-ins (internal/tui/ui.go), so `C`
     # shadows gh-dash's own checkout binding; Space still checks out.
-    ai =
+    ai-gh-dash =
       { lib, config, ... }:
       {
         programs.gh-dash.settings.keybindings.prs = lib.mkIf config.programs.tuicr.enable (

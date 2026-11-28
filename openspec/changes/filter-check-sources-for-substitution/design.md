@@ -92,7 +92,7 @@ The scripts test for directory existence and print `SKIP` when a directory is ab
 ### D6: sops and openspec paths become module-relative path literals
 
 - **Boundary**: source-versus-delivered; the home and system closures currently deliver the whole tree to reach one file each.
-- **Choice**: `defaultSopsFile = ../../../../secrets/home-manager/users/<user>/secrets.yaml` in each of `modules/home/users/{christophersmith,crs58,janettesmith,raquel,tara,ubuntu}/default.nix`; `sopsFile = ../../secrets/bridge/${userCfg.sopsIdentity}-age-key.enc` in `modules/nixos/hm-sops-bridge.nix` (as `../../secrets/bridge + "/${...}"` so interpolation stays a path); `assetsDir = ./assets` in `modules/home/ai/openspec/default.nix`, with `defaultText` updated to match.
+- **Choice**: `defaultSopsFile = ../../../../secrets/home-manager/users/<user>/secrets.yaml` in each of `modules/home/users/{christophersmith,crs58,janettesmith,raquel,tara,ubuntu}/default.nix`; `sopsFile = ../../secrets/bridge/${userCfg.sopsIdentity}-age-key.enc` in `modules/system/hm-sops-bridge.nix` (as `../../secrets/bridge + "/${...}"` so interpolation stays a path); `assetsDir = ./assets` in `modules/home/ai/openspec/default.nix`, with `defaultText` updated to match.
 - **Rationale**: a path literal inside the flake tree is copied to the store as its own content-hashed path, so the manifest and home-files derivations reference `.../<hash>-secrets.yaml` and `.../<hash>-assets` instead of the whole tree; this is the same mechanism every `sopsFile = ./secrets.yaml` in nixpkgs-style configurations relies on.
 - **Alternatives considered**: `lib.fileset.toSource` for a single file, rejected as heavier than a literal with no benefit; leaving the toplevels and allow-listing them, rejected in D3.
 

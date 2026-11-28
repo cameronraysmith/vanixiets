@@ -1,4 +1,3 @@
-{ config, ... }:
 {
   # home-manager ships modules/programs/worktrunk.nix as of 17903129, so the
   # third-party module this aspect used to import
@@ -11,7 +10,6 @@
   # claudeCodeIntegration tree. package is mkPackageOption with nullable, so
   # the worktrunk-bin override below still applies. Nothing this aspect used
   # was dropped, so the import goes and the settings stay.
-  flake.modules.homeManager.ai.imports = [ config.flake.modules.homeManager.worktrunk ];
   flake.modules.homeManager.worktrunk =
     { pkgs, ... }:
     {

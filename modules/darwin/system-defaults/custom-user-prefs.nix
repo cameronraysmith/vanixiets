@@ -1,7 +1,7 @@
 # macOS custom user preferences for specific applications
 { ... }:
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-system-defaults =
     {
       config,
       lib,

@@ -13,7 +13,7 @@
 # home.packages because it is a distinct binary name.
 { ... }:
 {
-  flake.modules.homeManager.ai =
+  flake.modules.homeManager.ai-opencode =
     {
       pkgs,
       config,

@@ -14,9 +14,48 @@ let
       parts = self.lib.nixosBaseParts;
       exempt = [ ];
     }
+    {
+      class = "darwin";
+      aspect = "base";
+      prefix = "base-";
+      file = "modules/darwin/base.nix";
+      parts = self.lib.darwinBaseParts;
+      exempt = [ ];
+    }
+    {
+      class = "homeManager";
+      aspect = "ai";
+      prefix = "ai-";
+      file = "modules/home/ai/default.nix";
+      parts = self.lib.homeAiParts;
+      # ai-capabilities imports these two, so no list names them.
+      exempt = [
+        "ai-skills"
+        "ai-skills-compose"
+      ];
+    }
   ];
   # Parts stated in several files on purpose, with exactly those files.
-  multiFile = { };
+  multiFile = {
+    darwin.base-system-defaults = map (n: "modules/darwin/system-defaults/${n}.nix") [
+      "custom-user-prefs"
+      "dock"
+      "finder"
+      "input-devices"
+      "loginwindow"
+      "misc-defaults"
+      "nsglobaldomain"
+      "screencapture"
+      "window-manager"
+    ];
+    homeManager.ai-claude-code = map (n: "modules/home/ai/claude-code/${n}.nix") [
+      "ccstatusline-settings"
+      "default"
+      "hooks"
+      "mcp-servers"
+      "wrappers"
+    ];
+  };
   sourcePrefix = toString self + "/";
   # The files an aspect or part is defined in, each once: a file whose
   # definition is a lib.mkMerge still counts as one file.

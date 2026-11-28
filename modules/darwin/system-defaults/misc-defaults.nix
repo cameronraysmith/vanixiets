@@ -6,7 +6,7 @@
 # - WindowManager → window-manager.nix
 { ... }:
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-system-defaults =
     {
       config,
       lib,

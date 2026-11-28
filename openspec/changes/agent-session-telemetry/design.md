@@ -303,7 +303,7 @@ The decision record's D16 sends agent traces to Langfuse Cloud as well as to Gre
   - `otel-envelope` holds this with cases `langfuseSendFailed`, `langfuseEnqueueFailed` and `langfuseStoreSendFailed`, and mutants `sendFailedExemptAnyExporter` and `sendFailedExemptAnySignal`.
   - A broken Langfuse path then shows only in the agent unit's own telemetry on `127.0.0.1:8890`: `otelcol_exporter_send_failed_spans{exporter="otlp_http/langfuse"}` rising while that exporter's `otelcol_exporter_sent_spans` stays flat.
   - Proposed, not built: a non-paging daily rule over that series, once the experiment outlasts a month.
-- **Secrets**: a shared clan var `langfuse` with hidden, persisted prompts `public-key` and `secret-key`. Precedents: `modules/nixos/postgresql-backup.nix` and `modules/nixos/r2-usage.nix` for the prompts, `modules/nixos/ntfy-alerter.nix` for the sharing.
+- **Secrets**: a shared clan var `langfuse` with hidden, persisted prompts `public-key` and `secret-key`. Precedents: `modules/nixos/postgresql-backup.nix` and `modules/nixos/r2-usage.nix` for the prompts, `modules/system/ntfy-alerter.nix` for the sharing.
   - Its script checks the `pk-lf-` and `sk-lf-` shapes.
   - Both files are secrets, deployed to magnetite and pyrite, each host a recipient under `vars/shared/langfuse/<file>/machines/` (`flake.lib.sharedVarsObligations`).
   - `otel-agent-session.service` loads them with `LoadCredential` as `langfuse-public-key` and `langfuse-secret-key`, and restarts when they change.

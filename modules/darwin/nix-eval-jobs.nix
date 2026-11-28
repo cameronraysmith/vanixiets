@@ -7,7 +7,7 @@ let
   flakeLib = config.flake.lib;
 in
 {
-  flake.modules.darwin.base =
+  flake.modules.darwin.base-nix-eval-jobs =
     {
       config,
       lib,

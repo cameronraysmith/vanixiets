@@ -1,0 +1,125 @@
+# Declared drvPath differences of the order step and the darwin and ai parts
+# lists, from its parent to its commit:
+#   just drv-diff <parent> <commit> openspec/changes/shape-the-repository-for-its-readers/drv-delta-order.txt
+# environment.systemPackages (NixOS, darwin) and home.packages (every
+# integrated home through home-manager.sharedModules, every standalone home
+# through flake.lib.mkHome, the darwin Omnigent worker homes in
+# darwin/omnigent-host.nix) are sorted by name alone, stably, and the
+# Brewfile's taps, brews and casks by name (modules/system/package-order.nix);
+# darwin base becomes the list of 30 parts in modules/darwin/base.nix and
+# homeManager.ai the list of 15 in modules/home/ai/default.nix. Before and
+# after (logs/srr-5b-state2-{parent2,commit2}-20261127-234552.json): every host's
+# systemPackages and every home's home.packages hold the same store paths with
+# the same priorities, the after order is the sorted order, and entries sharing
+# a name keep the parent's relative order; on the Macs users.knownUsers and
+# users.knownGroups are equal in members and order, and every uid and gid is
+# equal; on the NixOS hosts every user's uid and every group's gid is equal.
+# The Brewfiles have the same sections and the same lines in each; the casks
+# (and stibnite's brews) are reordered within their sections. drv-order-trace.py
+# over every toplevel, home and changed check accepts only chosenOutputs order
+# in system-path, system-applications, home-manager-path, home-manager-fonts
+# and home-manager-applications, the order of the three gh-dash bindings and
+# the Brewfile's in-section order. It rejects three leaves, each a content
+# change made on purpose: the checks skill's ladder and agent-context-vanixiets'
+# 40-fleet-and-user-conventions, two texts delivered into homes, which reach
+# apm-deps, apm-skills-compose and the checks that copy the plugin sources;
+# and packages/docs' nixos-deployment.md, whose cited path moved to
+# modules/system/hm-sops-bridge.nix (logs/srr-5b-trace-20261127-233754.log).
+# Every system path, every integrated, worker and standalone home-manager-path
+# and the Macs' system-applications link the same targets at parent and
+# commit, for every member present (logs/srr-5b-profiles-20261127-233804.log).
+# The base allow-list covers gitleaks, treefmt and ntfy-tls-verification.
+
+nixos.cinnabar  changed  # systemPackages sorted (system-path chosenOutputs); integrated homes: home.packages sorted (home-manager-path), gh-dash bindings order, the two home-delivered texts (apm-deps, apm-skills-compose)
+nixos.electrum  changed  # systemPackages sorted (system-path chosenOutputs); integrated homes: home.packages sorted (home-manager-path), gh-dash bindings order, the two home-delivered texts (apm-deps, apm-skills-compose)
+nixos.galena  changed  # systemPackages sorted (system-path chosenOutputs); integrated homes: home.packages sorted (home-manager-path), gh-dash bindings order, the two home-delivered texts (apm-deps, apm-skills-compose)
+nixos.magnetite  changed  # systemPackages sorted (system-path chosenOutputs); integrated homes: home.packages sorted (home-manager-path), gh-dash bindings order, the two home-delivered texts (apm-deps, apm-skills-compose)
+nixos.pyrite  changed  # systemPackages sorted (system-path chosenOutputs); integrated homes: home.packages sorted (home-manager-path), gh-dash bindings order, the two home-delivered texts (apm-deps, apm-skills-compose)
+nixos.scheelite  changed  # systemPackages sorted (system-path chosenOutputs); integrated homes: home.packages sorted (home-manager-path), gh-dash bindings order, the two home-delivered texts (apm-deps, apm-skills-compose)
+darwin.argentum  changed  # systemPackages sorted (system-path, system-applications); Brewfile casks sorted (and brews on stibnite); integrated homes: home-manager-path, -fonts, -applications chosenOutputs, gh-dash bindings order, the two home-delivered texts
+darwin.blackphos  changed  # systemPackages sorted (system-path, system-applications); Brewfile casks sorted (and brews on stibnite); integrated homes: home-manager-path, -fonts, -applications chosenOutputs, gh-dash bindings order, the two home-delivered texts
+darwin.rosegold  changed  # systemPackages sorted (system-path, system-applications); Brewfile casks sorted (and brews on stibnite); integrated homes: home-manager-path, -fonts, -applications chosenOutputs, gh-dash bindings order, the two home-delivered texts
+darwin.stibnite  changed  # systemPackages sorted (system-path, system-applications); Brewfile casks sorted (and brews on stibnite); integrated homes: home-manager-path, -fonts, -applications chosenOutputs, gh-dash bindings order, the two home-delivered texts; the Omnigent worker home's home.packages sorted
+home.cameron@aarch64-darwin  changed  # home.packages sorted (home-manager-path, -fonts, -applications chosenOutputs); gh-dash bindings order; the two home-delivered texts
+home.cameron@aarch64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs); gh-dash bindings order; the two home-delivered texts
+home.cameron@x86_64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs); gh-dash bindings order; the two home-delivered texts
+home.christophersmith@aarch64-darwin  changed  # home.packages sorted (home-manager-path, -fonts, -applications chosenOutputs)
+home.christophersmith@aarch64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+home.christophersmith@x86_64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+home.claude-sandbox@x86_64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs); the two home-delivered texts
+home.crs58@aarch64-darwin  changed  # home.packages sorted (home-manager-path, -fonts, -applications chosenOutputs); gh-dash bindings order; the two home-delivered texts
+home.crs58@aarch64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs); gh-dash bindings order; the two home-delivered texts
+home.crs58@x86_64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs); gh-dash bindings order; the two home-delivered texts
+home.janettesmith@aarch64-darwin  changed  # home.packages sorted (home-manager-path, -fonts, -applications chosenOutputs)
+home.janettesmith@aarch64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+home.janettesmith@x86_64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+home.raquel@aarch64-darwin  changed  # home.packages sorted (home-manager-path, -fonts, -applications chosenOutputs)
+home.raquel@aarch64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+home.raquel@x86_64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+home.tara@aarch64-darwin  changed  # home.packages sorted (home-manager-path, -fonts, -applications chosenOutputs)
+home.tara@aarch64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+home.tara@x86_64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+home.ubuntu@x86_64-linux  changed  # home.packages sorted (home-manager-path chosenOutputs)
+checks.aarch64-darwin.apps-build  changed  # builds the docs site (nixos-deployment.md path) and its agent-skills index (the checks skill's text)
+checks.aarch64-darwin.darwin-argentum  changed  # embeds darwin.argentum's toplevel
+checks.aarch64-darwin.darwin-blackphos  changed  # embeds darwin.blackphos's toplevel
+checks.aarch64-darwin.darwin-rosegold  changed  # embeds darwin.rosegold's toplevel
+checks.aarch64-darwin.darwin-stibnite  changed  # embeds darwin.stibnite's toplevel
+checks.aarch64-darwin.home-manager-crs58  changed  # embeds crs58's home: home-manager-path order; the two home-delivered texts; gh-dash bindings order
+checks.aarch64-darwin.home-manager-tara  changed  # embeds tara's home: home-manager-path order
+checks.aarch64-darwin.omnigent-worker-capabilities  changed  # its fixture worker home takes package-order like the darwin worker homes: home-manager-path order only
+checks.aarch64-darwin.omnigent-worker-darwin  changed  # builds from apm-plugins: the two home-delivered texts
+checks.aarch64-darwin.package-apm-skills-compose  changed  # builds from apm-plugins: the two home-delivered texts
+checks.aarch64-darwin.package-vanixiets-docs  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-payload  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-action-negative-control  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-negative-control  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-report  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-runner-controls  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-topology-negative-control  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-e2e-webkit-negative-control  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-linkcheck  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-typecheck  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.package-vanixiets-docs-test-unit  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.aarch64-darwin.pi-agent-environment-smoke  changed  # builds from apm-plugins: the two home-delivered texts
+checks.x86_64-linux.agent-skills-index  changed  # indexes the plugin sources: the checks skill's text
+checks.x86_64-linux.apm-deps  changed  # builds from apm-plugins: the two home-delivered texts
+checks.x86_64-linux.apm-marketplace-consumer  changed  # copies the plugin sources: the two home-delivered texts
+checks.x86_64-linux.apps-build  changed  # builds the docs site (nixos-deployment.md path) and its agent-skills index (the checks skill's text)
+checks.x86_64-linux.claude-marketplace-install  changed  # copies the plugin sources: the two home-delivered texts
+checks.x86_64-linux.deploy-docs-rehearsal  changed  # builds the docs site (nixos-deployment.md path) and its agent-skills index (the checks skill's text)
+checks.x86_64-linux.home-manager-christophersmith  changed  # embeds christophersmith's home: home-manager-path order
+checks.x86_64-linux.home-manager-claude-sandbox  changed  # embeds claude-sandbox's home: home-manager-path order; the two home-delivered texts
+checks.x86_64-linux.home-manager-crs58  changed  # embeds crs58's home: home-manager-path order; the two home-delivered texts; gh-dash bindings order
+checks.x86_64-linux.home-manager-janettesmith  changed  # embeds janettesmith's home: home-manager-path order
+checks.x86_64-linux.home-manager-raquel  changed  # embeds raquel's home: home-manager-path order
+checks.x86_64-linux.home-manager-ubuntu  changed  # embeds ubuntu's home: home-manager-path order
+checks.x86_64-linux.nixos-cinnabar  changed  # embeds nixos.cinnabar's toplevel
+checks.x86_64-linux.nixos-electrum  changed  # embeds nixos.electrum's toplevel
+checks.x86_64-linux.nixos-galena  changed  # embeds nixos.galena's toplevel
+checks.x86_64-linux.nixos-magnetite  changed  # embeds nixos.magnetite's toplevel
+checks.x86_64-linux.nixos-pyrite  changed  # embeds nixos.pyrite's toplevel
+checks.x86_64-linux.omnigent-acp-spawn-env  changed  # its cases embed, as text, the home-manager-path of magnetite's and pyrite's omnigent homes, each a declared reorder
+checks.x86_64-linux.omnigent-worker-capabilities  changed  # its fixture worker home takes package-order like the darwin worker homes: home-manager-path order only
+checks.x86_64-linux.package-apm-skills-compose  changed  # builds from apm-plugins: the two home-delivered texts
+checks.x86_64-linux.package-vanixiets-docs  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-payload  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-e2e  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-action-negative-control  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-negative-control  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-report  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-runner-controls  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-topology-negative-control  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-e2e-webkit-negative-control  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-linkcheck  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-typecheck  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.package-vanixiets-docs-test-unit  changed  # its docs source holds packages/docs/src/content/docs/tutorials/nixos-deployment.md, whose cited path moved
+checks.x86_64-linux.pi-agent-environment-smoke  changed  # builds from apm-plugins: the two home-delivered texts
+checks.x86_64-linux.pyrite-bitwarden-unlock  changed  # embeds pyrite's system-path: order only
+checks.x86_64-linux.skills-cli-discovery  changed  # copies the plugin sources: the two home-delivered texts
+checks.x86_64-linux.skills-spec-conformance  changed  # copies the plugin sources: the two home-delivered texts
+checks.x86_64-linux.structure-playwright-skill-parity  changed  # builds from apm-plugins: the two home-delivered texts
+checks.x86_64-linux.vm-test-evaluates-omnigent-worker-isolation  changed  # names the omnigent-worker-isolation test's run derivation
+vmTests.aarch64-linux.omnigent-worker-isolation  changed  # its node's homes take the two home-delivered texts; run-nixos-vm names the node closure's closure-info
+vmTests.x86_64-linux.omnigent-worker-isolation  changed  # its node's homes take the two home-delivered texts; run-nixos-vm names the node closure's closure-info

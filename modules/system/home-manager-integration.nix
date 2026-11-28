@@ -59,6 +59,8 @@ let
             useUserPackages = true;
             # Back up conflicting files instead of failing.
             backupFileExtension = "before-home-manager";
+            # Every home's packages in one sorted order (system/package-order.nix).
+            sharedModules = [ flakeConfig.flake.modules.homeManager.package-order ];
             # The pair's overrides are imported after the person's modules and
             # the attachment's extra imports.
             users = lib.mapAttrs (account: attachment: {

@@ -1,6 +1,5 @@
 { config, ... }:
 {
-  flake.modules.homeManager.ai.imports = [ config.flake.modules.homeManager.openspec ];
   flake.modules.homeManager.openspec =
     let
       managedConfigsModule = config.flake.modules.homeManager.managedConfigs;

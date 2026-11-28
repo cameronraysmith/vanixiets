@@ -31,7 +31,7 @@
 #
 # flake.modules.homeManager.secrets is the home side: a view of
 # `{ files.<f>.{path,placeholder} }` that the hm-sops-bridge modules set
-# (modules/nixos/hm-sops-bridge.nix) and that is `{ }` in a standalone home.
+# (modules/system/hm-sops-bridge.nix) and that is `{ }` in a standalone home.
 # flake.lib.secretsBackend.generatorsOf is clan's whole generator tree of a
 # host, generators of clan's own services included, for judges that need the
 # backend's own view rather than the entries a host declares: which shared
@@ -305,9 +305,7 @@ let
 in
 {
   flake.modules.nixos = nixos;
-  flake.modules.darwin = darwin // {
-    base.imports = [ darwin.secrets ];
-  };
+  flake.modules.darwin = darwin;
   flake.modules.homeManager = exportSecrets homeModule;
   flake.lib.secretsBackend.generatorsOf = hostConfig: hostConfig.clan.core.vars.generators;
 }

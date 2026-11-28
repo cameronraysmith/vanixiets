@@ -137,10 +137,7 @@ in
 {
   flake.modules.homeManager = config.flake.lib.exportAs {
     key = "atomic";
-    names = [
-      "ai"
-      "atomic"
-    ];
+    names = [ "atomic" ];
     module = content;
   };
 }

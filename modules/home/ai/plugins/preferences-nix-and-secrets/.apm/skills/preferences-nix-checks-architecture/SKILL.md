@@ -451,11 +451,17 @@ Of about 80 checks reviewed, about 60 were vacuous, tautological, duplicated, or
 One of them, `secrets-encryption-integrity` in `modules/checks/validation.nix`, passed any file that was not JSON, so a plaintext YAML secret would have passed a check whose name promised protection against exactly that.
 A vacuous check is not neutral: it costs evaluation and build time, and it signals coverage that does not exist, which suppresses the search for the real gap.
 
-The governing principle is a placement ladder ordered by cost, and every check is placed on the lowest rung that can observe its failure mode.
-A fact about configuration values belongs in a module `assertions` entry, or in an existing fleet obligation that is already evaluated on real hosts, such as the machine toplevel checks in `modules/checks/machines.nix`.
-Such a fact is then checked as a side effect of evaluating the configuration that must be evaluated anyway, against the real values rather than a fixture.
+The governing principle is a placement ladder ordered by cost, and every check is placed on the lowest rung that can observe its failure mode; `modules/checks/README.md` states the same ladder for this repository.
+
+1. A fact about one configuration's values belongs in a module `assertions` entry, or in a fleet obligation judged in the existing machine checks (`modules/checks/machines.nix`, `nixos-<host>` and `darwin-<host>`).
+   Such a fact is then checked as a side effect of evaluating the configuration that must be evaluated anyway, against the real values rather than a fixture.
+2. A fact that must also hold on hosts the machine checks skip, a fact across configurations, or a fact about the flake's structure is a check under `modules/checks/`, with a `testSizes.checks` entry beside it and a negative control in the same comparison.
+   Example: `sshd-no-keyboard-interactive.nix` compares one sshd setting on every NixOS machine of the inventory, with a mutant that must differ.
+3. Runtime behaviour, what a built system does when it runs, is a runtime test under `modules/vm-tests/`, and only on the platforms where that behaviour actually differs.
+
+The one exception to rung 1: fleet obligations run only in the machine checks, and a host whose registry record sets `checked = false` (`flake.fleet.hosts.<name>.checked`, `modules/lib/hosts.nix`) has no machine check, so a fact about one configuration's values that must hold on such a host as well is a standalone check on rung 2.
+
 A fact about our own pure logic belongs in an in-process unit test of that function, such as the nix-unit suite in `modules/home/users/lib.test.nix` that sits beside the `lib.nix` it tests, or a language-native test runner for non-Nix code.
-Only behaviour, meaning what a built artifact does when executed, needs a build-time derivation, and only on the platforms where that behaviour actually differs.
 
 The corollary is the rule an agent applies in review: a check that can be replaced by a cheaper rung of the ladder without losing a failure mode must be.
 A check that cannot name a plausible incorrect implementation it would catch, and that nothing else catches, has no rung at all and is deleted rather than re-pinned.

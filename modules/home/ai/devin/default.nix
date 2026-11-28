@@ -13,7 +13,7 @@
 # only the CLI-owned `version` key survives from the previous file.
 { config, ... }:
 {
-  flake.modules.homeManager.ai = {
+  flake.modules.homeManager.ai-devin = {
     imports = [ config.flake.modules.homeManager.devin ];
   };
 

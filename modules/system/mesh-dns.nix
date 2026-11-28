@@ -34,7 +34,7 @@ in
   # -mdnsresponder.log). /etc/resolver/zt keeps `a aaaa`
   # (modules/system/zt-dns.nix).
   # checks.x86_64-linux.darwin-mesh-resolver-flags holds every Mac to it.
-  flake.modules.darwin.base = {
+  flake.modules.darwin.base-mesh-dns = {
     environment.etc."resolver/${fleet.domain}" = {
       enable = true;
       text = lib.concatMapStrings (address: "nameserver ${address}\n") resolverAddresses + "flags aaaa\n";
