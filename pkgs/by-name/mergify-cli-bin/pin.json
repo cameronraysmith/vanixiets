@@ -1,7 +1,7 @@
 {
   "name": "mergify-cli-bin",
-  "version": "2026.11.19",
-  "realizedVersion": "2026.11.19",
+  "version": "2026.11.26",
+  "realizedVersion": "2026.11.26",
   "source": {
     "githubRelease": {
       "owner": "Mergifyio",
@@ -28,15 +28,15 @@
           }
         },
         "hashes": {
-          "x86_64-linux": "sha256-cOpck/qetjeTDsiagYAiUZRvKy4W6S38Gs34kC+ITpI=",
-          "aarch64-linux": "sha256-tH5BytaUO3WBdTrYhWCZxU6hQB0NYlIMjMMhoDq/ZmM=",
-          "x86_64-darwin": "sha256-5KsihmCsOxSLGkvIJV3zU+1Jd5LvP0fF3DEXUw5RQeM=",
-          "aarch64-darwin": "sha256-4No/O++CIt6zxkcNtd1jJ59whf6EEqSzQ54+2rvfRJc="
+          "x86_64-linux": "sha256-yag22BBK9715O70nL/7YJ0CJi+GE/nvc+1ZIU+YQ1yI=",
+          "aarch64-linux": "sha256-970/NoIj9umo06Fl0G2d73HmbnWou9YpGC39FYsSoTU=",
+          "x86_64-darwin": "sha256-/ZMyTmJ2auF3z/rnZT75PCt87S5eRwdnQKAiO9rTfYc=",
+          "aarch64-darwin": "sha256-Fn30LkU9hn6IwzzaRVcOFYW0gh4JbR3oaOzuXZN4zE8="
         }
       }
     }
   },
-  "rev": "21d1688cd21357d382a9e1a1d72c90e2cd501915",
+  "rev": "3ec032258b5d20fc79fab77c8b4dbfe98d72284b",
   "companions": [
     {
       "path": "modules/home/ai/plugins/version-control-and-forge/apm.yml",
