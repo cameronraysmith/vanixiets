@@ -41,9 +41,11 @@
 # units from each other; checks.x86_64-linux.postgresql-backup-obligations
 # judges the judge over literal fixtures.
 #
-# Imported by every NixOS base. vmTests.x86_64-linux.postgresql-backup-restore
-# drops and restores two databases from the job's own snapshot; rerun it on
-# every change to this module.
+# Imported by the host that enables it (machines/nixos/magnetite); the judge
+# reads every other host's vanixiets.postgresqlBackup.enable with `or false`.
+# vmTests.x86_64-linux.postgresql-backup-restore drops and restores two
+# databases from the job's own snapshot; rerun it on every change to this
+# module.
 { config, lib, ... }:
 let
   inherit (config.flake) modules;
@@ -290,8 +292,10 @@ let
             };
 
             systemd.services.${jobUnit}.serviceConfig = {
-              # Runs only after backup, prune and check have all succeeded.
-              ExecStartPost = [ "${stamp}" ];
+              # Runs only after backup, prune and check have all succeeded, and
+              # after observability-notify's resolve hook: the resolve notice is
+              # sent first, so a failed stamp reaches OnFailure after it.
+              ExecStartPost = lib.mkAfter [ "${stamp}" ];
               # restic refuses the backup's lock while any exclusive lock
               # is in the repository, stale or not, and nixpkgs runs
               # `unlock` only after the backup, so a run interrupted in its

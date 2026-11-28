@@ -44,7 +44,7 @@ The wifi credentials are shared clan vars under `vars/shared/wifi.fleet/`, so th
 
 A USB-C keyboard, or a USB-C-to-USB-A adapter for a USB-A keyboard, must be physically in the room before any boot in this procedure, and this is a gate rather than a recommendation.
 A MacBookPro14,1 has USB-C ports only and no USB-A port, so an adapter cannot be improvised at the moment it is needed.
-The moment it is needed is the stage-1 unlock prompt: if the internal SPI keyboard does not bind on a given boot, the external keyboard is the only way to answer it, and until it is answered the machine has no reachable state at all — no network, no shell, and no initrd ssh, since `boot.initrd.network.enable` is forced false.
+The moment it is needed is the stage-1 unlock prompt: if the internal SPI keyboard does not bind on a given boot, the external keyboard is the only way to answer it, and until it is answered the machine has no reachable state at all — no network, no shell, and no initrd ssh, since `boot.initrd.network.enable` is false: pyrite imports no initrd-networking module, and its host module asserts the option stays off.
 How long that prompt waits before giving up is not established: the `boot.zfs.passwordTimeout = 0` unbounded wait belonged to the ZFS-native design and does not carry over to `systemd-cryptsetup`, whose query timeout under this configuration was not verified (D1's design records the same non-claim).
 The gate does not rest on the answer, and it holds harder if the wait turns out to be bounded rather than infinite.
 Confirm the keyboard or adapter is on hand before booting the installer, not after a prompt goes unanswered.

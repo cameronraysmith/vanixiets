@@ -42,9 +42,8 @@
         assert lib.assertMsg (
           !(lib.any (name: lib.elem (normalize name) names) cfg.boot.blacklistedKernelModules)
         ) "pyrite Wi-Fi: a blacklist blocks brcmfmac, a vendor sub-module or brcmutil";
-        assert lib.assertMsg (
-          !(lib.any (name: lib.elem (normalize name) names) stage1)
-        ) "pyrite Wi-Fi: brcmfmac must stay out of stage 1 (see boot.initrd.network.enable in pyrite)";
+        assert lib.assertMsg (!(lib.any (name: lib.elem (normalize name) names) stage1))
+          "pyrite Wi-Fi: brcmfmac must stay out of stage 1, where its per-vendor sub-module cannot load and the failed attach unbinds the BCM4350, so the machine boots with no network device; boot.initrd.network.enable brings it in through nixpkgs' hardware/facter/networking/initrd.nix";
         pkgs.runCommand "pyrite-wifi" { nativeBuildInputs = [ pkgs.kmod ]; } ''
           set -euo pipefail
           export LC_ALL=C

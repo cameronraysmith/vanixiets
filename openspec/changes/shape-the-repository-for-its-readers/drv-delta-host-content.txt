@@ -1,0 +1,28 @@
+# Declared drvPath differences of the step that imports initrd-networking,
+# r2-usage and postgresql-backup only where they are used, from its parent to
+# its commit:
+#   just drv-diff <parent> <commit> openspec/changes/shape-the-repository-for-its-readers/drv-delta-host-content.txt
+# initrd-networking (renamed from base-initrd-networking) leaves the NixOS
+# base list and is imported by nixos.hetzner-cloud and nixos.gcp-cloud;
+# r2-usage and postgresql-backup leave the list and are imported by magnetite;
+# each pins its own ExecStartPost command with lib.mkAfter, after
+# observability-notify's resolve hook, so the order no longer follows imports.
+# Pyrite's lib.mkForce false on boot.initrd.network.enable is replaced by an
+# assertion that the option is false: without the part it is false by default,
+# and pyrite's toplevel is the same with either. Before and after
+# (logs/srr-6bc-drvs2-parent-20261127-234734.json,
+# logs/srr-6bc-checks2-parent-20261127-234734.json,
+# logs/srr-6bc-drvs4-commit-20261128-001128.json,
+# logs/srr-6bc-checks4-commit-20261128-001128.json): magnetite, cinnabar,
+# electrum, galena and scheelite, the four darwin toplevels, every home and
+# every vmTest are identical; magnetite's stays identical with the two modules
+# first or last in its import list. drv-order-trace.py
+# (logs/srr-6bc-trace2-20261127-234734.log) follows pyrite to two leaves:
+# initrd-nixos.conf and the shrunk module tree's rootModules, each without
+# virtio_net and virtio_pci and otherwise equal. No option documentation is
+# built on any host. The base allow-list covers gitleaks, treefmt and
+# ntfy-tls-verification.
+
+nixos.pyrite  changed  # initrd: virtio_net and virtio_pci leave initrd-nixos.conf and the shrunk module tree's rootModules
+checks.x86_64-linux.nixos-pyrite  changed  # embeds nixos.pyrite's toplevel
+checks.x86_64-linux.pyrite-wifi  changed  # searches pyrite's initrd module closure, whose shrunk module tree lost virtio_net and virtio_pci

@@ -428,7 +428,7 @@ Its finding on stale documents (ADR-0018/0019/0020, the READMEs and this documen
 - Locations: the `10-uplink` network and ZFS `devNodes` in cinnabar, electrum, galena, scheelite and magnetite; `MaxAuthTries` in six NixOS hosts against `modules/darwin/base-essentials.nix`.
 - Why this matters: P1 — a shared host shape restated per host.
 - Approach: a Hetzner cloud-server aspect for cinnabar, electrum and magnetite and a separate GCP cloud-server aspect for galena and scheelite; `MaxAuthTries` moves into `nixos.base`; pyrite, which uses `by-id`, is excluded.
-- Status: resolved by compose-hosts-from-cohesive-aspects (pull request 4453). `modules/nixos/hetzner-cloud.nix` (imported by cinnabar, electrum and magnetite) and `modules/nixos/gcp-cloud.nix` (galena and scheelite) hold the ZFS device nodes and the `10-uplink` network, and each asserts the host's `flake.fleet.hosts.<host>.cloud.provider`; `MaxAuthTries = 20` is in `nixos.base` (`modules/system/sshd-max-auth-tries.nix`).
+- Status: resolved by compose-hosts-from-cohesive-aspects (pull request 4453). `modules/nixos/hetzner-cloud.nix` (imported by cinnabar, electrum and magnetite) and `modules/nixos/gcp-cloud.nix` (galena and scheelite) hold the ZFS device nodes and the `10-uplink` network, import `initrd-networking` (remote unlock over initrd SSH, `modules/system/initrd-networking.nix`), which pyrite therefore does not receive, and each asserts the host's `flake.fleet.hosts.<host>.cloud.provider`; `MaxAuthTries = 20` is in `nixos.base` (`modules/system/sshd-max-auth-tries.nix`).
 
 ### O29 [P3] [LOW] Host literal in a user module
 

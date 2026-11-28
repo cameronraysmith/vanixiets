@@ -32,7 +32,8 @@
 # checks.x86_64-linux.r2-usage judges the judge over literal fixtures, and
 # runs the poller's formatting against a recorded response.
 #
-# Imported by every NixOS base.
+# Imported by the host that enables it (machines/nixos/magnetite); the judge
+# reads every other host's vanixiets.r2Usage.enable with `or false`.
 { config, lib, ... }:
 let
   schema = config.flake.lib.otelCollectorSchema;
@@ -332,7 +333,9 @@ let
               serviceConfig = hardening // {
                 Type = "oneshot";
                 ExecStart = "${lib.getExe (poller pkgs)} ${configFile} %d/token ${record}";
-                ExecStartPost = [ "${publish}" ];
+                # After observability-notify's resolve hook: the resolve notice is
+                # sent first, so a failed publish reaches OnFailure after it.
+                ExecStartPost = lib.mkAfter [ "${publish}" ];
                 LoadCredential = [ "token:${config.vanixiets.secrets.${generator}.files.token.path}" ];
                 MemoryMax = "128M";
               };

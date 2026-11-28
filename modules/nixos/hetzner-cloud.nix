@@ -1,11 +1,11 @@
 # The shape a Hetzner Cloud server takes, declared once for every host on
 # that provider: srvos's hardware module (cloud-init, the QEMU guest
 # profile, growPartition, GRUB devices at mkDefault, networkd with DHCP off),
-# the boot loader its server type gives, ZFS device nodes by path, and the
-# primary uplink. A host imports the aspect of the provider it runs on
-# (modules/nixos/gcp-cloud.nix is the other); the assertion holds that choice
-# to the registry's flake.fleet.hosts.<host>.cloud.provider, so the two cannot
-# disagree.
+# the boot loader its server type gives, remote unlock over initrd SSH, ZFS
+# device nodes by path, and the primary uplink. A host imports the aspect of
+# the provider it runs on (modules/nixos/gcp-cloud.nix is the other); the
+# assertion holds that choice to the registry's
+# flake.fleet.hosts.<host>.cloud.provider, so the two cannot disagree.
 {
   config,
   inputs,
@@ -14,6 +14,7 @@
 }:
 let
   inherit (config.flake.lib) hosts;
+  inherit (config.flake.modules.nixos) initrd-networking;
   provider = "hetzner";
 
   # Dedicated (ccx) and ARM (cax) types boot native UEFI; shared-vCPU (cx)
@@ -90,7 +91,10 @@ in
       cloud = hosts.${hostName}.cloud or null;
     in
     {
-      imports = [ inputs.srvos.nixosModules.hardware-hetzner-cloud ];
+      imports = [
+        inputs.srvos.nixosModules.hardware-hetzner-cloud
+        initrd-networking
+      ];
 
       assertions = [
         {

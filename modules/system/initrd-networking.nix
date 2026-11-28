@@ -1,5 +1,8 @@
+# Remote unlock of a cloud VM's encrypted root over SSH in the initrd, imported
+# by the provider aspects modules/nixos/hetzner-cloud.nix and
+# modules/nixos/gcp-cloud.nix.
 {
-  flake.modules.nixos.base-initrd-networking =
+  flake.modules.nixos.initrd-networking =
     { config, pkgs, ... }:
     {
       # The initrd SSH host key

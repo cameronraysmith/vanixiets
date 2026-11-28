@@ -63,6 +63,8 @@ in
         effects-vanixiets-secrets
         effects-ironstar-secrets
         shared-reference-tree
+        postgresql-backup
+        r2-usage
         perses-server
         fleet-alert-server
         omnigraph-server

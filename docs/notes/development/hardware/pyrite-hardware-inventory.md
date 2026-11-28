@@ -92,7 +92,7 @@ The internal keyboard and trackpad are SPI-attached and driven by mainline `appl
 The observed module set is `applespi`, `spi_pxa2xx_platform`, `spi_pxa2xx_core`, `intel_lpss_pci`, `intel_lpss`, and `applesmc`.
 
 The consequence is that a passphrase prompt on the internal keyboard at stage-1 initrd is viable, provided the initrd module set includes those modules.
-It is not free: the fleet's shared base module supplies only `virtio_pci` and `virtio_net` to initrd, so pyrite must carry the SPI modules itself or import a profile that does.
+It is not free: no module the fleet shares supplies initrd modules to pyrite, so pyrite must carry the SPI modules itself or import a profile that does.
 
 ## Power, thermal, and peripherals
 

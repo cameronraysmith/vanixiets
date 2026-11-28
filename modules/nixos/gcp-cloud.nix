@@ -1,13 +1,14 @@
 # The shape a Google Compute Engine server takes, declared once for every
-# host on that provider: ZFS device nodes by path and the primary uplink,
-# matching both interface namings GCE images use. It imports no srvos
-# hardware module (srvos's is Hetzner's). A host imports the aspect of the
-# provider it runs on (modules/nixos/hetzner-cloud.nix is the other); the
-# assertion holds that choice to the registry's
+# host on that provider: remote unlock over initrd SSH, ZFS device nodes by
+# path and the primary uplink, matching both interface namings GCE images
+# use. It imports no srvos hardware module (srvos's is Hetzner's). A host
+# imports the aspect of the provider it runs on (modules/nixos/hetzner-cloud.nix
+# is the other); the assertion holds that choice to the registry's
 # flake.fleet.hosts.<host>.cloud.provider, so the two cannot disagree.
 { config, ... }:
 let
   inherit (config.flake.lib) hosts;
+  inherit (config.flake.modules.nixos) initrd-networking;
   provider = "gcp";
 in
 {
@@ -18,6 +19,8 @@ in
       cloud = hosts.${hostName}.cloud or null;
     in
     {
+      imports = [ initrd-networking ];
+
       assertions = [
         {
           assertion = cloud != null && cloud.provider == provider;
